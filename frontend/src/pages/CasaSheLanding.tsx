@@ -3,15 +3,20 @@ import { useEffect, useState } from "react";
 
 /**
  * Landing público de Casa Shé — réplica fiel de https://casashe.mx/
- * Estética editorial: crema #FEF7E6 + café #402B1C, display Cormorant Garamond + cuerpo Baskervville.
+ * Marca oficial: verde #274A2A + crema #FEF7E6, display Cormorant Garamond + cuerpo Baskervville.
+ * Usa el logo/monograma oficiales (public/casashe/logo-*) en vez de texto.
  * CTAs conectados al registro/checkout real del sistema.
  */
 
 const CREAM = "#FEF7E6";
-const BROWN = "#402B1C";
+const GREEN = "#274A2A"; // verde de marca (tomado del logo oficial)
+const DEEP = "#1C3320"; // verde profundo para secciones/overlays oscuros
 
-const display = "font-['Cormorant_Garamond']";
+const LOGO = "/casashe/logo-wordmark.png";
+const LOGO_CREAM = "/casashe/logo-wordmark-cream.png";
+
 const body = "font-['Baskervville']";
+const display = "font-['Cormorant_Garamond']";
 
 type Card = {
   title: string;
@@ -75,16 +80,12 @@ function Navbar() {
       className="fixed inset-x-0 top-0 z-50 transition-all duration-300"
       style={{
         backgroundColor: scrolled ? CREAM : "transparent",
-        boxShadow: scrolled ? "0 1px 0 rgba(64,43,28,0.10)" : "none",
+        boxShadow: scrolled ? "0 1px 0 rgba(39,74,42,0.12)" : "none",
       }}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <a
-          href="#inicio"
-          className={`${display} text-2xl tracking-[0.35em] transition-colors`}
-          style={{ color: scrolled ? BROWN : CREAM }}
-        >
-          CASA&nbsp;SHÉ
+        <a href="#inicio" aria-label="Casa Shé — inicio">
+          <img src={scrolled ? LOGO : LOGO_CREAM} alt="Casa Shé" className="h-7 w-auto md:h-8" />
         </a>
         <nav className={`${body} hidden items-center gap-8 text-[13px] uppercase tracking-[0.18em] md:flex`}>
           {NAV.map((n) => (
@@ -92,7 +93,7 @@ function Navbar() {
               key={n.href}
               href={n.href}
               className="transition-opacity hover:opacity-60"
-              style={{ color: scrolled ? BROWN : CREAM }}
+              style={{ color: scrolled ? GREEN : CREAM }}
             >
               {n.label}
             </a>
@@ -100,10 +101,7 @@ function Navbar() {
           <Link
             to="/login"
             className="rounded-full border px-5 py-2 text-[12px] tracking-[0.2em] transition-colors"
-            style={{
-              borderColor: scrolled ? BROWN : CREAM,
-              color: scrolled ? BROWN : CREAM,
-            }}
+            style={{ borderColor: scrolled ? GREEN : CREAM, color: scrolled ? GREEN : CREAM }}
           >
             ENTRAR
           </Link>
@@ -111,7 +109,7 @@ function Navbar() {
         <Link
           to="/login"
           className={`${body} text-[12px] uppercase tracking-[0.2em] md:hidden`}
-          style={{ color: scrolled ? BROWN : CREAM }}
+          style={{ color: scrolled ? GREEN : CREAM }}
         >
           Entrar
         </Link>
@@ -128,13 +126,16 @@ function Hero() {
         alt="Interior de Casa Shé — estudio en la Condesa"
         className="absolute inset-0 h-full w-full object-cover"
       />
-      <div className="absolute inset-0" style={{ backgroundColor: "rgba(64,43,28,0.55)" }} />
+      <div className="absolute inset-0" style={{ backgroundColor: "rgba(28,51,32,0.55)" }} />
       <div className="relative z-10 px-6 text-center" style={{ color: CREAM }}>
-        <p className={`${body} mb-6 text-[13px] uppercase tracking-[0.5em]`}>Wellness Hub</p>
-        <h1 className={`${display} text-[clamp(4.5rem,16vw,11rem)] font-light leading-[0.9] tracking-[0.04em]`}>
-          CASA SHÉ
-        </h1>
-        <p className={`${body} mx-auto mt-6 max-w-xl text-base tracking-[0.12em] sm:text-lg`}>
+        <h1 className="sr-only">Casa Shé</h1>
+        <p className={`${body} mb-7 text-[13px] uppercase tracking-[0.5em]`}>Wellness Hub</p>
+        <img
+          src={LOGO_CREAM}
+          alt="Casa Shé"
+          className="mx-auto w-[min(82vw,620px)]"
+        />
+        <p className={`${body} mx-auto mt-8 max-w-xl text-base tracking-[0.12em] sm:text-lg`}>
           Pilates · Nutrición · Community · Talleres · Salsa
         </p>
         <p className={`${body} mt-2 text-sm tracking-[0.18em] opacity-80`}>
@@ -143,7 +144,7 @@ function Hero() {
         <a
           href="#paquetes"
           className={`${body} mt-10 inline-block rounded-full px-9 py-3.5 text-[13px] uppercase tracking-[0.28em] transition-all hover:scale-[1.03]`}
-          style={{ backgroundColor: CREAM, color: BROWN }}
+          style={{ backgroundColor: CREAM, color: GREEN }}
         >
           Descubre nuestros paquetes
         </a>
@@ -157,10 +158,10 @@ function Paquetes() {
     <section id="paquetes" className="px-6 py-24" style={{ backgroundColor: CREAM }}>
       <div className="mx-auto max-w-6xl">
         <div className="mb-14 text-center">
-          <p className={`${body} text-[13px] uppercase tracking-[0.4em]`} style={{ color: BROWN, opacity: 0.6 }}>
+          <p className={`${body} text-[13px] uppercase tracking-[0.4em]`} style={{ color: GREEN, opacity: 0.6 }}>
             Elige tu camino
           </p>
-          <h2 className={`${display} mt-3 text-5xl font-light tracking-wide`} style={{ color: BROWN }}>
+          <h2 className={`${display} mt-3 text-5xl font-light tracking-wide`} style={{ color: GREEN }}>
             Nuestros Paquetes
           </h2>
         </div>
@@ -169,7 +170,7 @@ function Paquetes() {
             <article
               key={c.title}
               className="group flex flex-col overflow-hidden rounded-2xl bg-white/60 ring-1 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
-              style={{ borderColor: "rgba(64,43,28,0.10)", boxShadow: "0 1px 0 rgba(64,43,28,0.06)" }}
+              style={{ borderColor: "rgba(39,74,42,0.10)", boxShadow: "0 1px 0 rgba(39,74,42,0.06)" }}
             >
               <div className="relative aspect-square overflow-hidden">
                 <img
@@ -180,33 +181,33 @@ function Paquetes() {
                 {c.oferta && (
                   <span
                     className={`${body} absolute left-4 top-4 rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.2em]`}
-                    style={{ backgroundColor: BROWN, color: CREAM }}
+                    style={{ backgroundColor: GREEN, color: CREAM }}
                   >
                     Oferta
                   </span>
                 )}
               </div>
               <div className="flex flex-1 flex-col items-center px-6 py-7 text-center">
-                <h3 className={`${body} text-lg uppercase tracking-[0.14em]`} style={{ color: BROWN }}>
+                <h3 className={`${body} text-lg uppercase tracking-[0.14em]`} style={{ color: GREEN }}>
                   {c.title}
                 </h3>
-                <p className={`${body} mt-1 text-[13px] tracking-wide`} style={{ color: BROWN, opacity: 0.55 }}>
+                <p className={`${body} mt-1 text-[13px] tracking-wide`} style={{ color: GREEN, opacity: 0.55 }}>
                   {c.hint}
                 </p>
                 <div className={`${display} mt-4 flex items-baseline justify-center gap-2`}>
                   {c.was && (
-                    <span className="text-lg line-through" style={{ color: BROWN, opacity: 0.4 }}>
+                    <span className="text-lg line-through" style={{ color: GREEN, opacity: 0.4 }}>
                       {c.was}
                     </span>
                   )}
-                  <span className="text-4xl font-medium" style={{ color: BROWN }}>
+                  <span className="text-4xl font-medium" style={{ color: GREEN }}>
                     {c.price}
                   </span>
                 </div>
                 <Link
                   to="/register"
                   className={`${body} mt-6 w-full rounded-full py-3 text-[12px] uppercase tracking-[0.24em] transition-colors`}
-                  style={{ backgroundColor: BROWN, color: CREAM }}
+                  style={{ backgroundColor: GREEN, color: CREAM }}
                 >
                   Comprar
                 </Link>
@@ -221,16 +222,16 @@ function Paquetes() {
 
 function Servicios() {
   return (
-    <section id="servicios" className="px-6 py-24" style={{ backgroundColor: "#F6EFDD" }}>
+    <section id="servicios" className="px-6 py-24" style={{ backgroundColor: "#F6EFDB" }}>
       <div className="mx-auto max-w-6xl">
         <div className="mb-20 text-center">
-          <p className={`${body} text-[13px] uppercase tracking-[0.4em]`} style={{ color: BROWN, opacity: 0.6 }}>
+          <p className={`${body} text-[13px] uppercase tracking-[0.4em]`} style={{ color: GREEN, opacity: 0.6 }}>
             Nuestros Servicios
           </p>
-          <h2 className={`${display} mt-3 text-6xl font-light tracking-wide`} style={{ color: BROWN }}>
+          <h2 className={`${display} mt-3 text-6xl font-light tracking-wide`} style={{ color: GREEN }}>
             Una experiencia 360°
           </h2>
-          <p className={`${body} mt-4 text-base tracking-[0.18em]`} style={{ color: BROWN, opacity: 0.7 }}>
+          <p className={`${body} mt-4 text-base tracking-[0.18em]`} style={{ color: GREEN, opacity: 0.7 }}>
             Pilates Mat · Yoga · Aeroyoga · Telas
           </p>
         </div>
@@ -245,13 +246,13 @@ function Servicios() {
                 <img src={p.img} alt={p.title} className="aspect-[4/3] w-full object-cover" />
               </figure>
               <div className={i % 2 === 1 ? "md:pr-10" : "md:pl-10"}>
-                <p className={`${body} text-[12px] uppercase tracking-[0.3em]`} style={{ color: BROWN, opacity: 0.55 }}>
+                <p className={`${body} text-[12px] uppercase tracking-[0.3em]`} style={{ color: GREEN, opacity: 0.55 }}>
                   {p.eyebrow}
                 </p>
-                <h3 className={`${display} mt-2 text-5xl font-light`} style={{ color: BROWN }}>
+                <h3 className={`${display} mt-2 text-5xl font-light`} style={{ color: GREEN }}>
                   {p.title}
                 </h3>
-                <p className={`${body} mt-5 text-lg leading-relaxed`} style={{ color: BROWN, opacity: 0.82 }}>
+                <p className={`${body} mt-5 text-lg leading-relaxed`} style={{ color: GREEN, opacity: 0.82 }}>
                   {p.text}
                 </p>
               </div>
@@ -267,7 +268,7 @@ function FuelBar() {
   return (
     <section id="bar" className="relative overflow-hidden">
       <img src="/casashe/fuelbar.jpg" alt="Fuel Bar de Casa Shé" className="absolute inset-0 h-full w-full object-cover" />
-      <div className="absolute inset-0" style={{ backgroundColor: "rgba(64,43,28,0.62)" }} />
+      <div className="absolute inset-0" style={{ backgroundColor: "rgba(28,51,32,0.64)" }} />
       <div className="relative z-10 mx-auto max-w-3xl px-6 py-32 text-center" style={{ color: CREAM }}>
         <p className={`${body} text-[12px] uppercase tracking-[0.4em]`} style={{ opacity: 0.8 }}>
           Fuel Bar
@@ -286,13 +287,14 @@ function Nosotras() {
   return (
     <section id="nosotras" className="px-6 py-28 text-center" style={{ backgroundColor: CREAM }}>
       <div className="mx-auto max-w-3xl">
-        <p className={`${body} text-[13px] uppercase tracking-[0.4em]`} style={{ color: BROWN, opacity: 0.6 }}>
+        <img src="/casashe/logo-monogram.png" alt="" aria-hidden className="mx-auto mb-8 h-12 w-auto opacity-90" />
+        <p className={`${body} text-[13px] uppercase tracking-[0.4em]`} style={{ color: GREEN, opacity: 0.6 }}>
           Nosotras
         </p>
-        <h2 className={`${display} mt-4 text-4xl font-light leading-snug sm:text-5xl`} style={{ color: BROWN }}>
+        <h2 className={`${display} mt-4 text-4xl font-light leading-snug sm:text-5xl`} style={{ color: GREEN }}>
           Un hub de bienestar para mujeres, en el corazón de la Condesa.
         </h2>
-        <p className={`${body} mx-auto mt-6 max-w-2xl text-lg leading-relaxed`} style={{ color: BROWN, opacity: 0.8 }}>
+        <p className={`${body} mx-auto mt-6 max-w-2xl text-lg leading-relaxed`} style={{ color: GREEN, opacity: 0.8 }}>
           Casa Shé es comunidad, movimiento y cuidado. Grupos pequeños, atención cercana y un espacio para que cada
           mujer encuentre lo que su cuerpo necesita. La comunidad es la medicina.
         </p>
@@ -303,16 +305,16 @@ function Nosotras() {
 
 function Footer() {
   return (
-    <footer id="contacto" style={{ backgroundColor: BROWN, color: CREAM }}>
+    <footer id="contacto" style={{ backgroundColor: DEEP, color: CREAM }}>
       <div className="px-6 py-24 text-center">
-        <h2 className={`${display} text-7xl font-light tracking-[0.06em]`}>CASA SHÉ</h2>
-        <p className={`${body} mt-2 text-sm uppercase tracking-[0.4em]`} style={{ opacity: 0.7 }}>
+        <img src={LOGO_CREAM} alt="Casa Shé" className="mx-auto w-[min(70vw,420px)]" />
+        <p className={`${body} mt-4 text-sm uppercase tracking-[0.4em]`} style={{ opacity: 0.7 }}>
           Wellness Hub
         </p>
         <Link
           to="/register"
           className={`${body} mt-9 inline-block rounded-full px-9 py-3.5 text-[13px] uppercase tracking-[0.28em] transition-all hover:scale-[1.03]`}
-          style={{ backgroundColor: CREAM, color: BROWN }}
+          style={{ backgroundColor: CREAM, color: GREEN }}
         >
           Reserva tu lugar
         </Link>
@@ -329,7 +331,7 @@ function Footer() {
 
 export default function CasaSheLanding() {
   return (
-    <main className={`${body} min-h-screen`} style={{ backgroundColor: CREAM, color: BROWN }}>
+    <main className={`${body} min-h-screen`} style={{ backgroundColor: CREAM, color: GREEN }}>
       <Navbar />
       <Hero />
       <Paquetes />
