@@ -127,7 +127,7 @@ export function ProfilerWizard({ onDone }: { onDone: () => void }) {
   };
 
   const Option = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
-    <button type="button" onClick={onClick}
+    <button type="button" onClick={onClick} aria-pressed={active}
       className={`w-full rounded-xl border px-4 py-3 text-left text-sm transition ${active ? 'border-bmb-ink bg-bmb-ink text-white' : 'border-bmb-ink/15 bg-white hover:border-bmb-ink/40'}`}>
       {children}
     </button>
@@ -161,7 +161,7 @@ export function ProfilerWizard({ onDone }: { onDone: () => void }) {
           </p>
         )}
         <div className="mt-6 flex flex-col gap-2">
-          <Button onClick={() => { onDone(); navigate('/app/checkout'); }} className="w-full">Ver mi paquete</Button>
+          <Button onClick={() => { onDone(); navigate(rec.plan.plan_id ? `/app/checkout?plan=${rec.plan.plan_id}` : '/app/checkout'); }} className="w-full">Ver mi paquete</Button>
           <Button variant="ghost" onClick={() => { onDone(); navigate('/app'); }} className="w-full">Entrar a Casa Shé</Button>
         </div>
       </div>
@@ -189,7 +189,7 @@ export function ProfilerWizard({ onDone }: { onDone: () => void }) {
         {step === 'frequency' && FREQ.map((o) => <Option key={o.v} active={frequency === o.v} onClick={() => setFrequency(o.v)}>{o.label}</Option>)}
         {step === 'health' && (<>
           {HEALTH.map((o) => <Option key={o.v} active={health.includes(o.v)} onClick={() => toggleHealth(o.v)}>{o.label}</Option>)}
-          <textarea value={healthNote} onChange={(e) => setHealthNote(e.target.value)} placeholder="¿Algo más que debamos saber? (opcional)"
+          <textarea value={healthNote} onChange={(e) => setHealthNote(e.target.value)} placeholder="¿Algo más que debamos saber? (opcional)" maxLength={500}
             className="mt-2 w-full rounded-xl border border-bmb-ink/15 px-4 py-3 text-sm" rows={2} />
         </>)}
       </div>

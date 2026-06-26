@@ -128,6 +128,7 @@ const sidebarItems: SidebarItem[] = [
             { href: '/admin/settings/cancellations', label: 'Cancelaciones' },
             { href: '/admin/settings/notifications', label: 'Notificaciones' },
             { href: '/admin/settings/closed-days', label: 'Días cerrados' },
+            { href: '/admin/settings/onboarding', label: 'Perfilador' },
         ],
     },
 ];
