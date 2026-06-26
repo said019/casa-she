@@ -273,6 +273,7 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
                 u.receive_promotions, u.receive_weekly_summary, u.created_at, u.updated_at,
                 u.default_facility_id, u.is_reception_master, u.permissions, u.temp_password,
                 u.reglamento_accepted_at,
+                u.onboarding_completed_at, u.onboarding_required, u.onboarding_invite_dismissed_at,
                 f.name AS facility_name,
                 i.id as instructor_id, i.coach_number, i.bio as instructor_bio,
                 i.photo_url as instructor_photo

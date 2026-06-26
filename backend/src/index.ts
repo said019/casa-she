@@ -46,6 +46,7 @@ import cashShiftRoutes from './routes/cash-shifts.js';
 import egresosRoutes from './routes/egresos.js';
 import closedDaysRoutes from './routes/closed-days.js';
 import statsRoutes from './routes/stats.js';
+import onboardingRoutes from './routes/onboarding.js';
 import stripeWebhook from './routes/stripe-webhook.js';
 import { validateStripeConfig } from './lib/stripe.js';
 import { query, queryOne } from './config/database.js';
@@ -3472,6 +3473,7 @@ app.use('/api/coach-payroll', coachPayrollRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/reception', receptionDashboardRoutes);
+app.use('/api/onboarding', onboardingRoutes);
 
 // 404 handler
 app.use((req, res) => {
