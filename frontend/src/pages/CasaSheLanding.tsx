@@ -72,14 +72,28 @@ const NAV = [
 // Horario de muestra (se usa cuando aún no hay clases cargadas en el sistema).
 // Refleja las franjas reales: L–V 7–13 y 17–22, fines 8–13, talleres fin de semana.
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"] as const;
-const SAMPLE_WEEK: Record<string, { time: string; name: string }[]> = {
-  Lun: [{ time: "07:00", name: "Pilates Mat" }, { time: "09:00", name: "Yoga" }, { time: "19:00", name: "Pilates Mat" }],
-  Mar: [{ time: "07:00", name: "Aeroyoga" }, { time: "18:00", name: "Pilates Mat" }, { time: "19:00", name: "Telas" }],
-  Mié: [{ time: "08:00", name: "Yoga" }, { time: "10:00", name: "Pilates Mat" }, { time: "20:00", name: "Telas" }],
-  Jue: [{ time: "07:00", name: "Aeroyoga" }, { time: "18:00", name: "Pilates Mat" }, { time: "19:00", name: "Yoga" }],
-  Vie: [{ time: "07:00", name: "Pilates Mat" }, { time: "09:00", name: "Yoga" }, { time: "20:00", name: "Telas" }],
-  Sáb: [{ time: "09:00", name: "Yoga" }, { time: "10:00", name: "Aeroyoga" }, { time: "14:00", name: "Taller" }],
-  Dom: [{ time: "10:00", name: "Pilates Mat" }, { time: "11:00", name: "Taller" }],
+
+// Meta por disciplina — color de la paleta secundaria del brand book
+// (Verde Casa, Musgo, Arcilla, Ciruela, Arena), duración y cupo reales del catálogo.
+const DISCIPLINE_META: Record<string, { color: string; dur: number; cupo: number }> = {
+  "Pilates Mat": { color: "#2E5D3F", dur: 50, cupo: 7 }, // Verde Casa
+  Yoga: { color: "#7C8A5E", dur: 60, cupo: 7 }, // Musgo
+  Aeroyoga: { color: "#B0805F", dur: 60, cupo: 6 }, // Arcilla
+  Telas: { color: "#7A4F57", dur: 60, cupo: 6 }, // Ciruela
+  Taller: { color: "#C0A06A", dur: 90, cupo: 7 }, // Arena
+};
+const metaFor = (name: string) => DISCIPLINE_META[name] ?? { color: GREEN, dur: 60, cupo: 7 };
+
+type ClassSlot = { time: string; name: string; coach?: string };
+
+const SAMPLE_WEEK: Record<string, ClassSlot[]> = {
+  Lun: [{ time: "07:00", name: "Pilates Mat", coach: "Renata" }, { time: "09:00", name: "Yoga", coach: "Sofía" }, { time: "19:00", name: "Pilates Mat", coach: "Camila" }],
+  Mar: [{ time: "07:00", name: "Aeroyoga", coach: "Valentina" }, { time: "18:00", name: "Pilates Mat", coach: "Renata" }, { time: "19:00", name: "Telas", coach: "Daniela" }],
+  Mié: [{ time: "08:00", name: "Yoga", coach: "Sofía" }, { time: "10:00", name: "Pilates Mat", coach: "Camila" }, { time: "20:00", name: "Telas", coach: "Daniela" }],
+  Jue: [{ time: "07:00", name: "Aeroyoga", coach: "Valentina" }, { time: "18:00", name: "Pilates Mat", coach: "Renata" }, { time: "19:00", name: "Yoga", coach: "Mariana" }],
+  Vie: [{ time: "07:00", name: "Pilates Mat", coach: "Camila" }, { time: "09:00", name: "Yoga", coach: "Sofía" }, { time: "20:00", name: "Telas", coach: "Daniela" }],
+  Sáb: [{ time: "09:00", name: "Yoga", coach: "Mariana" }, { time: "10:00", name: "Aeroyoga", coach: "Valentina" }, { time: "14:00", name: "Taller", coach: "Andrea" }],
+  Dom: [{ time: "10:00", name: "Pilates Mat", coach: "Renata" }, { time: "11:00", name: "Taller", coach: "Andrea" }],
 };
 
 interface ApiClass {
@@ -90,7 +104,7 @@ interface ApiClass {
 }
 
 function useWeekSchedule() {
-  return useQuery<Record<string, { time: string; name: string; coach?: string }[]> | null>({
+  return useQuery<Record<string, ClassSlot[]> | null>({
     queryKey: ["landing-horario"],
     queryFn: async () => {
       // Semana en curso (lun–dom) calculada en cliente.
@@ -103,7 +117,7 @@ function useWeekSchedule() {
       const fmt = (d: Date) => d.toISOString().slice(0, 10);
       const { data } = await api.get<ApiClass[]>(`/classes?start=${fmt(monday)}&end=${fmt(sunday)}`);
       if (!Array.isArray(data) || data.length === 0) return null; // sin datos → usar muestra
-      const grouped: Record<string, { time: string; name: string; coach?: string }[]> = {};
+      const grouped: Record<string, ClassSlot[]> = {};
       for (const c of data) {
         const dt = new Date(c.start_time);
         const key = DAYS[(dt.getDay() + 6) % 7];
@@ -119,6 +133,21 @@ function useWeekSchedule() {
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
+}
+
+function currentWeekLabel(): { range: string; todayIdx: number } {
+  try {
+    const now = new Date();
+    const todayIdx = (now.getDay() + 6) % 7; // 0 = lunes
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - todayIdx);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const d = (x: Date) => x.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
+    return { range: `Semana del ${d(monday)} al ${d(sunday)}`, todayIdx };
+  } catch {
+    return { range: "", todayIdx: -1 };
+  }
 }
 
 function Navbar() {
@@ -319,51 +348,99 @@ function Servicios() {
   );
 }
 
+function ClassChip({ c }: { c: ClassSlot }) {
+  const m = metaFor(c.name);
+  return (
+    <Link
+      to="/register"
+      className="group block rounded-xl p-3 text-left transition-all hover:-translate-y-0.5"
+      style={{ backgroundColor: CREAM, boxShadow: `inset 0 0 0 1px rgba(39,74,42,0.10)`, borderLeft: `3px solid ${m.color}` }}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <span className={`${display} text-xl leading-none`} style={{ color: GREEN }}>{c.time}</span>
+        <span className={`${body} text-[10px] uppercase tracking-[0.12em]`} style={{ color: GREEN, opacity: 0.45 }}>
+          {m.dur}′
+        </span>
+      </div>
+      <p className={`${body} mt-1.5 flex items-center gap-1.5 text-[13px] font-medium leading-tight`} style={{ color: GREEN }}>
+        <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: m.color }} />
+        {c.name}
+      </p>
+      {c.coach && (
+        <p className={`${body} mt-0.5 text-[11px] leading-tight`} style={{ color: GREEN, opacity: 0.55 }}>
+          con {c.coach}
+        </p>
+      )}
+      <p className={`${body} mt-1 text-[10px] uppercase tracking-[0.1em]`} style={{ color: m.color, opacity: 0.85 }}>
+        {m.cupo} lugares
+      </p>
+    </Link>
+  );
+}
+
 function Horario() {
   const { data } = useWeekSchedule();
   const isSample = !data;
   const week = data ?? SAMPLE_WEEK;
+  const { range, todayIdx } = currentWeekLabel();
+  const totalClases = DAYS.reduce((n, d) => n + (week[d]?.length ?? 0), 0);
 
   return (
     <section id="horario" className="px-6 py-24" style={{ backgroundColor: CREAM }}>
       <div className="mx-auto max-w-6xl">
-        <div className="mb-12 text-center">
+        <div className="mb-8 text-center">
           <p className={`${body} text-[13px] uppercase tracking-[0.4em]`} style={{ color: GREEN, opacity: 0.6 }}>
             Horario
           </p>
           <h2 className={`${display} mt-3 text-5xl font-light tracking-wide sm:text-6xl`} style={{ color: GREEN }}>
             Nuestra semana
           </h2>
-          <p className={`${body} mt-4 text-base tracking-[0.12em]`} style={{ color: GREEN, opacity: 0.7 }}>
-            Clases en grupos pequeños · 6–7 lugares por sesión
-          </p>
+          {range && (
+            <p className={`${body} mt-3 text-[13px] uppercase tracking-[0.22em]`} style={{ color: GREEN, opacity: 0.55 }}>
+              {range} · {totalClases} clases
+            </p>
+          )}
         </div>
 
-        <div className="flex snap-x gap-4 overflow-x-auto pb-3 lg:grid lg:grid-cols-7 lg:gap-3 lg:overflow-visible">
-          {DAYS.map((d) => {
+        {/* Leyenda de disciplinas */}
+        <div className="mb-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          {Object.entries(DISCIPLINE_META).map(([name, m]) => (
+            <span key={name} className={`${body} flex items-center gap-2 text-[12px] tracking-wide`} style={{ color: GREEN, opacity: 0.8 }}>
+              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: m.color }} />
+              {name}
+            </span>
+          ))}
+        </div>
+
+        <div className="flex snap-x gap-3 overflow-x-auto pb-3 lg:grid lg:grid-cols-7 lg:overflow-visible">
+          {DAYS.map((d, idx) => {
             const classes = week[d] ?? [];
+            const isToday = idx === todayIdx;
             return (
               <div
                 key={d}
-                className="min-w-[150px] flex-1 snap-start rounded-2xl p-4"
-                style={{ backgroundColor: "rgba(255,255,255,0.55)", boxShadow: "inset 0 0 0 1px rgba(39,74,42,0.10)" }}
+                className="min-w-[168px] flex-1 snap-start rounded-2xl p-3"
+                style={{
+                  backgroundColor: isToday ? "rgba(46,93,63,0.07)" : "rgba(255,255,255,0.55)",
+                  boxShadow: `inset 0 0 0 1px ${isToday ? "rgba(46,93,63,0.35)" : "rgba(39,74,42,0.10)"}`,
+                }}
               >
-                <p className={`${body} mb-3 text-center text-[12px] uppercase tracking-[0.28em]`} style={{ color: GREEN, opacity: 0.7 }}>
-                  {d}
-                </p>
+                <div className="mb-3 flex items-center justify-center gap-2">
+                  <p className={`${body} text-[12px] uppercase tracking-[0.26em]`} style={{ color: GREEN, opacity: isToday ? 1 : 0.7 }}>
+                    {d}
+                  </p>
+                  {isToday && (
+                    <span className={`${body} rounded-full px-2 py-0.5 text-[9px] uppercase tracking-[0.14em]`} style={{ backgroundColor: GREEN, color: CREAM }}>
+                      Hoy
+                    </span>
+                  )}
+                </div>
                 <div className="space-y-2">
                   {classes.length === 0 && (
-                    <p className={`${body} py-4 text-center text-sm`} style={{ color: GREEN, opacity: 0.3 }}>—</p>
+                    <p className={`${body} py-6 text-center text-sm`} style={{ color: GREEN, opacity: 0.28 }}>Descanso</p>
                   )}
                   {classes.map((c, i) => (
-                    <div
-                      key={i}
-                      className="rounded-xl px-3 py-2.5 text-center transition-colors"
-                      style={{ backgroundColor: CREAM, boxShadow: "inset 0 0 0 1px rgba(39,74,42,0.08)" }}
-                    >
-                      <p className={`${display} text-lg leading-none`} style={{ color: GREEN }}>{c.time}</p>
-                      <p className={`${body} mt-1 text-[13px] leading-tight`} style={{ color: GREEN, opacity: 0.85 }}>{c.name}</p>
-                    </div>
+                    <ClassChip key={i} c={c} />
                   ))}
                 </div>
               </div>
