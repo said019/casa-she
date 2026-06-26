@@ -51,6 +51,7 @@ import { validateStripeConfig } from './lib/stripe.js';
 import { query, queryOne } from './config/database.js';
 import { buildScheduleRows } from './lib/schedule.js';
 import { PRESET_MASTER, PRESET_NORMAL } from './lib/permissions.js';
+import { DEFAULT_RULES as ONBOARDING_DEFAULT_RULES } from './lib/onboarding-recommend.js';
 import { SEED_INSTRUCTORS, SEED_CLASS_TYPES, FICHAS } from './data/bmb-schedules.js';
 import { PHONE_BACKFILL, DOB_BACKFILL } from './data/fitune-backfill.js';
 import { PHONE_BY_EMAIL, DOB_BY_EMAIL } from './data/fitune-contact-backfill.js';
@@ -3304,6 +3305,49 @@ async function runStartupMigrations(): Promise<void> {
         const r = await query(`UPDATE class_types SET name = 'Reformer Jumpboard', updated_at = NOW() WHERE name = 'Jumpboard' RETURNING 1`);
         if (r.length) console.log(`Migration 103: class_type Jumpboard → Reformer Jumpboard (${r.length}).`);
     } catch (e) { console.error('Migration 103 error:', e); }
+
+    // === Onboarding Perfilador (Fase 2) ===
+    try {
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed_at TIMESTAMPTZ`);
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_required BOOLEAN NOT NULL DEFAULT true`);
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_invite_dismissed_at TIMESTAMPTZ`);
+
+      await query(`CREATE TABLE IF NOT EXISTS onboarding_responses (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        answers JSONB NOT NULL,
+        recommended_disciplines JSONB NOT NULL,
+        recommended_experience JSONB,
+        recommended_plan_id UUID,
+        recommended_plan_name TEXT,
+        health_flags JSONB,
+        requires_clearance BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+
+      // Backfill UNA sola vez: clientas existentes quedan invitadas, no bloqueadas.
+      const backfilled = await queryOne<{ x: number }>(
+        `SELECT 1 AS x FROM system_settings WHERE key='onboarding_backfill_v1'`
+      );
+      if (!backfilled) {
+        await query(`UPDATE users SET onboarding_required = false WHERE created_at < NOW()`);
+        await query(
+          `INSERT INTO system_settings (key, value, description)
+           VALUES ('onboarding_backfill_v1', 'true'::jsonb, 'Marca: backfill de onboarding_required ejecutado')
+           ON CONFLICT (key) DO NOTHING`
+        );
+      }
+
+      // Seed de reglas (no sobreescribe ediciones del admin).
+      await query(
+        `INSERT INTO system_settings (key, value, description)
+         VALUES ('onboarding_recommendation_rules', $1::jsonb, 'Reglas del motor del onboarding perfilador (editables)')
+         ON CONFLICT (key) DO NOTHING`,
+        [JSON.stringify(ONBOARDING_DEFAULT_RULES)]
+      );
+      console.log('Onboarding Perfilador: columnas, tabla y reglas aseguradas.');
+    } catch (e) { console.error('Onboarding Perfilador migration error:', e); }
 
     // ===========================================================================
     // Casa Shé v1 — catálogo, reglas y branding del estudio (CONSOLIDADO).
