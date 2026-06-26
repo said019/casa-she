@@ -33,6 +33,10 @@ export interface User {
     temp_password?: boolean;
     // Reglamento del estudio: timestamp de aceptación (null = aún no acepta). Obligatorio antes de reservar.
     reglamento_accepted_at?: string | null;
+    // Onboarding perfilador (Fase 2)
+    onboarding_completed_at?: string | null;
+    onboarding_required?: boolean;
+    onboarding_invite_dismissed_at?: string | null;
 }
 
 // Plan interface
