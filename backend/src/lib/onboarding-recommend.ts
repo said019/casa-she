@@ -129,3 +129,67 @@ export function scoreDisciplines(
     .filter((s) => s.score !== EXCLUDED)
     .sort((x, y) => (y.score - x.score) || (order(x.name) - order(y.name)));
 }
+
+export interface OnboardingCatalog {
+  disciplines: Record<string, { id: string }>; // por nombre, incluye 'Taller'
+  plans: Record<string, { id: string; price: number }>; // por nombre
+}
+
+export interface RecommendedDiscipline {
+  class_type_id: string | null;
+  name: string;
+  score: number;
+  reason: string;
+}
+
+export interface Recommendation {
+  disciplines: RecommendedDiscipline[];
+  experience: { class_type_id: string | null; name: string } | null;
+  plan: { plan_id: string | null; name: string; price: number | null };
+  requires_clearance: boolean;
+  health_flags: { embarazo: boolean; lesion: boolean; condicion: boolean; note: string | null };
+}
+
+export function recommend(
+  answers: OnboardingAnswers,
+  rules: OnboardingRules,
+  catalog: OnboardingCatalog,
+): Recommendation {
+  const scored = scoreDisciplines(answers, rules);
+
+  // Selección 2–3: siempre top 2; la 3ª solo si score >= threshold * topScore (con top > 0).
+  const top = scored.slice(0, 2);
+  if (scored.length >= 3) {
+    const topScore = scored[0].score;
+    const third = scored[2];
+    if (topScore > 0 && third.score >= rules.thirdDisciplineThreshold * topScore) {
+      top.push(third);
+    }
+  }
+
+  const disciplines: RecommendedDiscipline[] = top.map((s) => ({
+    class_type_id: catalog.disciplines[s.name]?.id ?? null,
+    name: s.name,
+    score: s.score,
+    reason: rules.reasons[s.name as ScoredDiscipline] ?? '',
+  }));
+
+  const experience = catalog.disciplines['Taller']
+    ? { class_type_id: catalog.disciplines['Taller'].id, name: 'Taller' }
+    : null;
+
+  const planName = rules.planByFrequency[answers.frequency];
+  const planRow = catalog.plans[planName];
+  const plan = { plan_id: planRow?.id ?? null, name: planName, price: planRow?.price ?? null };
+
+  const health = new Set(answers.health);
+  const health_flags = {
+    embarazo: health.has('embarazo'),
+    lesion: health.has('lesion'),
+    condicion: health.has('condicion'),
+    note: answers.health_note?.trim() || null,
+  };
+  const requires_clearance = health_flags.embarazo || health_flags.lesion || health_flags.condicion;
+
+  return { disciplines, experience, plan, requires_clearance, health_flags };
+}
