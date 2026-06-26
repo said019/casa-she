@@ -785,9 +785,11 @@ async function runStartupMigrations(): Promise<void> {
               ('Reformer individual',1,0,250,7,true,52),('Multi individual',0,1,150,7,true,53),('Personalizada',1,0,550,7,true,54)
             ) AS v(name, reformer_credits, multi_credits, price, duration_days, is_active, sort_order)
             WHERE NOT EXISTS (SELECT 1 FROM plans p WHERE p.name = v.name)`);
-        await query(`INSERT INTO system_settings (key, value) VALUES ('cancellation_policy', '{"enabled": true, "min_hours": 12, "refund_credit_on_cancel": true, "cancellations_per_membership": 2}'::jsonb)
-            ON CONFLICT (key) DO UPDATE SET value = jsonb_set(system_settings.value, '{min_hours}', '12'::jsonb)`);
-        console.log('Migration 031: BMB facilities, class types, plans + 12h cancellation seeded.');
+        // Casa Shé: cancelación 5h. Sin forzar en cada arranque (el bloque consolidado del
+        // final fija el valor una sola vez; así la admin puede ajustarlo después desde la UI).
+        await query(`INSERT INTO system_settings (key, value) VALUES ('cancellation_policy', '{"enabled": true, "min_hours": 5, "refund_credit_on_cancel": true, "cancellations_per_membership": 999}'::jsonb)
+            ON CONFLICT (key) DO NOTHING`);
+        console.log('Migration 031: catálogo base + cancelación 5h sembrados.');
     } catch (e) { console.error('Migration 031 error:', e); }
 
     // Migration 032: POS (catálogo + ventas) + caja (turnos) + atribución
@@ -1847,7 +1849,7 @@ async function runStartupMigrations(): Promise<void> {
             ON CONFLICT (key) DO UPDATE SET value =
                 jsonb_build_object(
                     'enabled',                      COALESCE((system_settings.value->>'enabled')::boolean, true),
-                    'min_hours',                    COALESCE((system_settings.value->>'min_hours')::numeric, 4),
+                    'min_hours',                    COALESCE((system_settings.value->>'min_hours')::numeric, 5),
                     'refund_credit_on_cancel',      COALESCE((system_settings.value->>'refund_credit_on_cancel')::boolean, true),
                     'cancellations_per_membership', COALESCE((system_settings.value->>'cancellations_per_membership')::int, 2),
                     'late_cancel_message',          COALESCE(system_settings.value->>'late_cancel_message',
@@ -1895,7 +1897,7 @@ async function runStartupMigrations(): Promise<void> {
             BEGIN
                 -- Read full cancellation policy
                 SELECT value INTO v_policy FROM system_settings WHERE key = 'cancellation_policy';
-                v_min_hours      := COALESCE((v_policy->>'min_hours')::numeric, 4);
+                v_min_hours      := COALESCE((v_policy->>'min_hours')::numeric, 5);
                 v_enabled        := COALESCE((v_policy->>'enabled')::boolean, true);
                 v_refund_enabled := COALESCE((v_policy->>'refund_credit_on_cancel')::boolean, true);
 
@@ -2055,7 +2057,7 @@ async function runStartupMigrations(): Promise<void> {
                 v_refund_enabled BOOLEAN;
             BEGIN
                 SELECT value INTO v_policy FROM system_settings WHERE key = 'cancellation_policy';
-                v_min_hours      := COALESCE((v_policy->>'min_hours')::numeric, 4);
+                v_min_hours      := COALESCE((v_policy->>'min_hours')::numeric, 5);
                 v_enabled        := COALESCE((v_policy->>'enabled')::boolean, true);
                 v_refund_enabled := COALESCE((v_policy->>'refund_credit_on_cancel')::boolean, true);
 
@@ -3340,6 +3342,77 @@ async function runStartupMigrations(): Promise<void> {
         const r = await query(`UPDATE class_types SET name = 'Reformer Jumpboard', updated_at = NOW() WHERE name = 'Jumpboard' RETURNING 1`);
         if (r.length) console.log(`Migration 103: class_type Jumpboard → Reformer Jumpboard (${r.length}).`);
     } catch (e) { console.error('Migration 103 error:', e); }
+
+    // ===========================================================================
+    // Casa Shé v1 — catálogo, reglas y branding del estudio (CONSOLIDADO).
+    // Corre AL FINAL, así gana sobre los seeds heredados de BMB/Balance Room.
+    // Idempotente: el upsert solo toca filas Casa Shé; la limpieza del catálogo
+    // viejo es de UNA sola vez (migration_flags) para no clobberear lo que la
+    // admin cree después.
+    // ===========================================================================
+    try {
+        const CS_PLANS = ['Clase de prueba', 'Drop-in', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Membresía 360', 'Membresía Black'];
+        const CS_TYPES = ['Pilates Mat', 'Yoga', 'Aeroyoga', 'Telas', 'Taller'];
+
+        // (a) Disciplinas Casa Shé (categoría 'multi' = un solo bucket de crédito; cupo 6-7).
+        await query(`INSERT INTO class_types (name, category, level, duration_minutes, max_capacity, is_active)
+            SELECT v.name, 'multi'::class_category, 'all'::class_level, v.dur, v.cap, true
+            FROM (VALUES ('Pilates Mat',50,7),('Yoga',60,7),('Aeroyoga',60,6),('Telas',60,6),('Taller',90,7))
+              AS v(name, dur, cap)
+            WHERE NOT EXISTS (SELECT 1 FROM class_types ct WHERE ct.name = v.name)`);
+        await query(`UPDATE class_types ct SET category='multi'::class_category, max_capacity=v.cap,
+              duration_minutes=v.dur, is_active=true
+            FROM (VALUES ('Pilates Mat',50,7),('Yoga',60,7),('Aeroyoga',60,6),('Telas',60,6),('Taller',90,7))
+              AS v(name, dur, cap)
+            WHERE ct.name = v.name`);
+
+        // (b) Planes/paquetes con precios reales de Casa Shé (todo multi_credits; reformer=0).
+        await query(`INSERT INTO plans (name, reformer_credits, multi_credits, price, duration_days, is_active, sort_order)
+            SELECT v.name, 0, v.credits, v.price, v.days, true, v.sort
+            FROM (VALUES
+              ('Clase de prueba',1,150,7,1),('Drop-in',1,280,30,2),('Paquete 5',5,1300,30,3),
+              ('Paquete 8',8,2000,30,4),('Paquete 12',12,2880,30,5),
+              ('Membresía 360',16,3600,30,6),('Membresía Black',24,4200,30,7)
+            ) AS v(name, credits, price, days, sort)
+            WHERE NOT EXISTS (SELECT 1 FROM plans p WHERE p.name = v.name)`);
+        await query(`UPDATE plans p SET reformer_credits=0, multi_credits=v.credits, price=v.price,
+              duration_days=v.days, is_active=true, sort_order=v.sort
+            FROM (VALUES
+              ('Clase de prueba',1,150,7,1),('Drop-in',1,280,30,2),('Paquete 5',5,1300,30,3),
+              ('Paquete 8',8,2000,30,4),('Paquete 12',12,2880,30,5),
+              ('Membresía 360',16,3600,30,6),('Membresía Black',24,4200,30,7)
+            ) AS v(name, credits, price, days, sort)
+            WHERE p.name = v.name`);
+
+        // (c) Sede única Casa Shé — Condesa.
+        await query(`INSERT INTO facilities (name, description, capacity, is_active, sort_order)
+            SELECT 'Casa Shé — Condesa', 'Alfonso Reyes 131, Condesa, CDMX', 7, true, 0
+            WHERE NOT EXISTS (SELECT 1 FROM facilities f WHERE f.name = 'Casa Shé — Condesa')`);
+
+        // (d) Cuenta admin de Casa Shé (reusa el hash del admin del seed: contraseña por defecto).
+        await query(`INSERT INTO users (email, password_hash, display_name, phone, role, is_active)
+            VALUES ('admin@casashe.mx', '$2b$10$ELPrfYdYroo/URqPraoj9eWP7KfYNGZfEbFpYq8uYLN.tnfdQY15S', 'Casa Shé Admin', '0000000000', 'admin', true)
+            ON CONFLICT (email) DO UPDATE SET role='admin', is_active=true`);
+
+        // (e) Limpieza ÚNICA del catálogo heredado de BMB + fijar reglas/branding una vez.
+        const cleaned = await query(`SELECT 1 FROM migration_flags WHERE name = 'casashe_v1_catalog'`);
+        if (!cleaned.length) {
+            await query(`UPDATE plans SET is_active=false WHERE name <> ALL($1::text[])`, [CS_PLANS]);
+            await query(`UPDATE class_types SET is_active=false WHERE name <> ALL($1::text[])`, [CS_TYPES]);
+            await query(`UPDATE facilities SET is_active=false WHERE name <> 'Casa Shé — Condesa'`);
+            // Cancelación 5h (una vez; luego editable desde la UI de admin).
+            await query(`UPDATE system_settings SET value = jsonb_set(jsonb_set(value,'{min_hours}','5'::jsonb),'{cancellations_per_membership}','999'::jsonb)
+                WHERE key='cancellation_policy'`);
+            // Datos del estudio + transferencia (placeholder hasta tener CLABE real de Casa Shé).
+            await query(`UPDATE system_settings SET value = $1::jsonb, updated_at = NOW() WHERE key='studio_info'`,
+                [JSON.stringify({ name: 'Casa Shé', address: 'Alfonso Reyes 131, Condesa, CDMX', phone: '', email: 'casashecondesa@gmail.com', website: 'https://casashe.mx', description: 'Wellness para mujeres en la Condesa, CDMX.', social_media: { instagram: '@casashe.mx', facebook: '', whatsapp: '' } })]);
+            await query(`UPDATE system_settings SET value = $1::jsonb, updated_at = NOW() WHERE key='bank_info'`,
+                [JSON.stringify({ bank_name: '(pendiente)', account_holder: 'Casa Shé', account_number: '', clabe: '(pendiente)', reference_instructions: 'Usa tu nombre completo como referencia' })]);
+            await query(`INSERT INTO migration_flags (name) VALUES ('casashe_v1_catalog') ON CONFLICT DO NOTHING`);
+            console.log('Casa Shé v1: limpieza de catálogo BMB + reglas/branding aplicados (una vez).');
+        }
+        console.log('Casa Shé v1: catálogo (disciplinas, precios, sede) y admin asegurados.');
+    } catch (e) { console.error('Casa Shé v1 seed error:', e); }
 
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }

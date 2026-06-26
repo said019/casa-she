@@ -51,9 +51,9 @@ router.put('/booking-enabled', authenticate, requireElevated, async (req: Reques
 
 const POLICY_DEFAULT = {
     enabled: true,
-    min_hours: 4,
+    min_hours: 5,
     refund_credit_on_cancel: true,
-    cancellations_per_membership: 2,
+    cancellations_per_membership: 999,
     late_cancel_message:
         'Esta clase ya no puede cancelarse a tiempo para recuperar tu crédito.',
 };
