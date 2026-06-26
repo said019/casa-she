@@ -1,15 +1,8 @@
-import { useFacilityScopeStore } from '@/stores/facilityScopeStore';
-import { useIsElevated } from '@/hooks/useIsElevated';
-
 /**
- * Devuelve el facility_id que se debe agregar a las queries.
- * - Para usuarios elevados con selector activo: el id seleccionado o '' si "Todas".
- * - Para no elevados: '' (el backend forzará su sucursal por scope).
+ * Casa Shé es mono-sede (Condesa). Ya no existe selector ni scope de sucursal:
+ * este hook siempre devuelve "sin filtro" para que el backend resuelva la única
+ * sede. Se mantiene como no-op porque varias pantallas aún lo importan.
  */
 export function useFacilityScope(): { facilityIdParam: string; isFiltered: boolean } {
-    const elevated = useIsElevated();
-    const selected = useFacilityScopeStore((s) => s.selectedFacilityId);
-    if (!elevated) return { facilityIdParam: '', isFiltered: false };
-    if (!selected) return { facilityIdParam: '', isFiltered: false };
-    return { facilityIdParam: selected, isFiltered: true };
+    return { facilityIdParam: '', isFiltered: false };
 }

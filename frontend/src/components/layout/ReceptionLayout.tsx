@@ -29,9 +29,6 @@ import {
     History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useIsElevated } from '@/hooks/useIsElevated';
-import { useFacilityScopeStore } from '@/stores/facilityScopeStore';
 import { effectivePermissions, type PermissionKey } from '@/lib/permissions';
 import { MyProfileDialog } from '@/components/reception/MyProfileDialog';
 import { AdminSearch } from '@/components/admin/AdminSearch';
@@ -57,7 +54,6 @@ export default function ReceptionLayout() {
     const navigate = useNavigate();
     const { logout } = useAuthStore();
     const user = useAuthStore((s) => s.user);
-    const elevated = useIsElevated();
     const perms = effectivePermissions(user?.permissions, user?.is_reception_master === true);
     const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
@@ -68,18 +64,9 @@ export default function ReceptionLayout() {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-    const selectedFacilityId = useFacilityScopeStore((s) => s.selectedFacilityId);
-    const setSelectedFacility = useFacilityScopeStore((s) => s.setSelected);
-
     const { data: me } = useQuery({
         queryKey: ['me'],
         queryFn: () => api.get('/auth/me').then((r) => r.data?.user ?? r.data),
-    });
-
-    const { data: facilities = [] } = useQuery<Array<{ id: string; name: string }>>({
-        queryKey: ['facilities'],
-        queryFn: async () => (await api.get('/facilities')).data,
-        enabled: elevated,
     });
 
     const handleLogout = () => {
@@ -247,24 +234,6 @@ export default function ReceptionLayout() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                            {elevated && (
-                                <Select
-                                    value={selectedFacilityId ?? 'all'}
-                                    onValueChange={(v) => setSelectedFacility(v === 'all' ? null : v)}
-                                >
-                                    <SelectTrigger className="h-10 w-[150px] rounded-full border-balance-sand/65 bg-balance-cream/70 text-xs sm:w-[190px]">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">Todas las sucursales</SelectItem>
-                                        {facilities.map((f) => (
-                                            <SelectItem key={f.id} value={f.id}>
-                                                {f.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            )}
                             {me?.display_name && (
                                 <span className="hidden text-sm font-semibold text-balance-dark/70 lg:block">
                                     {me.display_name}
@@ -284,11 +253,11 @@ export default function ReceptionLayout() {
                     </div>
                 </header>
 
-                {/* Aviso si la recepción no tiene sucursal asignada (los master operan todas, no aplica) */}
+                {/* Aviso si la recepción aún no tiene la sede asignada (los master no aplican) */}
                 {me?.role === 'reception' && !me?.default_facility_id && !me?.is_reception_master && (
                     <div className="flex items-center gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800 md:px-6">
                         <AlertTriangle className="h-4 w-4 shrink-0" />
-                        <span>Pide al admin que te asigne una sucursal.</span>
+                        <span>Pide al admin que active tu acceso a la sede.</span>
                     </div>
                 )}
 

@@ -39,16 +39,12 @@ const TIME_OPTIONS: [TimeOfDay, string][] = [
 const shortFacility = (f: string) => f.replace(/^Casa Shé\s*/i, "");
 
 export function FilterPills({
-  facilities, facility, onFacilityChange,
   categories, category, onCategoryChange,
   instructors, instructor, onInstructorChange,
   timeOfDay, onTimeOfDayChange,
   resultCount, activeFilters, onClear,
 }: Props) {
-  const facilityOptions: [string, string][] = [
-    ["all", "Todas las sucursales"],
-    ...facilities.map((f) => [f, shortFacility(f)] as [string, string]),
-  ];
+  // Casa Shé es mono-sede (Condesa): se eliminó el filtro de sucursal del render.
   const categoryOptions: [string, string][] = [
     ["all", "Todos los tipos"],
     ...categories.map((c) => [c, CATEGORY_LABEL[c as Exclude<Category, "all">]] as [string, string]),
@@ -62,7 +58,6 @@ export function FilterPills({
     <div className="border-y border-bmb-ink/20 py-3">
       {/* ───────── Móvil: dropdowns compactos (no se amontona) ───────── */}
       <div className="grid grid-cols-2 gap-2 lg:hidden">
-        <FilterSelect label="Sucursal" value={facility} onChange={onFacilityChange} options={facilityOptions} />
         <FilterSelect label="Tipo" value={category} onChange={(v) => onCategoryChange(v as Category)} options={categoryOptions} />
         <FilterSelect label="Coach" value={instructor} onChange={onInstructorChange} options={instructorOptions} />
         <FilterSelect label="Horario" value={timeOfDay} onChange={(v) => onTimeOfDayChange(v as TimeOfDay)} options={TIME_OPTIONS} />
@@ -76,15 +71,8 @@ export function FilterPills({
         </div>
       </div>
 
-      {/* ───────── Escritorio: pills (Sucursal/Tipo) + dropdowns (Coach/Horario) ───────── */}
+      {/* ───────── Escritorio: pills (Tipo) + dropdowns (Coach/Horario) ───────── */}
       <div className="hidden lg:flex lg:flex-wrap lg:items-end lg:gap-x-6 lg:gap-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="editorial-caption text-bmb-ink/55">Sucursal</span>
-          <PillButton active={facility === "all"} onClick={() => onFacilityChange("all")}>Todas</PillButton>
-          {facilities.map((f) => (
-            <PillButton key={f} active={facility === f} onClick={() => onFacilityChange(f)}>{shortFacility(f)}</PillButton>
-          ))}
-        </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="editorial-caption text-bmb-ink/55">Tipo</span>
           <PillButton active={category === "all"} onClick={() => onCategoryChange("all")}>Todas</PillButton>

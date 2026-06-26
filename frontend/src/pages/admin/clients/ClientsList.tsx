@@ -214,7 +214,7 @@ export default function ClientsList() {
                                 className="pl-10"
                             />
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                             <Select
                                 value={membershipStatus || 'all'}
                                 onValueChange={(v) => { setMembershipStatus(v === 'all' ? '' : v); setPage(0); }}
@@ -254,20 +254,6 @@ export default function ClientsList() {
                                     <SelectItem value="all">Todas las etiquetas</SelectItem>
                                     {CLIENT_TAGS.map((t) => (
                                         <SelectItem key={t.key} value={t.key}>{t.label}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <Select
-                                value={facilityId || 'all'}
-                                onValueChange={(v) => { setFacilityId(v === 'all' ? '' : v); setPage(0); }}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Sucursal" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todas las sucursales</SelectItem>
-                                    {facilities?.map((f) => (
-                                        <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>

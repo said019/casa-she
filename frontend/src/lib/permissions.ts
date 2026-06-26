@@ -14,6 +14,9 @@ export const PERMISSION_GROUPS: { title: string; keys: PermissionKey[] }[] = [
   { title: 'Equipo', keys: ['gestionar_permisos'] },
 ];
 
+// Casa Shé es mono-sede: `multi_sucursal` ya no implica elegir sucursal, solo marca
+// al "master" (acceso ampliado). Se conserva la key para no romper datos/permisos.
+
 export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   caja: 'Caja', vender: 'Vender', inventario: 'Inventario', checkin: 'Check-in',
   clientes: 'Clientes', reservas: 'Reservas',
@@ -21,10 +24,10 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   editar_catalogo: 'Editar catálogo (planes/precios)',
   editar_productos_precio: 'Editar precio/costo de productos',
   editar_coaches: 'Editar coaches', ver_audit: 'Ver bitácora', nomina: 'Nómina de coaches',
-  multi_sucursal: 'Operar varias sucursales', gestionar_permisos: 'Gestionar permisos del equipo',
+  multi_sucursal: 'Acceso ampliado (master)', gestionar_permisos: 'Gestionar permisos del equipo',
 };
 
-// `multi_sucursal` ≡ master (se sincroniza con is_reception_master): otorgarla = minar un
+// `multi_sucursal` ≡ master (se sincroniza con is_reception_master): otorgarla = volver
 // master, por eso es admin-only igual que gestionar_permisos/nomina.
 export const ADMIN_ONLY_KEYS: PermissionKey[] = ['gestionar_permisos', 'nomina', 'multi_sucursal'];
 

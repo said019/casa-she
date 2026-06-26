@@ -388,27 +388,7 @@ export default function ReportsEgresos() {
           </div>
         )}
 
-        {/* Egresos por sucursal */}
-        {dashboard?.byFacility && dashboard.byFacility.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Egresos por sucursal (mes actual)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {dashboard.byFacility.map((s, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{s.facility_name || 'General / Ambas'}</span>
-                    <div className="text-right">
-                      <span className="font-semibold">{formatMXN(s.total)}</span>
-                      <span className="text-muted-foreground ml-2 text-xs">{s.count} {s.count === 1 ? 'gasto' : 'gastos'}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Mono-sede (Condesa): se eliminó la comparativa de egresos por sucursal. */}
 
         {/* Filters */}
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
@@ -436,17 +416,6 @@ export default function ReportsEgresos() {
               <SelectItem value="pendiente">Pendientes</SelectItem>
               <SelectItem value="pagado">Pagados</SelectItem>
               <SelectItem value="cancelado">Cancelados</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={facilityFilter} onValueChange={setFacilityFilter}>
-            <SelectTrigger className="w-full md:w-48">
-              <SelectValue placeholder="Sucursal" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las sucursales</SelectItem>
-              {bmbFacilities.map((fc) => (
-                <SelectItem key={fc.id} value={fc.id}>{fc.name.replace(/^Casa Shé\s*/i, '')}</SelectItem>
-              ))}
             </SelectContent>
           </Select>
         </div>
@@ -607,19 +576,7 @@ export default function ReportsEgresos() {
               </div>
             </div>
 
-            {/* Sucursal */}
-            <div>
-              <Label>Sucursal</Label>
-              <Select value={form.facility_id || 'general'} onValueChange={(v) => setForm((fm) => ({ ...fm, facility_id: v === 'general' ? '' : v }))}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Sucursal" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="general">General / Ambas</SelectItem>
-                  {bmbFacilities.map((fc) => (
-                    <SelectItem key={fc.id} value={fc.id}>{fc.name.replace(/^Casa Shé\s*/i, '')}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Mono-sede (Condesa): sin selector de sucursal; el egreso queda general. */}
 
             {/* Status & Recurring */}
             <div className="grid sm:grid-cols-2 gap-3">

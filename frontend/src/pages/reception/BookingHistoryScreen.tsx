@@ -103,7 +103,7 @@ export default function BookingHistoryScreen() {
         setSearchInput(''); setSearch(''); setStatus('all'); setStartDate(''); setEndDate('');
     };
 
-    const showFacility = elevated && !facilityIdParam;
+    const showFacility = false;
     const colSpan = showFacility ? 7 : 6;
 
     const rows = useMemo(() => bookings, [bookings]);
@@ -118,7 +118,6 @@ export default function BookingHistoryScreen() {
                     </h1>
                     <p className="text-muted-foreground text-sm">
                         Todas las reservas de todos los usuarios. Filtra por usuario, clase, estado o fechas.
-                        {showFacility ? ' Mostrando todas las sucursales.' : ''}
                     </p>
                 </div>
             </div>

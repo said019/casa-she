@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthGuard } from '@/components/layout/AuthGuard';
@@ -179,6 +179,13 @@ export default function Checkout() {
     queryFn: async () => (await api.get('/facilities')).data,
   });
   const [selectedFacilityId, setSelectedFacilityId] = useState<string>('');
+
+  // Mono-sede (Condesa): no se elige estudio; se asigna automáticamente la única sede.
+  useEffect(() => {
+    if (!selectedFacilityId && facilities.length > 0) {
+      setSelectedFacilityId(facilities[0].id);
+    }
+  }, [facilities, selectedFacilityId]);
 
   // Fetch bank info for transfer instructions
   const { data: bankInfo } = useQuery<BankInfo>({
@@ -825,22 +832,7 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  {needsStudio && (
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Elige tu estudio (paquete individual)</Label>
-                      <Select value={selectedFacilityId} onValueChange={setSelectedFacilityId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona un estudio" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {facilities.map((f) => (
-                            <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">Tu paquete individual solo podrá usarse en este estudio.</p>
-                    </div>
-                  )}
+                  {/* Mono-sede (Condesa): se asigna automáticamente la única sede, sin selector. */}
                 </CardContent>
                 <CardFooter className="flex-col gap-3">
                   <Button

@@ -154,17 +154,6 @@ export function ProductsContent() {
                         ))}
                     </SelectContent>
                 </Select>
-                <Select value={facilityFilter} onValueChange={setFacilityFilter}>
-                    <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="Sucursal" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Todas las sucursales</SelectItem>
-                        {facilities?.map((f: any) => (
-                            <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
             </div>
 
             <div className="border rounded-md overflow-x-auto">
@@ -172,7 +161,6 @@ export function ProductsContent() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Producto</TableHead>
-                            <TableHead>Sucursal</TableHead>
                             <TableHead>Categoría</TableHead>
                             <TableHead>Precio</TableHead>
                             <TableHead>Stock</TableHead>
@@ -183,13 +171,13 @@ export function ProductsContent() {
                     <TableBody>
                         {isLoadingProducts ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="text-center py-8">
+                                <TableCell colSpan={6} className="text-center py-8">
                                     <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                                 </TableCell>
                             </TableRow>
                         ) : products?.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                     No hay productos registrados
                                 </TableCell>
                             </TableRow>
@@ -210,9 +198,6 @@ export function ProductsContent() {
                                                 <div className="text-xs text-muted-foreground">{product.sku}</div>
                                             </div>
                                         </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline" className="text-xs">{shortFacility(product.facility_name)}</Badge>
                                     </TableCell>
                                     <TableCell>{product.category_name || '-'}</TableCell>
                                     <TableCell>${Number(product.price).toFixed(2)}</TableCell>
@@ -357,19 +342,12 @@ function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, categori
                         </div>
                     </div>
 
-                    <div className="grid gap-2">
-                        <Label htmlFor="facilityId">Sucursal *</Label>
-                        <Select name="facilityId" defaultValue={initialData?.facility_id || defaultFacilityId || undefined}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Seleccionar sucursal..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {facilities?.map((f: any) => (
-                                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    {/* Mono-sede: el producto se asigna automáticamente a la única sede. */}
+                    <input
+                        type="hidden"
+                        name="facilityId"
+                        value={initialData?.facility_id || defaultFacilityId || facilities?.[0]?.id || ''}
+                    />
 
                     <div className="grid gap-2">
                         <Label htmlFor="categoryId">Categoría</Label>

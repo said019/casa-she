@@ -230,13 +230,7 @@ export default function CoachSchedule() {
                                                                     · {full ? 'lleno' : `${libres} ${libres === 1 ? 'libre' : 'libres'}`}
                                                                 </span>
                                                             </div>
-                                                            {/* Sucursal: en "Todas" se mezclan ambas sucursales, así que se muestra cuál es. */}
-                                                            {showAll && classItem.facility_name && (
-                                                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-1 truncate">
-                                                                    <MapPin className="h-3 w-3 shrink-0" />
-                                                                    <span className="truncate">{classItem.facility_name}</span>
-                                                                </div>
-                                                            )}
+                                                            {/* Mono-sede (Condesa): se eliminó la etiqueta de sucursal. */}
                                                         </div>
                                                     );
                                                     // Solo las clases del coach son clickeables (gestión/check-in).

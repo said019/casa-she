@@ -336,15 +336,7 @@ async function runStartupMigrations(): Promise<void> {
             END $$;
         `);
 
-        // Idempotent upsert (UNIQUE on facilities.name guarantees only 3 rows ever)
-        await query(`
-            INSERT INTO facilities (name, capacity, is_active, sort_order)
-            VALUES
-                ('Wunda',    6, true, 1),
-                ('Barre',    6, true, 2),
-                ('Hot Room', 6, true, 3)
-            ON CONFLICT (name) DO NOTHING
-        `);
+        // Casa Shé mono-sede: NO se crean salas/sucursales cruft (Wunda/Barre/Hot Room).
 
         // Link class types to facilities and set correct spot_icon
         // Barre
@@ -408,7 +400,9 @@ async function runStartupMigrations(): Promise<void> {
                 dow         INT;
                 target_date DATE;
             BEGIN
-                -- Ensure facilities exist
+                -- Casa Shé mono-sede: no se generan salas/horarios cruft de Balance Room.
+                RETURN;
+                -- (código BMB original deshabilitado)
                 INSERT INTO facilities (name, capacity, is_active, sort_order)
                 VALUES ('Wunda', 8, true, 1), ('Barre', 10, true, 2), ('Hot Room', 15, true, 3)
                 ON CONFLICT DO NOTHING;
@@ -717,15 +711,10 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Migration 030: membership categories + buckets ready.');
     } catch (e) { console.error('Migration 030 error:', e); }
 
-    // Migration 031: seed BMB facilities, class types (with category) and real plans + 12h cancellation
+    // Migration 031: seed base. Casa Shé es UN SOLO LUGAR: NO se crean las sucursales BMB
+    // (Tepa/San Miguel). La única sede ('Casa Shé — Condesa') la crea el bloque consolidado.
     try {
-        await query(`INSERT INTO facilities (name, description, capacity, is_active, sort_order)
-            SELECT v.name, v.description, v.capacity, v.is_active, v.sort_order
-            FROM (VALUES
-              ('BMB Studio Tepa', 'Calle Primero de Mayo 1, Diamante, 54763 Cuautitlán Izcalli, Méx.', 10, true, 0),
-              ('BMB Studio San Miguel', 'Cam. a Tepotzotlán 6D, Axotlan, 54715 Cuautitlán Izcalli, Méx.', 10, true, 1)
-            ) AS v(name, description, capacity, is_active, sort_order)
-            WHERE NOT EXISTS (SELECT 1 FROM facilities f WHERE f.name = v.name)`);
+        // (Sucursales BMB Tepa/San Miguel eliminadas — Casa Shé es mono-sede.)
         await query(`INSERT INTO class_types (name, category, level, duration_minutes, max_capacity)
             SELECT v.name, v.category::class_category, v.level::class_level, v.duration_minutes, v.max_capacity
             FROM (VALUES
@@ -3378,7 +3367,17 @@ async function runStartupMigrations(): Promise<void> {
             await query(`INSERT INTO migration_flags (name) VALUES ('casashe_v1_catalog') ON CONFLICT DO NOTHING`);
             console.log('Casa Shé v1: reglas (cancelación 5h) + branding del estudio fijados (una vez).');
         }
-        console.log('Casa Shé v1: catálogo y estado activo (solo Casa Shé) asegurados en cada arranque.');
+        // (g) Mono-sede: deja EXACTAMENTE una facility. Limpia referencias y borra cualquier
+        //     otra sede (Sala Principal del schema base, cruft, etc.). Best-effort: si alguna FK
+        //     impide el DELETE, la sede queda inactiva igual (por el toggle de arriba). Va al final
+        //     para no interrumpir el resto del seed.
+        try {
+            await query(`UPDATE class_types SET facility_id = NULL WHERE facility_id IN (SELECT id FROM facilities WHERE name <> 'Casa Shé — Condesa')`);
+            await query(`UPDATE users SET default_facility_id = NULL WHERE default_facility_id IN (SELECT id FROM facilities WHERE name <> 'Casa Shé — Condesa')`);
+            await query(`DELETE FROM facilities WHERE name <> 'Casa Shé — Condesa'`);
+        } catch (e) { console.warn('Casa Shé: no se pudieron borrar sedes extra (quedan inactivas):', (e as Error).message); }
+
+        console.log('Casa Shé v1: catálogo, sede única y estado activo asegurados en cada arranque.');
     } catch (e) { console.error('Casa Shé v1 seed error:', e); }
 
   } finally {

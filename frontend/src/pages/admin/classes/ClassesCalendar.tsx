@@ -683,7 +683,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
     const activeClasses = classes?.filter((c) => c.status !== 'cancelled') || [];
 
-    // Sucursales BMB (de facilities). El calendario muestra UNA a la vez (toggle).
+    // Sede única (de facilities). Sin selector visible: el filtro se fija a la única sede.
     const bmbStudios = useMemo(
         () => (facilities || [])
             .filter((f) => /^casa sh/i.test(f.name))
@@ -691,7 +691,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         [facilities]
     );
 
-    // Default: primera sucursal en cuanto cargan (en vez de 'all', que amontona ambas).
+    // Fija el filtro a la única sede en cuanto carga (en vez de 'all').
     useEffect(() => {
         if (bmbStudios.length && !bmbStudios.some((s) => s.id === studioFilter)) {
             setStudioFilter(bmbStudios[0].id);
@@ -744,26 +744,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                 <Badge variant="outline" className="rounded-full border-balance-olive/30 bg-balance-olive/10 px-3 py-1 text-balance-olive">
                                     {occupancy}% ocupación
                                 </Badge>
-                                {bmbStudios.length > 0 && (
-                                    <div className="inline-flex items-center rounded-full border border-balance-olive/30 bg-balance-cream/75 p-1">
-                                        {bmbStudios.map((s) => (
-                                            <button
-                                                key={s.id}
-                                                type="button"
-                                                onClick={() => setStudioFilter(s.id)}
-                                                aria-pressed={studioFilter === s.id}
-                                                className={cn(
-                                                    'rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
-                                                    studioFilter === s.id
-                                                        ? 'bg-balance-olive text-balance-cream'
-                                                        : 'text-balance-dark/60 hover:text-balance-olive'
-                                                )}
-                                            >
-                                                {s.short || s.name}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
+                                {/* Mono-sede (Condesa): se eliminó el toggle de sucursal del calendario. */}
                                 <Select value={programFilter} onValueChange={setProgramFilter}>
                                     <SelectTrigger className="w-[150px]"><SelectValue placeholder="Programa" /></SelectTrigger>
                                     <SelectContent>

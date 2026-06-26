@@ -48,9 +48,9 @@ export function ClientCrmPanel({
 }: ClientCrmPanelProps) {
   const qc = useQueryClient();
   const isElevated = useIsElevated();
-  // Admin/master eligen con qué WhatsApp (sucursal) se manda el reenvío de credenciales.
-  // Recepción normal no ve el selector: el backend usa el WhatsApp de su sucursal.
-  const [waKey, setWaKey] = useState<'san-miguel' | 'tepa'>('san-miguel');
+  // Mono-sede (Condesa): ya no se elige WhatsApp por sucursal; el backend usa el
+  // único número. Se conserva la key por defecto por compatibilidad del payload.
+  const [waKey] = useState<'san-miguel' | 'tepa'>('san-miguel');
 
   const resendCredentials = useMutation({
     mutationFn: async () =>
@@ -206,19 +206,6 @@ export function ClientCrmPanel({
       <Card>
         <CardContent className="pt-4">
           <h3 className="font-medium mb-3">Enviar mensaje</h3>
-          {isElevated && (
-            <div className="mb-2">
-              <p className="text-[11px] text-muted-foreground mb-1">Enviar credenciales desde el WhatsApp de:</p>
-              <ToggleGroup
-                type="single"
-                value={waKey}
-                onValueChange={(v) => { if (v === 'san-miguel' || v === 'tepa') setWaKey(v); }}
-                className="justify-start gap-1"
-              >
-                <ToggleGroupItem value="san-miguel" size="sm" className="text-xs px-3">Condesa</ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-          )}
           <Button
             variant="outline"
             size="sm"

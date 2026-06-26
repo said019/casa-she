@@ -12,7 +12,7 @@ export default function Hero() {
   const today = new Date();
   return (
     <section className="relative min-h-[88svh] overflow-hidden bg-bmb-dark text-bmb-cream lg:min-h-[92svh]">
-      {/* Foto real del studio (San Miguel) detrás del titular */}
+      {/* Foto real del studio (Condesa) detrás del titular */}
       <div className="absolute inset-0">
         <img
           src="/studio/salon.webp"

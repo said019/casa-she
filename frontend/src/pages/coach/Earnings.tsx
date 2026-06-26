@@ -180,7 +180,6 @@ export default function CoachEarnings() {
                                                     <TableHead className="text-right">Clases</TableHead>
                                                     <TableHead className="text-right">Tarifa</TableHead>
                                                     <TableHead className="text-right">Monto</TableHead>
-                                                    <TableHead className="text-center">Sucursal</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -196,13 +195,6 @@ export default function CoachEarnings() {
                                                         <TableCell className="text-right">{p.classes_count}</TableCell>
                                                         <TableCell className="text-right">{mxn.format(Number(p.pay_rate_per_class))}</TableCell>
                                                         <TableCell className="text-right font-semibold">{mxn.format(Number(p.amount))}</TableCell>
-                                                        <TableCell className="text-center">
-                                                            {p.facility_id ? (
-                                                                <Badge variant="outline" className="text-xs">por sucursal</Badge>
-                                                            ) : (
-                                                                <Badge variant="outline" className="text-xs">todas</Badge>
-                                                            )}
-                                                        </TableCell>
                                                     </TableRow>
                                                 ))}
                                             </TableBody>

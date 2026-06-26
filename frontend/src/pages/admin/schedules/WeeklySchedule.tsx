@@ -37,7 +37,7 @@ const scheduleSchema = z.object({
     endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Formato HH:MM (24h)'),
     maxCapacity: z.coerce.number().int().positive(),
     isActive: z.boolean().default(true),
-    facilityId: z.string().uuid('Selecciona una sucursal'),
+    facilityId: z.string().uuid('No se pudo determinar la sede'),
 });
 
 type ScheduleForm = z.infer<typeof scheduleSchema>;
@@ -138,16 +138,15 @@ export default function WeeklySchedule({ embedded = false }: { embedded?: boolea
     const handleAddClass = (day: number) => {
         setSelectedDay(day);
         setValue('dayOfWeek', day);
-        // Pre-seleccionar la sucursal de la pestaña activa (si no es "Todas").
-        const activeFacility = (facilities || []).find((fac) => fac.name === facilityFilter);
-        setValue('facilityId', activeFacility ? activeFacility.id : ('' as unknown as string));
+        // Mono-sede: se asigna automáticamente la única sede (no hay selector).
+        const onlyFacility = (facilities || [])[0];
+        setValue('facilityId', onlyFacility ? onlyFacility.id : ('' as unknown as string));
         setIsDialogOpen(true);
     };
 
-    // Group schedules by day (with optional facility filter)
+    // Group schedules by day — mono-sede: sin filtro de sucursal.
     const schedulesByDay = Array.from({ length: 7 }, (_, i) => {
-        return (schedules?.filter(s => s.day_of_week === i) || [])
-            .filter(s => facilityFilter === 'all' || s.facility_name === facilityFilter);
+        return schedules?.filter(s => s.day_of_week === i) || [];
     });
 
     const content = (
@@ -160,27 +159,6 @@ export default function WeeklySchedule({ embedded = false }: { embedded?: boolea
                         {/* <Button variant="outline">
                  Generar ClasesPróximas
             </Button> */}
-                    </div>
-
-                    <div className="flex gap-2 flex-wrap">
-                        {[
-                            { id: 'all', label: 'Todas' },
-                            ...(facilities || [])
-                                .filter((fac) => /^casa sh/i.test(fac.name))
-                                .map((fac) => ({ id: fac.name, label: fac.name.replace(/^Casa Shé\s*/i, '') })),
-                        ].map((f) => (
-                            <button
-                                key={f.id}
-                                onClick={() => setFacilityFilter(f.id)}
-                                className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all border ${
-                                    facilityFilter === f.id
-                                        ? 'bg-primary text-primary-foreground border-primary'
-                                        : 'bg-muted text-muted-foreground border-border hover:text-foreground'
-                                }`}
-                            >
-                                {f.label}
-                            </button>
-                        ))}
                     </div>
 
                     {!isLoading && schedulesByDay && (
@@ -244,23 +222,7 @@ export default function WeeklySchedule({ embedded = false }: { embedded?: boolea
 
                             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                                 <input type="hidden" {...register('dayOfWeek')} />
-
-                                <div className="space-y-2">
-                                    <Label>Sucursal *</Label>
-                                    <Select value={watch('facilityId') || ''} onValueChange={(val) => setValue('facilityId', val)}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Seleccionar sucursal..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {facilities?.map(f => (
-                                                <SelectItem key={f.id} value={f.id}>
-                                                    {f.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {errors.facilityId && <p className="text-xs text-destructive">{errors.facilityId.message}</p>}
-                                </div>
+                                {/* Mono-sede: la sede se asigna automáticamente al abrir el diálogo (sin selector). */}
 
                                 <div className="space-y-2">
                                     <Label>Tipo de Clase</Label>

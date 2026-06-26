@@ -71,7 +71,7 @@ export default function ReportsInstructors() {
                     <div>
                         <h1 className="text-3xl font-heading font-bold">Rendimiento de Instructores</h1>
                         <p className="text-muted-foreground">
-                            Comparativa de asistencia y ocupación. Las reseñas son del coach (no se filtran por sucursal).
+                            Comparativa de asistencia y ocupación. Las reseñas son del coach.
                         </p>
                     </div>
                     <div className="flex flex-wrap items-end gap-3">
@@ -85,20 +85,6 @@ export default function ReportsInstructors() {
                                     <SelectItem value="7days">Últimos 7 días</SelectItem>
                                     <SelectItem value="30days">Últimos 30 días</SelectItem>
                                     <SelectItem value="90days">Últimos 3 meses</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-1">
-                            <Label className="text-xs">Sucursal</Label>
-                            <Select value={facilityId} onValueChange={setFacilityId}>
-                                <SelectTrigger className="h-9 w-[200px]">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todas las sucursales</SelectItem>
-                                    {facilities.map((f) => (
-                                        <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>

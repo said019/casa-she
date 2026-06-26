@@ -1,24 +1,16 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 
 interface FacilityScopeState {
-    selectedFacilityId: string | null; // null = "Todas"
+    selectedFacilityId: string | null; // siempre null → la única sede
     setSelected: (id: string | null) => void;
 }
 
 /**
- * Selector global de sucursal para usuarios elevados.
- * null = "Todas" (default). Persisted en localStorage para que sobreviva refresh.
- *
- * Reception normal NUNCA usa esto — el backend siempre fuerza su facility.
- * Solo aplica a admin/super_admin/reception+master.
+ * Casa Shé es mono-sede (Condesa). El antiguo selector de sucursal de BMB ya no
+ * existe: este store queda como no-op para no romper los imports que sobreviven.
+ * `selectedFacilityId` siempre es null (= la única sede) y `setSelected` no hace nada.
  */
-export const useFacilityScopeStore = create<FacilityScopeState>()(
-    persist(
-        (set) => ({
-            selectedFacilityId: null,
-            setSelected: (id) => set({ selectedFacilityId: id }),
-        }),
-        { name: 'bmb-facility-scope' }
-    )
-);
+export const useFacilityScopeStore = create<FacilityScopeState>()(() => ({
+    selectedFacilityId: null,
+    setSelected: () => {},
+}));

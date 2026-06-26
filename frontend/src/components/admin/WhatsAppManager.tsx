@@ -200,10 +200,9 @@ export function WhatsAppManager() {
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-2xl font-bold tracking-tight">WhatsApp por sucursal</h2>
+                <h2 className="text-2xl font-bold tracking-tight">WhatsApp</h2>
                 <p className="text-muted-foreground">
-                    Vincula un WhatsApp por sucursal. Los mensajes a cada usuario salen del número de su
-                    sucursal; si no tiene sucursal fija, sale del principal (Condesa).
+                    WhatsApp de Casa Shé. Los mensajes a cada usuario salen de este número.
                 </p>
             </div>
 

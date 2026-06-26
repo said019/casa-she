@@ -131,7 +131,7 @@ function exportXLSX(rows: Row[], periodToken: string, periodLbl: string, facilit
     // Hoja 1: Nómina — números nativos para que Excel haga totales y formato MXN
     const sheet1Rows: (string | number)[][] = [
         ['Nómina de Coaches — Casa Shé'],
-        [`Periodo: ${periodLbl}`, `Sucursal: ${facilityName}`],
+        [`Periodo: ${periodLbl}`, `Sede: ${facilityName}`],
         [],
         ['Coach', 'Tarifa por clase (MXN)', 'Clases impartidas', 'Total (MXN)', 'Estado'],
     ];
@@ -524,9 +524,9 @@ export function CoachPayrollContent() {
     );
     const totalClasses = useMemo(() => rows.reduce((s, r) => s + r.classes_count, 0), [rows]);
 
-    const facilityName = facilityId === 'all'
-        ? 'Todas las sucursales'
-        : (facilities.find((f) => f.id === facilityId)?.name ?? 'Sucursal');
+    const facilityName = facilities.find((f) => f.id === facilityId)?.name
+        ?? facilities[0]?.name
+        ?? 'Casa Shé';
 
     return (
         <div className="space-y-6">
@@ -567,20 +567,6 @@ export function CoachPayrollContent() {
                     <CardContent className="pt-4 pb-3">
                         <div className="flex flex-wrap items-end gap-4">
                             <PeriodPicker frequency={frequency} value={period} onChange={setPeriod} />
-                            <div className="space-y-1">
-                                <Label className="text-xs">Sucursal</Label>
-                                <Select value={facilityId} onValueChange={setFacilityId}>
-                                    <SelectTrigger className="h-8 w-56">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">Todas las sucursales</SelectItem>
-                                        {facilities.map((f) => (
-                                            <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
                             <div className="flex-1 min-w-[200px] grid grid-cols-2 gap-3 ml-auto">
                                 <div className="text-right">
                                     <div className="text-xs text-muted-foreground">Clases del periodo</div>

@@ -28,7 +28,7 @@ const newClientSchema = z.object({
   password: z.string().min(8, 'Mínimo 8 caracteres').optional().or(z.literal('')),
   dateOfBirth: z.string().optional().or(z.literal('')),
   acceptsCommunications: z.boolean().default(false),
-  // admin/master: de qué WhatsApp (sucursal) sale la bienvenida con credenciales.
+  // Mono-sede: la bienvenida sale del único WhatsApp; se conserva el campo por compatibilidad.
   whatsappKey: z.enum(['san-miguel', 'tepa']).optional(),
 });
 
@@ -307,20 +307,6 @@ export const NewClientForm = ({ onSubmit, isLoading, onCancel }: NewClientFormPr
             </div>
           </div>
 
-          {isElevated && (
-            <div className="md:col-span-2 space-y-2">
-              <Label>Enviar la bienvenida por el WhatsApp de</Label>
-              <ToggleGroup
-                type="single"
-                value={whatsappKey || 'san-miguel'}
-                onValueChange={(v) => { if (v === 'san-miguel' || v === 'tepa') setValue('whatsappKey', v); }}
-                className="justify-start gap-1"
-              >
-                <ToggleGroupItem value="san-miguel" size="sm" className="text-xs px-3">Condesa</ToggleGroupItem>
-              </ToggleGroup>
-              <p className="text-xs text-muted-foreground">Las credenciales de acceso se mandan desde este número.</p>
-            </div>
-          )}
         </CardContent>
       </Card>
 

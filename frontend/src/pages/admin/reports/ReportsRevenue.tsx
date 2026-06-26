@@ -150,17 +150,6 @@ export default function ReportsRevenue() {
                         <p className="text-muted-foreground">Desglose de ventas y métodos de pago.</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        <Select value={facility} onValueChange={setFacility}>
-                            <SelectTrigger className="w-[200px]">
-                                <SelectValue placeholder="Sucursal" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Todas las sucursales</SelectItem>
-                                {(facilities || []).filter((f) => /^casa sh/i.test(f.name)).map((f) => (
-                                    <SelectItem key={f.id} value={f.id}>{f.name.replace(/^Casa Shé\s*/i, '')}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
                         <Select value={period} onValueChange={setPeriod}>
                             <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="Periodo" />
@@ -303,7 +292,7 @@ export default function ReportsRevenue() {
                             <CardTitle>Ventas por recepcionista</CardTitle>
                             <CardDescription>
                                 Solo las membresías públicas generan comisión. La comisión mostrada es una estimación (% × membresías del periodo, sin aplicar el objetivo mensual);
-                                el pago oficial, con objetivo, se gestiona en <a href="/admin/commissions" className="underline">Comisiones</a>. No se filtra por sucursal.
+                                el pago oficial, con objetivo, se gestiona en <a href="/admin/commissions" className="underline">Comisiones</a>.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -335,27 +324,7 @@ export default function ReportsRevenue() {
                         </CardContent>
                     </Card>
 
-                    {facility === 'all' && Array.isArray(revenueStats?.byFacility) && revenueStats.byFacility.length > 0 && (
-                        <Card className="col-span-2">
-                            <CardHeader>
-                                <CardTitle>Ingresos por sucursal</CardTitle>
-                                <CardDescription>Comparativa entre sucursales (no incluye eventos)</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {revenueStats.byFacility.map((s: any, i: number) => (
-                                        <div key={i} className="flex items-center justify-between">
-                                            <div>
-                                                <p className="font-medium">{s.facility_name || 'Sin sucursal'}</p>
-                                                <p className="text-xs text-muted-foreground">{s.count} {Number(s.count) === 1 ? 'transacci\u00f3n' : 'transacciones'}</p>
-                                            </div>
-                                            <div className="font-bold">{formatCurrency(Number(s.total) || 0)}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
+                    {/* Mono-sede (Condesa): se elimin\u00f3 la comparativa de ingresos por sucursal. */}
                 </div>
             </div>
         </AdminLayout>

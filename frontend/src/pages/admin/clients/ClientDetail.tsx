@@ -155,8 +155,8 @@ export default function ClientDetail() {
 
     // Mutation para reenviar credenciales (genera contraseña nueva)
     const isElevated = useIsElevated();
-    // Admin/master eligen desde qué WhatsApp (sucursal) sale el mensaje.
-    const [waKey, setWaKey] = useState<'san-miguel' | 'tepa'>('san-miguel');
+    // Mono-sede: el WhatsApp sale del único número; se conserva la key por compatibilidad.
+    const [waKey] = useState<'san-miguel' | 'tepa'>('san-miguel');
     const [resendResult, setResendResult] = useState<{
         tempPassword: string;
         emailSent: boolean;
@@ -381,19 +381,6 @@ export default function ClientDetail() {
                                                 La contraseña anterior dejará de funcionar.
                                             </AlertDialogDescription>
                                         </AlertDialogHeader>
-                                        {isElevated && client.phone && (
-                                            <div className="mb-1">
-                                                <p className="text-xs text-muted-foreground mb-1 font-body">Enviar el WhatsApp desde la sucursal:</p>
-                                                <ToggleGroup
-                                                    type="single"
-                                                    value={waKey}
-                                                    onValueChange={(v) => { if (v === 'san-miguel' || v === 'tepa') setWaKey(v); }}
-                                                    className="justify-start gap-1"
-                                                >
-                                                    <ToggleGroupItem value="san-miguel" size="sm" className="text-xs px-3">Condesa</ToggleGroupItem>
-                                                </ToggleGroup>
-                                            </div>
-                                        )}
                                         <AlertDialogFooter>
                                             <AlertDialogCancel className="rounded-xl font-body">Cancelar</AlertDialogCancel>
                                             <AlertDialogAction

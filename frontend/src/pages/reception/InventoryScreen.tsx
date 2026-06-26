@@ -201,17 +201,6 @@ function NewProductDialog({ categories, onCreated }: { categories: Category[]; o
                             onChange={(e) => setForm({ ...form, name: e.target.value })}
                             placeholder="Ej. Botella de agua" />
                     </div>
-                    {elevated && (
-                        <div className="space-y-1">
-                            <Label>Sucursal</Label>
-                            <Select value={facilityValue} onValueChange={(v) => setForm({ ...form, facility_id: v })}>
-                                <SelectTrigger><SelectValue placeholder="Elige sucursal" /></SelectTrigger>
-                                <SelectContent>
-                                    {facilities.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
                             <Label htmlFor="np-price">Precio (MXN)</Label>

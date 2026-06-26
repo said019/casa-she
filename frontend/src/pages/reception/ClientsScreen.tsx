@@ -401,22 +401,6 @@ function ReserveClassDialog({ clientId, clientName, onDone }: { clientId: string
                         <Label>Día</Label>
                         <Input type="date" value={date} onChange={(e) => { setDate(e.target.value); setClassId(''); }} />
                     </div>
-                    {elevated && facilities.length > 1 && (
-                        <div className="space-y-1">
-                            <Label>Sucursal</Label>
-                            <Select value={facility || 'all'} onValueChange={(v) => { setFacility(v === 'all' ? '' : v); setClassId(''); }}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todas las sucursales</SelectItem>
-                                    {facilities.map((f) => (
-                                        <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
                     <div className="space-y-1">
                         <Label>Clase</Label>
                         <Select value={classId} onValueChange={setClassId}>
@@ -877,19 +861,6 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
                     <Card>
                         <CardContent className="pt-4">
                             <h3 className="font-medium mb-2">Credenciales de acceso</h3>
-                            {elevated && (
-                                <div className="mb-2">
-                                    <p className="text-[11px] text-muted-foreground mb-1">Enviar desde el WhatsApp de:</p>
-                                    <ToggleGroup
-                                        type="single"
-                                        value={waKey}
-                                        onValueChange={(v) => { if (v === 'san-miguel' || v === 'tepa') setWaKey(v); }}
-                                        className="justify-start gap-1"
-                                    >
-                                        <ToggleGroupItem value="san-miguel" size="sm" className="text-xs px-3">Condesa</ToggleGroupItem>
-                                    </ToggleGroup>
-                                </div>
-                            )}
                             <Button
                                 variant="outline"
                                 size="sm"

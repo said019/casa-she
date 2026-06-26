@@ -103,7 +103,7 @@ export default function TeamScreen() {
           <div className="py-12 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-balance-olive" /></div>
         ) : visible.length === 0 ? (
           <p className="py-12 text-center text-balance-dark/55">
-            {staff.length === 0 ? 'No hay recepcionistas.' : 'No hay recepcionistas en esta sucursal.'}
+            No hay recepcionistas.
           </p>
         ) : (
           <ul className="divide-y divide-balance-sand/40">

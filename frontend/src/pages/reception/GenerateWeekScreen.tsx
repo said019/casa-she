@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { startOfWeek, addDays, format } from 'date-fns';
 import api, { getErrorMessage } from '@/lib/api';
@@ -65,6 +65,11 @@ export default function ReceptionGenerateWeekScreen() {
         .map((f) => ({ id: f.id, name: f.name.replace(/^Casa Shé\s*/i, '').trim() || f.name })),
     [facilities],
   );
+
+  // Mono-sede: auto-selecciona la única sede en vez de mostrar un selector.
+  useEffect(() => {
+    if (facility === 'all' && studios[0]?.id) setFacility(studios[0].id);
+  }, [studios, facility]);
 
   // Plantilla semanal (lo que el generador usa). Permite ver QUÉ se va a crear.
   const { data: template = [] } = useQuery<TemplateRow[]>({
@@ -138,7 +143,7 @@ export default function ReceptionGenerateWeekScreen() {
   }
 
   const facilityLabel =
-    facility === 'all' ? 'ambas sucursales' : studios.find((s) => s.id === facility)?.name ?? 'la sucursal';
+    studios.find((s) => s.id === facility)?.name ?? 'Casa Shé';
   const invalidRange = !startDate || !endDate || endDate < startDate;
 
   return (
@@ -179,26 +184,9 @@ export default function ReceptionGenerateWeekScreen() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Sucursal</Label>
-            <Select value={facility} onValueChange={setFacility}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Ambas sucursales</SelectItem>
-                {studios.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           <div className="rounded-[1rem] border border-balance-olive/16 bg-balance-cream/55 px-4 py-3 text-sm text-balance-dark/72">
             <Sparkles className="mr-1.5 inline h-4 w-4 text-balance-olive" />
-            Se generará la plantilla para <strong>{facilityLabel}</strong>.
+            Se generará la plantilla de la semana.
           </div>
 
           {/* Preview: qué horarios se van a generar */}

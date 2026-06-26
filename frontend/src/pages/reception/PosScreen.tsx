@@ -182,25 +182,9 @@ function AbrirCajaDialog({ open, onOpenChange, onConfirm, isPending }: AbrirCaja
         <DialogHeader>
           <DialogTitle>La caja está cerrada</DialogTitle>
           <DialogDescription>
-            No hay un turno abierto en esta sucursal. ¿Abrir caja ahora para registrar la venta?
+            No hay un turno abierto. ¿Abrir caja ahora para registrar la venta?
           </DialogDescription>
         </DialogHeader>
-
-        {elevated && (
-          <div className="space-y-2 py-1">
-            <Label htmlFor="abrir-fac">Sucursal</Label>
-            <Select value={facilityId} onValueChange={setFacilityId}>
-              <SelectTrigger id="abrir-fac">
-                <SelectValue placeholder="Elige la sucursal" />
-              </SelectTrigger>
-              <SelectContent>
-                {facilities.map((f) => (
-                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
 
         <div className="space-y-2 py-2">
           <Label htmlFor="abrir-float">Fondo inicial (MXN)</Label>

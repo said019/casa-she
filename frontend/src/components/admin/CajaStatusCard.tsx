@@ -93,7 +93,7 @@ export function CajaStatusCard() {
         const map = new Map<string, { name: string; rows: CajaStaffStatus[] }>();
         for (const r of list) {
             const key = r.shift_facility_id ?? r.assigned_facility_id ?? '__none__';
-            const name = r.shift_facility_name ?? r.assigned_facility_name ?? 'Sin sucursal asignada';
+            const name = r.shift_facility_name ?? r.assigned_facility_name ?? 'Sin sede';
             if (!map.has(key)) map.set(key, { name, rows: [] });
             map.get(key)!.rows.push(r);
         }
@@ -278,15 +278,6 @@ function AdminOpenCaja() {
                 <div className="space-y-2">
                     <p className="text-sm font-medium">Abrir mi caja</p>
                     <div className="flex flex-wrap items-end gap-2">
-                        <div className="space-y-1">
-                            <span className="block text-xs text-muted-foreground">Sucursal</span>
-                            <Select value={facilityId} onValueChange={setFacilityId}>
-                                <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Elige sucursal" /></SelectTrigger>
-                                <SelectContent>
-                                    {facilities.map((f) => (<SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>))}
-                                </SelectContent>
-                            </Select>
-                        </div>
                         <div className="space-y-1">
                             <span className="block text-xs text-muted-foreground">Fondo inicial</span>
                             <Input type="number" value={float} onChange={(e) => setFloat(e.target.value)} className="h-9 w-28" />

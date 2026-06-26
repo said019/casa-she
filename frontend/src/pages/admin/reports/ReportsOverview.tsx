@@ -295,37 +295,7 @@ export default function ReportsOverview() {
                     </Card>
                 )}
 
-                {/* Utilidad por sucursal */}
-                {profitByFacility?.rows && profitByFacility.rows.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Utilidad por sucursal</CardTitle>
-                            <CardDescription>Ingresos − egresos asignados, por local, en el período</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                {profitByFacility.rows.map((s) => {
-                                    const positive = s.profit >= 0;
-                                    return (
-                                        <div key={s.facility_id} className={`rounded-xl border p-4 ${positive ? 'border-emerald-200 bg-emerald-50/40' : 'border-red-200 bg-red-50/40'}`}>
-                                            <p className="text-sm font-semibold">{s.facility_name.replace(/^Casa Shé\s*/i, '')}</p>
-                                            <p className={`mt-1 text-xl sm:text-2xl font-bold tabular-nums truncate ${positive ? 'text-emerald-600' : 'text-red-500'}`}>{formatCurrency(s.profit)}</p>
-                                            <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-                                                <span>Ingresos: <span className="font-medium text-emerald-600">{formatCurrency(s.revenue)}</span></span>
-                                                <span>Egresos: <span className="font-medium text-red-500">{formatCurrency(s.expenses)}</span></span>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            {profitByFacility.generalExpenses > 0 && (
-                                <p className="mt-3 text-xs text-muted-foreground">
-                                    * No incluye {formatCurrency(profitByFacility.generalExpenses)} de gastos generales sin asignar a una sucursal.
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
+                {/* Mono-sede (Condesa): se eliminó la comparativa de utilidad por sucursal. */}
             </div>
         </AdminLayout>
     );

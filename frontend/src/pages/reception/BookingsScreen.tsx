@@ -31,7 +31,6 @@ import api, { getErrorMessage } from '@/lib/api';
 import { CancelBookingDialog } from '@/components/bookings/CancelBookingDialog';
 import { GuestBookingDialog } from '@/components/bookings/GuestBookingDialog';
 import { useFacilityScope } from '@/hooks/useFacilityScope';
-import { useFacilityScopeStore } from '@/stores/facilityScopeStore';
 import { useIsElevated } from '@/hooks/useIsElevated';
 import { useAuthStore } from '@/stores/authStore';
 import SellPlanDialog from '@/components/memberships/SellPlanDialog';
@@ -680,22 +679,7 @@ function AdminBookDialog({ defaultDate, onDone }: { defaultDate: string; onDone:
                         <Label>Día</Label>
                         <Input type="date" value={date} onChange={(e) => { setDate(e.target.value); setClassId(''); }} />
                     </div>
-                    {elevated && facilities.length > 1 && (
-                        <div className="space-y-1">
-                            <Label>Sucursal</Label>
-                            <Select value={facility || 'all'} onValueChange={(v) => { setFacility(v === 'all' ? '' : v); setClassId(''); }}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todas las sucursales</SelectItem>
-                                    {facilities.map((f) => (
-                                        <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
+                    {/* Mono-sede (Condesa): se eliminó el selector de sucursal. */}
                     <div className="space-y-1">
                         <Label>Clase</Label>
                         <Select value={classId} onValueChange={setClassId}>
@@ -1184,16 +1168,7 @@ function FilterBar({
     });
     const activeInstructors = instructors.filter((i) => i.is_active);
 
-    // Filtro de sucursal (admin / recepción master). Usa el store global que ya
-    // alimenta todas las consultas de clases vía useFacilityScope.
-    const elevated = useIsElevated();
-    const selectedFacilityId = useFacilityScopeStore((s) => s.selectedFacilityId);
-    const setSelectedFacility = useFacilityScopeStore((s) => s.setSelected);
-    const { data: facilities = [] } = useQuery<{ id: string; name: string }[]>({
-        queryKey: ['facilities'],
-        queryFn: async () => (await api.get('/facilities')).data,
-        enabled: elevated,
-    });
+    // Casa Shé es mono-sede (Condesa): se eliminó el selector de sucursal.
 
     const pill = (val: CategoryFilter, label: string) => (
         <button
@@ -1218,22 +1193,6 @@ function FilterBar({
                 {pill('reformer', 'Reformer')}
                 {pill('multi', 'Multi')}
             </div>
-            {elevated && facilities.length > 1 && (
-                <Select
-                    value={selectedFacilityId ?? 'all'}
-                    onValueChange={(v) => setSelectedFacility(v === 'all' ? null : v)}
-                >
-                    <SelectTrigger className="h-8 text-xs w-44">
-                        <SelectValue placeholder="Todas las sucursales" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Todas las sucursales</SelectItem>
-                        {facilities.map((f) => (
-                            <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            )}
             <Select value={instructorId || 'all'} onValueChange={(v) => setInstructorId(v === 'all' ? '' : v)}>
                 <SelectTrigger className="h-8 text-xs w-48">
                     <SelectValue placeholder="Todos los instructores" />

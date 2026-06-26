@@ -101,25 +101,11 @@ const METHOD_LABELS: Record<string, string> = {
 // ─── Quick action: Open cash shift inline ─────────────────────────────────────
 function OpenShiftInline({ onOpened }: { onOpened: () => void }) {
     const [opening, setOpening] = useState('0');
-    const { elevated, facilities, facilityId, setFacilityId, openMutation, needsFacility } = useOpenCaja(onOpened);
+    // Mono-sede: useOpenCaja fija automáticamente la única sede (sin selector visible).
+    const { openMutation, needsFacility } = useOpenCaja(onOpened);
 
     return (
         <div className="flex flex-wrap items-end gap-2">
-            {elevated && (
-                <div className="space-y-1">
-                    <Label className="text-xs">Sucursal</Label>
-                    <Select value={facilityId} onValueChange={setFacilityId}>
-                        <SelectTrigger className="h-9 w-44">
-                            <SelectValue placeholder="Elige sucursal" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {facilities.map((f) => (
-                                <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            )}
             <div className="space-y-1">
                 <Label className="text-xs">Fondo inicial</Label>
                 <Input

@@ -102,7 +102,8 @@ function CreateReceptionistDialog({ open, onOpenChange, facilities }: CreateDial
     const [displayName, setDisplayName] = useState('');
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
-    const [facilityId, setFacilityId] = useState<string>('none');
+    // Mono-sede: la recepción se asigna automáticamente a la única sede (sin selector).
+    const facilityId = facilities[0]?.id ?? 'none';
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const resetForm = () => {
@@ -110,7 +111,6 @@ function CreateReceptionistDialog({ open, onOpenChange, facilities }: CreateDial
         setDisplayName('');
         setPhone('');
         setPassword('');
-        setFacilityId('none');
         setErrors({});
     };
 
@@ -230,27 +230,6 @@ function CreateReceptionistDialog({ open, onOpenChange, facilities }: CreateDial
                         )}
                     </div>
 
-                    <div className="grid gap-2">
-                        <Label htmlFor="create-facility">Sucursal asignada</Label>
-                        <Select
-                            value={facilityId}
-                            onValueChange={setFacilityId}
-                            disabled={createMutation.isPending}
-                        >
-                            <SelectTrigger id="create-facility">
-                                <SelectValue placeholder="Seleccionar sucursal..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="none">— Sin asignar —</SelectItem>
-                                {facilities.map((f) => (
-                                    <SelectItem key={f.id} value={f.id}>
-                                        {f.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
                     <DialogFooter className="mt-2">
                         <Button
                             type="button"
@@ -286,13 +265,13 @@ function EditReceptionistDialog({ staff, onOpenChange, facilities }: EditDialogP
     const queryClient = useQueryClient();
 
     const [displayName, setDisplayName] = useState(staff?.display_name ?? '');
-    const [facilityId, setFacilityId] = useState<string>(staff?.default_facility_id ?? 'none');
+    // Mono-sede: la sede se asigna automáticamente a la única (sin selector visible).
+    const facilityId = staff?.default_facility_id ?? facilities[0]?.id ?? 'none';
     const [isActive, setIsActive] = useState(staff?.is_active ?? true);
 
     // Keep local state in sync when staff prop changes (dialog re-opens for a different row)
     useState(() => {
         setDisplayName(staff?.display_name ?? '');
-        setFacilityId(staff?.default_facility_id ?? 'none');
         setIsActive(staff?.is_active ?? true);
     });
 
@@ -347,27 +326,6 @@ function EditReceptionistDialog({ staff, onOpenChange, facilities }: EditDialogP
                             disabled={editMutation.isPending}
                             required
                         />
-                    </div>
-
-                    <div className="grid gap-2">
-                        <Label htmlFor="edit-facility">Sucursal asignada</Label>
-                        <Select
-                            value={facilityId}
-                            onValueChange={setFacilityId}
-                            disabled={editMutation.isPending}
-                        >
-                            <SelectTrigger id="edit-facility">
-                                <SelectValue placeholder="Seleccionar sucursal..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="none">— Sin asignar —</SelectItem>
-                                {facilities.map((f) => (
-                                    <SelectItem key={f.id} value={f.id}>
-                                        {f.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
                     </div>
 
                     <div className="flex items-center justify-between rounded-lg border p-3">
@@ -562,7 +520,6 @@ function ReceptionStaffContent() {
                             <TableHead>Nombre</TableHead>
                             <TableHead>Email</TableHead>
                             <TableHead>Teléfono</TableHead>
-                            <TableHead>Sucursal</TableHead>
                             <TableHead>Master</TableHead>
                             <TableHead>Estado</TableHead>
                             <TableHead className="text-right">Acciones</TableHead>
@@ -571,19 +528,19 @@ function ReceptionStaffContent() {
                     <TableBody>
                         {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="text-center py-10">
+                                <TableCell colSpan={6} className="text-center py-10">
                                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
                                 </TableCell>
                             </TableRow>
                         ) : isError ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="text-center py-10 text-destructive">
+                                <TableCell colSpan={6} className="text-center py-10 text-destructive">
                                     Error al cargar equipo. Intenta de nuevo.
                                 </TableCell>
                             </TableRow>
                         ) : staffList.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                                <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
                                     <UserX className="h-8 w-8 mx-auto mb-2 opacity-40" />
                                     No hay recepcionistas registrados.
                                 </TableCell>
@@ -623,20 +580,6 @@ function ReceptionStaffContent() {
                                         </TableCell>
                                         <TableCell className="text-muted-foreground text-sm">
                                             {member.phone || '—'}
-                                        </TableCell>
-                                        <TableCell>
-                                            {member.facility_name ? (
-                                                <Badge
-                                                    variant="outline"
-                                                    className="text-blue-600 border-blue-200 bg-blue-50"
-                                                >
-                                                    {member.facility_name}
-                                                </Badge>
-                                            ) : (
-                                                <span className="text-muted-foreground text-sm italic">
-                                                    — sin asignar —
-                                                </span>
-                                            )}
                                         </TableCell>
                                         {/* Master switch: only for reception rows */}
                                         <TableCell>
@@ -891,8 +834,8 @@ function ReceptionStaffContent() {
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             {masterConfirm?.value
-                                ? `${masterConfirm.member.display_name} podrá operar en todas las sucursales y tendrá accesos avanzados de recepción.`
-                                : `${masterConfirm?.member.display_name} quedará como recepcionista estándar, limitada a su sucursal asignada.`
+                                ? `${masterConfirm.member.display_name} tendrá accesos avanzados de recepción.`
+                                : `${masterConfirm?.member.display_name} quedará como recepcionista estándar.`
                             }
                         </AlertDialogDescription>
                     </AlertDialogHeader>

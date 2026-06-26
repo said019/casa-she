@@ -99,24 +99,6 @@ export default function CashShiftsList() {
                 {/* Filters */}
                 <div className="rounded-[1.5rem] border border-[#DCCCC0]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
                     <div className="flex flex-wrap items-end gap-4">
-                        {/* Facility */}
-                        <div className="space-y-1 min-w-[180px]">
-                            <Label className="text-xs text-[#6B554D]">Sucursal</Label>
-                            <Select value={facilityId} onValueChange={setFacilityId}>
-                                <SelectTrigger className="h-8 text-xs">
-                                    <SelectValue placeholder="Todas" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todas</SelectItem>
-                                    {facilities.map((f) => (
-                                        <SelectItem key={f.id} value={f.id}>
-                                            {f.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
                         {/* Status */}
                         <div className="space-y-1 min-w-[150px]">
                             <Label className="text-xs text-[#6B554D]">Estado</Label>

@@ -495,24 +495,6 @@ export default function CajaScreen() {
           </div>
           <p className="mt-1.5 text-sm text-[#6B554D]">Ingresa el fondo inicial en efectivo para abrir el turno.</p>
           <div className="mt-4 space-y-4">
-            {elevated && (
-              <div className="space-y-2">
-                <Label className="text-[#6B554D]">Sucursal</Label>
-                <Select value={facilityId} onValueChange={setFacilityId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Elige la sucursal" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {facilities.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {needsFacility && (
-                  <p className="text-xs text-amber-600">Elige una sucursal para abrir la caja.</p>
-                )}
-              </div>
-            )}
             <div className="space-y-2">
               <Label htmlFor="opening-float" className="text-[#6B554D]">Fondo inicial (MXN)</Label>
               <Input
