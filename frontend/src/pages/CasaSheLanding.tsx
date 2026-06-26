@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import api from "@/lib/api";
 
 /**
  * Landing público de Casa Shé — réplica fiel de https://casashe.mx/
@@ -61,10 +63,63 @@ const PILLARS = [
 const NAV = [
   { label: "Inicio", href: "#inicio" },
   { label: "Servicios", href: "#servicios" },
+  { label: "Horario", href: "#horario" },
   { label: "Fuel Bar", href: "#bar" },
   { label: "Nosotras", href: "#nosotras" },
   { label: "Contacto", href: "#contacto" },
 ];
+
+// Horario de muestra (se usa cuando aún no hay clases cargadas en el sistema).
+// Refleja las franjas reales: L–V 7–13 y 17–22, fines 8–13, talleres fin de semana.
+const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"] as const;
+const SAMPLE_WEEK: Record<string, { time: string; name: string }[]> = {
+  Lun: [{ time: "07:00", name: "Pilates Mat" }, { time: "09:00", name: "Yoga" }, { time: "19:00", name: "Pilates Mat" }],
+  Mar: [{ time: "07:00", name: "Aeroyoga" }, { time: "18:00", name: "Pilates Mat" }, { time: "19:00", name: "Telas" }],
+  Mié: [{ time: "08:00", name: "Yoga" }, { time: "10:00", name: "Pilates Mat" }, { time: "20:00", name: "Telas" }],
+  Jue: [{ time: "07:00", name: "Aeroyoga" }, { time: "18:00", name: "Pilates Mat" }, { time: "19:00", name: "Yoga" }],
+  Vie: [{ time: "07:00", name: "Pilates Mat" }, { time: "09:00", name: "Yoga" }, { time: "20:00", name: "Telas" }],
+  Sáb: [{ time: "09:00", name: "Yoga" }, { time: "10:00", name: "Aeroyoga" }, { time: "14:00", name: "Taller" }],
+  Dom: [{ time: "10:00", name: "Pilates Mat" }, { time: "11:00", name: "Taller" }],
+};
+
+interface ApiClass {
+  id: string;
+  start_time: string;
+  class_type_name?: string;
+  instructor_name?: string;
+}
+
+function useWeekSchedule() {
+  return useQuery<Record<string, { time: string; name: string; coach?: string }[]> | null>({
+    queryKey: ["landing-horario"],
+    queryFn: async () => {
+      // Semana en curso (lun–dom) calculada en cliente.
+      const now = new Date();
+      const day = (now.getDay() + 6) % 7; // 0 = lunes
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - day);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      const fmt = (d: Date) => d.toISOString().slice(0, 10);
+      const { data } = await api.get<ApiClass[]>(`/classes?start=${fmt(monday)}&end=${fmt(sunday)}`);
+      if (!Array.isArray(data) || data.length === 0) return null; // sin datos → usar muestra
+      const grouped: Record<string, { time: string; name: string; coach?: string }[]> = {};
+      for (const c of data) {
+        const dt = new Date(c.start_time);
+        const key = DAYS[(dt.getDay() + 6) % 7];
+        (grouped[key] ||= []).push({
+          time: dt.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }),
+          name: c.class_type_name || "Clase",
+          coach: c.instructor_name,
+        });
+      }
+      for (const k of Object.keys(grouped)) grouped[k].sort((a, b) => a.time.localeCompare(b.time));
+      return grouped;
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+}
 
 function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -264,6 +319,77 @@ function Servicios() {
   );
 }
 
+function Horario() {
+  const { data } = useWeekSchedule();
+  const isSample = !data;
+  const week = data ?? SAMPLE_WEEK;
+
+  return (
+    <section id="horario" className="px-6 py-24" style={{ backgroundColor: CREAM }}>
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-12 text-center">
+          <p className={`${body} text-[13px] uppercase tracking-[0.4em]`} style={{ color: GREEN, opacity: 0.6 }}>
+            Horario
+          </p>
+          <h2 className={`${display} mt-3 text-5xl font-light tracking-wide sm:text-6xl`} style={{ color: GREEN }}>
+            Nuestra semana
+          </h2>
+          <p className={`${body} mt-4 text-base tracking-[0.12em]`} style={{ color: GREEN, opacity: 0.7 }}>
+            Clases en grupos pequeños · 6–7 lugares por sesión
+          </p>
+        </div>
+
+        <div className="flex snap-x gap-4 overflow-x-auto pb-3 lg:grid lg:grid-cols-7 lg:gap-3 lg:overflow-visible">
+          {DAYS.map((d) => {
+            const classes = week[d] ?? [];
+            return (
+              <div
+                key={d}
+                className="min-w-[150px] flex-1 snap-start rounded-2xl p-4"
+                style={{ backgroundColor: "rgba(255,255,255,0.55)", boxShadow: "inset 0 0 0 1px rgba(39,74,42,0.10)" }}
+              >
+                <p className={`${body} mb-3 text-center text-[12px] uppercase tracking-[0.28em]`} style={{ color: GREEN, opacity: 0.7 }}>
+                  {d}
+                </p>
+                <div className="space-y-2">
+                  {classes.length === 0 && (
+                    <p className={`${body} py-4 text-center text-sm`} style={{ color: GREEN, opacity: 0.3 }}>—</p>
+                  )}
+                  {classes.map((c, i) => (
+                    <div
+                      key={i}
+                      className="rounded-xl px-3 py-2.5 text-center transition-colors"
+                      style={{ backgroundColor: CREAM, boxShadow: "inset 0 0 0 1px rgba(39,74,42,0.08)" }}
+                    >
+                      <p className={`${display} text-lg leading-none`} style={{ color: GREEN }}>{c.time}</p>
+                      <p className={`${body} mt-1 text-[13px] leading-tight`} style={{ color: GREEN, opacity: 0.85 }}>{c.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-10 text-center">
+          {isSample && (
+            <p className={`${body} mb-4 text-[13px] tracking-wide`} style={{ color: GREEN, opacity: 0.55 }}>
+              Horario de muestra · crea tu cuenta para ver disponibilidad y reservar en vivo.
+            </p>
+          )}
+          <Link
+            to="/register"
+            className={`${body} inline-block rounded-full px-9 py-3.5 text-[13px] uppercase tracking-[0.28em] transition-all hover:scale-[1.03]`}
+            style={{ backgroundColor: GREEN, color: CREAM }}
+          >
+            Reserva tu lugar
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function FuelBar() {
   return (
     <section id="bar" className="relative overflow-hidden">
@@ -336,6 +462,7 @@ export default function CasaSheLanding() {
       <Hero />
       <Paquetes />
       <Servicios />
+      <Horario />
       <FuelBar />
       <Nosotras />
       <Footer />
