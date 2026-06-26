@@ -156,8 +156,8 @@ export default function ReportsRevenue() {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">Todas las sucursales</SelectItem>
-                                {(facilities || []).filter((f) => /^bmb/i.test(f.name)).map((f) => (
-                                    <SelectItem key={f.id} value={f.id}>{f.name.replace(/^BMB Studio\s*/i, '')}</SelectItem>
+                                {(facilities || []).filter((f) => /^casa sh/i.test(f.name)).map((f) => (
+                                    <SelectItem key={f.id} value={f.id}>{f.name.replace(/^Casa Shé\s*/i, '')}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>

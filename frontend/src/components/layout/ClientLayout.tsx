@@ -15,6 +15,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import CasaSheLogo from '@/components/CasaSheLogo';
 
 interface ClientLayoutProps {
     children: ReactNode;
@@ -97,17 +98,13 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             >
                 <div className="mx-auto flex h-[4.8rem] max-w-[1480px] items-center justify-between gap-3 px-5 sm:px-8 lg:px-10">
                     <Link to="/app" className="flex min-w-0 items-center gap-3">
-                        <img
-                            src="/bmb-studio-logo.png"
-                            alt="BMB Studio"
-                            className="h-12 w-auto object-contain"
-                        />
+                        <CasaSheLogo variant="mark" className="h-10 w-10 text-bmb-gold" />
                         <div className="hidden min-w-0 sm:block">
                             <span className="block truncate font-heading text-xl font-medium leading-none tracking-[-0.02em] text-bmb-dark">
-                                BMB Studio
+                                Casa Shé
                             </span>
                             <span className="mt-1 block text-[9px] font-semibold uppercase tracking-[0.25em] text-bmb-gold">
-                                Body · Mind · Balance
+                                La comunidad es la medicina
                             </span>
                         </div>
                     </Link>

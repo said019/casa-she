@@ -35,6 +35,7 @@ import { useFacilityScopeStore } from '@/stores/facilityScopeStore';
 import { effectivePermissions, type PermissionKey } from '@/lib/permissions';
 import { MyProfileDialog } from '@/components/reception/MyProfileDialog';
 import { AdminSearch } from '@/components/admin/AdminSearch';
+import CasaSheLogo from '@/components/CasaSheLogo';
 
 type NavItem = { href: string; label: string; icon: ElementType; exact?: boolean; perm?: PermissionKey };
 
@@ -149,10 +150,10 @@ export default function ReceptionLayout() {
                 <div className="flex h-[5.25rem] items-center justify-between px-4">
                     {!sidebarCollapsed && (
                         <Link to="/reception" className="flex min-w-0 items-center gap-3">
-                            <img src="/bmb-studio-logo.png" alt="BMB Studio" className="h-11 w-auto object-contain" />
+                            <CasaSheLogo variant="mark" className="h-9 w-9 text-balance-gold" />
                             <div className="min-w-0">
                                 <span className="block truncate text-[0.95rem] font-semibold tracking-[-0.02em] text-balance-dark">
-                                    BMB Studio
+                                    Casa Shé
                                 </span>
                                 <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.24em] text-balance-olive">
                                     {facilityLabel}
@@ -196,9 +197,9 @@ export default function ReceptionLayout() {
                         >
                             <div className="flex h-[5.25rem] items-center justify-between px-4">
                                 <Link to="/reception" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3">
-                                    <img src="/bmb-studio-logo.png" alt="BMB Studio" className="h-10 w-auto object-contain" />
+                                    <CasaSheLogo variant="mark" className="h-9 w-9 text-balance-gold" />
                                     <div>
-                                        <span className="block text-sm font-semibold text-balance-dark">BMB Studio</span>
+                                        <span className="block text-sm font-semibold text-balance-dark">Casa Shé</span>
                                         <span className="block text-[10px] uppercase tracking-[0.22em] text-balance-olive">{facilityLabel}</span>
                                     </div>
                                 </Link>

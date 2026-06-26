@@ -686,8 +686,8 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     // Sucursales BMB (de facilities). El calendario muestra UNA a la vez (toggle).
     const bmbStudios = useMemo(
         () => (facilities || [])
-            .filter((f) => /^bmb/i.test(f.name))
-            .map((f) => ({ id: f.id, name: f.name, short: f.name.replace(/^BMB Studio\s*/i, '') })),
+            .filter((f) => /^casa sh/i.test(f.name))
+            .map((f) => ({ id: f.id, name: f.name, short: f.name.replace(/^Casa Shé\s*/i, '') })),
         [facilities]
     );
 

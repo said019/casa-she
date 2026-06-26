@@ -684,7 +684,7 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
             const today = todayIso();
             // SIN filtro de sucursal: la clienta reserva en cualquier sucursal y recepción debe ver
             // TODAS sus reservas (antes se filtraba por la sucursal de recepción y escondía, p.ej.,
-            // las reservas de San Miguel cuando entrabas como recepción Tepa).
+            // reservas de otra sucursal cuando entrabas como recepción de una distinta).
             const res = await api.get(`/bookings?userId=${client?.id}&startDate=${today}&limit=500`);
             return (res.data as ClientBooking[])
                 .filter((b) => b.booking_status === 'confirmed' || b.booking_status === 'checked_in' || b.booking_status === 'waitlist')
@@ -886,8 +886,7 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
                                         onValueChange={(v) => { if (v === 'san-miguel' || v === 'tepa') setWaKey(v); }}
                                         className="justify-start gap-1"
                                     >
-                                        <ToggleGroupItem value="san-miguel" size="sm" className="text-xs px-3">San Miguel</ToggleGroupItem>
-                                        <ToggleGroupItem value="tepa" size="sm" className="text-xs px-3">Tepa</ToggleGroupItem>
+                                        <ToggleGroupItem value="san-miguel" size="sm" className="text-xs px-3">Condesa</ToggleGroupItem>
                                     </ToggleGroup>
                                 </div>
                             )}

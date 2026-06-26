@@ -51,7 +51,7 @@ export default function InstructorAccess() {
                 <strong>Pasos siguientes:</strong>
                 <ol className="list-decimal list-inside mt-2 space-y-1">
                   <li>Abre tu correo electrónico</li>
-                  <li>Busca el email de BMB Studio</li>
+                  <li>Busca el email de Casa Shé</li>
                   <li>Haz clic en el botón de acceso</li>
                   <li>Serás redirigido automáticamente</li>
                 </ol>

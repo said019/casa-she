@@ -60,9 +60,9 @@ interface ClassRow {
     facility_name?: string | null;
 }
 
-// Sucursal en formato corto para la etiqueta (quita el prefijo "BMB Studio")
+// Sucursal en formato corto para la etiqueta (quita el prefijo "Casa Shé")
 const shortFacility = (name?: string | null) =>
-    (name || '').replace(/^BMB\s*Studio\s*/i, '').trim();
+    (name || '').replace(/^Casa Shé\s*/i, '').trim();
 
 type CategoryFilter = 'all' | 'reformer' | 'multi';
 

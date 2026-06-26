@@ -77,7 +77,7 @@ export default function UpdatePrompt() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-bmb-dark">Nueva versión disponible</p>
           <p className="mt-0.5 text-xs text-bmb-dark/70">
-            Recarga para tener lo último de BMB Studio.
+            Recarga para tener lo último de Casa Shé.
           </p>
           <div className="mt-2.5 flex items-center gap-2">
             <Button

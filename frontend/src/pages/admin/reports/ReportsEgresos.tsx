@@ -142,7 +142,7 @@ export default function ReportsEgresos() {
     queryFn: async () => (await api.get('/facilities')).data,
   });
 
-  const bmbFacilities = facilities.filter((fc) => /^bmb/i.test(fc.name));
+  const bmbFacilities = facilities.filter((fc) => /^casa sh/i.test(fc.name));
 
   const { data: egresos = [], isLoading } = useQuery<Egreso[]>({
     queryKey: ['egresos', catFilter, statusFilter, search, facilityFilter],
@@ -445,7 +445,7 @@ export default function ReportsEgresos() {
             <SelectContent>
               <SelectItem value="all">Todas las sucursales</SelectItem>
               {bmbFacilities.map((fc) => (
-                <SelectItem key={fc.id} value={fc.id}>{fc.name.replace(/^BMB Studio\s*/i, '')}</SelectItem>
+                <SelectItem key={fc.id} value={fc.id}>{fc.name.replace(/^Casa Shé\s*/i, '')}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -615,7 +615,7 @@ export default function ReportsEgresos() {
                 <SelectContent>
                   <SelectItem value="general">General / Ambas</SelectItem>
                   {bmbFacilities.map((fc) => (
-                    <SelectItem key={fc.id} value={fc.id}>{fc.name.replace(/^BMB Studio\s*/i, '')}</SelectItem>
+                    <SelectItem key={fc.id} value={fc.id}>{fc.name.replace(/^Casa Shé\s*/i, '')}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

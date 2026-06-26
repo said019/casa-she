@@ -42,6 +42,7 @@ import {
     ArrowLeftRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import CasaSheLogo from '@/components/CasaSheLogo';
 import { AdminBreadcrumbs } from '@/components/layout/AdminBreadcrumbs';
 import { AdminSearch } from '@/components/admin/AdminSearch';
 import api from '@/lib/api';
@@ -425,13 +426,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 <div className="flex h-[5.25rem] items-center justify-between px-4">
                     {!sidebarCollapsed && (
                         <Link to="/admin/dashboard" className="flex min-w-0 items-center gap-3">
-                            <img
-                                src="/bmb-studio-logo.png"
-                                alt="BMB Studio"
-                                className="h-11 w-auto object-contain"
-                            />
+                            <CasaSheLogo variant="mark" className="h-9 w-9 text-balance-gold" />
                             <div className="min-w-0">
-                                <span className="block truncate text-[0.95rem] font-semibold tracking-[-0.02em] text-balance-dark">BMB Studio</span>
+                                <span className="block truncate text-[0.95rem] font-semibold tracking-[-0.02em] text-balance-dark">Casa Shé</span>
                                 <span className="block text-[10px] font-semibold uppercase tracking-[0.24em] text-balance-olive">Studio admin</span>
                             </div>
                         </Link>
@@ -471,13 +468,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                         >
                             <div className="flex h-[5.25rem] items-center justify-between px-4">
                                 <Link to="/admin/dashboard" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3">
-                                    <img
-                                        src="/bmb-studio-logo.png"
-                                        alt="BMB Studio"
-                                        className="h-10 w-auto object-contain"
-                                    />
+                                    <CasaSheLogo variant="mark" className="h-9 w-9 text-balance-gold" />
                                     <div>
-                                        <span className="block text-sm font-semibold text-balance-dark">BMB Studio</span>
+                                        <span className="block text-sm font-semibold text-balance-dark">Casa Shé</span>
                                         <span className="block text-[10px] uppercase tracking-[0.22em] text-balance-olive">Admin</span>
                                     </div>
                                 </Link>

@@ -64,27 +64,29 @@ export default {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
         },
-        // BMB Studio brand palette (keys kept for backwards-compat with existing classes)
+        // Casa Shé brand palette (keys kept for backwards-compat with existing bmb-*/balance-* classes)
         balance: {
-          dark: "#2A2118",   // café oscuro — foreground
-          olive: "#CE9B25",  // dorado — primario (logo)
-          cream: "#ECE1CE",  // crema — background
-          gold: "#AD6C20",   // dorado profundo — detalles
-          sand: "#DCCCC0",   // taupe — bordes/superficies suaves
+          dark: "#16261A",   // verde casa profundo — secciones oscuras
+          olive: "#2E4A35",  // Verde Casa — primario (logo)
+          cream: "#FBF3DD",  // Avena — background
+          gold: "#B5512F",   // Arcilla — detalle cálido profundo
+          sand: "#D8D2BC",   // Arena — bordes/superficies suaves
         },
         bmb: {
-          gold: "#CE9B25",
-          deepgold: "#AD6C20",
-          cream: "#ECE1CE",
-          paper: "#FCFAF5",
-          taupe: "#DCCCC0",
-          mauve: "#A6776A",
-          rose: "#DBB0B3",
-          blush: "#E6D0CA",
-          leaf: "#7C8265",
-          dark: "#2A2118",
-          // `ink` is a semantic alias of `dark` for the editorial system. Keep both for backwards-compat.
-          ink: "#2A2118",
+          gold: "#2E4A35",     // Verde Casa — acento primario (era dorado)
+          deepgold: "#B5512F", // Arcilla — acento cálido para hover/activo
+          cream: "#FBF3DD",    // Avena — fondo
+          paper: "#FFFDF6",    // crema más clara — tarjetas
+          taupe: "#D8D2BC",    // Arena
+          mauve: "#8C6A57",    // arcilla apagada
+          rose: "#C9B7A0",     // arena cálida
+          blush: "#EDE3D2",    // avena suave
+          leaf: "#2E4A35",     // Verde Casa
+          moss: "#B6A43C",     // Musgo — mostaza de marca (acento decorativo)
+          clay: "#B5512F",     // Arcilla
+          dark: "#16261A",     // verde casa profundo
+          // `ink` es alias semántico para texto/editorial.
+          ink: "#2E1B22",      // Ciruela — texto
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

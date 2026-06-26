@@ -31,7 +31,7 @@ export default function BookClasses() {
             <div className="mx-auto max-w-[1440px] px-5 pt-10 sm:px-8 lg:px-12">
               <div className="flex items-baseline justify-between editorial-caption text-bmb-ink/55 border-b border-bmb-ink pb-3">
                 <span>Reservar — horarios</span>
-                <span>BMB Studio</span>
+                <span>Casa Shé</span>
               </div>
             </div>
             <Schedule bookedIds={bookedIds} defaultFirstFacility />

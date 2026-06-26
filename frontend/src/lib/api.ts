@@ -14,8 +14,8 @@ const api = axios.create({
 });
 
 // Token storage key
-const TOKEN_KEY = 'bmb_studio_token';
-// Admin API token (separate from JWT) used by /evolution endpoints in the BMB Studio API
+const TOKEN_KEY = 'casashe_token';
+// Admin API token (separate from JWT) used by /evolution endpoints in the Casa Shé API
 const ADMIN_TOKEN_KEY = 'bmb_studio_admin_token';
 
 export function getAdminApiToken(): string | null {
@@ -52,7 +52,7 @@ api.interceptors.request.use(
         if (token && config.headers) {
             config.headers.Authorization = `Bearer ${token}`;
         }
-        // Attach admin token for /evolution/* endpoints (BMB Studio API)
+        // Attach admin token for /evolution/* endpoints (Casa Shé API)
         const adminToken = getAdminApiToken();
         if (adminToken && config.headers && (config.url || '').startsWith('/evolution')) {
             config.headers['x-admin-token'] = adminToken;

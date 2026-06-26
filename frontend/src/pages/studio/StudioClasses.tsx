@@ -36,7 +36,7 @@ export default function StudioClasses() {
             <div className="aspect-[16/9] overflow-hidden rounded-lg">
               <img
                 src="/studio/barre.webp"
-                alt="Interior de BMB Studio — salón de clases"
+                alt="Interior de Casa Shé — salón de clases"
                 className="h-full w-full object-cover"
                 loading="lazy"
               />

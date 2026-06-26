@@ -3412,7 +3412,7 @@ runStartupMigrations()
     .finally(() => {
         app.listen(PORT, () => {
             console.log(`
-🚀 Balance Room API Server
+🚀 Casa Shé API Server
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📡 Server running on http://localhost:${PORT}
 🔒 Auth routes: /api/auth

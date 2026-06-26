@@ -9,6 +9,7 @@ import type { BookingClient } from '@/types/booking';
 import type { ClientMembership } from '@/types/membership';
 import { categoryCredits } from '@/types/membership';
 import { ClientLayout } from '@/components/layout/ClientLayout';
+import { CasaSheMark } from '@/components/CasaSheLogo';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -218,7 +219,7 @@ export default function ClientDashboard() {
             <div className="rounded-[1.55rem] border border-[#DCCCC0]/72 bg-[#FCEFEC]/76 p-4 shadow-[0_18px_58px_-52px_rgba(42,33,24,.55)] sm:p-6">
               <div className="relative overflow-hidden rounded-[1.15rem] bg-[#F3E2DC]/56 p-5 sm:p-7">
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.06]">
-                  <img src="/bmb-studio-logo.png" alt="" aria-hidden="true" className="h-52 w-auto object-contain" />
+                  <CasaSheMark className="h-52 w-52 text-bmb-deepgold" />
                 </div>
                 <div className="relative space-y-8">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

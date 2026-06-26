@@ -203,7 +203,7 @@ export function WhatsAppManager() {
                 <h2 className="text-2xl font-bold tracking-tight">WhatsApp por sucursal</h2>
                 <p className="text-muted-foreground">
                     Vincula un WhatsApp por sucursal. Los mensajes a cada usuario salen del número de su
-                    sucursal; si no tiene sucursal fija, sale del principal (San Miguel).
+                    sucursal; si no tiene sucursal fija, sale del principal (Condesa).
                 </p>
             </div>
 

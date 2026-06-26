@@ -106,10 +106,10 @@ export default function Privacy() {
                 Contáctanos para cualquier pregunta sobre privacidad
               </p>
               <a
-                href="mailto:privacy@bmbstudio.mx"
+                href="mailto:casashecondesa@gmail.com"
                 className="text-xs text-primary hover:underline"
               >
-                privacy@bmbstudio.mx
+                casashecondesa@gmail.com
               </a>
             </div>
           </aside>
@@ -129,7 +129,7 @@ export default function Privacy() {
               <section id="intro" className="space-y-4">
                 <h2 className="font-heading text-2xl font-semibold">Introducción</h2>
                 <p className="text-muted-foreground leading-relaxed">
-                  En BMB Studio, nos comprometemos a proteger tu privacidad y datos personales. 
+                  En Casa Shé, nos comprometemos a proteger tu privacidad y datos personales. 
                   Esta Política de Privacidad describe cómo recopilamos, usamos, compartimos y protegemos 
                   tu información cuando utilizas nuestros servicios de Pilates y fitness.
                 </p>
@@ -250,8 +250,8 @@ export default function Privacy() {
                 </div>
                 <p className="text-muted-foreground leading-relaxed">
                   Para ejercer estos derechos, contáctanos en{" "}
-                  <a href="mailto:privacy@bmbstudio.mx" className="text-primary hover:underline">
-                    privacy@bmbstudio.mx
+                  <a href="mailto:casashecondesa@gmail.com" className="text-primary hover:underline">
+                    casashecondesa@gmail.com
                   </a>
                 </p>
               </section>
@@ -292,16 +292,16 @@ export default function Privacy() {
                 </p>
                 <div className="bg-muted/50 p-6 rounded-lg space-y-3">
                   <div>
-                    <p className="text-sm font-medium">BMB Studio</p>
-                    <p className="text-sm text-muted-foreground">Cuautitlán Izcalli, Méx.</p>
+                    <p className="text-sm font-medium">Casa Shé</p>
+                    <p className="text-sm text-muted-foreground">Alfonso Reyes 131 · Condesa, CDMX</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium">Email</p>
                     <a
-                      href="mailto:privacy@bmbstudio.mx"
+                      href="mailto:casashecondesa@gmail.com"
                       className="text-sm text-primary hover:underline"
                     >
-                      privacy@bmbstudio.mx
+                      casashecondesa@gmail.com
                     </a>
                   </div>
                   <div>

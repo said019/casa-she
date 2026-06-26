@@ -22,7 +22,7 @@ function getDefaultDates() {
 
 function exportToExcel(overview: any, startDate: string, endDate: string) {
     const rows = [
-        ['Reporte General - BMB Studio'],
+        ['Reporte General - Casa Shé'],
         [`Período: ${startDate} al ${endDate}`],
         [''],
         ['RESUMEN FINANCIERO'],
@@ -308,7 +308,7 @@ export default function ReportsOverview() {
                                     const positive = s.profit >= 0;
                                     return (
                                         <div key={s.facility_id} className={`rounded-xl border p-4 ${positive ? 'border-emerald-200 bg-emerald-50/40' : 'border-red-200 bg-red-50/40'}`}>
-                                            <p className="text-sm font-semibold">{s.facility_name.replace(/^BMB Studio\s*/i, '')}</p>
+                                            <p className="text-sm font-semibold">{s.facility_name.replace(/^Casa Shé\s*/i, '')}</p>
                                             <p className={`mt-1 text-xl sm:text-2xl font-bold tabular-nums truncate ${positive ? 'text-emerald-600' : 'text-red-500'}`}>{formatCurrency(s.profit)}</p>
                                             <div className="mt-2 flex justify-between text-xs text-muted-foreground">
                                                 <span>Ingresos: <span className="font-medium text-emerald-600">{formatCurrency(s.revenue)}</span></span>

@@ -1,32 +1,30 @@
-// BMB Studio — Brand-aware email templates.
+// Casa Shé — Brand-aware email templates.
 // Single source of truth for colors, logo, footer, and the wrapper layout.
 
 export const brand = {
-    name: 'BMB Studio',
-    tagline: 'Pilates · Reformer · Barre',
-    olive: '#7e8579',
-    oliveDark: '#646b5e',
-    cream: '#fbf8f2',
-    sand: '#ebe6d9',
-    dark: '#3D3229',
-    accent: '#b89968',
-    alert: '#a8524c',
-    text: '#3D3229',
-    textMuted: 'rgba(61,50,41,0.62)',
+    name: 'Casa Shé',
+    tagline: 'Movimiento · Nutrición · Comunidad',
+    olive: '#2E4A35',      // Verde Casa — primario
+    oliveDark: '#16261A',  // verde profundo
+    cream: '#FBF3DD',      // Avena — fondo
+    sand: '#D8D2BC',       // Arena — superficie
+    dark: '#2E1B22',       // Ciruela — texto/encabezados
+    accent: '#B6A43C',     // Musgo — acento
+    alert: '#B5512F',      // Arcilla — alertas
+    text: '#2E1B22',
+    textMuted: 'rgba(46,27,34,0.62)',
 };
 
-// URL viva del frontend en prod = dominio de marca con www (verificado: /app/login
-// y el logo cargan). OJO: 'bmb-studio.com.mx' (con guion) y sin www están MUERTOS;
-// el bueno es 'www.bmbstudio.com.mx'. Default aquí para que los links y el logo de
-// TODOS los correos funcionen aunque FRONTEND_URL no esté seteado.
-const PROD_FRONTEND = 'https://www.bmbstudio.com.mx';
+// URL viva del frontend en prod. Default a casashe.mx para que links/logo funcionen
+// aunque FRONTEND_URL no esté seteado. Sobreescribible con FRONTEND_URL / EMAIL_LOGO_URL.
+const PROD_FRONTEND = 'https://casashe.mx';
 
 export function getFrontendUrl(): string {
     return process.env.FRONTEND_URL || PROD_FRONTEND;
 }
 
 export function getLogoUrl(): string {
-    return process.env.EMAIL_LOGO_URL || `${PROD_FRONTEND}/bmb-studio-logo.png`;
+    return process.env.EMAIL_LOGO_URL || `${getFrontendUrl()}/casa-she-logo.png`;
 }
 
 export function getEmailFrom(): string {
@@ -84,8 +82,8 @@ export function wrapEmail({ title, preview, body }: WrapOpts): string {
 ${body}
 </td></tr>
 <tr><td style="padding:24px 40px 32px;border-top:1px solid rgba(61,50,41,0.08);text-align:center;color:${brand.textMuted};font-size:12px;line-height:1.6;">
-© ${new Date().getFullYear()} ${brand.name} · Pilates Studio<br />
-<a href="${getFrontendUrl()}" style="color:${brand.olive};text-decoration:none;">bmb-studio.com.mx</a>
+© ${new Date().getFullYear()} ${brand.name} · Condesa, CDMX<br />
+<a href="${getFrontendUrl()}" style="color:${brand.olive};text-decoration:none;">casashe.mx</a>
 </td></tr>
 </table>
 </td></tr>

@@ -21,7 +21,7 @@ import { useAuthStore } from '@/stores/authStore';
  * Muestra a TODO el equipo de recepción (no respeta el filtro de sucursal del header:
  * es una vista de supervisión, queremos ver ambas sucursales de un vistazo). Cada quien
  * se agrupa por la sucursal DONDE tiene la caja abierta; si no tiene caja, por su sucursal
- * asignada. Así una master que abre en San Miguel aparece bajo San Miguel aunque no tenga
+ * asignada. Así una master que abre en Condesa aparece bajo Condesa aunque no tenga
  * sucursal asignada.
  */
 interface CajaStaffStatus {

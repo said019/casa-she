@@ -56,7 +56,7 @@ export default function StudioLayout({ children }: StudioLayoutProps) {
   );
 
   useEffect(() => {
-    document.title = `${studio.name} | BMB Studio`;
+    document.title = `${studio.name} | Casa Shé`;
   }, [studio.name]);
 
   const isActive = (path: string) => {

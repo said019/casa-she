@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,500;6..96,600&family=Montserrat:wght@300;400;500;600;700&family=WindSong:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Baskervville:ital@0;1&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,132 +6,132 @@
 
 @layer base {
   :root {
-    /* BMB Studio Palette
-     * Crema:         #ECE1CE — Background
-     * Taupe:         #DCCCC0 — Borders and quiet surfaces
-     * Dorado:        #CE9B25 — Primary actions and accents (logo primario)
-     * Dorado prof.:  #AD6C20 — Deep gold details
-     * Café oscuro:   #2A2118 — Foreground
-     * Malva:         #A6776A — Warm accent
+    /* Casa Shé Palette
+     * Avena:       #FBF3DD — Background (44 78% 93%)
+     * Arena:       #D8D2BC — Borders / quiet surfaces (47 26% 79%)
+     * Verde Casa:  #2E4A35 — Primary actions & accents (135 23% 24%)
+     * Arcilla:     #B5512F — Deep warm accent / destructive (15 59% 45%)
+     * Ciruela:     #2E1B22 — Foreground / text (338 26% 14%)
+     * Musgo:       #B6A43C — Mustard accent / warning (51 50% 47%)
      */
-    --background: 40 44% 91%;
-    --foreground: 30 27% 14%;
+    --background: 44 78% 93%;
+    --foreground: 338 26% 14%;
 
-    --card: 42 46% 96%;
-    --card-foreground: 30 27% 14%;
+    --card: 44 64% 96%;
+    --card-foreground: 338 26% 14%;
 
-    --popover: 42 46% 96%;
-    --popover-foreground: 30 27% 14%;
+    --popover: 44 64% 96%;
+    --popover-foreground: 338 26% 14%;
 
-    --primary: 42 72% 47%;
-    --primary-foreground: 40 45% 96%;
+    --primary: 135 23% 24%;
+    --primary-foreground: 44 78% 95%;
 
-    --secondary: 28 22% 78%;
-    --secondary-foreground: 30 27% 18%;
+    --secondary: 47 26% 79%;
+    --secondary-foreground: 338 26% 16%;
 
-    --muted: 38 33% 87%;
-    --muted-foreground: 30 12% 40%;
+    --muted: 44 38% 88%;
+    --muted-foreground: 135 8% 36%;
 
-    --accent: 40 42% 83%;
-    --accent-foreground: 30 27% 16%;
+    --accent: 47 32% 84%;
+    --accent-foreground: 338 26% 16%;
 
-    --destructive: 0 72% 50%;
-    --destructive-foreground: 40 45% 97%;
+    --destructive: 15 59% 45%;
+    --destructive-foreground: 44 78% 96%;
 
-    --border: 34 24% 80%;
-    --input: 34 24% 80%;
-    --ring: 42 72% 47%;
+    --border: 47 22% 78%;
+    --input: 47 22% 78%;
+    --ring: 135 23% 24%;
 
     --radius: 0.5rem;
 
-    /* Custom tokens — BMB Studio */
-    --hero-gradient: linear-gradient(135deg, hsl(40 44% 93%) 0%, hsl(38 40% 86%) 52%, hsl(42 58% 78%) 100%);
-    --card-gradient: linear-gradient(180deg, hsl(42 46% 97%) 0%, hsl(40 34% 91%) 100%);
-    --overlay-dark: linear-gradient(180deg, hsla(30, 27%, 14%, 0.2) 0%, hsla(30, 27%, 14%, 0.55) 100%);
-    --glow-sage: 0 18px 42px hsla(42, 72%, 47%, 0.18);
-    --glow-warm: 0 18px 42px hsla(33, 69%, 40%, 0.16);
+    /* Custom tokens — Casa Shé */
+    --hero-gradient: linear-gradient(135deg, hsl(44 78% 94%) 0%, hsl(47 40% 86%) 52%, hsl(135 20% 80%) 100%);
+    --card-gradient: linear-gradient(180deg, hsl(44 64% 97%) 0%, hsl(44 40% 91%) 100%);
+    --overlay-dark: linear-gradient(180deg, hsla(135, 27%, 12%, 0.2) 0%, hsla(135, 27%, 12%, 0.6) 100%);
+    --glow-sage: 0 18px 42px hsla(135, 23%, 24%, 0.18);
+    --glow-warm: 0 18px 42px hsla(15, 59%, 45%, 0.16);
 
     /* Typography */
-    --font-heading: 'Hamachi', 'Bodoni Moda', serif;
-    --font-body: 'Carla Sans', 'Montserrat', sans-serif;
-    --font-script: 'WindSong', cursive;
+    --font-heading: 'Instrument Serif', serif;
+    --font-body: 'Baskervville', Georgia, serif;
+    --font-script: 'Instrument Serif', serif;
 
     /* Animations */
     --transition-smooth: all 0.32s cubic-bezier(0.22, 1, 0.36, 1);
     --transition-bounce: all 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 
     /* Admin shell tokens */
-    --admin-bg: 40 33% 90%;
-    --admin-panel: 42 40% 96%;
-    --admin-rail: 38 28% 88%;
+    --admin-bg: 44 40% 90%;
+    --admin-panel: 44 50% 96%;
+    --admin-rail: 47 28% 88%;
 
-    /* BMB Studio semantic status colors */
-    --success: 145 30% 42%;
-    --success-foreground: 40 45% 97%;
-    --warning: 38 72% 48%;
-    --warning-foreground: 30 27% 14%;
-    --info: 28 30% 58%;
-    --info-foreground: 30 27% 14%;
+    /* Casa Shé semantic status colors */
+    --success: 135 23% 30%;
+    --success-foreground: 44 78% 96%;
+    --warning: 51 50% 47%;
+    --warning-foreground: 338 26% 14%;
+    --info: 47 26% 55%;
+    --info-foreground: 338 26% 14%;
 
-    --sidebar-background: 42 44% 96%;
-    --sidebar-foreground: 30 27% 14%;
-    --sidebar-primary: 42 72% 47%;
-    --sidebar-primary-foreground: 40 45% 96%;
-    --sidebar-accent: 40 34% 89%;
-    --sidebar-accent-foreground: 30 27% 14%;
-    --sidebar-border: 34 22% 82%;
-    --sidebar-ring: 42 72% 47%;
+    --sidebar-background: 44 56% 96%;
+    --sidebar-foreground: 338 26% 14%;
+    --sidebar-primary: 135 23% 24%;
+    --sidebar-primary-foreground: 44 78% 95%;
+    --sidebar-accent: 47 34% 89%;
+    --sidebar-accent-foreground: 338 26% 14%;
+    --sidebar-border: 47 22% 82%;
+    --sidebar-ring: 135 23% 24%;
   }
 
   .dark {
-    /* BMB Studio Dark Mode */
-    --background: 30 18% 9%;
-    --foreground: 40 30% 92%;
+    /* Casa Shé Dark Mode — verde casa profundo + avena */
+    --background: 135 27% 12%;
+    --foreground: 44 60% 92%;
 
-    --card: 30 16% 12%;
-    --card-foreground: 40 30% 92%;
+    --card: 135 22% 15%;
+    --card-foreground: 44 60% 92%;
 
-    --popover: 30 18% 10%;
-    --popover-foreground: 40 30% 92%;
+    --popover: 135 24% 13%;
+    --popover-foreground: 44 60% 92%;
 
-    --primary: 42 68% 52%;
-    --primary-foreground: 30 30% 10%;
+    --primary: 135 22% 50%;
+    --primary-foreground: 135 30% 10%;
 
-    --secondary: 28 14% 30%;
-    --secondary-foreground: 40 30% 92%;
+    --secondary: 135 12% 28%;
+    --secondary-foreground: 44 60% 92%;
 
-    --muted: 30 12% 17%;
-    --muted-foreground: 40 14% 58%;
+    --muted: 135 12% 18%;
+    --muted-foreground: 44 16% 62%;
 
-    --accent: 36 22% 26%;
-    --accent-foreground: 40 30% 92%;
+    --accent: 51 30% 32%;
+    --accent-foreground: 44 60% 92%;
 
-    --destructive: 0 62% 40%;
-    --destructive-foreground: 40 40% 96%;
+    --destructive: 15 55% 44%;
+    --destructive-foreground: 44 60% 96%;
 
-    --border: 30 12% 19%;
-    --input: 30 12% 19%;
-    --ring: 42 68% 52%;
+    --border: 135 12% 20%;
+    --input: 135 12% 20%;
+    --ring: 135 22% 50%;
 
-    --success: 145 25% 48%;
-    --success-foreground: 30 18% 9%;
-    --warning: 38 60% 55%;
-    --warning-foreground: 30 18% 9%;
-    --info: 28 24% 55%;
-    --info-foreground: 30 18% 9%;
+    --success: 135 25% 48%;
+    --success-foreground: 135 27% 10%;
+    --warning: 51 50% 55%;
+    --warning-foreground: 135 27% 10%;
+    --info: 47 24% 58%;
+    --info-foreground: 135 27% 10%;
 
-    --sidebar-background: 30 18% 9%;
-    --sidebar-foreground: 40 22% 92%;
-    --sidebar-primary: 42 68% 52%;
-    --sidebar-primary-foreground: 30 30% 10%;
-    --sidebar-accent: 30 12% 15%;
-    --sidebar-accent-foreground: 40 22% 92%;
-    --sidebar-border: 30 12% 17%;
-    --sidebar-ring: 42 68% 52%;
+    --sidebar-background: 135 27% 11%;
+    --sidebar-foreground: 44 40% 92%;
+    --sidebar-primary: 135 22% 50%;
+    --sidebar-primary-foreground: 135 30% 10%;
+    --sidebar-accent: 135 12% 16%;
+    --sidebar-accent-foreground: 44 40% 92%;
+    --sidebar-border: 135 12% 18%;
+    --sidebar-ring: 135 22% 50%;
 
-    --admin-bg: 30 16% 10%;
-    --admin-panel: 30 13% 13%;
-    --admin-rail: 30 12% 16%;
+    --admin-bg: 135 22% 11%;
+    --admin-panel: 135 18% 14%;
+    --admin-rail: 135 14% 17%;
   }
 }
 
@@ -210,18 +210,18 @@
     font-family: var(--font-heading);
     font-style: italic;
     font-variant-numeric: tabular-nums;
-    color: #CE9B25;
+    color: #B6A43C;
     letter-spacing: -0.01em;
   }
 
   .editorial-rule {
     height: 1px;
-    background-color: #2A2118;
+    background-color: #2E1B22;
     width: 100%;
   }
 
   .editorial-rule-dotted {
-    background-image: linear-gradient(to right, rgba(42, 33, 24, 0.32) 1px, transparent 1px);
+    background-image: linear-gradient(to right, rgba(46, 27, 34, 0.32) 1px, transparent 1px);
     background-size: 4px 1px;
     background-repeat: repeat-x;
     background-position: top;
@@ -257,48 +257,37 @@
     font-family: var(--font-heading);
   }
 
-  /* Landing público con la tipografía del menú (sans Montserrat), sin la serif editorial. */
-  .landing-sans .font-heading,
-  .landing-sans h1,
-  .landing-sans h2,
-  .landing-sans h3,
-  .landing-sans h4,
-  .landing-sans h5,
-  .landing-sans h6,
-  .landing-sans .numeral {
-    font-family: var(--font-body);
-    font-style: normal;
-  }
+  /* Landing público: usa la serif editorial (Instrument Serif) como el resto de la marca. */
 
-  /* === Atmósfera de marca BMB — gradientes dorados luminosos (golden-hour) ===
-   * Adaptado del lenguaje "sunset" pero recoloreado a la paleta BMB
-   * (dorado #CE9B25 / crema #ECE1CE / dorado profundo #AD6C20). Mantiene el
-   * fondo luminoso para que el texto oscuro sea legible encima. */
+  /* === Atmósfera de marca Casa Shé — gradientes orgánicos verde/musgo/avena ===
+   * Recoloreado a la paleta Casa Shé (Verde Casa #2E4A35 / Avena #FBF3DD /
+   * Musgo #B6A43C). Mantiene el fondo luminoso para que el texto oscuro sea
+   * legible encima. */
   .bmb-aura-field {
     pointer-events: none;
     position: absolute;
     inset: -18%;
     z-index: 0;
-    filter: blur(30px) saturate(1.08);
+    filter: blur(30px) saturate(1.06);
     transform: rotate(-5deg) scale(1.04);
     background-image:
-      radial-gradient(ellipse 50% 64% at 16% 16%, hsla(44, 90%, 88%, 0.96) 0%, hsla(42, 78%, 70%, 0.66) 36%, transparent 68%),
-      radial-gradient(ellipse 64% 56% at 74% 38%, hsla(42, 76%, 58%, 0.82) 0%, hsla(40, 66%, 56%, 0.5) 40%, transparent 72%),
-      radial-gradient(ellipse 60% 50% at 88% 84%, hsla(36, 64%, 50%, 0.5) 0%, transparent 64%),
-      radial-gradient(ellipse 72% 50% at 24% 92%, hsla(43, 86%, 78%, 0.7) 0%, transparent 64%),
-      linear-gradient(135deg, hsl(44, 60%, 92%) 0%, hsl(42, 74%, 80%) 30%, hsl(42, 74%, 60%) 70%, hsl(36, 62%, 48%) 105%);
+      radial-gradient(ellipse 50% 64% at 16% 16%, hsla(44, 82%, 90%, 0.96) 0%, hsla(47, 40%, 78%, 0.6) 36%, transparent 68%),
+      radial-gradient(ellipse 64% 56% at 74% 38%, hsla(51, 50%, 56%, 0.62) 0%, hsla(135, 24%, 42%, 0.4) 40%, transparent 72%),
+      radial-gradient(ellipse 60% 50% at 88% 84%, hsla(135, 28%, 30%, 0.45) 0%, transparent 64%),
+      radial-gradient(ellipse 72% 50% at 24% 92%, hsla(44, 70%, 84%, 0.7) 0%, transparent 64%),
+      linear-gradient(135deg, hsl(44, 70%, 93%) 0%, hsl(47, 36%, 82%) 30%, hsl(51, 40%, 62%) 70%, hsl(135, 24%, 34%) 110%);
   }
   .bmb-aura-ribbon {
     pointer-events: none;
     position: absolute;
     inset: -10%;
     z-index: 0;
-    opacity: 0.4;
-    filter: blur(24px) saturate(1.15);
+    opacity: 0.38;
+    filter: blur(24px) saturate(1.1);
     transform: rotate(-7deg) scale(1.08);
     mix-blend-mode: soft-light;
     background:
-      conic-gradient(from 220deg at 60% 46%, transparent 0deg 56deg, hsla(44, 88%, 76%, 0.85) 80deg, hsla(42, 76%, 56%, 0.9) 116deg, hsla(36, 60%, 46%, 0.45) 150deg, transparent 192deg 360deg);
+      conic-gradient(from 220deg at 60% 46%, transparent 0deg 56deg, hsla(44, 78%, 80%, 0.8) 80deg, hsla(51, 50%, 54%, 0.7) 116deg, hsla(135, 26%, 34%, 0.4) 150deg, transparent 192deg 360deg);
   }
   .bmb-aura-veil {
     pointer-events: none;
@@ -322,16 +311,16 @@
     background-size: 16px 16px, 22px 22px;
   }
   .bmb-glow {
-    box-shadow: 0 30px 60px -22px hsla(42, 72%, 46%, 0.4), 0 14px 34px -14px hsla(36, 55%, 30%, 0.2);
+    box-shadow: 0 30px 60px -22px hsla(135, 24%, 30%, 0.38), 0 14px 34px -14px hsla(15, 55%, 38%, 0.18);
   }
-  /* Superficie dorada reutilizable (hero/cards) */
+  /* Superficie reutilizable Casa Shé (hero/cards) — verde/musgo/avena */
   .bg-bmb-aura {
     background:
-      radial-gradient(ellipse 66% 56% at 16% 20%, hsla(44, 86%, 86%, 0.92) 0%, transparent 56%),
-      radial-gradient(ellipse 74% 60% at 84% 16%, hsla(42, 76%, 58%, 0.9) 0%, transparent 60%),
-      radial-gradient(ellipse 70% 58% at 86% 90%, hsla(36, 62%, 48%, 0.5) 0%, transparent 62%),
-      radial-gradient(ellipse 80% 64% at 22% 88%, hsla(43, 84%, 72%, 0.66) 0%, transparent 60%),
-      linear-gradient(135deg, #F2E1B0 0%, #D6A53A 52%, #9A6E22 100%);
+      radial-gradient(ellipse 66% 56% at 16% 20%, hsla(44, 80%, 88%, 0.92) 0%, transparent 56%),
+      radial-gradient(ellipse 74% 60% at 84% 16%, hsla(51, 48%, 56%, 0.72) 0%, transparent 60%),
+      radial-gradient(ellipse 70% 58% at 86% 90%, hsla(135, 28%, 30%, 0.5) 0%, transparent 62%),
+      radial-gradient(ellipse 80% 64% at 22% 88%, hsla(44, 70%, 82%, 0.66) 0%, transparent 60%),
+      linear-gradient(135deg, #FBF3DD 0%, #B6A43C 55%, #2E4A35 105%);
   }
 
   /* Material Symbols Outlined — íconos de nav/acciones del /app del cliente. */
@@ -387,12 +376,12 @@
   /* Estética compartida con el shell admin (AdminLayout). Reutilizable en el /app
      de cliente para no esparcir números mágicos por las páginas. */
   .app-radial-bg {
-    /* Atmósfera cálida rosa/blush + dorado (paleta IG), en vez del verde-sage apagado. */
+    /* Atmósfera Casa Shé: avena cálida + toques verde/musgo/arena. */
     background-image:
-      radial-gradient(circle at 12% 4%, rgba(219, 176, 179, 0.38), transparent 36%),
-      radial-gradient(circle at 86% 9%, rgba(206, 155, 37, 0.18), transparent 30%),
-      radial-gradient(circle at 30% 78%, rgba(219, 176, 179, 0.22), transparent 42%),
-      radial-gradient(circle at 80% 92%, rgba(230, 208, 202, 0.5), transparent 34%);
+      radial-gradient(circle at 12% 4%, rgba(46, 74, 53, 0.14), transparent 36%),
+      radial-gradient(circle at 86% 9%, rgba(182, 164, 60, 0.16), transparent 30%),
+      radial-gradient(circle at 30% 78%, rgba(216, 210, 188, 0.4), transparent 42%),
+      radial-gradient(circle at 80% 92%, rgba(251, 243, 221, 0.6), transparent 34%);
   }
 
   .app-panel {

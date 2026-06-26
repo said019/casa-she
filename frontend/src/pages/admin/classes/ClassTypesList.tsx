@@ -257,7 +257,7 @@ export default function ClassTypesList() {
                             <DialogHeader>
                                 <DialogTitle>{editingType ? 'Editar disciplina' : 'Nueva disciplina'}</DialogTitle>
                                 <DialogDescription>
-                                    Nombre, color, duración y cupo. Usa 6 lugares para respetar el formato de grupos reducidos de BMB Studio.
+                                    Nombre, color, duración y cupo. Usa 6 lugares para respetar el formato de grupos reducidos de Casa Shé.
                                 </DialogDescription>
                             </DialogHeader>
 

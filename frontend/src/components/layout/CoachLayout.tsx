@@ -26,6 +26,7 @@ import {
     Wallet,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
+import CasaSheLogo from '@/components/CasaSheLogo';
 
 interface CoachLayoutProps {
     children: ReactNode;
@@ -87,12 +88,8 @@ export default function CoachLayout({ children }: CoachLayoutProps) {
 
                             {/* Logo */}
                             <Link to="/coach" className="flex items-center space-x-2.5">
-                                <img 
-                                    src="/bmb-studio-logo.png" 
-                                    alt="BMB Studio" 
-                                    className="h-10 w-auto object-contain"
-                                />
-                                <span className="font-heading text-xl font-bold text-balance-gold">BMB Studio</span>
+                                <CasaSheLogo variant="mark" className="h-8 w-8 text-balance-gold" />
+                                <span className="font-heading text-xl font-bold text-balance-gold">Casa Shé</span>
                                 <span className="text-[10px] font-body font-semibold text-balance-gold uppercase tracking-[2px] bg-balance-gold/10 px-2.5 py-1 rounded-lg">
                                     Coach
                                 </span>
@@ -175,12 +172,8 @@ export default function CoachLayout({ children }: CoachLayoutProps) {
                         <div className="flex flex-col h-full">
                             <div className="flex h-16 items-center justify-between border-b px-4">
                                 <div className="flex items-center space-x-2">
-                                    <img 
-                                        src="/bmb-studio-logo.png" 
-                                        alt="BMB Studio" 
-                                        className="h-10 w-auto object-contain"
-                                    />
-                                    <span className="font-heading text-lg font-bold text-balance-gold">BMB Studio Coach</span>
+                                    <CasaSheLogo variant="mark" className="h-8 w-8 text-balance-gold" />
+                                    <span className="font-heading text-lg font-bold text-balance-gold">Casa Shé</span>
                                 </div>
                                 <Button
                                     variant="ghost"

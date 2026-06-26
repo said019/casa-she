@@ -190,7 +190,7 @@ function ManifestSwitcher() {
     const link = document.querySelector('link[rel="manifest"]');
     if (link) link.setAttribute("href", isCoach ? "/coach-manifest.json" : "/manifest.json");
     const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
-    if (appleTitle) appleTitle.setAttribute("content", isCoach ? "BMB Coach" : "BMB Studio");
+    if (appleTitle) appleTitle.setAttribute("content", isCoach ? "Casa Shé" : "Casa Shé");
   }, [pathname]);
   return null;
 }

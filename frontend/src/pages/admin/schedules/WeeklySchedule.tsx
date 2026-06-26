@@ -166,8 +166,8 @@ export default function WeeklySchedule({ embedded = false }: { embedded?: boolea
                         {[
                             { id: 'all', label: 'Todas' },
                             ...(facilities || [])
-                                .filter((fac) => /^bmb/i.test(fac.name))
-                                .map((fac) => ({ id: fac.name, label: fac.name.replace(/^BMB Studio\s*/i, '') })),
+                                .filter((fac) => /^casa sh/i.test(fac.name))
+                                .map((fac) => ({ id: fac.name, label: fac.name.replace(/^Casa Shé\s*/i, '') })),
                         ].map((f) => (
                             <button
                                 key={f.id}

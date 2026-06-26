@@ -247,7 +247,7 @@ export default function StudioInstructors() {
                                 un equipo
                             </span>
                             <p className="mt-7 font-body text-sm leading-relaxed text-bmb-cream/72 sm:text-base">
-                                BMB Studio · Tepa · San Miguel
+                                Casa Shé · Condesa, CDMX
                                 <br />
                                 {total} coaches dando clases este mes.
                             </p>

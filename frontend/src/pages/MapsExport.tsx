@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
+import { CasaSheMark } from '@/components/CasaSheLogo';
 
 type Reformer = {
   id: string;
@@ -42,9 +43,9 @@ function MapCard({ facility, reformers }: { facility: Facility; reformers: Refor
   return (
     <div className="export-frame">
       <div className="export-header">
-        <img src="/bmb-studio-logo.png" alt="" className="export-logo" />
+        <CasaSheMark className="export-logo" />
         <div>
-          <div className="export-brand">BMB Studio</div>
+          <div className="export-brand">Casa Shé</div>
           <div className="export-room">Sala {facility.name}</div>
         </div>
       </div>
@@ -129,7 +130,7 @@ function MapCard({ facility, reformers }: { facility: Facility; reformers: Refor
       </div>
 
       <div className="export-footer">
-        <span>bmbstudio.mx</span>
+        <span>casashe.mx</span>
         <span>·</span>
         <span>Capacidad {reformers.length}</span>
       </div>

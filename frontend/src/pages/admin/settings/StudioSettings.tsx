@@ -38,7 +38,7 @@ export default function StudioSettings() {
     const [saving, setSaving] = useState(false);
     const [savingBank, setSavingBank] = useState(false);
     const [settings, setSettings] = useState<StudioSettingsType>({
-        name: 'BMB Studio',
+        name: 'Casa Shé',
         address: '',
         phone: '',
         email: '',
@@ -285,7 +285,7 @@ export default function StudioSettings() {
                             <Label htmlFor="account_holder">Titular de la cuenta</Label>
                             <Input
                                 id="account_holder"
-                                placeholder="Ej: BMB Studio SA de CV"
+                                placeholder="Ej: Casa Shé SA de CV"
                                 value={bankInfo.account_holder}
                                 onChange={(e) => setBankInfo({ ...bankInfo, account_holder: e.target.value })}
                             />

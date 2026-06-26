@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { ClientLayout } from '@/components/layout/ClientLayout';
+import { CasaSheMark } from '@/components/CasaSheLogo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -50,7 +51,7 @@ function ReferralCodePanel() {
   const handleShareWhatsApp = () => {
     if (!data?.code) return;
     const msg = encodeURIComponent(
-      `¡Te invito a BMB Studio! 🧘\nUsa mi código *${data.code}* al registrarte. 💚`
+      `¡Te invito a Casa Shé! 🧘\nUsa mi código *${data.code}* al registrarte. 💚`
     );
     window.open(`https://wa.me/?text=${msg}`, '_blank');
   };
@@ -60,12 +61,10 @@ function ReferralCodePanel() {
       {/* Fondo dorado con profundidad + aura cálida */}
       <div className="absolute inset-0 bg-[linear-gradient(150deg,#d0a23f_0%,#bb8526_48%,#a06d16_100%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(125%_85%_at_12%_-5%,rgba(255,248,228,0.34)_0%,transparent_55%)]" />
-      {/* Watermark de la mariposa BMB */}
-      <img
-        src="/bmb-studio-logo-light.png"
-        alt=""
+      {/* Watermark del monograma Casa Shé */}
+      <CasaSheMark
         aria-hidden="true"
-        className="pointer-events-none absolute -right-10 -top-12 w-52 select-none opacity-[0.08]"
+        className="pointer-events-none absolute -right-10 -top-12 h-52 w-52 select-none text-balance-cream opacity-[0.08]"
       />
 
       <div className="relative space-y-5">
@@ -251,11 +250,11 @@ export default function WalletClub() {
               <div>
                 <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-balance-olive/25 bg-balance-cream/65 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-balance-olive">
                   <Sparkles className="h-3.5 w-3.5" />
-                  Lealtad Balance
+                  Lealtad Casa Shé
                 </div>
                 <h1 className="text-3xl font-semibold tracking-[-0.04em] text-balance-dark sm:text-4xl">Programa de lealtad</h1>
                 <p className="mt-1 max-w-[58ch] text-sm text-balance-dark/62">
-                  Tus puntos, recompensas y progreso en BMB Studio.
+                  Tus puntos, recompensas y progreso en Casa Shé.
                 </p>
               </div>
               <div className="flex flex-col gap-2 sm:items-end">
@@ -297,7 +296,7 @@ export default function WalletClub() {
                   <div className="rounded-[1.5rem] border border-balance-sand/65 bg-balance-cream/45 p-5">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <Sparkles className="h-4 w-4 text-balance-olive" />
-                      Lealtad BMB Studio
+                      Lealtad Casa Shé
                     </div>
                     <p className="mt-3 text-sm text-muted-foreground">
                       Gana puntos al asistir a clases y canjéalos por beneficios del studio.

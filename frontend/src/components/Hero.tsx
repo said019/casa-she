@@ -3,9 +3,9 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 const STATS = [
-  { value: "10+", label: "disciplinas" },
-  { value: "2", label: "sucursales" },
-  { value: "6", label: "lugares por clase" },
+  { value: "4", label: "disciplinas" },
+  { value: "6–7", label: "lugares por clase" },
+  { value: "Condesa", label: "Ciudad de México" },
 ];
 
 export default function Hero() {
@@ -16,7 +16,7 @@ export default function Hero() {
       <div className="absolute inset-0">
         <img
           src="/studio/salon.webp"
-          alt="Salón de BMB Studio San Miguel"
+          alt="Salón de Casa Shé, Condesa"
           className="h-full w-full object-cover object-center"
         />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(42,33,24,0.62)_0%,rgba(42,33,24,0.34)_38%,rgba(42,33,24,0.86)_100%)]" />
@@ -26,19 +26,19 @@ export default function Hero() {
         <div className="mx-auto w-full max-w-[1440px]">
           {/* Masthead editorial */}
           <div className="flex items-baseline justify-between border-b border-bmb-cream/25 pb-3 editorial-caption text-bmb-cream/70">
-            <span>BMB Studio — Tepa &amp; San Miguel</span>
+            <span>Casa Shé — Condesa, CDMX</span>
             <span>{format(today, "MMMM", { locale: es })} · MMXXVI</span>
           </div>
 
           {/* Titular cálido con tipografía editorial */}
           <h1 className="mt-9 font-heading text-bmb-cream text-[clamp(2.8rem,8vw,6.25rem)] leading-[0.95] tracking-[-0.01em]">
-            Conecta tu mente<br />
-            con <span className="italic text-bmb-gold">tu cuerpo</span>.
+            Vuelve a<br />
+            <span className="italic text-bmb-gold">ti misma</span>.
           </h1>
 
           <p className="mt-6 max-w-xl font-heading italic text-lg leading-relaxed text-bmb-cream/85 lg:text-xl">
-            Pilates Reformer, Hot Pilates, Pole y Barre. Un studio para reencontrarte
-            y cuidar tu cuerpo, con coaches que te acompañan de cerca.
+            Pilates Mat, Yoga, Aeroyoga y Telas. Una casa para moverte, nutrirte y
+            reconectar con tu cuerpo en comunidad. Aquí, la comunidad es la medicina.
           </p>
 
           {/* CTAs claros */}

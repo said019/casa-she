@@ -316,8 +316,7 @@ export const NewClientForm = ({ onSubmit, isLoading, onCancel }: NewClientFormPr
                 onValueChange={(v) => { if (v === 'san-miguel' || v === 'tepa') setValue('whatsappKey', v); }}
                 className="justify-start gap-1"
               >
-                <ToggleGroupItem value="san-miguel" size="sm" className="text-xs px-3">San Miguel</ToggleGroupItem>
-                <ToggleGroupItem value="tepa" size="sm" className="text-xs px-3">Tepa</ToggleGroupItem>
+                <ToggleGroupItem value="san-miguel" size="sm" className="text-xs px-3">Condesa</ToggleGroupItem>
               </ToggleGroup>
               <p className="text-xs text-muted-foreground">Las credenciales de acceso se mandan desde este número.</p>
             </div>

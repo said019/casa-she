@@ -940,7 +940,7 @@ export default function ClientEvents() {
           <div>
             <h1 className="text-2xl font-heading font-bold text-foreground">Eventos</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Descubre los eventos especiales de BMB Studio
+              Descubre los eventos especiales de Casa Shé
             </p>
           </div>
 

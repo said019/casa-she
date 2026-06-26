@@ -390,8 +390,7 @@ export default function ClientDetail() {
                                                     onValueChange={(v) => { if (v === 'san-miguel' || v === 'tepa') setWaKey(v); }}
                                                     className="justify-start gap-1"
                                                 >
-                                                    <ToggleGroupItem value="san-miguel" size="sm" className="text-xs px-3">San Miguel</ToggleGroupItem>
-                                                    <ToggleGroupItem value="tepa" size="sm" className="text-xs px-3">Tepa</ToggleGroupItem>
+                                                    <ToggleGroupItem value="san-miguel" size="sm" className="text-xs px-3">Condesa</ToggleGroupItem>
                                                 </ToggleGroup>
                                             </div>
                                         )}

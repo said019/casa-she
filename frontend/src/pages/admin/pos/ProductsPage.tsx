@@ -75,7 +75,7 @@ export function ProductsContent() {
             return Array.isArray(data) ? data : [];
         },
     });
-    const shortFacility = (name?: string | null) => (name || '').replace(/^BMB Studio\s*/i, '') || '—';
+    const shortFacility = (name?: string | null) => (name || '').replace(/^Casa Shé\s*/i, '') || '—';
     const defaultFacilityId = facilityFilter !== 'all' ? facilityFilter : (facilities[0]?.id ?? '');
 
     // Create/Update Product Mutation

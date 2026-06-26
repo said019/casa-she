@@ -37,7 +37,7 @@ export default function ReferFriends() {
   const handleShareWhatsApp = () => {
     if (!data?.code) return;
     const msg = encodeURIComponent(
-      `¡Te invito a BMB Studio! 🧘\nRegístrate con mi código *${data.code}*. 💚\n${window.location.origin}`
+      `¡Te invito a Casa Shé! 🧘\nRegístrate con mi código *${data.code}*. 💚\n${window.location.origin}`
     );
     window.open(`https://wa.me/?text=${msg}`, '_blank');
   };

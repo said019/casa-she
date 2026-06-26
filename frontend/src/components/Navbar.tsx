@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Menu, X } from "lucide-react";
+import CasaSheLogo from "./CasaSheLogo";
 
 const LINKS = [
   { href: "#horarios", label: "Horarios" },
@@ -14,8 +15,8 @@ export default function Navbar() {
   return (
     <nav className="sticky top-0 z-30 border-b border-bmb-ink/15 bg-bmb-cream/95 backdrop-blur-sm pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex max-w-[1440px] items-center justify-between px-5 py-4 sm:px-8 lg:px-12">
-        <Link to="/" aria-label="BMB Studio" className="flex items-center">
-          <img src="/bmb-studio-logo.png" alt="BMB Studio" className="h-12 w-auto" />
+        <Link to="/" aria-label="Casa Shé" className="flex items-center text-bmb-gold">
+          <CasaSheLogo variant="full" />
         </Link>
 
         {/* Desktop: links + Entrar */}

@@ -1,17 +1,10 @@
 const BRANCHES = [
   {
-    label: "Sucursal I",
-    name: "Tepa",
-    address: "Av. Primero de Mayo Mz 4 Lt 1, Santiago Tepalcapa, 54743 Cuautitlán Izcalli, Méx.",
+    label: "Nuestra sede",
+    name: "Condesa",
+    address: "Alfonso Reyes 131, Condesa, 06140 Ciudad de México, CDMX",
     hours: ["Lun–Vie · 06:30–21:00", "Sáb–Dom · 08:00–14:00"],
-    mapsUrl: "https://maps.app.goo.gl/Ms5XdnaaTVHSusLz8",
-  },
-  {
-    label: "Sucursal II",
-    name: "San Miguel",
-    address: "Cam. a Tepotzotlán 6D, Axotlan, 54715 Cuautitlán Izcalli, Méx.",
-    hours: ["Lun–Vie · 06:30–21:00", "Sáb–Dom · 08:00–14:00"],
-    mapsUrl: "https://maps.app.goo.gl/Pk1Wvc9EpUaJQ31m9",
+    mapsUrl: "https://www.google.com/maps/search/Casa+Sh%C3%A9+Condesa+CDMX",
   },
 ];
 
@@ -36,7 +29,7 @@ export default function Location() {
               {/* Mapa real de Google (embed sin API key, por dirección) */}
               <div className="mt-5 overflow-hidden border border-bmb-ink/15 bg-bmb-paper">
                 <iframe
-                  title={`Mapa de BMB Studio ${b.name}`}
+                  title={`Mapa de Casa Shé ${b.name}`}
                   src={`https://www.google.com/maps?q=${encodeURIComponent(b.address)}&output=embed`}
                   className="block h-64 w-full"
                   loading="lazy"

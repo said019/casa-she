@@ -61,8 +61,8 @@ export default function ReceptionGenerateWeekScreen() {
   const studios = useMemo(
     () =>
       facilities
-        .filter((f) => /^bmb/i.test(f.name))
-        .map((f) => ({ id: f.id, name: f.name.replace(/^BMB Studio\s*/i, '').trim() || f.name })),
+        .filter((f) => /^casa sh/i.test(f.name))
+        .map((f) => ({ id: f.id, name: f.name.replace(/^Casa Shé\s*/i, '').trim() || f.name })),
     [facilities],
   );
 
@@ -236,7 +236,7 @@ export default function ReceptionGenerateWeekScreen() {
                           <span className="ml-auto shrink-0 truncate text-xs text-balance-dark/50">
                             {s.instructor_name || 'Coach'}
                             {facility === 'all' && s.facility_name
-                              ? ` · ${s.facility_name.replace(/^BMB Studio\s*/i, '')}`
+                              ? ` · ${s.facility_name.replace(/^Casa Shé\s*/i, '')}`
                               : ''}
                           </span>
                         </div>

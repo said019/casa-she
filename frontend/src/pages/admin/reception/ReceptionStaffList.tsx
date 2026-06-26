@@ -194,7 +194,7 @@ function CreateReceptionistDialog({ open, onOpenChange, facilities }: CreateDial
                         <Input
                             id="create-email"
                             type="email"
-                            placeholder="recepcion@bmbstudio.com"
+                            placeholder="recepcion@casashe.mx"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             disabled={createMutation.isPending}

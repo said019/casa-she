@@ -81,13 +81,13 @@ export default function Instructors() {
         <figure className="relative mt-8 aspect-[16/7] overflow-hidden">
           <img
             src={TEAM_HERO_PHOTO}
-            alt="El equipo BMB Studio"
+            alt="El equipo de Casa Shé"
             className="h-full w-full object-cover"
             loading="lazy"
             decoding="async"
           />
           <figcaption className="absolute bottom-3 left-4 font-heading italic text-base text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]">
-            — Tepa · San Miguel —
+            — Condesa, CDMX —
           </figcaption>
         </figure>
 

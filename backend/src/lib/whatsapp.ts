@@ -140,7 +140,7 @@ export async function getWhatsAppStatus(instance?: string): Promise<{
 }
 
 // ============================================
-// Mensajes predefinidos para BMB Studio
+// Mensajes predefinidos para Casa Shé
 //
 // POLÍTICA WHATSAPP (decisión de la dueña, 2026-06-23): para evitar bloqueo del
 // número, WhatsApp queda limitado a SOLO 3 mensajes automáticos:
@@ -167,7 +167,7 @@ export async function sendBookingConfirmation(
     return false; // WhatsApp desactivado: solo 3 mensajes permitidos (ver política arriba)
     const spotText = spotNumber ? `\n🎯 Lugar: #${spotNumber}` : '';
     const sucursal = sucursalLabel(facilityName);
-    const sucursalText = sucursal ? `\n🏠 BMB Studio ${sucursal}` : '';
+    const sucursalText = sucursal ? `\n🏠 Casa Shé ${sucursal}` : '';
 
     const message = `✅ *Reserva Confirmada*\n\n` +
         `Hola ${clientName}!\n\n` +
@@ -225,7 +225,7 @@ export async function sendClientWelcome(
 ): Promise<boolean> {
     // Alumnos de plataforma: sin WhatsApp salvo su reserva.
     if (await isPlatformMemberByPhone(phone)) return false;
-    const message = `🎉 *¡Bienvenida a BMB Studio!*\n\n` +
+    const message = `🎉 *¡Bienvenida a Casa Shé!*\n\n` +
         `Hola ${clientName}!\n\n` +
         `Tu cuenta ha sido creada. Aquí están tus datos de acceso:\n\n` +
         `📧 *Email:* ${email}\n` +
@@ -249,7 +249,7 @@ export async function sendMigrationWelcome(
     return false; // WhatsApp desactivado: solo 3 mensajes permitidos (ver política arriba)
     // Alumnos de plataforma: sin WhatsApp salvo su reserva.
     if (await isPlatformMemberByPhone(phone)) return false;
-    const message = `🎉 *Bienvenida a BMB Studio*\n\n` +
+    const message = `🎉 *Bienvenida a Casa Shé*\n\n` +
         `Hola ${clientName}!\n\n` +
         `Tu cuenta ha sido creada en nuestra nueva plataforma.\n\n` +
         `📱 *Datos de acceso:*\n` +

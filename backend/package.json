@@ -1,5 +1,5 @@
 {
-    "name": "balance-studio-server",
+    "name": "casa-she-backend",
     "version": "1.0.0",
     "description": "Backend API for Balance Studio Pilates management system",
     "main": "dist/index.js",

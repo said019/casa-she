@@ -27,7 +27,7 @@ interface TemplateConfig {
 
 const defaultTemplates: TemplateConfig = {
     send_class_reminder: '⏰ *Recordatorio*\n\nHola {nombre}!\n\nTe recordamos que tienes clase pronto.\n\n🏋️ {clase}\n⏰ {hora}\n👨‍🏫 {instructor}\n\n¡No olvides traer tu toalla!',
-    send_booking_confirmation: '✅ *Reserva Confirmada*\n\nHola {nombre}!\n\nTu reserva para *{clase}* ha sido confirmada.\n\n📅 {fecha}\n⏰ {hora}\n👨‍🏫 {instructor}\n\n¡Te esperamos en BMB Studio!',
+    send_booking_confirmation: '✅ *Reserva Confirmada*\n\nHola {nombre}!\n\nTu reserva para *{clase}* ha sido confirmada.\n\n📅 {fecha}\n⏰ {hora}\n👨‍🏫 {instructor}\n\n¡Te esperamos en Casa Shé!',
     send_cancellation_notice: '❌ *Reserva Cancelada*\n\nHola {nombre},\n\nTu reserva para *{clase}* del {fecha} a las {hora} ha sido cancelada.\n\nSi tienes créditos disponibles, puedes reservar otra clase.',
     send_membership_expiring: '⚠️ *Tu Membresía está por Vencer*\n\nHola {nombre}!\n\nTu membresía *{plan}* vence el *{fecha}*.\n\nTe quedan {creditos} créditos.\n\n¿Deseas renovar? Contáctanos o renueva desde la app.',
     send_points_earned: '🎉 *¡Ganaste Puntos!*\n\nHola {nombre}!\n\nHas ganado *{puntos} puntos* de lealtad.\n\nTu saldo actual: {saldo} puntos.\n\n¡Sigue acumulando!',

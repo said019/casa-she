@@ -74,7 +74,7 @@ const flows: Flow[] = [
             { actor: 'admin', action: 'Abre Panel → Horario → Selecciona la clase', detail: 'Navega al dia y horario solicitado.' },
             { actor: 'admin', action: 'Busca al usuario por nombre o telefono → Agregar', detail: 'Un clic y la reserva queda confirmada.' },
             { actor: 'system', action: 'Reserva confirmada automaticamente', detail: 'El sistema registra la reserva y descuenta del paquete.' },
-            { actor: 'system', action: 'Recordatorio WhatsApp 24h antes de la clase', detail: '"Hola Maria, recuerda que tienes clase manana jueves a las 10am en BMB Studio."' },
+            { actor: 'system', action: 'Recordatorio WhatsApp 24h antes de la clase', detail: '"Hola Maria, recuerda que tienes clase manana jueves a las 10am en Casa Shé."' },
             { actor: 'system', action: 'Si tiene Wallet Pass: push notification al celular', detail: 'Le aparece como notificacion normal en su celular, sin abrir nada.' },
         ],
     },

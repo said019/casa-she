@@ -162,7 +162,7 @@ export default function Schedule({ bookedIds, defaultFirstFacility }: SchedulePr
               Semana {format(weekStart, "w")} · {format(weekStart, "d MMM", { locale: es })} — {format(addDays(weekStart, 6), "d MMM", { locale: es })}
             </p>
             <h2 className="mt-1 font-heading text-2xl sm:text-3xl text-bmb-ink lg:text-5xl">
-              Horarios <span className="italic text-bmb-gold">BMB</span>
+              Horarios <span className="italic text-bmb-gold">Casa Shé</span>
             </h2>
           </div>
           <div className="flex flex-col gap-2 lg:items-end">

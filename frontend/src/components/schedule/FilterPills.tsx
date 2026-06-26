@@ -36,7 +36,7 @@ const TIME_OPTIONS: [TimeOfDay, string][] = [
   ["evening", "Noche"],
 ];
 
-const shortFacility = (f: string) => f.replace(/^BMB Studio\s*/i, "");
+const shortFacility = (f: string) => f.replace(/^Casa Shé\s*/i, "");
 
 export function FilterPills({
   facilities, facility, onFacilityChange,

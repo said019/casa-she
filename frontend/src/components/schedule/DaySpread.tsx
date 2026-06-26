@@ -82,7 +82,7 @@ export function DaySpread({ weekDays, selectedDate, onSelectDate, classes, now, 
                   <span className="min-w-0">
                     <div className="font-heading italic text-base text-bmb-ink leading-tight truncate">{c.name}</div>
                     <div className="mt-0.5 editorial-caption-sm text-bmb-ink/55 truncate">
-                      {c.instructor} · {c.facilityName?.replace(/^BMB Studio\s*/i, "")}
+                      {c.instructor} · {c.facilityName?.replace(/^Casa Shé\s*/i, "")}
                     </div>
                   </span>
                   <span

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import CasaSheLogo from '@/components/CasaSheLogo';
 import {
     ArrowRight,
     Eye,
@@ -99,7 +100,7 @@ export default function Login() {
                 >
                     <img
                         src="/studio/reformers-vertical.webp"
-                        alt="Interior de BMB Studio"
+                        alt="Interior de Casa Shé"
                         className="absolute inset-0 h-full w-full object-cover"
                     />
                     <div className="absolute inset-x-0 top-0 h-44 bg-gradient-to-b from-bmb-cream/80 to-transparent" />
@@ -107,15 +108,11 @@ export default function Login() {
 
                     <div className="relative z-10 flex min-h-screen flex-col justify-between p-12 xl:p-16">
                         <Link to="/" className="flex w-fit items-center gap-3">
-                            <img
-                                src="/bmb-studio-logo.png"
-                                alt="BMB Studio"
-                                className="h-14 w-auto object-contain"
-                            />
+                            <CasaSheLogo variant="mark" className="h-14 w-14 text-bmb-deepgold" />
                             <div className="leading-none text-bmb-dark">
-                                <p className="font-heading text-3xl font-medium tracking-[-0.02em]">BMB Studio</p>
+                                <p className="font-heading text-3xl font-medium tracking-[-0.02em]">Casa Shé</p>
                                 <p className="mt-1 font-body text-[9px] font-semibold uppercase tracking-[0.25em] text-bmb-deepgold">
-                                    Body · Mind · Balance
+                                    La comunidad es la medicina
                                 </p>
                             </div>
                         </Link>
@@ -142,8 +139,8 @@ export default function Login() {
                     >
                         <div className="mb-6 flex items-center justify-between gap-4">
                             <Link to="/" className="flex items-center gap-2 lg:hidden">
-                                <img src="/bmb-studio-logo.png" alt="BMB Studio" className="h-9 w-auto object-contain" />
-                                <span className="font-heading text-lg font-medium tracking-[-0.02em] text-bmb-dark">BMB Studio</span>
+                                <CasaSheLogo variant="mark" className="h-9 w-9 text-bmb-deepgold" />
+                                <span className="font-heading text-lg font-medium tracking-[-0.02em] text-bmb-dark">Casa Shé</span>
                             </Link>
                             <Link
                                 to="/"
@@ -156,7 +153,7 @@ export default function Login() {
                         <div className="rounded-[1.5rem] border border-balance-sand/55 bg-[hsl(var(--admin-panel))]/92 p-5 shadow-[0_24px_70px_-42px_rgba(51,42,34,0.45)] sm:p-8">
                             <div className="mb-8">
                                 <h2 className="font-heading text-4xl font-medium leading-[0.95] tracking-[-0.045em] text-bmb-dark sm:text-5xl">
-                                    Entra a BMB Studio
+                                    Entra a Casa Shé
                                 </h2>
                                 <p className="mt-3 font-body text-sm leading-relaxed text-bmb-dark/62">
                                     Reserva clases y revisa tus créditos.
@@ -282,7 +279,7 @@ export default function Login() {
                                 </p>
                             </div>
                             <p className="mt-1 text-center font-body text-[11px] leading-relaxed text-bmb-dark/56">
-                                Para abrir BMB Studio como app, sin entrar al navegador cada vez.
+                                Para abrir Casa Shé como app, sin entrar al navegador cada vez.
                             </p>
 
                             {/* Selector de dispositivo */}
@@ -327,7 +324,7 @@ export default function Login() {
                             </ol>
 
                             <p className="mt-2.5 text-center font-body text-[11px] text-bmb-dark/55">
-                                Listo ✨ El ícono de BMB Studio queda en tu pantalla, como cualquier app.
+                                Listo ✨ El ícono de Casa Shé queda en tu pantalla, como cualquier app.
                             </p>
                         </div>
                         )}

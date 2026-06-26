@@ -1,11 +1,11 @@
 {
-  "name": "BMB Studio",
-  "short_name": "BMB Studio",
-  "description": "Pilates Reformer, Yoga, Barre y más en Tepa y San Miguel",
+  "name": "Casa Shé",
+  "short_name": "Casa Shé",
+  "description": "Pilates Mat, Yoga, Aeroyoga, Telas y comunidad en la Condesa, CDMX",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ECE1CE",
-  "theme_color": "#CE9B25",
+  "background_color": "#FBF3DD",
+  "theme_color": "#2E4A35",
   "orientation": "portrait",
   "icons": [
     {

@@ -130,7 +130,7 @@ function rowStatus(r: Row): string {
 function exportXLSX(rows: Row[], periodToken: string, periodLbl: string, facilityName: string) {
     // Hoja 1: Nómina — números nativos para que Excel haga totales y formato MXN
     const sheet1Rows: (string | number)[][] = [
-        ['Nómina de Coaches — BMB Studio'],
+        ['Nómina de Coaches — Casa Shé'],
         [`Periodo: ${periodLbl}`, `Sucursal: ${facilityName}`],
         [],
         ['Coach', 'Tarifa por clase (MXN)', 'Clases impartidas', 'Total (MXN)', 'Estado'],
@@ -355,7 +355,7 @@ function CoachClassesDetail({ instructorId, period, facilityId }: { instructorId
                         </span>
                         {c.facility_name && (
                             <span className="hidden shrink-0 truncate text-xs text-muted-foreground sm:block">
-                                {c.facility_name.replace(/^BMB Studio\s*/i, '')}
+                                {c.facility_name.replace(/^Casa Shé\s*/i, '')}
                             </span>
                         )}
                     </button>

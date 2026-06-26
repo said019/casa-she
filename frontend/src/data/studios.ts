@@ -66,33 +66,26 @@ export interface StudioInfo {
 const studioDirectory: Record<string, StudioInfo> = {
   bmb: {
     slug: 'bmb',
-    name: 'BMB Studio',
-    tagline: 'Pilates Reformer, Yoga, Barre y más — en Tepa y San Miguel.',
+    name: 'Casa Shé',
+    tagline: 'Pilates Mat, Yoga, Aeroyoga y Telas — en Condesa, CDMX.',
     description:
-      'Estudio de pilates con clases en grupos pequeños y atención personalizada. Membresías por créditos: Reformer, Multiclases y Mixtas.',
-    addressLine: 'Calle Primero de Mayo 1, Diamante',
-    city: 'Cuautitlán Izcalli',
-    state: 'Estado de México',
-    postalCode: '54763',
+      'Estudio de wellness para mujeres con clases en grupos pequeños y atención personalizada. Membresías por créditos: Mat, Multiclases y Mixtas.',
+    addressLine: 'Alfonso Reyes 131, Condesa',
+    city: 'Ciudad de México',
+    state: 'CDMX',
+    postalCode: '06140',
     phone: '',
     whatsapp: '5543860391', // TODO: confirmar WhatsApp oficial
-    email: 'hola@bmbstudio.mx', // TODO: confirmar correo oficial
-    instagram: '@bmbstudio', // TODO: confirmar Instagram oficial
-    mapUrl: 'https://www.google.com/maps/search/BMB+Studio+Cuautitl%C3%A1n+Izcalli',
+    email: 'casashecondesa@gmail.com',
+    instagram: '@casashe.mx',
+    mapUrl: 'https://www.google.com/maps/search/Casa+Sh%C3%A9+Condesa+CDMX',
     branches: [
       {
-        name: 'BMB Studio Tepa',
-        addressLines: ['Calle Primero de Mayo 1, Diamante', '54763 Cuautitlán Izcalli, Méx.'],
-        mapUrl: 'https://www.google.com/maps?q=Calle+Primero+de+Mayo+1,+Diamante,+54763+Cuautitl%C3%A1n+Izcalli,+M%C3%A9x.',
+        name: 'Casa Shé — Condesa',
+        addressLines: ['Alfonso Reyes 131, Condesa', '06140 Ciudad de México, CDMX'],
+        mapUrl: 'https://www.google.com/maps?q=Alfonso+Reyes+131,+Condesa,+06140+Ciudad+de+M%C3%A9xico,+CDMX',
         mapEmbed:
-          'https://www.google.com/maps?q=Calle+Primero+de+Mayo+1,+Diamante,+54763+Cuautitl%C3%A1n+Izcalli,+M%C3%A9x.&output=embed',
-      },
-      {
-        name: 'BMB Studio San Miguel',
-        addressLines: ['Cam. a Tepotzotlán 6D, Axotlan', '54715 Cuautitlán Izcalli, Méx.'],
-        mapUrl: 'https://www.google.com/maps?q=Cam.+a+Tepotzotl%C3%A1n+6D,+Axotlan,+54715+Cuautitl%C3%A1n+Izcalli,+M%C3%A9x.',
-        mapEmbed:
-          'https://www.google.com/maps?q=Cam.+a+Tepotzotl%C3%A1n+6D,+Axotlan,+54715+Cuautitl%C3%A1n+Izcalli,+M%C3%A9x.&output=embed',
+          'https://www.google.com/maps?q=Alfonso+Reyes+131,+Condesa,+06140+Ciudad+de+M%C3%A9xico,+CDMX&output=embed',
       },
     ],
     classTypes: [
@@ -178,7 +171,7 @@ const studioDirectory: Record<string, StudioInfo> = {
     businessHours: [
       { label: 'Mañana', hours: 'Reformer desde las 7:10' },
       { label: 'Tarde', hours: 'Clases desde las 17:10' },
-      { label: 'Sucursales', hours: 'Tepa y San Miguel' },
+      { label: 'Sede', hours: 'Condesa, CDMX' },
       { label: 'Cancelación', hours: 'Hasta 12 horas antes' },
     ],
     palette: {
