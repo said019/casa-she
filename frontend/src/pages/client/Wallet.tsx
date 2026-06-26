@@ -64,7 +64,8 @@ function ReferralCodePanel() {
       {/* Watermark del monograma Casa Shé */}
       <CasaSheMark
         aria-hidden="true"
-        className="pointer-events-none absolute -right-10 -top-12 h-52 w-52 select-none text-balance-cream opacity-[0.08]"
+        tone="cream"
+        className="pointer-events-none absolute -right-10 -top-12 h-52 w-52 select-none opacity-[0.08]"
       />
 
       <div className="relative space-y-5">

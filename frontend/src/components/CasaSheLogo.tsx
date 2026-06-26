@@ -1,48 +1,44 @@
 /**
- * Logo de marca Casa Shé.
- * - `mark`: monograma de 4 pétalos (quatrefoil de trazos entrelazados, estilo del
- *   símbolo SS del manual de marca). Placeholder de línea fina hasta tener el SVG oficial.
- * - `full`: monograma + wordmark "CASA SHÉ" en Instrument Serif.
- * Hereda el color vía `currentColor`, así que se controla con clases de texto
- * (p.ej. `text-bmb-gold` = Verde Casa, `text-bmb-cream` = Avena).
+ * Logo de marca Casa Shé — usa los activos oficiales en alta calidad.
+ * - `mark`: monograma oficial (símbolo entrelazado del manual de marca).
+ * - `full`: wordmark oficial "CASA SHÉ" + monograma.
+ * Color: por defecto Verde Casa (sobre fondos claros). Para fondos oscuros/de color,
+ * pasar `tone="cream"` y se usa la versión crema (Avena).
+ * El tamaño se controla con clases (h-9 w-9, etc.); se mantiene la proporción (object-contain).
  */
 
+const MONOGRAM = "/casashe/logo-monogram.png";
+const MONOGRAM_CREAM = "/casashe/logo-monogram-cream.png";
+const WORDMARK = "/casashe/logo-wordmark.png";
+const WORDMARK_CREAM = "/casashe/logo-wordmark-cream.png";
+
+type Tone = "green" | "cream";
 type Props = {
   variant?: "full" | "mark";
+  tone?: Tone;
   className?: string;
 };
 
-export function CasaSheMark({ className = "" }: { className?: string }) {
+export function CasaSheMark({ className = "", tone = "green" }: { className?: string; tone?: Tone }) {
   return (
-    <svg
-      viewBox="0 0 64 64"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.4}
+    <img
+      src={tone === "cream" ? MONOGRAM_CREAM : MONOGRAM}
+      alt=""
       aria-hidden="true"
-      className={className}
-    >
-      <circle cx="32" cy="20" r="11.5" />
-      <circle cx="44" cy="32" r="11.5" />
-      <circle cx="32" cy="44" r="11.5" />
-      <circle cx="20" cy="32" r="11.5" />
-    </svg>
+      className={`object-contain ${className}`}
+    />
   );
 }
 
-export default function CasaSheLogo({ variant = "full", className = "" }: Props) {
+export default function CasaSheLogo({ variant = "full", tone = "green", className = "" }: Props) {
   if (variant === "mark") {
-    return <CasaSheMark className={className} />;
+    return <CasaSheMark className={className} tone={tone} />;
   }
   return (
-    <span className={`inline-flex items-center gap-2.5 ${className}`}>
-      <span
-        className="font-heading tracking-[0.18em] leading-none"
-        style={{ fontSize: "1.5rem" }}
-      >
-        CASA SHÉ
-      </span>
-      <CasaSheMark className="h-6 w-6" />
-    </span>
+    <img
+      src={tone === "cream" ? WORDMARK_CREAM : WORDMARK}
+      alt="Casa Shé"
+      className={`object-contain ${className || "h-7 w-auto"}`}
+    />
   );
 }
