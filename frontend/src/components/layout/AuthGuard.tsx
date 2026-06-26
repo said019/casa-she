@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore';
 import type { UserRole } from '@/types/auth';
 import { Loader2 } from 'lucide-react';
 import { OnboardingGate } from '@/components/OnboardingGate';
+import { ProfilerGate } from '@/components/onboarding/ProfilerGate';
 
 interface AuthGuardProps {
     children?: ReactNode; // Make optional
@@ -90,6 +91,11 @@ export function AuthGuard({ children, requiredRoles, redirectTo = '/login', allo
     // Primer ingreso con contraseña temporal: forzar completar acceso antes de usar la app.
     if (user?.temp_password) {
         return <OnboardingGate />;
+    }
+
+    // Perfilador obligatorio para clientas nuevas: bloquea la app hasta completarlo.
+    if (user?.role === 'client' && user?.onboarding_required && !user?.onboarding_completed_at) {
+        return <ProfilerGate />;
     }
 
     // Render children if provided (wrapper mode), otherwise Outlet (layout mode)
