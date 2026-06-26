@@ -35,22 +35,21 @@ function MSym({ name, size = 22, filled = false, className }: { name: string; si
 }
 
 // icon = nombre de glifo Material Symbols.
+// v1 Casa Shé: sin Eventos ni Videos (fuera de alcance). "Cartera" = créditos + QR de check-in.
 const navItems = [
     { href: '/app', label: 'Inicio', icon: 'home' },
     { href: '/app/book', label: 'Reservar', icon: 'calendar_add_on' },
     { href: '/app/classes', label: 'Mis clases', icon: 'event_note' },
     { href: '/app/checkout', label: 'Comprar', icon: 'shopping_bag' },
-    { href: '/app/events', label: 'Eventos', icon: 'celebration' },
-    { href: '/app/videos', label: 'Videos', icon: 'play_circle' },
-    { href: '/app/wallet', label: 'Lealtad', icon: 'redeem' },
+    { href: '/app/wallet', label: 'Cartera', icon: 'redeem' },
 ];
 
-// El bottom-nav navega; "Reservar" (acción principal) vive en el FAB dorado.
+// El bottom-nav navega; "Reservar" (acción principal) vive en el FAB.
 const bottomNavItems = [
     { href: '/app', label: 'Inicio', icon: 'home' },
     { href: '/app/checkout', label: 'Comprar', icon: 'shopping_bag' },
     { href: '/app/classes', label: 'Clases', icon: 'event_note' },
-    { href: '/app/wallet', label: 'Lealtad', icon: 'redeem' },
+    { href: '/app/wallet', label: 'Cartera', icon: 'redeem' },
 ];
 
 export function ClientLayout({ children }: ClientLayoutProps) {

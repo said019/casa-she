@@ -39,23 +39,17 @@ import CasaSheLogo from '@/components/CasaSheLogo';
 
 type NavItem = { href: string; label: string; icon: ElementType; exact?: boolean; perm?: PermissionKey };
 
+// v1 Casa Shé: recepción acotada al core (sin Caja/Vender/Inventario/Nómina/WhatsApp).
 const allNav: NavItem[] = [
     { href: '/reception', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-    { href: '/reception/caja', label: 'Caja', icon: CreditCard, perm: 'caja' },
-    { href: '/reception/vender', label: 'Vender', icon: ShoppingCart, perm: 'vender' },
-    { href: '/reception/inventario', label: 'Inventario', icon: Package, perm: 'inventario' },
     { href: '/reception/checkin', label: 'Check-in', icon: UserCheck, perm: 'checkin' },
     { href: '/reception/clientes', label: 'Usuarios', icon: Users, perm: 'clientes' },
     { href: '/reception/reservas', label: 'Reservas', icon: CalendarDays, perm: 'reservas' },
     { href: '/reception/historial', label: 'Historial de reservas', icon: History, perm: 'reservas' },
     { href: '/reception/lista-espera', label: 'Lista de espera', icon: Hourglass, perm: 'reservas' },
     { href: '/reception/calendario', label: 'Calendario', icon: CalendarDays, perm: 'multi_sucursal' },
-    { href: '/reception/plantilla', label: 'Plantilla', icon: CalendarPlus, perm: 'multi_sucursal' },
-    { href: '/reception/generar', label: 'Generar semana', icon: CalendarPlus, perm: 'multi_sucursal' },
     { href: '/reception/aprobaciones', label: 'Aprobaciones', icon: BadgeCheck, perm: 'multi_sucursal' },
-    { href: '/reception/nomina', label: 'Nómina', icon: Wallet, perm: 'nomina' },
     { href: '/reception/equipo', label: 'Equipo', icon: Settings2, perm: 'gestionar_permisos' },
-    { href: '/reception/whatsapp', label: 'WhatsApp', icon: MessageCircle },
 ];
 
 export default function ReceptionLayout() {
