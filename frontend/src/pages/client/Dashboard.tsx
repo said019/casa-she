@@ -9,6 +9,7 @@ import type { BookingClient } from '@/types/booking';
 import type { ClientMembership } from '@/types/membership';
 import { categoryCredits } from '@/types/membership';
 import { ClientLayout } from '@/components/layout/ClientLayout';
+import { ProfilerInviteBanner } from '@/components/onboarding/ProfilerInviteBanner';
 import { CasaSheMark } from '@/components/CasaSheLogo';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -139,6 +140,7 @@ export default function ClientDashboard() {
   return (
     <AuthGuard requiredRoles={['client']}>
       <ClientLayout>
+        <ProfilerInviteBanner />
         <div className="relative space-y-10 pb-4">
           <section className="relative overflow-hidden rounded-[1.6rem] border border-[#DCCCC0]/70 bg-[#FCEFEC]/72 shadow-[0_24px_80px_-68px_rgba(42,33,24,.72)]">
             <div className="absolute inset-0 opacity-[0.2]">

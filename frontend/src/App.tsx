@@ -27,6 +27,7 @@ import InstructorMagicLogin from "./pages/instructor/InstructorMagicLogin";
 
 // Client pages
 import ClientDashboard from "./pages/client/Dashboard";
+import ClientOnboarding from "./pages/client/Onboarding";
 import BookClasses from "./pages/client/BookClasses";
 import BookClassConfirm from "./pages/client/BookClassConfirm";
 import MyBookings from "./pages/client/MyBookings";
@@ -226,6 +227,7 @@ const App = () => (
 
             {/* Client Routes */}
             <Route path="/app" element={<ClientDashboard />} />
+            <Route path="/app/onboarding" element={<ClientOnboarding />} />
             <Route path="/app/book" element={<BookClasses />} />
             <Route path="/app/book/:classId" element={<BookClassConfirm />} />
             <Route path="/app/classes" element={<MyBookings />} />
