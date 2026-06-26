@@ -1,0 +1,86 @@
+{
+    "formatVersion": 1,
+    "passTypeIdentifier": "pass.com.catarsis.membership",
+    "teamIdentifier": "XXXXXXXXXX",
+    "organizationName": "Catarsis Studio",
+    "description": "Membresía Catarsis Studio",
+    "serialNumber": "",
+    "webServiceURL": "",
+    "authenticationToken": "",
+    
+    "storeCard": {
+        "headerFields": [
+            {
+                "key": "membership_type",
+                "label": "PLAN",
+                "value": ""
+            }
+        ],
+        "primaryFields": [
+            {
+                "key": "member_name",
+                "label": "MIEMBRO",
+                "value": ""
+            }
+        ],
+        "secondaryFields": [
+            {
+                "key": "classes_remaining",
+                "label": "CLASES RESTANTES",
+                "value": ""
+            },
+            {
+                "key": "valid_until",
+                "label": "VÁLIDO HASTA",
+                "value": "",
+                "dateStyle": "PKDateStyleMedium"
+            }
+        ],
+        "auxiliaryFields": [
+            {
+                "key": "loyalty_points",
+                "label": "PUNTOS",
+                "value": ""
+            }
+        ],
+        "backFields": [
+            {
+                "key": "member_since",
+                "label": "Miembro desde",
+                "value": ""
+            },
+            {
+                "key": "contact",
+                "label": "Contacto",
+                "value": "info@catarsisstudio.com"
+            },
+            {
+                "key": "address",
+                "label": "Dirección",
+                "value": ""
+            },
+            {
+                "key": "terms",
+                "label": "Términos y Condiciones",
+                "value": "Esta membresía es personal e intransferible. Las clases no utilizadas expiran según las condiciones del plan."
+            }
+        ]
+    },
+    
+    "backgroundColor": "rgb(140, 132, 117)",
+    "foregroundColor": "rgb(255, 255, 255)",
+    "labelColor": "rgb(230, 225, 220)",
+    
+    "barcodes": [
+        {
+            "format": "PKBarcodeFormatQR",
+            "message": "",
+            "messageEncoding": "iso-8859-1"
+        }
+    ],
+    
+    "locations": [],
+    
+    "relevantDate": "",
+    "expirationDate": ""
+}

@@ -1,0 +1,19 @@
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm install --include=dev"]
+
+[phases.install.variables]
+NODE_ENV = "development"
+NPM_CONFIG_PRODUCTION = "false"
+
+[phases.build]
+cmds = ["rm -rf node_modules/.vite", "npx --no-install vite build"]
+
+[phases.build.variables]
+NODE_ENV = "development"
+NPM_CONFIG_PRODUCTION = "false"
+
+[start]
+cmd = "npx serve dist -s -p ${PORT:-8080}"

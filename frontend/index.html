@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>BMB Studio | Pilates Reformer · Yoga · Barre — Tepa & San Miguel</title>
+  <meta name="description"
+    content="BMB Studio — Pilates Reformer, Yoga, Barre, Sculpt y más. Estudio de pilates con dos sucursales: Tepa y San Miguel." />
+  <meta name="author" content="BMB Studio" />
+  <link rel="canonical" href="https://bmbstudio.mx" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" href="/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <!-- El <link rel="manifest"> lo CREA el script de abajo según la ruta, para que no haya
+       carrera entre el manifest de cliente y el de coach (el navegador lee el manifest muy
+       temprano y un link estático ganaba la carrera). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <!-- Solo los glifos usados en el /app (fuente subsetteada = carga al instante) -->
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=calendar_add_on,celebration,close,event_note,home,logout,menu,newspaper,notifications,person,person_add,play_circle,receipt_long,redeem,shopping_bag&display=block" />
+  <meta name="theme-color" content="#CE9B25" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="BMB Studio" />
+
+  <!-- Crea el <link rel="manifest"> con el manifest correcto según la ruta, ANTES de que el
+       navegador lo lea. En /coach/* usa el manifest de coach (start_url /coach, "BMB Coach")
+       y pone el apple-title "BMB Coach"; en el resto, el manifest normal. Así el acceso directo
+       que guardan los coaches abre su portal y dice "BMB Coach" (no el index/"BMB Studio"). -->
+  <script>
+    (function () {
+      try {
+        var isCoach = location.pathname.indexOf('/coach') === 0;
+        var link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = isCoach ? '/coach-manifest.json' : '/manifest.json';
+        document.head.appendChild(link);
+        if (isCoach) {
+          var t = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+          if (t) t.setAttribute('content', 'BMB Coach');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta property="og:title" content="BMB Studio | Pilates Reformer, Yoga & Barre" />
+  <meta property="og:description"
+    content="Estudio de pilates en Tepa y San Miguel. Clases pequeñas y personalizadas con toque premium." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://bmbstudio.mx" />
+  <meta property="og:image" content="https://bmbstudio.mx/icon-512.png" />
+
+  <meta name="twitter:url" content="https://bmbstudio.mx" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="/bmb-studio-logo.png" />
+  <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>

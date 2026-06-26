@@ -1,0 +1,481 @@
+@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,500;6..96,600&family=Montserrat:wght@300;400;500;600;700&family=WindSong:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* BMB Studio Palette
+     * Crema:         #ECE1CE — Background
+     * Taupe:         #DCCCC0 — Borders and quiet surfaces
+     * Dorado:        #CE9B25 — Primary actions and accents (logo primario)
+     * Dorado prof.:  #AD6C20 — Deep gold details
+     * Café oscuro:   #2A2118 — Foreground
+     * Malva:         #A6776A — Warm accent
+     */
+    --background: 40 44% 91%;
+    --foreground: 30 27% 14%;
+
+    --card: 42 46% 96%;
+    --card-foreground: 30 27% 14%;
+
+    --popover: 42 46% 96%;
+    --popover-foreground: 30 27% 14%;
+
+    --primary: 42 72% 47%;
+    --primary-foreground: 40 45% 96%;
+
+    --secondary: 28 22% 78%;
+    --secondary-foreground: 30 27% 18%;
+
+    --muted: 38 33% 87%;
+    --muted-foreground: 30 12% 40%;
+
+    --accent: 40 42% 83%;
+    --accent-foreground: 30 27% 16%;
+
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 40 45% 97%;
+
+    --border: 34 24% 80%;
+    --input: 34 24% 80%;
+    --ring: 42 72% 47%;
+
+    --radius: 0.5rem;
+
+    /* Custom tokens — BMB Studio */
+    --hero-gradient: linear-gradient(135deg, hsl(40 44% 93%) 0%, hsl(38 40% 86%) 52%, hsl(42 58% 78%) 100%);
+    --card-gradient: linear-gradient(180deg, hsl(42 46% 97%) 0%, hsl(40 34% 91%) 100%);
+    --overlay-dark: linear-gradient(180deg, hsla(30, 27%, 14%, 0.2) 0%, hsla(30, 27%, 14%, 0.55) 100%);
+    --glow-sage: 0 18px 42px hsla(42, 72%, 47%, 0.18);
+    --glow-warm: 0 18px 42px hsla(33, 69%, 40%, 0.16);
+
+    /* Typography */
+    --font-heading: 'Hamachi', 'Bodoni Moda', serif;
+    --font-body: 'Carla Sans', 'Montserrat', sans-serif;
+    --font-script: 'WindSong', cursive;
+
+    /* Animations */
+    --transition-smooth: all 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    --transition-bounce: all 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+
+    /* Admin shell tokens */
+    --admin-bg: 40 33% 90%;
+    --admin-panel: 42 40% 96%;
+    --admin-rail: 38 28% 88%;
+
+    /* BMB Studio semantic status colors */
+    --success: 145 30% 42%;
+    --success-foreground: 40 45% 97%;
+    --warning: 38 72% 48%;
+    --warning-foreground: 30 27% 14%;
+    --info: 28 30% 58%;
+    --info-foreground: 30 27% 14%;
+
+    --sidebar-background: 42 44% 96%;
+    --sidebar-foreground: 30 27% 14%;
+    --sidebar-primary: 42 72% 47%;
+    --sidebar-primary-foreground: 40 45% 96%;
+    --sidebar-accent: 40 34% 89%;
+    --sidebar-accent-foreground: 30 27% 14%;
+    --sidebar-border: 34 22% 82%;
+    --sidebar-ring: 42 72% 47%;
+  }
+
+  .dark {
+    /* BMB Studio Dark Mode */
+    --background: 30 18% 9%;
+    --foreground: 40 30% 92%;
+
+    --card: 30 16% 12%;
+    --card-foreground: 40 30% 92%;
+
+    --popover: 30 18% 10%;
+    --popover-foreground: 40 30% 92%;
+
+    --primary: 42 68% 52%;
+    --primary-foreground: 30 30% 10%;
+
+    --secondary: 28 14% 30%;
+    --secondary-foreground: 40 30% 92%;
+
+    --muted: 30 12% 17%;
+    --muted-foreground: 40 14% 58%;
+
+    --accent: 36 22% 26%;
+    --accent-foreground: 40 30% 92%;
+
+    --destructive: 0 62% 40%;
+    --destructive-foreground: 40 40% 96%;
+
+    --border: 30 12% 19%;
+    --input: 30 12% 19%;
+    --ring: 42 68% 52%;
+
+    --success: 145 25% 48%;
+    --success-foreground: 30 18% 9%;
+    --warning: 38 60% 55%;
+    --warning-foreground: 30 18% 9%;
+    --info: 28 24% 55%;
+    --info-foreground: 30 18% 9%;
+
+    --sidebar-background: 30 18% 9%;
+    --sidebar-foreground: 40 22% 92%;
+    --sidebar-primary: 42 68% 52%;
+    --sidebar-primary-foreground: 30 30% 10%;
+    --sidebar-accent: 30 12% 15%;
+    --sidebar-accent-foreground: 40 22% 92%;
+    --sidebar-border: 30 12% 17%;
+    --sidebar-ring: 42 68% 52%;
+
+    --admin-bg: 30 16% 10%;
+    --admin-panel: 30 13% 13%;
+    --admin-rail: 30 12% 16%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
+
+@layer components {
+  .hero-gradient {
+    background: var(--hero-gradient);
+  }
+
+  .card-gradient {
+    background: var(--card-gradient);
+  }
+
+  .overlay-dark {
+    background: var(--overlay-dark);
+  }
+
+  .glow-sage {
+    box-shadow: var(--glow-sage);
+  }
+
+  .glow-warm {
+    box-shadow: var(--glow-warm);
+  }
+
+  .font-script {
+    font-family: var(--font-script);
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .editorial-caption {
+    font-family: var(--font-body);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    line-height: 1.4;
+  }
+
+  .editorial-caption-sm {
+    font-family: var(--font-body);
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    line-height: 1.4;
+  }
+
+  .numeral {
+    font-family: var(--font-heading);
+    font-style: italic;
+    font-variant-numeric: tabular-nums;
+    color: #CE9B25;
+    letter-spacing: -0.01em;
+  }
+
+  .editorial-rule {
+    height: 1px;
+    background-color: #2A2118;
+    width: 100%;
+  }
+
+  .editorial-rule-dotted {
+    background-image: linear-gradient(to right, rgba(42, 33, 24, 0.32) 1px, transparent 1px);
+    background-size: 4px 1px;
+    background-repeat: repeat-x;
+    background-position: top;
+    height: 1px;
+    width: 100%;
+  }
+
+  .admin-shell {
+    font-family: var(--font-body);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .admin-shell h1,
+  .admin-shell h2,
+  .admin-shell h3,
+  .admin-shell h4,
+  .admin-shell h5,
+  .admin-shell h6 {
+    font-family: var(--font-body);
+  }
+
+  .client-app-shell {
+    font-family: var(--font-body);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .client-app-shell h1,
+  .client-app-shell h2,
+  .client-app-shell h3,
+  .client-app-shell h4,
+  .client-app-shell h5,
+  .client-app-shell h6 {
+    font-family: var(--font-heading);
+  }
+
+  /* Landing público con la tipografía del menú (sans Montserrat), sin la serif editorial. */
+  .landing-sans .font-heading,
+  .landing-sans h1,
+  .landing-sans h2,
+  .landing-sans h3,
+  .landing-sans h4,
+  .landing-sans h5,
+  .landing-sans h6,
+  .landing-sans .numeral {
+    font-family: var(--font-body);
+    font-style: normal;
+  }
+
+  /* === Atmósfera de marca BMB — gradientes dorados luminosos (golden-hour) ===
+   * Adaptado del lenguaje "sunset" pero recoloreado a la paleta BMB
+   * (dorado #CE9B25 / crema #ECE1CE / dorado profundo #AD6C20). Mantiene el
+   * fondo luminoso para que el texto oscuro sea legible encima. */
+  .bmb-aura-field {
+    pointer-events: none;
+    position: absolute;
+    inset: -18%;
+    z-index: 0;
+    filter: blur(30px) saturate(1.08);
+    transform: rotate(-5deg) scale(1.04);
+    background-image:
+      radial-gradient(ellipse 50% 64% at 16% 16%, hsla(44, 90%, 88%, 0.96) 0%, hsla(42, 78%, 70%, 0.66) 36%, transparent 68%),
+      radial-gradient(ellipse 64% 56% at 74% 38%, hsla(42, 76%, 58%, 0.82) 0%, hsla(40, 66%, 56%, 0.5) 40%, transparent 72%),
+      radial-gradient(ellipse 60% 50% at 88% 84%, hsla(36, 64%, 50%, 0.5) 0%, transparent 64%),
+      radial-gradient(ellipse 72% 50% at 24% 92%, hsla(43, 86%, 78%, 0.7) 0%, transparent 64%),
+      linear-gradient(135deg, hsl(44, 60%, 92%) 0%, hsl(42, 74%, 80%) 30%, hsl(42, 74%, 60%) 70%, hsl(36, 62%, 48%) 105%);
+  }
+  .bmb-aura-ribbon {
+    pointer-events: none;
+    position: absolute;
+    inset: -10%;
+    z-index: 0;
+    opacity: 0.4;
+    filter: blur(24px) saturate(1.15);
+    transform: rotate(-7deg) scale(1.08);
+    mix-blend-mode: soft-light;
+    background:
+      conic-gradient(from 220deg at 60% 46%, transparent 0deg 56deg, hsla(44, 88%, 76%, 0.85) 80deg, hsla(42, 76%, 56%, 0.9) 116deg, hsla(36, 60%, 46%, 0.45) 150deg, transparent 192deg 360deg);
+  }
+  .bmb-aura-veil {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background:
+      linear-gradient(90deg, hsla(40, 50%, 92%, 0.46) 0%, hsla(40, 50%, 92%, 0.12) 32%, hsla(42, 50%, 96%, 0.26) 64%, hsla(40, 50%, 92%, 0.5) 100%),
+      linear-gradient(180deg, hsla(40, 50%, 92%, 0.36) 0%, hsla(40, 50%, 92%, 0.02) 52%, hsla(40, 50%, 92%, 0.46) 100%);
+  }
+  .bmb-grain {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    opacity: 0.05;
+    mix-blend-mode: multiply;
+    background-image:
+      radial-gradient(circle at 22% 28%, hsla(36, 60%, 36%, 0.3) 0 1px, transparent 1.4px),
+      radial-gradient(circle at 72% 78%, hsla(30, 30%, 20%, 0.24) 0 1px, transparent 1.4px);
+    background-size: 16px 16px, 22px 22px;
+  }
+  .bmb-glow {
+    box-shadow: 0 30px 60px -22px hsla(42, 72%, 46%, 0.4), 0 14px 34px -14px hsla(36, 55%, 30%, 0.2);
+  }
+  /* Superficie dorada reutilizable (hero/cards) */
+  .bg-bmb-aura {
+    background:
+      radial-gradient(ellipse 66% 56% at 16% 20%, hsla(44, 86%, 86%, 0.92) 0%, transparent 56%),
+      radial-gradient(ellipse 74% 60% at 84% 16%, hsla(42, 76%, 58%, 0.9) 0%, transparent 60%),
+      radial-gradient(ellipse 70% 58% at 86% 90%, hsla(36, 62%, 48%, 0.5) 0%, transparent 62%),
+      radial-gradient(ellipse 80% 64% at 22% 88%, hsla(43, 84%, 72%, 0.66) 0%, transparent 60%),
+      linear-gradient(135deg, #F2E1B0 0%, #D6A53A 52%, #9A6E22 100%);
+  }
+
+  /* Material Symbols Outlined — íconos de nav/acciones del /app del cliente. */
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+  }
+  .material-symbols-outlined.filled {
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+
+  /* Tarjetas con flip 3D (clases del landing). Prefijos -webkit para Safari. */
+  .flip-3d {
+    transform-style: preserve-3d;
+    -webkit-transform-style: preserve-3d;
+  }
+  .flip-face {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .admin-shell::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image:
+      linear-gradient(90deg, hsl(var(--foreground) / 0.28) 1px, transparent 1px),
+      linear-gradient(hsl(var(--foreground) / 0.24) 1px, transparent 1px);
+    background-size: 36px 36px;
+    mask-image: linear-gradient(to bottom, black, transparent 70%);
+  }
+
+  .ease-admin-flow {
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+@layer utilities {
+  /* Estética compartida con el shell admin (AdminLayout). Reutilizable en el /app
+     de cliente para no esparcir números mágicos por las páginas. */
+  .app-radial-bg {
+    /* Atmósfera cálida rosa/blush + dorado (paleta IG), en vez del verde-sage apagado. */
+    background-image:
+      radial-gradient(circle at 12% 4%, rgba(219, 176, 179, 0.38), transparent 36%),
+      radial-gradient(circle at 86% 9%, rgba(206, 155, 37, 0.18), transparent 30%),
+      radial-gradient(circle at 30% 78%, rgba(219, 176, 179, 0.22), transparent 42%),
+      radial-gradient(circle at 80% 92%, rgba(230, 208, 202, 0.5), transparent 34%);
+  }
+
+  .app-panel {
+    background-color: hsl(var(--admin-panel));
+    border: 1px solid rgba(220, 204, 192, 0.55);
+  }
+
+  .app-soft-shadow {
+    box-shadow: 0 14px 34px -28px rgba(166, 119, 106, 0.42);
+  }
+
+  .animate-fade-up {
+    animation: fadeUp 0.8s ease-out forwards;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.6s ease-out forwards;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.5s ease-out forwards;
+  }
+
+  .animate-slide-left {
+    animation: slideLeft 0.6s ease-out forwards;
+  }
+
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes slideLeft {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .delay-100 { animation-delay: 100ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-400 { animation-delay: 400ms; }
+  .delay-500 { animation-delay: 500ms; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
