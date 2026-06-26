@@ -14,14 +14,16 @@ interface AuthShellProps {
 
 export default function AuthShell({ eyebrow, title, subtitle, children, footer }: AuthShellProps) {
     return (
-        <main className="min-h-screen bg-bmb-cream text-bmb-dark">
-            <div className="grid min-h-screen lg:grid-cols-[0.9fr_1.1fr]">
-                {/* Panel de marca — solo desktop */}
+        // Alto fijo a la pantalla: nada de scroll de ventana. El panel de marca cubre
+        // siempre toda la columna y SOLO el formulario hace scroll interno si hace falta.
+        <main className="h-[100dvh] overflow-hidden bg-bmb-cream text-bmb-dark">
+            <div className="grid h-full lg:grid-cols-[0.9fr_1.1fr]">
+                {/* Panel de marca — solo desktop. Stretch del grid → cubre toda la altura. */}
                 <motion.section
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.55, ease: easeOut }}
-                    className="relative hidden overflow-hidden lg:sticky lg:top-0 lg:block lg:h-screen lg:self-start"
+                    className="relative hidden overflow-hidden lg:block"
                 >
                     <img
                         src="/casashe/hero.png"
@@ -32,11 +34,7 @@ export default function AuthShell({ eyebrow, title, subtitle, children, footer }
 
                     <div className="relative z-10 flex h-full flex-col justify-between p-12 xl:p-16">
                         <Link to="/" className="w-fit">
-                            <img
-                                src="/casashe/logo-wordmark-cream.png"
-                                alt="Casa Shé"
-                                className="h-9 w-auto"
-                            />
+                            <img src="/casashe/logo-wordmark-cream.png" alt="Casa Shé" className="h-9 w-auto" />
                         </Link>
 
                         <div className="max-w-md">
@@ -50,8 +48,8 @@ export default function AuthShell({ eyebrow, title, subtitle, children, footer }
                     </div>
                 </motion.section>
 
-                {/* Panel de formulario — centra si cabe, hace scroll desde arriba si el form es más alto que la pantalla */}
-                <section className="relative flex min-h-screen flex-col px-5 py-12 sm:px-8 lg:px-14">
+                {/* Panel de formulario — scroll interno; centra si cabe, scroll desde arriba si no. */}
+                <section className="relative flex h-full flex-col overflow-y-auto px-5 py-12 sm:px-8 lg:px-14">
                     <motion.div
                         initial={{ opacity: 0, y: 18 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -61,16 +59,9 @@ export default function AuthShell({ eyebrow, title, subtitle, children, footer }
                         {/* Encabezado móvil */}
                         <div className="mb-8 flex items-center justify-between gap-4 lg:hidden">
                             <Link to="/" className="flex items-center">
-                                <img
-                                    src="/casashe/logo-wordmark.png"
-                                    alt="Casa Shé"
-                                    className="h-7 w-auto"
-                                />
+                                <img src="/casashe/logo-wordmark.png" alt="Casa Shé" className="h-7 w-auto" />
                             </Link>
-                            <Link
-                                to="/"
-                                className="font-body text-sm text-bmb-dark/65 transition-colors hover:text-bmb-dark"
-                            >
+                            <Link to="/" className="font-body text-sm text-bmb-dark/65 transition-colors hover:text-bmb-dark">
                                 Inicio
                             </Link>
                         </div>
@@ -86,18 +77,14 @@ export default function AuthShell({ eyebrow, title, subtitle, children, footer }
                                 {title}
                             </h1>
                             {subtitle && (
-                                <p className="mt-3 font-body leading-relaxed text-bmb-dark/65">
-                                    {subtitle}
-                                </p>
+                                <p className="mt-3 font-body leading-relaxed text-bmb-dark/65">{subtitle}</p>
                             )}
                         </div>
 
                         <div className="mt-8">{children}</div>
 
                         {footer && (
-                            <div className="mt-6 text-center font-body text-sm text-bmb-dark/65">
-                                {footer}
-                            </div>
+                            <div className="mt-6 text-center font-body text-sm text-bmb-dark/65">{footer}</div>
                         )}
                     </motion.div>
                 </section>
