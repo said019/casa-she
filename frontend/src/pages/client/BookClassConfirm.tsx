@@ -82,7 +82,10 @@ export default function BookClassConfirm() {
       // conteo en pantalla (Dashboard/Perfil) usa 'my-membership' y no se actualizaba,
       // por eso parecía que "no se jalaban los créditos".
       queryClient.invalidateQueries({ queryKey: ['my-membership'] });
-      toast({ title: '¡Reserva exitosa!', description: 'Te esperamos en clase.' });
+      toast({
+        title: '¡Reserva exitosa!',
+        description: 'Llega 10 min antes y trae ropa cómoda. Recuerda: cancela hasta 5 h antes para no perder tu crédito.',
+      });
       navigate('/app/classes');
     },
     onError: (err: any) => {
