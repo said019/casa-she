@@ -18,10 +18,10 @@ export default function AuthShell({ eyebrow, title, subtitle, children, footer }
             <div className="grid min-h-screen lg:grid-cols-[0.9fr_1.1fr]">
                 {/* Panel de marca — solo desktop */}
                 <motion.section
-                    initial={{ opacity: 0, scale: 0.985 }}
-                    animate={{ opacity: 1, scale: 1 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
                     transition={{ duration: 0.55, ease: easeOut }}
-                    className="relative hidden overflow-hidden lg:block"
+                    className="relative hidden overflow-hidden lg:sticky lg:top-0 lg:block lg:h-screen lg:self-start"
                 >
                     <img
                         src="/casashe/hero.png"
@@ -30,7 +30,7 @@ export default function AuthShell({ eyebrow, title, subtitle, children, footer }
                     />
                     <div className="absolute inset-0" style={{ backgroundColor: 'rgba(22,38,26,0.62)' }} />
 
-                    <div className="relative z-10 flex min-h-screen flex-col justify-between p-12 xl:p-16">
+                    <div className="relative z-10 flex h-full flex-col justify-between p-12 xl:p-16">
                         <Link to="/" className="w-fit">
                             <img
                                 src="/casashe/logo-wordmark-cream.png"
@@ -50,13 +50,13 @@ export default function AuthShell({ eyebrow, title, subtitle, children, footer }
                     </div>
                 </motion.section>
 
-                {/* Panel de formulario */}
-                <section className="relative flex min-h-screen items-center justify-center px-5 py-10 sm:px-8 lg:px-14">
+                {/* Panel de formulario — centra si cabe, hace scroll desde arriba si el form es más alto que la pantalla */}
+                <section className="relative flex min-h-screen flex-col px-5 py-12 sm:px-8 lg:px-14">
                     <motion.div
                         initial={{ opacity: 0, y: 18 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.45, ease: easeOut }}
-                        className="w-full max-w-[440px]"
+                        className="m-auto w-full max-w-[440px]"
                     >
                         {/* Encabezado móvil */}
                         <div className="mb-8 flex items-center justify-between gap-4 lg:hidden">
