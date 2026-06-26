@@ -7,7 +7,7 @@ Monorepo construido sobre la arquitectura de BMB-Studio y **rebrandeado a Casa S
 - **`backend/`** — API: Express + TypeScript + PostgreSQL (SQL puro, migraciones idempotentes en el arranque) + JWT + Zod + node-cron + Resend (email) + Stripe (tarjeta) + Cloudinary.
 - **`frontend/`** — App: Vite + React 18 + TypeScript + TailwindCSS + shadcn/ui + React Query + Zustand + React Router.
 
-Diseño y plan en [`docs/superpowers/`](docs/superpowers/).
+Diseño y plan en [`docs/superpowers/`](docs/superpowers/). **Qué sigue / roadmap:** [`PROXIMOS-PASOS.md`](PROXIMOS-PASOS.md).
 
 ---
 
