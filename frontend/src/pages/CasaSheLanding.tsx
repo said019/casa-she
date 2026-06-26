@@ -16,7 +16,7 @@ const LOGO = "/casashe/logo-wordmark.png";
 const LOGO_CREAM = "/casashe/logo-wordmark-cream.png";
 
 const body = "font-['Baskervville']";
-const display = "font-['Cormorant_Garamond']";
+const display = "font-heading"; // Instrument Serif (display oficial de marca)
 
 type Card = {
   title: string;
