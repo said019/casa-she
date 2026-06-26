@@ -7,6 +7,8 @@ import api, { getErrorMessage } from '@/lib/api';
 import { ClientLayout } from '@/components/layout/ClientLayout';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { CoachSheet } from '@/components/CoachSheet';
+import { ReglamentoGate } from '@/components/ReglamentoGate';
+import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,7 +42,11 @@ export default function BookClassConfirm() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
   const [coachOpen, setCoachOpen] = useState(false);
+  const [regOpen, setRegOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<null | 'book' | 'waitlist'>(null);
+  const needsReglamento = user?.role === 'client' && !user?.reglamento_accepted_at;
 
   const { data, isLoading, isError } = useQuery<ClassDetail>({
     queryKey: ['class-detail', classId],
@@ -62,7 +68,7 @@ export default function BookClassConfirm() {
     queryKey: ['cancellation-policy'],
     queryFn: async () => (await api.get('/settings/cancellation-policy')).data,
   });
-  const cancelHours = Number(cancelPolicy?.min_hours ?? 12);
+  const cancelHours = Number(cancelPolicy?.min_hours ?? 5);
 
   const canBook = Boolean(classId);
   const bookMutation = useMutation({
@@ -79,7 +85,12 @@ export default function BookClassConfirm() {
       toast({ title: '¡Reserva exitosa!', description: 'Te esperamos en clase.' });
       navigate('/app/classes');
     },
-    onError: (err) => {
+    onError: (err: any) => {
+      if (err?.response?.data?.code === 'REGLAMENTO_REQUIRED') {
+        setPendingAction('book');
+        setRegOpen(true);
+        return;
+      }
       toast({
         variant: 'destructive',
         title: 'No se pudo reservar',
@@ -105,9 +116,29 @@ export default function BookClassConfirm() {
         bookMutation.mutate(); // se liberó un lugar: reservar normal
         return;
       }
+      if (err?.response?.data?.code === 'REGLAMENTO_REQUIRED') {
+        setPendingAction('waitlist');
+        setRegOpen(true);
+        return;
+      }
       toast({ variant: 'destructive', title: 'No se pudo anotar', description: getErrorMessage(err) });
     },
   });
+
+  // Gate de reglamento: si la clienta no lo ha aceptado, abrimos el modal antes de reservar.
+  const handleBook = () => {
+    if (needsReglamento) { setPendingAction('book'); setRegOpen(true); return; }
+    bookMutation.mutate();
+  };
+  const handleWaitlist = () => {
+    if (needsReglamento) { setPendingAction('waitlist'); setRegOpen(true); return; }
+    waitlistMutation.mutate();
+  };
+  const onReglamentoAccepted = () => {
+    if (pendingAction === 'waitlist') waitlistMutation.mutate();
+    else bookMutation.mutate();
+    setPendingAction(null);
+  };
 
   const isFull = (data?.current_bookings || 0) >= (data?.max_capacity || 0);
   const isClosed = !!data?.booking_closed;
@@ -258,7 +289,7 @@ export default function BookClassConfirm() {
             {isFull && !isClosed && !isBookingPaused && !isCancelled && !isPast ? (
               <Button
                 className="w-full sm:w-auto"
-                onClick={() => waitlistMutation.mutate()}
+                onClick={handleWaitlist}
                 disabled={!canBook || waitlistMutation.isPending || bookMutation.isPending}
               >
                 {waitlistMutation.isPending ? 'Anotando...' : 'Anotarme en lista de espera'}
@@ -266,7 +297,7 @@ export default function BookClassConfirm() {
             ) : (
               <Button
                 className="w-full sm:w-auto"
-                onClick={() => bookMutation.mutate()}
+                onClick={handleBook}
                 disabled={!canBook || bookMutation.isPending || isFull || isClosed || isBookingPaused || isCancelled || isPast}
               >
                 {bookMutation.isPending ? 'Reservando...' : isBookingPaused ? 'Reservas pausadas' : isClosed ? 'Clase cerrada' : isPast ? 'Clase ya pasada' : 'Confirmar reserva'}
@@ -281,6 +312,8 @@ export default function BookClassConfirm() {
           onClose={() => setCoachOpen(false)}
           onPickClass={(cid) => { setCoachOpen(false); navigate(`/app/book/${cid}`); }}
         />
+
+        <ReglamentoGate open={regOpen} onOpenChange={setRegOpen} onAccepted={onReglamentoAccepted} />
       </ClientLayout>
     </AuthGuard>
   );

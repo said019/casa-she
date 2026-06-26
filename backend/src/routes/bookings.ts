@@ -518,6 +518,18 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
         // NO cambiar el comportamiento actual cuando una política no está configurada.
         // ============================================
         if (req.user?.role === 'client') {
+            // Reglamento obligatorio: la clienta debe haberlo aceptado antes de su 1ra reserva.
+            const reg = await queryOne<{ reglamento_accepted_at: string | null }>(
+                `SELECT reglamento_accepted_at FROM users WHERE id = $1`,
+                [req.user.userId]
+            );
+            if (!reg?.reglamento_accepted_at) {
+                return res.status(403).json({
+                    error: 'Debes aceptar el reglamento antes de reservar tu primera clase.',
+                    code: 'REGLAMENTO_REQUIRED',
+                });
+            }
+
             const polRow = await queryOne<{ value: any }>(
                 `SELECT value FROM system_settings WHERE key = 'booking_policies'`
             );

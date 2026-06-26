@@ -3354,6 +3354,9 @@ async function runStartupMigrations(): Promise<void> {
         const CS_PLANS = ['Clase de prueba', 'Drop-in', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Membresía 360', 'Membresía Black'];
         const CS_TYPES = ['Pilates Mat', 'Yoga', 'Aeroyoga', 'Telas', 'Taller'];
 
+        // Reglamento obligatorio: marca de aceptación por usuaria (NULL = no aceptado aún).
+        await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reglamento_accepted_at TIMESTAMPTZ`);
+
         // (a) Disciplinas Casa Shé (categoría 'multi' = un solo bucket de crédito; cupo 6-7).
         await query(`INSERT INTO class_types (name, category, level, duration_minutes, max_capacity, is_active)
             SELECT v.name, 'multi'::class_category, 'all'::class_level, v.dur, v.cap, true

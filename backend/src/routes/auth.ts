@@ -272,6 +272,7 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
                 u.accepts_communications, u.date_of_birth, u.receive_reminders,
                 u.receive_promotions, u.receive_weekly_summary, u.created_at, u.updated_at,
                 u.default_facility_id, u.is_reception_master, u.permissions, u.temp_password,
+                u.reglamento_accepted_at,
                 f.name AS facility_name,
                 i.id as instructor_id, i.coach_number, i.bio as instructor_bio,
                 i.photo_url as instructor_photo
@@ -311,6 +312,28 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Get me error:', error);
         res.status(500).json({ error: 'Error al obtener usuario' });
+    }
+});
+
+// ============================================
+// POST /api/auth/accept-reglamento - La usuaria acepta el reglamento del estudio.
+// Obligatorio antes de su primera reserva (el gate vive en POST /api/bookings).
+// ============================================
+router.post('/accept-reglamento', authenticate, async (req: Request, res: Response) => {
+    try {
+        await query(
+            `UPDATE users SET reglamento_accepted_at = COALESCE(reglamento_accepted_at, NOW()), updated_at = NOW()
+             WHERE id = $1`,
+            [req.user!.userId]
+        );
+        const row = await queryOne<{ reglamento_accepted_at: string }>(
+            `SELECT reglamento_accepted_at FROM users WHERE id = $1`,
+            [req.user!.userId]
+        );
+        res.json({ reglamento_accepted_at: row?.reglamento_accepted_at ?? null });
+    } catch (error) {
+        console.error('Accept reglamento error:', error);
+        res.status(500).json({ error: 'Error al aceptar el reglamento' });
     }
 });
 

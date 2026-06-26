@@ -31,6 +31,8 @@ export interface User {
     permissions?: Record<string, boolean>;
     // Contraseña temporal: si true, el usuario debe completar su acceso (datos + nueva contraseña).
     temp_password?: boolean;
+    // Reglamento del estudio: timestamp de aceptación (null = aún no acepta). Obligatorio antes de reservar.
+    reglamento_accepted_at?: string | null;
 }
 
 // Plan interface
