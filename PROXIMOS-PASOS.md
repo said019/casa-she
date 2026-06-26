@@ -57,7 +57,7 @@ Login: `admin@casashe.mx` (cambiar contraseña). Luego:
 
 ## Fase 2 (siguiente entrega)
 
-- [ ] **Cuestionario de onboarding perfilador** que dirige a cada usuaria a lo que su cuerpo necesita (diferenciador de marca del PDF).
+- [x] **Cuestionario de onboarding perfilador** — implementado (gate para nuevas, invitación a existentes, motor por reglas editable en admin). Ver `docs/superpowers/specs/2026-06-26-casa-she-onboarding-perfilador-design.md`.
 - [ ] **Lealtad** (puntos/sellos) — el motor existe en el código (desactivado); definir reglas y activarlo.
 - [ ] **Recordatorios automáticos por email** 24 h y 2 h antes de la clase (activar el cron `sendClassReminders` + `ENABLE_CRON_JOBS=true` en prod) y aviso de créditos por vencer.
 - [ ] **Lineamientos editables por disciplina** + notificación in-app persistente tras tomar cada crédito (hoy es un aviso fijo en la confirmación).
