@@ -14,81 +14,77 @@ interface AuthShellProps {
 
 export default function AuthShell({ eyebrow, title, subtitle, children, footer }: AuthShellProps) {
     return (
-        // Alto fijo a la pantalla: nada de scroll de ventana. El panel de marca cubre
-        // siempre toda la columna y SOLO el formulario hace scroll interno si hace falta.
-        <main className="h-[100dvh] overflow-hidden bg-bmb-cream text-bmb-dark">
-            <div className="grid h-full lg:grid-cols-[0.9fr_1.1fr]">
-                {/* Panel de marca — solo desktop. Stretch del grid → cubre toda la altura. */}
-                <motion.section
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.55, ease: easeOut }}
-                    className="relative hidden overflow-hidden lg:block"
-                >
-                    <img
-                        src="/casashe/hero.png"
-                        alt="Interior de Casa Shé"
-                        className="absolute inset-0 h-full w-full object-cover"
-                    />
-                    <div className="absolute inset-0" style={{ backgroundColor: 'rgba(22,38,26,0.62)' }} />
+        <main className="min-h-[100dvh] bg-bmb-cream text-bmb-dark">
+            {/* Panel de marca — FIJO a la mitad izquierda en desktop: siempre cubre, nunca se recorta. */}
+            <motion.aside
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.55, ease: easeOut }}
+                className="relative hidden overflow-hidden lg:fixed lg:inset-y-0 lg:left-0 lg:block lg:w-[45%]"
+            >
+                <img
+                    src="/casashe/hero.png"
+                    alt="Interior de Casa Shé"
+                    className="absolute inset-0 h-full w-full object-cover"
+                />
+                <div className="absolute inset-0" style={{ backgroundColor: 'rgba(22,38,26,0.62)' }} />
 
-                    <div className="relative z-10 flex h-full flex-col justify-between p-12 xl:p-16">
-                        <Link to="/" className="w-fit">
-                            <img src="/casashe/logo-wordmark-cream.png" alt="Casa Shé" className="h-9 w-auto" />
-                        </Link>
+                <div className="relative z-10 flex h-full flex-col justify-between p-10 xl:p-14">
+                    <Link to="/" className="w-fit">
+                        <img src="/casashe/logo-wordmark-cream.png" alt="Casa Shé" className="h-8 w-auto" />
+                    </Link>
 
-                        <div className="max-w-md">
-                            <p className="font-heading text-[clamp(2.2rem,3vw,3.2rem)] leading-tight text-bmb-cream">
-                                La comunidad es la medicina.
-                            </p>
-                            <p className="mt-4 font-body text-sm leading-relaxed text-bmb-cream/80">
-                                Wellness hub para mujeres · Condesa, CDMX
-                            </p>
-                        </div>
+                    <div className="max-w-md">
+                        <p className="font-heading text-[clamp(2rem,2.6vw,2.9rem)] leading-tight text-bmb-cream">
+                            La comunidad es la medicina.
+                        </p>
+                        <p className="mt-3 font-body text-sm leading-relaxed text-bmb-cream/80">
+                            Wellness hub para mujeres · Condesa, CDMX
+                        </p>
                     </div>
-                </motion.section>
+                </div>
+            </motion.aside>
 
-                {/* Panel de formulario — scroll interno; centra si cabe, scroll desde arriba si no. */}
-                <section className="relative flex h-full flex-col overflow-y-auto px-5 py-12 sm:px-8 lg:px-14">
-                    <motion.div
-                        initial={{ opacity: 0, y: 18 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.45, ease: easeOut }}
-                        className="m-auto w-full max-w-[440px]"
-                    >
-                        {/* Encabezado móvil */}
-                        <div className="mb-8 flex items-center justify-between gap-4 lg:hidden">
-                            <Link to="/" className="flex items-center">
-                                <img src="/casashe/logo-wordmark.png" alt="Casa Shé" className="h-7 w-auto" />
-                            </Link>
-                            <Link to="/" className="font-body text-sm text-bmb-dark/65 transition-colors hover:text-bmb-dark">
-                                Inicio
-                            </Link>
-                        </div>
+            {/* Panel de formulario — en flujo normal (scroll natural de la página). Nunca recorta. */}
+            <section className="flex min-h-[100dvh] flex-col px-5 py-12 sm:px-8 lg:ml-[45%] lg:px-14">
+                <motion.div
+                    initial={{ opacity: 0, y: 18 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.45, ease: easeOut }}
+                    className="m-auto w-full max-w-[440px]"
+                >
+                    {/* Encabezado móvil */}
+                    <div className="mb-8 flex items-center justify-between gap-4 lg:hidden">
+                        <Link to="/" className="flex items-center">
+                            <img src="/casashe/logo-wordmark.png" alt="Casa Shé" className="h-7 w-auto" />
+                        </Link>
+                        <Link to="/" className="font-body text-sm text-bmb-dark/65 transition-colors hover:text-bmb-dark">
+                            Inicio
+                        </Link>
+                    </div>
 
-                        {/* Encabezado */}
-                        <div>
-                            {eyebrow && (
-                                <p className="font-body text-[12px] uppercase tracking-[0.32em] text-bmb-dark/55">
-                                    {eyebrow}
-                                </p>
-                            )}
-                            <h1 className="font-heading text-4xl leading-[0.98] text-bmb-dark sm:text-5xl">
-                                {title}
-                            </h1>
-                            {subtitle && (
-                                <p className="mt-3 font-body leading-relaxed text-bmb-dark/65">{subtitle}</p>
-                            )}
-                        </div>
-
-                        <div className="mt-8">{children}</div>
-
-                        {footer && (
-                            <div className="mt-6 text-center font-body text-sm text-bmb-dark/65">{footer}</div>
+                    {/* Encabezado */}
+                    <div>
+                        {eyebrow && (
+                            <p className="font-body text-[12px] uppercase tracking-[0.32em] text-bmb-dark/55">
+                                {eyebrow}
+                            </p>
                         )}
-                    </motion.div>
-                </section>
-            </div>
+                        <h1 className="font-heading text-4xl leading-[0.98] text-bmb-dark sm:text-5xl">
+                            {title}
+                        </h1>
+                        {subtitle && (
+                            <p className="mt-3 font-body leading-relaxed text-bmb-dark/65">{subtitle}</p>
+                        )}
+                    </div>
+
+                    <div className="mt-8">{children}</div>
+
+                    {footer && (
+                        <div className="mt-6 text-center font-body text-sm text-bmb-dark/65">{footer}</div>
+                    )}
+                </motion.div>
+            </section>
         </main>
     );
 }
