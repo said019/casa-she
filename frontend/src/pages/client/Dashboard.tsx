@@ -263,6 +263,20 @@ export default function ClientDashboard() {
             })}
           </motion.div>
 
+          {/* Momento de marca — la frase que define el lugar */}
+          <motion.div
+            initial={reduce ? false : { opacity: 0, y: 14 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.5 }}
+            transition={{ duration: 0.6, ease: EASE }}
+            className="flex items-center gap-5 rounded-[1.4rem] border border-[#D6D5C2]/60 bg-[#F6F0E4]/55 px-6 py-6 sm:px-8 sm:py-7"
+          >
+            <CasaSheMark className="hidden h-12 w-12 shrink-0 opacity-80 sm:block" />
+            <p className="font-heading text-xl italic leading-snug tracking-[-0.01em] text-[#2E1B22] sm:text-2xl">
+              La comunidad <span style={{ color: '#AE4836' }}>es la medicina</span>.
+            </p>
+          </motion.div>
+
           <section className="space-y-4">
             <p className="pl-2 text-sm font-medium text-[#6B554D]">Mi membresía</p>
             <div className="rounded-[1.55rem] border border-[#D6D5C2]/72 bg-[#F6F0E4]/76 p-4 shadow-[0_18px_58px_-52px_rgba(42,33,24,.55)] sm:p-6">
@@ -298,7 +312,7 @@ export default function ClientDashboard() {
                       className={
                         membership?.status === 'active' && !isOutOfCredits
                           ? 'w-fit rounded-full bg-[#DDE4D5] px-3 py-1 text-[#2E1B22]'
-                          : 'w-fit rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-amber-800'
+                          : 'w-fit rounded-full border border-[#AE4836]/30 bg-[#AE4836]/10 px-3 py-1 text-[#AE4836]'
                       }
                     >
                       {membershipStatusText}
@@ -308,13 +322,13 @@ export default function ClientDashboard() {
                   {membershipLoading ? (
                     <Skeleton className="h-20 w-full bg-[#D6D5C2]/45" />
                   ) : membership && (isOutOfCredits || isExpiredOrCancelled) ? (
-                    <div className="flex items-start gap-3 rounded-[1rem] border border-amber-200/70 bg-amber-50/72 p-4">
-                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                    <div className="flex items-start gap-3 rounded-[1rem] border border-[#AE4836]/25 bg-[#AE4836]/[0.07] p-4">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#AE4836]" />
                       <div>
-                        <p className="text-sm font-semibold text-amber-900">
+                        <p className="text-sm font-semibold text-[#2E1B22]">
                           {isOutOfCredits ? `Agotaste tus ${membership.class_limit} clases.` : 'Tu membresía necesita renovación.'}
                         </p>
-                        <p className="mt-1 text-xs leading-relaxed text-amber-700">
+                        <p className="mt-1 text-xs leading-relaxed text-[#6B554D]">
                           Renueva para seguir reservando clases y acumulando puntos de lealtad.
                         </p>
                       </div>
