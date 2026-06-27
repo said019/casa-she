@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { ClientLayout } from '@/components/layout/ClientLayout';
+import { CasaSheMark } from '@/components/CasaSheLogo';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -72,6 +73,24 @@ function isMembershipFeePlan(plan: Plan) {
     plan.name.toLowerCase().includes('inscrip') ||
     Number(plan.price) === 500
   );
+}
+
+// Tarjetas de marca del index ("Nuestros Paquetes"): imagen, precio anterior,
+// detalle y orden. Se mapea cada plan de la BD por su nombre.
+type PlanCardMeta = { img: string; was?: string; hint: string; oferta?: boolean; order: number };
+const PLAN_CARDS: { match: (n: string) => boolean; meta: PlanCardMeta }[] = [
+  { match: (n) => n.includes('black'), meta: { img: '/casashe/card-black.jpeg', was: '$4,800', hint: '24 créditos · acceso total', oferta: true, order: 1 } },
+  { match: (n) => n.includes('360'), meta: { img: '/casashe/card-360.jpeg', was: '$3,800', hint: '16 créditos al mes', oferta: true, order: 2 } },
+  { match: (n) => n.includes('12'), meta: { img: '/casashe/card-12.jpeg', hint: '12 créditos · vigencia 1 mes', order: 3 } },
+  { match: (n) => n.includes('8'), meta: { img: '/casashe/card-8.jpeg', hint: '8 créditos · vigencia 1 mes', order: 4 } },
+  { match: (n) => n.includes('5'), meta: { img: '/casashe/card-5.jpeg', hint: '5 créditos · vigencia 1 mes', order: 5 } },
+  { match: (n) => n.includes('drop') || n.includes('suelta'), meta: { img: '/casashe/card-suelta.jpeg', was: '$300', hint: '1 clase drop-in', oferta: true, order: 6 } },
+  { match: (n) => n.includes('prueba') || n.includes('muestra'), meta: { img: '/casashe/card-muestra.jpeg', hint: 'Tu primera vez en casa', order: 7 } },
+];
+
+function getPlanCardMeta(name: string): PlanCardMeta | undefined {
+  const n = name.toLowerCase();
+  return PLAN_CARDS.find((c) => c.match(n))?.meta;
 }
 
 function getRewardPoints(classLimit: number | null) {
@@ -381,7 +400,7 @@ export default function Checkout() {
                 {step === 'confirm' && 'Confirmar orden'}
               </h1>
               <p className="mt-1 text-sm text-balance-dark/62">
-                {step === 'plan' && 'Los paquetes están agrupados por intención para que elijas sin adivinar.'}
+                {step === 'plan' && 'Elige el paquete que va contigo.'}
                 {step === 'payment' && 'Elige el método que te quede más cómodo.'}
                 {step === 'confirm' && 'Revisa los detalles de tu compra'}
               </p>
@@ -399,139 +418,77 @@ export default function Checkout() {
 
           {/* Step 1: Select Plan */}
           {step === 'plan' && (
-            <div className="space-y-5">
+            <div>
               {plansLoading ? (
-                <>
-                  <Skeleton className="h-44 w-full rounded-[1.75rem]" />
-                  <Skeleton className="h-44 w-full rounded-[1.75rem]" />
-                  <Skeleton className="h-44 w-full rounded-[1.75rem]" />
-                </>
-              ) : groupedPlans.length > 0 ? (
-                groupedPlans.map((group) => (
-                  <section key={group.type} className={`overflow-hidden rounded-[1.55rem] p-2 sm:p-3 ring-1 ${group.panel}`}>
-                    <div className="grid gap-4 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                      <div className="flex min-h-[12rem] flex-col justify-between rounded-[1.2rem] bg-[#FBF7EE]/58 p-4 ring-1 ring-[#2E1B22]/[0.06]">
-                        <div>
-                          <span className={`inline-flex rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${group.chip}`}>
-                            {group.eyebrow}
-                          </span>
-                          <h2 className="mt-4 text-2xl font-semibold leading-tight tracking-[-0.035em]">{group.title}</h2>
-                          <p className={`mt-2 text-sm leading-relaxed ${group.text}`}>{group.detail}</p>
-                        </div>
-                        <p className="mt-5 border-t border-[#2E1B22]/10 pt-3 text-xs font-semibold leading-relaxed text-[#2E1B22]/62">
-                          {group.rule}
-                        </p>
-                      </div>
-
-                      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                        {group.plans.map((plan) => {
-                          const presentation = getPackagePresentation(plan);
-                          const isSelected = selectedPlanId === plan.id;
-                          const rewardPoints = getRewardPoints(plan.class_limit);
-                          const price = Number(plan.price);
-                          const classesLabel = getPlanAccessLabel(plan);
-                          const pricePerClass = plan.class_limit
-                            ? formatPrice(Math.round(price / plan.class_limit))
-                            : null;
-
-                          return (
-                            <button
-                              key={plan.id}
-                              type="button"
-                              className={`group relative flex min-h-[14rem] w-full min-w-0 flex-col overflow-hidden rounded-[1.25rem] p-4 text-left ring-1 transition duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A4E36]/45 active:scale-[0.99] ${presentation.card} ${
-                                isSelected ? presentation.selected : ''
-                              }`}
-                              aria-pressed={isSelected}
-                              onClick={() => handlePlanSelect(plan.id)}
-                            >
-                              <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-current/25 to-transparent" />
-
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${presentation.badge}`}>
-                                      {presentation.accentLabel}
-                                    </span>
-                                    {isMembershipFeePlan(plan) && (
-                                      <span className="rounded-full bg-balance-cream/70 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-balance-dark/70 ring-1 ring-balance-dark/10">
-                                        acceso anual
-                                      </span>
-                                    )}
-                                    {isSelected && (
-                                      <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${presentation.chip}`}>
-                                        <CheckCircle2 className="h-3 w-3" />
-                                        Seleccionado
-                                      </span>
-                                    )}
-                                  </div>
-                                  <h4 className="mt-3 text-xl font-heading font-bold leading-[1.02] tracking-[-0.035em] text-current">
-                                    {plan.name}
-                                  </h4>
-                                  {plan.description && (
-                                    <p className={`mt-2 overflow-hidden text-sm leading-relaxed font-body [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] ${presentation.text}`}>
-                                      {plan.description}
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="shrink-0 text-right">
-                                  <p className="text-2xl font-heading font-bold tracking-[-0.05em] text-current">
-                                    {formatPrice(price)}
-                                  </p>
-                                  <p className={`mt-1 text-xs font-semibold ${presentation.text}`}>
-                                    {plan.duration_days} días
-                                  </p>
-                                </div>
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {[0, 1, 2].map((i) => (
+                    <Skeleton key={i} className="h-[26rem] w-full rounded-2xl" />
+                  ))}
+                </div>
+              ) : visiblePlans.length > 0 ? (
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {[...visiblePlans]
+                    .sort((a, b) => (getPlanCardMeta(a.name)?.order ?? 99) - (getPlanCardMeta(b.name)?.order ?? 99))
+                    .map((plan) => {
+                      const meta = getPlanCardMeta(plan.name);
+                      const isSelected = selectedPlanId === plan.id;
+                      const price = Number(plan.price);
+                      return (
+                        <button
+                          key={plan.id}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => handlePlanSelect(plan.id)}
+                          className={`group flex flex-col overflow-hidden rounded-2xl bg-white/60 text-left ring-1 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A4E36] active:scale-[0.99] ${
+                            isSelected ? 'ring-2 ring-[#2A4E36]' : 'ring-[#2A4E36]/10'
+                          }`}
+                        >
+                          <div className="relative aspect-square overflow-hidden">
+                            {meta ? (
+                              <img
+                                src={meta.img}
+                                alt={plan.name}
+                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center bg-[#2A4E36]/10">
+                                <CasaSheMark className="h-20 w-20 opacity-40" />
                               </div>
-
-                              <div className="mt-4 flex flex-wrap items-center gap-2">
-                                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D6D5C2]/75 bg-[#ECE1CE]/58 px-3 py-1.5 text-sm font-semibold">
-                                  <Star className="h-4 w-4" />
-                                  {classesLabel}
-                                </span>
-                                {pricePerClass && (
-                                  <span className="rounded-full border border-[#D6D5C2]/75 bg-[#ECE1CE]/58 px-3 py-1.5 text-xs font-semibold">
-                                    {pricePerClass} por clase
-                                  </span>
-                                )}
-                                {rewardPoints && (
-                                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${presentation.badge}`}>
-                                    <Star className="h-3.5 w-3.5 fill-current" />
-                                    +{rewardPoints} pts
-                                  </span>
-                                )}
-                              </div>
-
-                              {plan.features && plan.features.length > 0 && (
-                                <ul className="mt-4 space-y-2">
-                                  {plan.features.map((feature, idx) => (
-                                    <li key={idx} className="flex items-start gap-2 text-sm">
-                                      <Check className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                                      <span className="font-body">{feature}</span>
-                                    </li>
-                                  ))}
-                                </ul>
+                            )}
+                            {meta?.oferta && (
+                              <span
+                                className="absolute left-4 top-4 rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.2em]"
+                                style={{ backgroundColor: '#2A4E36', color: '#F6F0E4' }}
+                              >
+                                Oferta
+                              </span>
+                            )}
+                            {isSelected && (
+                              <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-[#F6F0E4] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2A4E36]">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Elegido
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-1 flex-col items-center px-6 py-7 text-center">
+                            <h3 className="font-heading text-lg uppercase tracking-[0.14em] text-[#2A4E36]">{plan.name}</h3>
+                            <p className="mt-1 text-[13px] tracking-wide text-[#2A4E36]/55">
+                              {meta?.hint ?? `${plan.duration_days} días`}
+                            </p>
+                            <div className="mt-4 flex items-baseline justify-center gap-2 font-heading">
+                              {meta?.was && (
+                                <span className="text-lg text-[#2A4E36]/40 line-through">{meta.was}</span>
                               )}
-
-                              <div className={`mt-auto inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-bold ${presentation.cta}`}>
-                                {isSelected ? (
-                                  <>
-                                    <CheckCircle2 className="h-4 w-4" />
-                                    Seleccionado
-                                  </>
-                                ) : (
-                                  <>
-                                    Seleccionar {presentation.shortTitle.toLowerCase()}
-                                    <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                                  </>
-                                )}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </section>
-                ))
+                              <span className="text-4xl font-medium text-[#2A4E36]">{formatPrice(price)}</span>
+                            </div>
+                            <span className="mt-6 w-full rounded-full bg-[#2A4E36] py-3 text-[12px] uppercase tracking-[0.24em] text-[#F6F0E4] transition-colors group-hover:bg-[#16261A]">
+                              {isSelected ? 'Continuar' : 'Comprar'}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                </div>
               ) : (
                 <Card className="rounded-[1.25rem]">
                   <CardContent className="py-8 text-center">
