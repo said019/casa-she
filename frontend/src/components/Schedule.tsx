@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { addDays, addWeeks, format, isToday, parseISO, startOfWeek, subWeeks } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
+import { motion, useReducedMotion } from "framer-motion";
+import { CalendarRange, ChevronRight, SlidersHorizontal } from "lucide-react";
 import api from "@/lib/api";
 import {
   ScheduleClass,
@@ -55,6 +57,9 @@ export default function Schedule({ bookedIds, defaultFirstFacility }: SchedulePr
   const [flipDirection, setFlipDirection] = useState<"forward" | "back">("forward");
   const goPrev = () => { setFlipDirection("back"); setWeekStart((w) => subWeeks(w, 1)); };
   const goNext = () => { setFlipDirection("forward"); setWeekStart((w) => addWeeks(w, 1)); };
+  const thisWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const isCurrentWeek = format(weekStart, "yyyy-MM-dd") === format(thisWeekStart, "yyyy-MM-dd");
+  const goThisWeek = () => { setFlipDirection("back"); setWeekStart(thisWeekStart); };
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth < 768 : false);
 
@@ -171,7 +176,7 @@ export default function Schedule({ bookedIds, defaultFirstFacility }: SchedulePr
             </span>
             <div className="flex flex-wrap gap-2">
               <NavBtn onClick={goPrev}>‹ Sem. ant.</NavBtn>
-              <NavBtn active>Esta semana</NavBtn>
+              <NavBtn onClick={goThisWeek} active={isCurrentWeek}>Esta semana</NavBtn>
               <NavBtn onClick={goNext}>Sem. sig. ›</NavBtn>
             </div>
           </div>
@@ -195,7 +200,9 @@ export default function Schedule({ bookedIds, defaultFirstFacility }: SchedulePr
         />
 
         {/* Grid scaffold — cells filled in Task 1.3 */}
-        {isMobile ? (
+        {hourRail.length === 0 ? (
+          <EmptyWeek weekDays={weekDays} activeFilters={activeFilters} onNext={goNext} onClear={clearFilters} />
+        ) : isMobile ? (
           <DaySpread
             weekDays={weekDays}
             selectedDate={selectedDate}
@@ -214,22 +221,28 @@ export default function Schedule({ bookedIds, defaultFirstFacility }: SchedulePr
           />
           <div
             key={startDate}
-            className={`grid border-l border-t border-bmb-ink/15 ${
+            className={`grid overflow-hidden rounded-2xl border border-bmb-ink/12 ${
               flipDirection === "forward" ? "animate-week-flip-in" : "animate-week-flip-in-back"
             }`}
             style={{ gridTemplateColumns: `56px repeat(7, 1fr)` }}
           >
-          <div className="border-r border-b border-bmb-ink/15 bg-bmb-paper" />
+          <div className="border-r border-b border-bmb-ink/12 bg-bmb-paper" />
           {weekDays.map((d) => (
             <div
               key={d.toISOString()}
-              className={`border-r border-b border-bmb-ink/15 px-2 py-2 text-center ${
-                isToday(d) ? "bg-bmb-gold text-bmb-ink" : "bg-bmb-paper"
+              className={`border-r border-b border-bmb-ink/12 px-2 py-2.5 text-center ${
+                isToday(d) ? "bg-bmb-gold/10" : "bg-bmb-paper"
               }`}
             >
               <div className="editorial-caption-sm opacity-70">{format(d, "EEE", { locale: es })}</div>
-              <div className={`mt-1 font-heading text-2xl font-semibold leading-none ${isToday(d) ? "text-bmb-ink" : ""}`}>
-                {format(d, "d")}
+              <div className="mt-1 flex justify-center">
+                <span
+                  className={`flex h-9 w-9 items-center justify-center rounded-full font-heading text-xl font-semibold leading-none ${
+                    isToday(d) ? "bg-bmb-gold text-bmb-cream" : "text-bmb-ink"
+                  }`}
+                >
+                  {format(d, "d")}
+                </span>
               </div>
             </div>
           ))}
@@ -240,14 +253,77 @@ export default function Schedule({ bookedIds, defaultFirstFacility }: SchedulePr
           </div>
         </div>
         )}
-
-        {hourRail.length === 0 && (
-          <p className="mt-12 text-center font-heading italic text-bmb-ink/55">
-            — sin clases programadas esta semana —
-          </p>
-        )}
       </div>
     </section>
+  );
+}
+
+function EmptyWeek({
+  weekDays,
+  activeFilters,
+  onNext,
+  onClear,
+}: {
+  weekDays: Date[];
+  activeFilters: boolean;
+  onNext: () => void;
+  onClear: () => void;
+}) {
+  const reduce = useReducedMotion();
+  const EASE = [0.23, 1, 0.32, 1] as const;
+  return (
+    <motion.div
+      initial={reduce ? false : { opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: EASE }}
+      className="mt-7"
+    >
+      {/* Cinta de la semana */}
+      <div className="grid grid-cols-7 gap-1.5 sm:gap-2.5">
+        {weekDays.map((d, i) => {
+          const today = isToday(d);
+          return (
+            <motion.div
+              key={d.toISOString()}
+              initial={reduce ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.34, ease: EASE, delay: reduce ? 0 : 0.04 + i * 0.035 }}
+              className={`flex flex-col items-center rounded-2xl border py-3 transition-colors ${
+                today ? "border-bmb-gold bg-bmb-gold text-bmb-cream" : "border-bmb-ink/10 bg-bmb-paper text-bmb-ink"
+              }`}
+            >
+              <span className={`editorial-caption-sm ${today ? "text-bmb-cream/80" : "opacity-55"}`}>
+                {format(d, "EEE", { locale: es })}
+              </span>
+              <span className="mt-1 font-heading text-lg leading-none sm:text-2xl">{format(d, "d")}</span>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Tarjeta de estado vacío */}
+      <div className="mt-5 flex flex-col items-center rounded-[1.6rem] border border-dashed border-bmb-ink/15 bg-bmb-paper/60 px-6 py-14 text-center sm:py-16">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-bmb-gold/10 text-bmb-gold">
+          {activeFilters ? <SlidersHorizontal className="h-7 w-7" /> : <CalendarRange className="h-7 w-7" />}
+        </div>
+        <h3 className="mt-5 font-heading text-2xl text-bmb-ink sm:text-3xl">
+          {activeFilters ? "Sin clases con estos filtros" : "Aún no hay clases esta semana"}
+        </h3>
+        <p className="mt-2 max-w-sm font-body text-sm leading-relaxed text-bmb-ink/55">
+          {activeFilters
+            ? "Prueba quitar algún filtro para ver más opciones disponibles."
+            : "Estamos afinando los horarios de Casa Shé. Echa un vistazo a la próxima semana."}
+        </p>
+        <button
+          type="button"
+          onClick={activeFilters ? onClear : onNext}
+          className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-bmb-gold px-6 py-3 font-body text-[12px] uppercase tracking-[0.18em] text-bmb-cream transition-transform duration-200 active:scale-[0.98]"
+        >
+          {activeFilters ? "Limpiar filtros" : "Ver próxima semana"}
+          {!activeFilters && <ChevronRight className="h-4 w-4" />}
+        </button>
+      </div>
+    </motion.div>
   );
 }
 
@@ -256,8 +332,8 @@ function NavBtn({ children, active, onClick }: { children: React.ReactNode; acti
     <button
       type="button"
       onClick={onClick}
-      className={`whitespace-nowrap border px-3 py-1 font-heading italic text-[13px] ${
-        active ? "bg-bmb-gold border-bmb-gold text-bmb-ink" : "border-bmb-ink text-bmb-ink hover:bg-bmb-ink/5"
+      className={`whitespace-nowrap rounded-full border px-4 py-1.5 font-heading italic text-[13px] transition-[background-color,transform] duration-200 active:scale-[0.97] ${
+        active ? "bg-bmb-gold border-bmb-gold text-bmb-cream" : "border-bmb-ink/30 text-bmb-ink hover:bg-bmb-ink/5"
       }`}
     >
       {children}
