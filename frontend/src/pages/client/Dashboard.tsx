@@ -21,10 +21,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   AlertTriangle,
   Calendar,
+  CalendarCheck,
   Clock,
   Gift,
   ChevronRight,
   Plus,
+  ShoppingBag,
   Sparkles,
   Play,
   Leaf,
@@ -54,6 +56,14 @@ const statusLabel: Record<ClientMembership['status'], string> = {
 };
 
 const EASE = [0.23, 1, 0.32, 1] as const; // ease-out fuerte (Emil)
+
+// Accesos rápidos — cada uno con su acento de la paleta de marca Casa Shé.
+const QUICK_ACTIONS = [
+  { to: '/app/book', label: 'Reservar clase', sub: 'Encuentra tu horario', icon: Plus, color: '#2A4E36', primary: true },
+  { to: '/app/classes', label: 'Mis reservas', sub: 'Tu agenda', icon: CalendarCheck, color: '#6C8424', primary: false },
+  { to: '/app/checkout', label: 'Adquirir plan', sub: 'Paquetes y membresías', icon: ShoppingBag, color: '#B4A248', primary: false },
+  { to: '/app/wallet', label: 'Lealtad', sub: 'Tus puntos', icon: Gift, color: '#AE4836', primary: false },
+];
 
 export default function ClientDashboard() {
   const { user } = useAuthStore();
@@ -205,32 +215,53 @@ export default function ClientDashboard() {
           {/* Clases por calificar (se auto-oculta si no hay) */}
           <PendingReviewsList />
 
-          <div className="flex flex-wrap gap-3">
-            <Button asChild size="lg" className="h-auto rounded-full border border-[#AE4836]/18 bg-[#2A4E36] px-6 py-3 text-[#F6F0E4] shadow-[0_14px_40px_-32px_rgba(166,119,106,.8)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#16261A]">
-              <Link to="/app/book">
-                <Plus className="h-5 w-5" />
-                Reservar clase
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg" className="h-auto rounded-full border-[#D6D5C2]/80 bg-[#F6F0E4]/66 px-6 py-3 text-[#2E1B22] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#DDE4D5]/34">
-              <Link to="/app/classes">
-                <Calendar className="h-5 w-5" />
-                Mis reservas
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg" className="h-auto rounded-full border-[#D6D5C2]/80 bg-[#F6F0E4]/66 px-6 py-3 text-[#2E1B22] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#DDE4D5]/34">
-              <Link to="/app/checkout">
-                <Plus className="h-5 w-5" />
-                Adquirir plan
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg" className="h-auto rounded-full border-[#D6D5C2]/80 bg-[#F6F0E4]/66 px-6 py-3 text-[#2E1B22] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#DDE4D5]/34">
-              <Link to="/app/wallet">
-                <Gift className="h-5 w-5 text-[#AE4836]" />
-                Lealtad
-              </Link>
-            </Button>
-          </div>
+          {/* Accesos rápidos — tarjetas editoriales, cada una con su acento de marca */}
+          <motion.div
+            variants={heroStagger} initial="hidden" animate="show"
+            className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+          >
+            {QUICK_ACTIONS.map((a) => {
+              const Icon = a.icon;
+              if (a.primary) {
+                return (
+                  <motion.div key={a.to} variants={heroItem}>
+                    <Link
+                      to={a.to}
+                      className="group flex h-full flex-col justify-between gap-6 rounded-[1.2rem] p-5 text-[#F6F0E4] shadow-[0_18px_50px_-34px_rgba(22,38,26,.9)] transition-transform duration-300 hover:-translate-y-1 active:scale-[0.98]"
+                      style={{ backgroundColor: a.color }}
+                    >
+                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F6F0E4]/15 text-[#F6F0E4] transition-transform duration-300 group-hover:scale-105">
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <span>
+                        <span className="block font-heading text-xl font-medium leading-tight tracking-[-0.02em]">{a.label}</span>
+                        <span className="mt-0.5 block text-[12px] text-[#F6F0E4]/70">{a.sub}</span>
+                      </span>
+                    </Link>
+                  </motion.div>
+                );
+              }
+              return (
+                <motion.div key={a.to} variants={heroItem}>
+                  <Link
+                    to={a.to}
+                    className="group flex h-full flex-col justify-between gap-6 rounded-[1.2rem] border border-[#D6D5C2]/70 bg-[#F6F0E4]/76 p-5 text-[#2E1B22] shadow-[0_14px_44px_-40px_rgba(42,33,24,.55)] transition-transform duration-300 hover:-translate-y-1 active:scale-[0.98]"
+                  >
+                    <span
+                      className="flex h-11 w-11 items-center justify-center rounded-full transition-transform duration-300 group-hover:scale-105"
+                      style={{ backgroundColor: `${a.color}1F`, color: a.color }}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <span>
+                      <span className="block font-heading text-xl font-medium leading-tight tracking-[-0.02em]">{a.label}</span>
+                      <span className="mt-0.5 block text-[12px] text-[#6B554D]">{a.sub}</span>
+                    </span>
+                  </Link>
+                </motion.div>
+              );
+            })}
+          </motion.div>
 
           <section className="space-y-4">
             <p className="pl-2 text-sm font-medium text-[#6B554D]">Mi membresía</p>
