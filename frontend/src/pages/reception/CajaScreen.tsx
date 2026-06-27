@@ -480,7 +480,7 @@ export default function CajaScreen() {
     return (
       <div className="p-4 md:p-6 space-y-5 max-w-2xl mx-auto">
         {/* Hero: estado sin turno */}
-        <div className="relative overflow-hidden rounded-[1.75rem] border border-[#D6D5C2]/70 bg-gradient-to-br from-[#FBF3DD] via-[#F7ECE0] to-[#F1E2D2] p-5 sm:p-6 shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]">
+        <div className="relative overflow-hidden rounded-[1.75rem] border border-[#D6D5C2]/70 bg-gradient-to-br from-[#F6F0E4] via-[#F7ECE0] to-[#F1E2D2] p-5 sm:p-6 shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
             <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Sin turno
           </span>
@@ -490,7 +490,7 @@ export default function CajaScreen() {
 
         {/* Panel: abrir caja */}
         <div className="rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#B5512F]">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#AE4836]">
             <Wallet className="h-4 w-4" /> Abrir caja
           </div>
           <p className="mt-1.5 text-sm text-[#6B554D]">Ingresa el fondo inicial en efectivo para abrir el turno.</p>
@@ -537,7 +537,7 @@ export default function CajaScreen() {
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-2xl mx-auto">
       {/* Hero: estado del turno + efectivo esperado como número protagonista */}
-      <div className="relative overflow-hidden rounded-[1.75rem] border border-[#D6D5C2]/70 bg-gradient-to-br from-[#FBF3DD] via-[#F7ECE0] to-[#F1E2D2] p-5 sm:p-6 shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]">
+      <div className="relative overflow-hidden rounded-[1.75rem] border border-[#D6D5C2]/70 bg-gradient-to-br from-[#F6F0E4] via-[#F7ECE0] to-[#F1E2D2] p-5 sm:p-6 shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
@@ -554,7 +554,7 @@ export default function CajaScreen() {
         </div>
 
         <div className="mt-5 rounded-2xl border border-white/70 bg-white/70 px-5 py-4 backdrop-blur-sm">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#B5512F]">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#AE4836]">
             <Wallet className="h-4 w-4" /> Efectivo esperado en caja
           </div>
           <p className="mt-1.5 font-heading text-[2.5rem] leading-none font-bold tabular-nums text-[#2E1B22]">
@@ -603,7 +603,7 @@ export default function CajaScreen() {
 
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-[#2E1B22]">Efectivo esperado</span>
-            <span className="font-heading text-lg font-bold tabular-nums text-[#B5512F]">{mxn.format(expectedCash)}</span>
+            <span className="font-heading text-lg font-bold tabular-nums text-[#AE4836]">{mxn.format(expectedCash)}</span>
           </div>
         </div>
       </div>
@@ -614,7 +614,7 @@ export default function CajaScreen() {
           <p className="text-sm font-semibold text-[#2E1B22]">Ventas por método de pago</p>
           <div className="mt-3 space-y-2">
             {totals.byMethod.map((bm) => (
-              <div key={bm.method} className="flex items-center justify-between rounded-xl bg-[#FBF3DD]/70 px-3 py-2 text-sm">
+              <div key={bm.method} className="flex items-center justify-between rounded-xl bg-[#F6F0E4]/70 px-3 py-2 text-sm">
                 <span className="text-[#6B554D]">{formatMethod(bm.method)}</span>
                 <span className="font-semibold tabular-nums text-[#2E1B22]">{mxn.format(bm.total)}</span>
               </div>
@@ -689,7 +689,7 @@ function MyShiftsHistory() {
                         {diff < 0 ? 'Faltó ' : 'Sobró '}{mxn.format(Math.abs(diff))}
                       </span>
                     )}
-                    <span className="text-xs text-[#B5512F]">{isOpen ? 'Ocultar' : 'Ver ventas'}</span>
+                    <span className="text-xs text-[#AE4836]">{isOpen ? 'Ocultar' : 'Ver ventas'}</span>
                   </span>
                 </button>
                 {isOpen && (
@@ -740,7 +740,7 @@ function ShiftSales({ shiftId }: { shiftId: string }) {
       ) : (
         <ul className="mt-3 space-y-2">
           {sales.map((s) => (
-            <li key={`${s.tipo}-${s.id}`} className="rounded-xl border border-[#D6D5C2]/50 bg-[#FBF3DD]/40 p-3">
+            <li key={`${s.tipo}-${s.id}`} className="rounded-xl border border-[#D6D5C2]/50 bg-[#F6F0E4]/40 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">

@@ -171,7 +171,7 @@ export default function BookClassConfirm() {
               {/* Color band from class type */}
               <div
                 className="h-2"
-                style={{ backgroundColor: data.is_free ? '#16a34a' : (data.class_type_color || '#9A6E3A') }}
+                style={{ backgroundColor: data.is_free ? '#16a34a' : (data.class_type_color || '#8A5A2A') }}
               />
               <CardContent className="pt-5 space-y-4">
                 <div className="flex items-center gap-3 flex-wrap">
@@ -232,7 +232,7 @@ export default function BookClassConfirm() {
                     <AvatarImage src={data.instructor_photo || undefined} alt={data.instructor_name} />
                     <AvatarFallback
                       className="text-xs text-white"
-                      style={{ backgroundColor: data.class_type_color || '#9A6E3A' }}
+                      style={{ backgroundColor: data.class_type_color || '#8A5A2A' }}
                     >
                       {data.instructor_name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
                     </AvatarFallback>

@@ -31,7 +31,7 @@ const CHAPTER_SCENES = [
     // 3 — taupe — calmer
     { bg: 'bg-[#D6D5C2]', text: 'text-bmb-dark', numTone: 'text-[#7E5A36]/55', tag: 'text-bmb-dark/70', accent: 'bg-[#7E5A36]' },
     // 4 — mauve warm (rare, used for accent chapter)
-    { bg: 'bg-[#2E4A35]', text: 'text-bmb-cream', numTone: 'text-bmb-cream/45', tag: 'text-bmb-cream/82', accent: 'bg-bmb-cream' },
+    { bg: 'bg-[#2A4E36]', text: 'text-bmb-cream', numTone: 'text-bmb-cream/45', tag: 'text-bmb-cream/82', accent: 'bg-bmb-cream' },
 ];
 
 function scene(i: number) { return CHAPTER_SCENES[i % CHAPTER_SCENES.length]; }

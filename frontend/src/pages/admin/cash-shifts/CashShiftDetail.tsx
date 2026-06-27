@@ -111,7 +111,7 @@ export default function CashShiftDetail() {
                 </div>
 
                 {/* Summary — hero panel */}
-                <div className="relative overflow-hidden rounded-[1.75rem] border border-[#D6D5C2]/70 bg-gradient-to-br from-[#FBF3DD] via-[#F7ECE0] to-[#F1E2D2] p-5 sm:p-6 shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]">
+                <div className="relative overflow-hidden rounded-[1.75rem] border border-[#D6D5C2]/70 bg-gradient-to-br from-[#F6F0E4] via-[#F7ECE0] to-[#F1E2D2] p-5 sm:p-6 shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]">
                     <div className="flex items-center justify-between">
                         <p className="text-sm font-semibold text-[#2E1B22]">Resumen del Turno</p>
                         <StatusBadge status={shift.status} />
@@ -154,7 +154,7 @@ export default function CashShiftDetail() {
                         <p className="text-sm font-semibold text-[#2E1B22]">Ventas por Método de Pago</p>
                         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             {byMethod.map((item: any, idx: number) => (
-                                <div key={idx} className="flex items-center justify-between rounded-xl bg-[#FBF3DD]/70 px-3 py-2">
+                                <div key={idx} className="flex items-center justify-between rounded-xl bg-[#F6F0E4]/70 px-3 py-2">
                                     <span className="text-sm font-medium text-[#6B554D]">{getPaymentMethodLabel(item.method)}</span>
                                     <span className="font-semibold tabular-nums text-[#2E1B22]">{mxn(item.total)}</span>
                                 </div>
@@ -195,7 +195,7 @@ export default function CashShiftDetail() {
                                     </div>
                                     <div className="flex flex-wrap gap-2">
                                         {g.rows.map((r: any, ri: number) => (
-                                            <span key={ri} className="rounded-md bg-[#FBF3DD] px-2 py-1 text-xs text-[#6B554D]">
+                                            <span key={ri} className="rounded-md bg-[#F6F0E4] px-2 py-1 text-xs text-[#6B554D]">
                                                 <span>{getPaymentMethodLabel(r.method)}</span>: <span className="tabular-nums text-[#2E1B22]">{mxn(r.total)}</span> ({r.n})
                                             </span>
                                         ))}
@@ -214,7 +214,7 @@ export default function CashShiftDetail() {
                     ) : (
                         <div className="mt-3 space-y-2">
                             {movements.map((mov: any, idx: number) => (
-                                <div key={idx} className="rounded-xl border border-[#D6D5C2]/50 bg-[#FBF3DD]/40 p-3">
+                                <div key={idx} className="rounded-xl border border-[#D6D5C2]/50 bg-[#F6F0E4]/40 p-3">
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2">

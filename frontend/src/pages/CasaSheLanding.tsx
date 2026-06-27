@@ -5,14 +5,14 @@ import api from "@/lib/api";
 
 /**
  * Landing público de Casa Shé — réplica fiel de https://casashe.mx/
- * Marca oficial: verde #274A2A + crema #FEF7E6, display Cormorant Garamond + cuerpo Baskervville.
+ * Marca oficial: verde #2A4E36 + crema #F6F0E4, display Cormorant Garamond + cuerpo Baskervville.
  * Usa el logo/monograma oficiales (public/casashe/logo-*) en vez de texto.
  * CTAs conectados al registro/checkout real del sistema.
  */
 
-const CREAM = "#FEF7E6";
-const GREEN = "#274A2A"; // verde de marca (tomado del logo oficial)
-const DEEP = "#1C3320"; // verde profundo para secciones/overlays oscuros
+const CREAM = "#F6F0E4";
+const GREEN = "#2A4E36"; // verde de marca (tomado del logo oficial)
+const DEEP = "#16261A"; // verde profundo para secciones/overlays oscuros
 
 const LOGO = "/casashe/logo-wordmark.png";
 const LOGO_CREAM = "/casashe/logo-wordmark-cream.png";
@@ -77,7 +77,7 @@ const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"] as const;
 // (Verde Casa, Musgo, Arcilla, Ciruela, Arena), duración y cupo reales del catálogo.
 const DISCIPLINE_META: Record<string, { color: string; dur: number; cupo: number }> = {
   "Pilates Mat": { color: "#2E5D3F", dur: 50, cupo: 7 }, // Verde Casa
-  Yoga: { color: "#7C8A5E", dur: 60, cupo: 7 }, // Musgo
+  Yoga: { color: "#6C8424", dur: 60, cupo: 7 }, // Musgo
   Aeroyoga: { color: "#B0805F", dur: 60, cupo: 6 }, // Arcilla
   Telas: { color: "#7A4F57", dur: 60, cupo: 6 }, // Ciruela
   Taller: { color: "#C0A06A", dur: 90, cupo: 7 }, // Arena

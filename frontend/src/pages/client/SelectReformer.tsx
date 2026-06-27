@@ -477,7 +477,7 @@ function StyleBlock() {
         --lum-accent: #7e8579;
         --lum-accent-soft: #a8b09f;
         --lum-alert: #a8524c;
-        --lum-amber: #B5512F;
+        --lum-amber: #AE4836;
         --lum-amber-soft: rgba(184,153,104,0.22);
         --lum-spring: cubic-bezier(0.34,1.56,0.64,1);
         --lum-glide: cubic-bezier(0.16,1,0.3,1);
@@ -801,7 +801,7 @@ function StyleBlock() {
 
       .lum-spot-selected { transform:translate(-50%,calc(-50% - 8px)); }
       .lum-spot-selected .tile {
-        background:linear-gradient(160deg,#d4c094 0%,#B5512F 55%,#d4c094 100%);
+        background:linear-gradient(160deg,#d4c094 0%,#AE4836 55%,#d4c094 100%);
         border-color:var(--lum-amber);
         box-shadow:0 0 0 5px var(--lum-amber-soft),0 28px 44px -20px rgba(184,153,104,.45),inset 0 1px 0 rgba(255,255,255,.95),inset 0 0 0 1px rgba(255,255,255,.6);
         animation:lumSelGlow 2s var(--lum-glide) infinite;

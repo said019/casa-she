@@ -32,9 +32,9 @@ const mxn = (n: number) => "$" + Number(n).toLocaleString("es-MX");
 
 // Color por tipo de plan (igual que en el /app, derivado de planPresentation).
 const TYPE_COLOR: Record<PackageType, string> = {
-  membership: "#2E4A35",
-  sample: "#B5512F",
-  individual: "#2E4A35",
+  membership: "#2A4E36",
+  sample: "#AE4836",
+  individual: "#2A4E36",
   mixto: "#DBB0B3",
 };
 
@@ -171,7 +171,7 @@ function FilterPill({
   onClick: () => void;
   children: ReactNode;
 }) {
-  const c = color ?? "#B5512F"; // dorado para "Todos"
+  const c = color ?? "#AE4836"; // dorado para "Todos"
   return (
     <button
       type="button"

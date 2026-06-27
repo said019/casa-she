@@ -291,7 +291,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                                     <span className="flex min-w-0 items-center gap-3">
                                         <span className={cn(
                                             'flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.85rem] transition-colors',
-                                            hasActiveChild ? 'bg-balance-cream/62 text-[#B5512F]' : 'bg-[#DDE4D5]/35 text-[#B5512F] group-hover:bg-[#DDE4D5]/55'
+                                            hasActiveChild ? 'bg-balance-cream/62 text-[#AE4836]' : 'bg-[#DDE4D5]/35 text-[#AE4836] group-hover:bg-[#DDE4D5]/55'
                                         )}>
                                             <Icon className="h-[18px] w-[18px]" />
                                         </span>
@@ -360,7 +360,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                             >
                                 <span className={cn(
                                     'flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.85rem] transition-colors',
-                                    isActive(item.href!) ? 'bg-balance-cream/62 text-[#B5512F]' : 'bg-[#DDE4D5]/35 text-[#B5512F] group-hover:bg-[#DDE4D5]/55'
+                                    isActive(item.href!) ? 'bg-balance-cream/62 text-[#AE4836]' : 'bg-[#DDE4D5]/35 text-[#AE4836] group-hover:bg-[#DDE4D5]/55'
                                 )}>
                                     <Icon className="h-[18px] w-[18px]" />
                                 </span>
@@ -398,7 +398,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                         size="icon"
                         onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
                         className={cn(
-                            'h-10 w-10 rounded-full border border-[#DDE4D5] bg-[#DDE4D5]/40 text-[#B5512F] transition-all duration-200 hover:bg-[#DDE4D5] hover:text-balance-dark active:scale-[0.96]',
+                            'h-10 w-10 rounded-full border border-[#DDE4D5] bg-[#DDE4D5]/40 text-[#AE4836] transition-all duration-200 hover:bg-[#DDE4D5] hover:text-balance-dark active:scale-[0.96]',
                             sidebarCollapsed && 'mx-auto'
                         )}
                         aria-label={sidebarCollapsed ? 'Expandir navegación' : 'Contraer navegación'}

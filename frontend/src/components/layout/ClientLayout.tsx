@@ -225,7 +225,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                                         <span className="flex items-center gap-3">
                                             <span className={cn(
                                                 'flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.85rem] transition-colors',
-                                                isActive ? 'bg-balance-cream/62 text-[#B5512F]' : 'bg-[#DDE4D5]/35 text-[#B5512F]'
+                                                isActive ? 'bg-balance-cream/62 text-[#AE4836]' : 'bg-[#DDE4D5]/35 text-[#AE4836]'
                                             )}>
                                                 <MSym name={item.icon} size={20} filled={isActive} />
                                             </span>

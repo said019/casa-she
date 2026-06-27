@@ -67,23 +67,23 @@ export default {
         // Casa Shé brand palette (keys kept for backwards-compat with existing bmb-*/balance-* classes)
         balance: {
           dark: "#16261A",   // verde casa profundo — secciones oscuras
-          olive: "#2E4A35",  // Verde Casa — primario (logo)
-          cream: "#FBF3DD",  // Avena — background
-          gold: "#B5512F",   // Arcilla — detalle cálido profundo
+          olive: "#2A4E36",  // Verde Casa — primario (logo)
+          cream: "#F6F0E4",  // Avena — background
+          gold: "#AE4836",   // Arcilla — detalle cálido profundo
           sand: "#D8D2BC",   // Arena — bordes/superficies suaves
         },
         bmb: {
-          gold: "#2E4A35",     // Verde Casa — acento primario (era dorado)
-          deepgold: "#B5512F", // Arcilla — acento cálido para hover/activo
-          cream: "#FBF3DD",    // Avena — fondo
+          gold: "#2A4E36",     // Verde Casa — acento primario (era dorado)
+          deepgold: "#AE4836", // Arcilla — acento cálido para hover/activo
+          cream: "#F6F0E4",    // Avena — fondo
           paper: "#FFFDF6",    // crema más clara — tarjetas
           taupe: "#D8D2BC",    // Arena
           mauve: "#8C6A57",    // arcilla apagada
           rose: "#C9B7A0",     // arena cálida
           blush: "#EDE3D2",    // avena suave
-          leaf: "#2E4A35",     // Verde Casa
+          leaf: "#2A4E36",     // Verde Casa
           moss: "#B6A43C",     // Musgo — mostaza de marca (acento decorativo)
-          clay: "#B5512F",     // Arcilla
+          clay: "#AE4836",     // Arcilla
           dark: "#16261A",     // verde casa profundo
           // `ink` es alias semántico para texto/editorial.
           ink: "#2E1B22",      // Ciruela — texto

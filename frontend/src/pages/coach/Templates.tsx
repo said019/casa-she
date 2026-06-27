@@ -307,7 +307,7 @@ export default function CoachTemplates() {
                                             {/* Color accent bar */}
                                             <div 
                                                 className="h-1 w-full"
-                                                style={{ backgroundColor: template.class_type_color || '#9A6E3A' }}
+                                                style={{ backgroundColor: template.class_type_color || '#8A5A2A' }}
                                             />
                                             <CardHeader className="pb-3">
                                                 <div className="flex items-start justify-between">

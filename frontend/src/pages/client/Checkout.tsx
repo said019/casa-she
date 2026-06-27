@@ -365,7 +365,7 @@ export default function Checkout() {
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full bg-[#FBF6E8]/72 text-[#2E1B22] hover:bg-[#D6D5C2]/55"
+              className="rounded-full bg-[#FBF7EE]/72 text-[#2E1B22] hover:bg-[#D6D5C2]/55"
               onClick={() => {
                 if (step === 'payment') setStep('plan');
                 else if (step === 'confirm') setStep('payment');
@@ -390,11 +390,11 @@ export default function Checkout() {
           </section>
 
           <div className="flex items-center gap-2 text-sm">
-            <Badge variant={step === 'plan' ? 'default' : 'secondary'} className={step === 'plan' ? 'rounded-full bg-[#2E4A35] text-[#FEF7E6]' : 'rounded-full bg-[#D6D5C2]/50 text-[#2E1B22]/68'}>1. Plan</Badge>
+            <Badge variant={step === 'plan' ? 'default' : 'secondary'} className={step === 'plan' ? 'rounded-full bg-[#2A4E36] text-[#F6F0E4]' : 'rounded-full bg-[#D6D5C2]/50 text-[#2E1B22]/68'}>1. Plan</Badge>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            <Badge variant={step === 'payment' ? 'default' : 'secondary'} className={step === 'payment' ? 'rounded-full bg-[#2E4A35] text-[#FEF7E6]' : 'rounded-full bg-[#D6D5C2]/50 text-[#2E1B22]/68'}>2. Pago</Badge>
+            <Badge variant={step === 'payment' ? 'default' : 'secondary'} className={step === 'payment' ? 'rounded-full bg-[#2A4E36] text-[#F6F0E4]' : 'rounded-full bg-[#D6D5C2]/50 text-[#2E1B22]/68'}>2. Pago</Badge>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            <Badge variant={step === 'confirm' ? 'default' : 'secondary'} className={step === 'confirm' ? 'rounded-full bg-[#2E4A35] text-[#FEF7E6]' : 'rounded-full bg-[#D6D5C2]/50 text-[#2E1B22]/68'}>3. Confirmar</Badge>
+            <Badge variant={step === 'confirm' ? 'default' : 'secondary'} className={step === 'confirm' ? 'rounded-full bg-[#2A4E36] text-[#F6F0E4]' : 'rounded-full bg-[#D6D5C2]/50 text-[#2E1B22]/68'}>3. Confirmar</Badge>
           </div>
 
           {/* Step 1: Select Plan */}
@@ -410,7 +410,7 @@ export default function Checkout() {
                 groupedPlans.map((group) => (
                   <section key={group.type} className={`overflow-hidden rounded-[1.55rem] p-2 sm:p-3 ring-1 ${group.panel}`}>
                     <div className="grid gap-4 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                      <div className="flex min-h-[12rem] flex-col justify-between rounded-[1.2rem] bg-[#FBF6E8]/58 p-4 ring-1 ring-[#2E1B22]/[0.06]">
+                      <div className="flex min-h-[12rem] flex-col justify-between rounded-[1.2rem] bg-[#FBF7EE]/58 p-4 ring-1 ring-[#2E1B22]/[0.06]">
                         <div>
                           <span className={`inline-flex rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${group.chip}`}>
                             {group.eyebrow}
@@ -438,7 +438,7 @@ export default function Checkout() {
                             <button
                               key={plan.id}
                               type="button"
-                              className={`group relative flex min-h-[14rem] w-full min-w-0 flex-col overflow-hidden rounded-[1.25rem] p-4 text-left ring-1 transition duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E4A35]/45 active:scale-[0.99] ${presentation.card} ${
+                              className={`group relative flex min-h-[14rem] w-full min-w-0 flex-col overflow-hidden rounded-[1.25rem] p-4 text-left ring-1 transition duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A4E36]/45 active:scale-[0.99] ${presentation.card} ${
                                 isSelected ? presentation.selected : ''
                               }`}
                               aria-pressed={isSelected}
@@ -548,7 +548,7 @@ export default function Checkout() {
           {step === 'payment' && selectedPlan && (
             <div className="space-y-4">
               {/* Selected plan summary */}
-              <Card className="rounded-[1.5rem] border-[#D6D5C2]/75 bg-[#FBF6E8]/58">
+              <Card className="rounded-[1.5rem] border-[#D6D5C2]/75 bg-[#FBF7EE]/58">
                 <CardContent className="py-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -565,7 +565,7 @@ export default function Checkout() {
               </Card>
 
               {/* Payment methods */}
-              <Card className="rounded-[1.75rem] border-[#D6D5C2]/75 bg-[#FBF6E8]/82 shadow-[0_22px_72px_-64px_rgba(42,33,24,.55)]">
+              <Card className="rounded-[1.75rem] border-[#D6D5C2]/75 bg-[#FBF7EE]/82 shadow-[0_22px_72px_-64px_rgba(42,33,24,.55)]">
                 <CardHeader>
                   <CardTitle className="text-lg">Selecciona método de pago</CardTitle>
                 </CardHeader>
@@ -579,15 +579,15 @@ export default function Checkout() {
                       <div
                         key={method.value}
                         className={`flex cursor-pointer items-start space-x-3 rounded-[1.25rem] border p-4 transition-colors ${selectedPaymentMethod === method.value
-                          ? 'border-[#2E4A35]/58 bg-[#DDE4D5]/36'
-                          : 'border-[#D6D5C2]/68 bg-[#FBF6E8]/40 hover:bg-[#DDE4D5]/24'
+                          ? 'border-[#2A4E36]/58 bg-[#DDE4D5]/36'
+                          : 'border-[#D6D5C2]/68 bg-[#FBF7EE]/40 hover:bg-[#DDE4D5]/24'
                           }`}
                         onClick={() => setSelectedPaymentMethod(method.value)}
                       >
                         <RadioGroupItem value={method.value} id={method.value} className="mt-1" />
                         <div className="flex-1">
                           <Label htmlFor={method.value} className="flex items-center gap-2 cursor-pointer">
-                            <method.icon className="h-5 w-5 text-[#B5512F]" />
+                            <method.icon className="h-5 w-5 text-[#AE4836]" />
                             <span className="font-medium">{method.label}</span>
                           </Label>
                           <p className="text-sm text-muted-foreground mt-1">
@@ -599,7 +599,7 @@ export default function Checkout() {
                   </RadioGroup>
                 </CardContent>
                 <CardFooter>
-                  <Button onClick={handlePaymentMethodSelect} className="w-full rounded-full bg-[#2E4A35] text-[#FEF7E6] hover:bg-[#16261A]">
+                  <Button onClick={handlePaymentMethodSelect} className="w-full rounded-full bg-[#2A4E36] text-[#F6F0E4] hover:bg-[#16261A]">
                     Continuar
                     <ChevronRight className="h-4 w-4 ml-2" />
                   </Button>
@@ -611,7 +611,7 @@ export default function Checkout() {
           {/* Step 3: Confirm Order */}
           {step === 'confirm' && selectedPlan && (
             <div className="space-y-4">
-              <Card className="rounded-[1.75rem] border-[#D6D5C2]/75 bg-[#FBF6E8]/82 shadow-[0_22px_72px_-64px_rgba(42,33,24,.55)]">
+              <Card className="rounded-[1.75rem] border-[#D6D5C2]/75 bg-[#FBF7EE]/82 shadow-[0_22px_72px_-64px_rgba(42,33,24,.55)]">
                 <CardHeader>
                   <CardTitle className="text-lg">Resumen de tu orden</CardTitle>
                 </CardHeader>
@@ -649,14 +649,14 @@ export default function Checkout() {
                     </Label>
 
                     {discountResult ? (
-                      <div className="flex items-center justify-between rounded-[1rem] border border-[#2E4A35]/24 bg-[#DDE4D5]/30 p-3">
+                      <div className="flex items-center justify-between rounded-[1rem] border border-[#2A4E36]/24 bg-[#DDE4D5]/30 p-3">
                         <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-[#2E4A35]" />
+                          <CheckCircle2 className="h-4 w-4 text-[#2A4E36]" />
                           <div>
                             <p className="text-sm font-medium text-[#6F4D45]">
                               {discountResult.code}
                             </p>
-                            <p className="text-xs text-[#2E4A35]">
+                            <p className="text-xs text-[#2A4E36]">
                               {discountResult.discountType === 'percentage'
                                 ? `${discountResult.discountValue}% de descuento`
                                 : `${formatPrice(discountResult.discountValue)} de descuento`}
@@ -666,7 +666,7 @@ export default function Checkout() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-[#2E4A35] hover:bg-[#D6D5C2]/50 hover:text-[#2E1B22]"
+                          className="h-8 w-8 text-[#2A4E36] hover:bg-[#D6D5C2]/50 hover:text-[#2E1B22]"
                           onClick={handleRemoveDiscount}
                         >
                           <X className="h-4 w-4" />
@@ -720,7 +720,7 @@ export default function Checkout() {
                         <span>{formatPrice(selectedPlan.price)}</span>
                       </div>
                       {discountResult && (
-                        <div className="flex items-center justify-between text-sm text-[#2E4A35]">
+                        <div className="flex items-center justify-between text-sm text-[#2A4E36]">
                           <span className="flex items-center gap-1">
                             <Tag className="h-3 w-3" />
                             Descuento ({discountResult.code})
@@ -734,7 +734,7 @@ export default function Checkout() {
                   {/* Total */}
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-lg">Total</span>
-                    <span className="font-bold text-lg text-[#2E4A35]">
+                    <span className="font-bold text-lg text-[#2A4E36]">
                       {formatPrice(finalTotal)}
                     </span>
                   </div>
@@ -776,7 +776,7 @@ export default function Checkout() {
                             className="h-10 w-10 shrink-0"
                             onClick={() => copyToClipboard(bankInfo.account_holder, 'holder')}
                           >
-                            {copiedField === 'holder' ? <Check className="h-3.5 w-3.5 text-[#2E4A35]" /> : <Copy className="h-3.5 w-3.5" />}
+                            {copiedField === 'holder' ? <Check className="h-3.5 w-3.5 text-[#2A4E36]" /> : <Copy className="h-3.5 w-3.5" />}
                           </Button>
                         </div>
                         {bankInfo.account_number && (
@@ -791,7 +791,7 @@ export default function Checkout() {
                               className="h-10 w-10 shrink-0"
                               onClick={() => copyToClipboard(bankInfo.account_number, 'account')}
                             >
-                              {copiedField === 'account' ? <Check className="h-3.5 w-3.5 text-[#2E4A35]" /> : <Copy className="h-3.5 w-3.5" />}
+                              {copiedField === 'account' ? <Check className="h-3.5 w-3.5 text-[#2A4E36]" /> : <Copy className="h-3.5 w-3.5" />}
                             </Button>
                           </div>
                         )}
@@ -806,12 +806,12 @@ export default function Checkout() {
                             className="h-10 w-10 shrink-0"
                             onClick={() => copyToClipboard(bankInfo.clabe, 'clabe')}
                           >
-                            {copiedField === 'clabe' ? <Check className="h-3.5 w-3.5 text-[#2E4A35]" /> : <Copy className="h-3.5 w-3.5" />}
+                            {copiedField === 'clabe' ? <Check className="h-3.5 w-3.5 text-[#2A4E36]" /> : <Copy className="h-3.5 w-3.5" />}
                           </Button>
                         </div>
-                        <div className="rounded-[0.625rem] border border-[#2E4A35]/22 bg-[#DDE4D5]/35 p-2.5">
+                        <div className="rounded-[0.625rem] border border-[#2A4E36]/22 bg-[#DDE4D5]/35 p-2.5">
                           <p className="text-xs text-muted-foreground">Monto a transferir</p>
-                          <p className="font-bold text-[#2E4A35]">{formatPrice(finalTotal)}</p>
+                          <p className="font-bold text-[#2A4E36]">{formatPrice(finalTotal)}</p>
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
@@ -837,7 +837,7 @@ export default function Checkout() {
                 <CardFooter className="flex-col gap-3">
                   <Button
                     onClick={handleConfirmOrder}
-                    className="w-full rounded-full bg-[#2E4A35] text-[#FEF7E6] hover:bg-[#16261A]"
+                    className="w-full rounded-full bg-[#2A4E36] text-[#F6F0E4] hover:bg-[#16261A]"
                     disabled={createOrder.isPending}
                   >
                     {createOrder.isPending ? (

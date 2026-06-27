@@ -139,7 +139,7 @@ export default function CashShiftsList() {
                 {/* Shifts list — cards (mobile-first) */}
                 {isLoading ? (
                     <div className="flex justify-center py-12">
-                        <Loader2 className="h-6 w-6 animate-spin text-[#B5512F]" />
+                        <Loader2 className="h-6 w-6 animate-spin text-[#AE4836]" />
                     </div>
                 ) : error ? (
                     <div className="rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-8 text-center text-destructive shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
@@ -159,7 +159,7 @@ export default function CashShiftsList() {
                                 key={shift.id}
                                 type="button"
                                 onClick={() => navigate(`/admin/cash-shifts/${shift.id}`)}
-                                className="block w-full rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-5 text-left shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)] transition hover:border-[#B5512F]/40 hover:shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]"
+                                className="block w-full rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-5 text-left shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)] transition hover:border-[#AE4836]/40 hover:shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]"
                             >
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
@@ -176,19 +176,19 @@ export default function CashShiftsList() {
                                 </div>
 
                                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                    <div className="rounded-xl bg-[#FBF3DD]/70 px-3 py-2">
+                                    <div className="rounded-xl bg-[#F6F0E4]/70 px-3 py-2">
                                         <p className="text-[11px] uppercase tracking-wide text-[#6B554D]">Fondo inicial</p>
                                         <p className="font-semibold tabular-nums text-[#2E1B22]">{mxn(shift.opening_float)}</p>
                                     </div>
-                                    <div className="rounded-xl bg-[#FBF3DD]/70 px-3 py-2">
+                                    <div className="rounded-xl bg-[#F6F0E4]/70 px-3 py-2">
                                         <p className="text-[11px] uppercase tracking-wide text-[#6B554D]">Esperado</p>
                                         <p className="font-semibold tabular-nums text-[#2E1B22]">{mxn(shift.expected_cash)}</p>
                                     </div>
-                                    <div className="rounded-xl bg-[#FBF3DD]/70 px-3 py-2">
+                                    <div className="rounded-xl bg-[#F6F0E4]/70 px-3 py-2">
                                         <p className="text-[11px] uppercase tracking-wide text-[#6B554D]">Contado</p>
                                         <p className="font-semibold tabular-nums text-[#2E1B22]">{mxn(shift.counted_cash)}</p>
                                     </div>
-                                    <div className="rounded-xl bg-[#FBF3DD]/70 px-3 py-2">
+                                    <div className="rounded-xl bg-[#F6F0E4]/70 px-3 py-2">
                                         <p className="text-[11px] uppercase tracking-wide text-[#6B554D]">Diferencia</p>
                                         <p className={`font-semibold tabular-nums ${diffColor(shift.difference)}`}>
                                             {mxn(shift.difference)}
