@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -52,8 +53,16 @@ const statusLabel: Record<ClientMembership['status'], string> = {
   paused: 'Pausada',
 };
 
+const EASE = [0.23, 1, 0.32, 1] as const; // ease-out fuerte (Emil)
+
 export default function ClientDashboard() {
   const { user } = useAuthStore();
+  const reduce = useReducedMotion();
+  const heroStagger = { hidden: {}, show: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } } };
+  const heroItem = {
+    hidden: reduce ? { opacity: 0 } : { opacity: 0, y: 14 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: EASE } },
+  };
 
   const { data: membership, isLoading: membershipLoading } = useQuery<ClientMembership | null>({
     queryKey: ['my-membership'],
@@ -142,49 +151,56 @@ export default function ClientDashboard() {
       <ClientLayout>
         <ProfilerInviteBanner />
         <div className="relative space-y-10 pb-4">
-          <section className="relative overflow-hidden rounded-[1.6rem] border border-[#D6D5C2]/70 bg-[#F6F0E4]/72 shadow-[0_24px_80px_-68px_rgba(42,33,24,.72)]">
-            <div className="absolute inset-0 opacity-[0.2]">
+          <motion.section
+            variants={heroStagger} initial="hidden" animate="show"
+            className="relative overflow-hidden rounded-[1.6rem] border border-[#2A4E36]/14 bg-[#16261A] text-[#F6F0E4] shadow-[0_30px_90px_-60px_rgba(22,38,26,.9)]"
+          >
+            {/* Foto del estudio, muy sutil, fundida en verde profundo */}
+            <div className="absolute inset-0 opacity-[0.16]">
               <img src="/studio/barre.webp" alt="" aria-hidden="true" className="h-full w-full object-cover object-center" />
-              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,248,245,.94)_0%,rgba(255,248,245,.82)_46%,rgba(236,225,206,.78)_100%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(105deg,rgba(22,38,26,.94)_0%,rgba(22,38,26,.78)_48%,rgba(42,78,54,.62)_100%)]" />
             </div>
-            {/* Wash dorado (golden-hour) — atmósfera de marca */}
+            {/* Atmósfera de marca — Musgo + Verde Casa + Arcilla (sin rosas) */}
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-0"
-              style={{ background: 'radial-gradient(120% 95% at 88% -8%, hsla(42,80%,62%,0.4) 0%, transparent 50%), radial-gradient(100% 90% at -8% 110%, hsla(6,55%,80%,0.55) 0%, transparent 56%), radial-gradient(82% 80% at 58% 124%, hsla(355,52%,84%,0.42) 0%, transparent 60%)' }}
+              style={{ background: 'radial-gradient(115% 95% at 90% -12%, rgba(108,132,36,0.42) 0%, transparent 54%), radial-gradient(95% 90% at -8% 112%, rgba(42,78,54,0.55) 0%, transparent 58%), radial-gradient(70% 75% at 64% 128%, rgba(174,72,54,0.30) 0%, transparent 62%)' }}
             />
-            <div className="relative grid gap-8 p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:p-12">
+            {/* Monograma de marca como filigrana (versión crema sobre fondo oscuro) */}
+            <CasaSheMark tone="cream" className="pointer-events-none absolute -right-10 -top-12 h-72 w-72 opacity-[0.07]" />
+
+            <div className="relative grid gap-8 p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_16rem] lg:p-12">
               <div className="max-w-4xl">
-                <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#2A4E36]/24 bg-[#F6F0E4]/72 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#2A4E36]">
-                  <Leaf className="h-3.5 w-3.5" />
-                  Bienvenido de vuelta
-                </div>
-                <p className="font-heading text-2xl font-medium tracking-[-0.03em] text-[#6B554D] sm:text-3xl">
+                <motion.div variants={heroItem} className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#F6F0E4]/20 bg-[#F6F0E4]/[0.06] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#D6D5C2]">
+                  <Leaf className="h-3.5 w-3.5 text-[#B4A248]" />
+                  Bienvenida de vuelta
+                </motion.div>
+                <motion.p variants={heroItem} className="font-heading text-2xl font-medium italic tracking-[-0.03em] text-[#D6D5C2] sm:text-3xl">
                   {firstName}
-                </p>
-                <h1 className="mt-2 max-w-4xl font-heading text-[clamp(3.2rem,8vw,7rem)] font-medium leading-[0.88] tracking-[-0.055em] text-[#2E1B22]">
+                </motion.p>
+                <motion.h1 variants={heroItem} className="mt-2 max-w-4xl font-heading text-[clamp(3.2rem,8vw,7rem)] font-medium leading-[0.88] tracking-[-0.055em] text-[#F6F0E4]">
                   Encuentra tu centro hoy.
-                </h1>
-                <p className="mt-6 max-w-[64ch] text-sm leading-7 text-[#6B554D] sm:text-base">
-                  Reserva tu siguiente clase, revisa tu membresía y mantén tu constancia en una experiencia simple y cuidada.
-                </p>
+                </motion.h1>
+                <motion.p variants={heroItem} className="mt-6 max-w-[60ch] text-sm leading-7 text-[#D6D5C2]/80 sm:text-base">
+                  Reserva tu siguiente clase, revisa tu membresía y sostén tu constancia en una experiencia simple y cuidada.
+                </motion.p>
               </div>
 
-              <aside className="flex flex-col justify-end rounded-[1.25rem] border border-[#D6D5C2]/80 bg-[#F6F0E4]/70 p-5 text-right">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#2E1B22]/46">
+              <motion.aside variants={heroItem} className="flex flex-col justify-end rounded-[1.25rem] border border-[#F6F0E4]/14 bg-[#F6F0E4]/[0.06] p-5 text-right backdrop-blur-sm">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#D6D5C2]/60">
                   {monthLabel} · {today.getFullYear()}
                 </p>
                 <div className="mt-4 flex items-end justify-end gap-3">
-                  <span className="font-heading text-4xl font-medium italic leading-none text-[#6B554D] capitalize">
+                  <span className="font-heading text-4xl font-medium italic leading-none text-[#D6D5C2] capitalize">
                     {weekdayLabel}
                   </span>
-                  <span className="font-heading text-[6.5rem] font-semibold leading-[0.78] tracking-[-0.06em] text-[#AE4836]">
+                  <span className="font-heading text-[6.5rem] font-semibold leading-[0.78] tracking-[-0.06em] text-[#B4A248]">
                     {dayNumber}
                   </span>
                 </div>
-              </aside>
+              </motion.aside>
             </div>
-          </section>
+          </motion.section>
 
           {/* Clases por calificar (se auto-oculta si no hay) */}
           <PendingReviewsList />
