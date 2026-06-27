@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import CasaSheLogo from '@/components/CasaSheLogo';
+import { RECEPTION_ENABLED } from '@/config/features';
 import { AdminBreadcrumbs } from '@/components/layout/AdminBreadcrumbs';
 import { AdminSearch } from '@/components/admin/AdminSearch';
 import api from '@/lib/api';
@@ -93,7 +94,8 @@ const sidebarItems: SidebarItem[] = [
         children: [
             { href: '/admin/members', label: 'Usuarios' },
             { href: '/admin/instructors', label: 'Coaches' },
-            { href: '/admin/reception', label: 'Recepción' },
+            // Recepción apagada por feature flag (RECEPTION_ENABLED). Reactivar => reaparece.
+            ...(RECEPTION_ENABLED ? [{ href: '/admin/reception', label: 'Recepción' }] : []),
         ],
     },
     {

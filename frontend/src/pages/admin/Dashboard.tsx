@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/layout/AdminLayout';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { BookingToggleCard } from '@/components/admin/BookingToggleCard';
 import { CajaStatusCard } from '@/components/admin/CajaStatusCard';
+import { RECEPTION_ENABLED } from '@/config/features';
 import api from '@/lib/api';
 import type { AdminStats, Membership } from '@/types/auth';
 import type { Order } from '@/types/order';
@@ -117,7 +118,7 @@ export default function AdminDashboard() {
             <AdminLayout>
                 <div className="space-y-6">
                     <BookingToggleCard />
-                    <CajaStatusCard />
+                    {RECEPTION_ENABLED && <CajaStatusCard />}
                     {totalAttention === 0 ? (
                         <section className="flex flex-wrap items-center justify-between gap-4 rounded-[1.5rem] border border-balance-sand/65 bg-[hsl(var(--admin-panel))] px-5 py-4">
                             <div className="flex items-center gap-3">

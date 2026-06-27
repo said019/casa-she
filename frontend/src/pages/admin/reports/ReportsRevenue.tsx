@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { Loader2, DollarSign, TrendingUp, CreditCard, Wallet, ChevronDown, ChevronRight } from 'lucide-react';
 import api from '@/lib/api';
+import { RECEPTION_ENABLED } from '@/config/features';
 import { format, subDays } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -287,6 +288,7 @@ export default function ReportsRevenue() {
                         </CardContent>
                     </Card>
 
+                    {RECEPTION_ENABLED && (
                     <Card className="col-span-2">
                         <CardHeader>
                             <CardTitle>Ventas por recepcionista</CardTitle>
@@ -323,6 +325,7 @@ export default function ReportsRevenue() {
                             </div>
                         </CardContent>
                     </Card>
+                    )}
 
                     {/* Mono-sede (Condesa): se elimin\u00f3 la comparativa de ingresos por sucursal. */}
                 </div>
