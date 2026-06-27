@@ -86,7 +86,7 @@ function applyFilters(
 // en el mismo color sin que admin tenga que configurarlo.
 // Espaciados en el círculo de tono para que dos clases consecutivas no salgan muy parecidas.
 const PALETTE = [
-    '#B89968', // gold cálido (BMB)
+    '#B5512F', // gold cálido (BMB)
     '#6B8E7B', // sage verdoso
     '#A8524C', // terracotta
     '#5C7286', // slate-blue

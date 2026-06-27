@@ -315,7 +315,7 @@ export default function VideoPlayer() {
                                     <div
                                         className="absolute -inset-3 rounded-3xl opacity-20 blur-2xl pointer-events-none"
                                         style={{
-                                            background: `linear-gradient(135deg, ${video.category_color || '#A48550'}60 0%, transparent 50%, ${video.category_color || '#A48550'}30 100%)`,
+                                            background: `linear-gradient(135deg, ${video.category_color || '#9A6E3A'}60 0%, transparent 50%, ${video.category_color || '#9A6E3A'}30 100%)`,
                                         }}
                                     />
                                     <div className="relative aspect-video bg-foreground rounded-2xl overflow-hidden shadow-2xl ring-1 ring-border/50">

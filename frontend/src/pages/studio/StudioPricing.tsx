@@ -49,7 +49,7 @@ export default function StudioPricing() {
                 </p>
                 <Link
                   to={`${basePath}/buy/${welcomeOffer.id}`}
-                  className="inline-block px-8 py-4 bg-white text-[#6B5B4F] font-semibold uppercase tracking-wider hover:bg-[#F5F1E8] transition-colors"
+                  className="inline-block px-8 py-4 bg-white text-[#6B5B4F] font-semibold uppercase tracking-wider hover:bg-[#F6F1E2] transition-colors"
                   style={{ fontFamily: "'DM Sans', sans-serif" }}
                 >
                   Activar Oferta
@@ -159,7 +159,7 @@ export default function StudioPricing() {
                       className={`block w-full py-3 px-6 text-center text-sm font-semibold uppercase tracking-wider transition-colors ${isPopular
                         ? 'bg-[#6B5B4F] text-white hover:bg-[#5A4A3F]'
                         : plan.name.toLowerCase().includes('suelta')
-                          ? 'bg-white border-2 border-[#5A5A5A] text-[#5A5A5A] hover:bg-[#F5F1E8]'
+                          ? 'bg-white border-2 border-[#5A5A5A] text-[#5A5A5A] hover:bg-[#F6F1E2]'
                           : 'bg-[#5A5A5A] text-white hover:bg-[#2A2A2A]'
                         }`}
                       style={{ fontFamily: "'DM Sans', sans-serif" }}

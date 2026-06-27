@@ -98,7 +98,7 @@ export function CoachSheet({
                             className="h-full w-full object-cover object-top"
                         />
                     ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#ECE1CE_0%,#DCCCC0_100%)]">
+                        <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#ECE1CE_0%,#D6D5C2_100%)]">
                             <span className="font-heading text-[clamp(6rem,18vw,12rem)] font-medium leading-none text-bmb-dark/22">
                                 {initials(coach?.display_name ?? instructorName ?? '?')}
                             </span>

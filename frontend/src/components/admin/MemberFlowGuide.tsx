@@ -141,8 +141,8 @@ export default function MemberFlowGuide() {
                 onClick={() => setIsOpen(!isOpen)}
             >
                 <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-[#A48550]/10 flex items-center justify-center">
-                        <HelpCircle className="h-4 w-4 text-[#A48550]" />
+                    <div className="h-8 w-8 rounded-lg bg-[#9A6E3A]/10 flex items-center justify-center">
+                        <HelpCircle className="h-4 w-4 text-[#9A6E3A]" />
                     </div>
                     <div className="text-left">
                         <h3 className="text-sm font-semibold">Guia rapida de flujos</h3>

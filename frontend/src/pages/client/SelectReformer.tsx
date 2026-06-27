@@ -471,13 +471,13 @@ function StyleBlock() {
         --lum-ink-20: rgba(28,28,30,0.18);
         --lum-ink-08: rgba(28,28,30,0.08);
         --lum-cream: #fbf8f2;
-        --lum-cream-2: #f5f1e8;
+        --lum-cream-2: #F6F1E2;
         --lum-sand: #ebe6d9;
-        --lum-sand-dark: #d9d3c4;
+        --lum-sand-dark: #D6D5C2;
         --lum-accent: #7e8579;
         --lum-accent-soft: #a8b09f;
         --lum-alert: #a8524c;
-        --lum-amber: #b89968;
+        --lum-amber: #B5512F;
         --lum-amber-soft: rgba(184,153,104,0.22);
         --lum-spring: cubic-bezier(0.34,1.56,0.64,1);
         --lum-glide: cubic-bezier(0.16,1,0.3,1);
@@ -764,14 +764,14 @@ function StyleBlock() {
       .lum-spot:disabled { cursor:not-allowed; }
       .lum-spot:hover:not(:disabled) { transform:translate(-50%,calc(-50% - 4px)); }
       .lum-spot:hover:not(:disabled) .tile {
-        background:linear-gradient(160deg,#d9d3c4 0%,#c4bda9 55%,#d9d3c4 100%);
+        background:linear-gradient(160deg,#D6D5C2 0%,#c4bda9 55%,#D6D5C2 100%);
         box-shadow:0 22px 36px -16px rgba(126,133,121,.42),inset 0 1px 0 rgba(255,255,255,.55),inset 0 0 0 1px rgba(255,255,255,.25);
       }
       @keyframes lumTileIn { from{opacity:0;transform:translate(-50%,calc(-50% + 16px)) scale(.94)} to{opacity:1;transform:translate(-50%,-50%) scale(1)} }
       .lum-spot .tile {
         position:absolute; inset:0;
         border-radius:clamp(12px,1.4vw,18px);
-        background:linear-gradient(160deg,#ebe6d9 0%,#d9d3c4 55%,#ebe6d9 100%);
+        background:linear-gradient(160deg,#ebe6d9 0%,#D6D5C2 55%,#ebe6d9 100%);
         border:1px solid rgba(126,133,121,.40);
         box-shadow:0 12px 24px -12px rgba(126,133,121,.28),inset 0 1px 0 rgba(255,255,255,.55),inset 0 0 0 1px rgba(255,255,255,.2);
         transition:all .45s var(--lum-spring); overflow:hidden;
@@ -801,7 +801,7 @@ function StyleBlock() {
 
       .lum-spot-selected { transform:translate(-50%,calc(-50% - 8px)); }
       .lum-spot-selected .tile {
-        background:linear-gradient(160deg,#d4c094 0%,#b89968 55%,#d4c094 100%);
+        background:linear-gradient(160deg,#d4c094 0%,#B5512F 55%,#d4c094 100%);
         border-color:var(--lum-amber);
         box-shadow:0 0 0 5px var(--lum-amber-soft),0 28px 44px -20px rgba(184,153,104,.45),inset 0 1px 0 rgba(255,255,255,.95),inset 0 0 0 1px rgba(255,255,255,.6);
         animation:lumSelGlow 2s var(--lum-glide) infinite;

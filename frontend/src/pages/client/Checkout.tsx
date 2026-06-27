@@ -360,12 +360,12 @@ export default function Checkout() {
     <AuthGuard requiredRoles={['client']}>
       <ClientLayout>
         <div className="mx-auto max-w-5xl space-y-6">
-          <section className="rounded-[1.75rem] border border-[#DCCCC0]/80 bg-[#E6D0CA]/34 p-5 shadow-[0_22px_72px_-62px_rgba(42,33,24,0.58)] sm:p-6">
+          <section className="rounded-[1.75rem] border border-[#D6D5C2]/80 bg-[#DDE4D5]/34 p-5 shadow-[0_22px_72px_-62px_rgba(42,33,24,0.58)] sm:p-6">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full bg-[#FCF8F1]/72 text-[#2A2118] hover:bg-[#DCCCC0]/55"
+              className="rounded-full bg-[#FBF6E8]/72 text-[#2E1B22] hover:bg-[#D6D5C2]/55"
               onClick={() => {
                 if (step === 'payment') setStep('plan');
                 else if (step === 'confirm') setStep('payment');
@@ -390,11 +390,11 @@ export default function Checkout() {
           </section>
 
           <div className="flex items-center gap-2 text-sm">
-            <Badge variant={step === 'plan' ? 'default' : 'secondary'} className={step === 'plan' ? 'rounded-full bg-[#A6776A] text-[#FFF8EE]' : 'rounded-full bg-[#DCCCC0]/50 text-[#2A2118]/68'}>1. Plan</Badge>
+            <Badge variant={step === 'plan' ? 'default' : 'secondary'} className={step === 'plan' ? 'rounded-full bg-[#2E4A35] text-[#FEF7E6]' : 'rounded-full bg-[#D6D5C2]/50 text-[#2E1B22]/68'}>1. Plan</Badge>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            <Badge variant={step === 'payment' ? 'default' : 'secondary'} className={step === 'payment' ? 'rounded-full bg-[#A6776A] text-[#FFF8EE]' : 'rounded-full bg-[#DCCCC0]/50 text-[#2A2118]/68'}>2. Pago</Badge>
+            <Badge variant={step === 'payment' ? 'default' : 'secondary'} className={step === 'payment' ? 'rounded-full bg-[#2E4A35] text-[#FEF7E6]' : 'rounded-full bg-[#D6D5C2]/50 text-[#2E1B22]/68'}>2. Pago</Badge>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            <Badge variant={step === 'confirm' ? 'default' : 'secondary'} className={step === 'confirm' ? 'rounded-full bg-[#A6776A] text-[#FFF8EE]' : 'rounded-full bg-[#DCCCC0]/50 text-[#2A2118]/68'}>3. Confirmar</Badge>
+            <Badge variant={step === 'confirm' ? 'default' : 'secondary'} className={step === 'confirm' ? 'rounded-full bg-[#2E4A35] text-[#FEF7E6]' : 'rounded-full bg-[#D6D5C2]/50 text-[#2E1B22]/68'}>3. Confirmar</Badge>
           </div>
 
           {/* Step 1: Select Plan */}
@@ -410,7 +410,7 @@ export default function Checkout() {
                 groupedPlans.map((group) => (
                   <section key={group.type} className={`overflow-hidden rounded-[1.55rem] p-2 sm:p-3 ring-1 ${group.panel}`}>
                     <div className="grid gap-4 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                      <div className="flex min-h-[12rem] flex-col justify-between rounded-[1.2rem] bg-[#FCF8F1]/58 p-4 ring-1 ring-[#2A2118]/[0.06]">
+                      <div className="flex min-h-[12rem] flex-col justify-between rounded-[1.2rem] bg-[#FBF6E8]/58 p-4 ring-1 ring-[#2E1B22]/[0.06]">
                         <div>
                           <span className={`inline-flex rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${group.chip}`}>
                             {group.eyebrow}
@@ -418,7 +418,7 @@ export default function Checkout() {
                           <h2 className="mt-4 text-2xl font-semibold leading-tight tracking-[-0.035em]">{group.title}</h2>
                           <p className={`mt-2 text-sm leading-relaxed ${group.text}`}>{group.detail}</p>
                         </div>
-                        <p className="mt-5 border-t border-[#2A2118]/10 pt-3 text-xs font-semibold leading-relaxed text-[#2A2118]/62">
+                        <p className="mt-5 border-t border-[#2E1B22]/10 pt-3 text-xs font-semibold leading-relaxed text-[#2E1B22]/62">
                           {group.rule}
                         </p>
                       </div>
@@ -438,7 +438,7 @@ export default function Checkout() {
                             <button
                               key={plan.id}
                               type="button"
-                              className={`group relative flex min-h-[14rem] w-full min-w-0 flex-col overflow-hidden rounded-[1.25rem] p-4 text-left ring-1 transition duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A6776A]/45 active:scale-[0.99] ${presentation.card} ${
+                              className={`group relative flex min-h-[14rem] w-full min-w-0 flex-col overflow-hidden rounded-[1.25rem] p-4 text-left ring-1 transition duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E4A35]/45 active:scale-[0.99] ${presentation.card} ${
                                 isSelected ? presentation.selected : ''
                               }`}
                               aria-pressed={isSelected}
@@ -484,12 +484,12 @@ export default function Checkout() {
                               </div>
 
                               <div className="mt-4 flex flex-wrap items-center gap-2">
-                                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#DCCCC0]/75 bg-[#ECE1CE]/58 px-3 py-1.5 text-sm font-semibold">
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D6D5C2]/75 bg-[#ECE1CE]/58 px-3 py-1.5 text-sm font-semibold">
                                   <Star className="h-4 w-4" />
                                   {classesLabel}
                                 </span>
                                 {pricePerClass && (
-                                  <span className="rounded-full border border-[#DCCCC0]/75 bg-[#ECE1CE]/58 px-3 py-1.5 text-xs font-semibold">
+                                  <span className="rounded-full border border-[#D6D5C2]/75 bg-[#ECE1CE]/58 px-3 py-1.5 text-xs font-semibold">
                                     {pricePerClass} por clase
                                   </span>
                                 )}
@@ -548,7 +548,7 @@ export default function Checkout() {
           {step === 'payment' && selectedPlan && (
             <div className="space-y-4">
               {/* Selected plan summary */}
-              <Card className="rounded-[1.5rem] border-[#DCCCC0]/75 bg-[#FCF8F1]/58">
+              <Card className="rounded-[1.5rem] border-[#D6D5C2]/75 bg-[#FBF6E8]/58">
                 <CardContent className="py-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -565,7 +565,7 @@ export default function Checkout() {
               </Card>
 
               {/* Payment methods */}
-              <Card className="rounded-[1.75rem] border-[#DCCCC0]/75 bg-[#FCF8F1]/82 shadow-[0_22px_72px_-64px_rgba(42,33,24,.55)]">
+              <Card className="rounded-[1.75rem] border-[#D6D5C2]/75 bg-[#FBF6E8]/82 shadow-[0_22px_72px_-64px_rgba(42,33,24,.55)]">
                 <CardHeader>
                   <CardTitle className="text-lg">Selecciona método de pago</CardTitle>
                 </CardHeader>
@@ -579,15 +579,15 @@ export default function Checkout() {
                       <div
                         key={method.value}
                         className={`flex cursor-pointer items-start space-x-3 rounded-[1.25rem] border p-4 transition-colors ${selectedPaymentMethod === method.value
-                          ? 'border-[#A6776A]/58 bg-[#E6D0CA]/36'
-                          : 'border-[#DCCCC0]/68 bg-[#FCF8F1]/40 hover:bg-[#E6D0CA]/24'
+                          ? 'border-[#2E4A35]/58 bg-[#DDE4D5]/36'
+                          : 'border-[#D6D5C2]/68 bg-[#FBF6E8]/40 hover:bg-[#DDE4D5]/24'
                           }`}
                         onClick={() => setSelectedPaymentMethod(method.value)}
                       >
                         <RadioGroupItem value={method.value} id={method.value} className="mt-1" />
                         <div className="flex-1">
                           <Label htmlFor={method.value} className="flex items-center gap-2 cursor-pointer">
-                            <method.icon className="h-5 w-5 text-[#AD6C20]" />
+                            <method.icon className="h-5 w-5 text-[#B5512F]" />
                             <span className="font-medium">{method.label}</span>
                           </Label>
                           <p className="text-sm text-muted-foreground mt-1">
@@ -599,7 +599,7 @@ export default function Checkout() {
                   </RadioGroup>
                 </CardContent>
                 <CardFooter>
-                  <Button onClick={handlePaymentMethodSelect} className="w-full rounded-full bg-[#A6776A] text-[#FFF8EE] hover:bg-[#8F6258]">
+                  <Button onClick={handlePaymentMethodSelect} className="w-full rounded-full bg-[#2E4A35] text-[#FEF7E6] hover:bg-[#16261A]">
                     Continuar
                     <ChevronRight className="h-4 w-4 ml-2" />
                   </Button>
@@ -611,7 +611,7 @@ export default function Checkout() {
           {/* Step 3: Confirm Order */}
           {step === 'confirm' && selectedPlan && (
             <div className="space-y-4">
-              <Card className="rounded-[1.75rem] border-[#DCCCC0]/75 bg-[#FCF8F1]/82 shadow-[0_22px_72px_-64px_rgba(42,33,24,.55)]">
+              <Card className="rounded-[1.75rem] border-[#D6D5C2]/75 bg-[#FBF6E8]/82 shadow-[0_22px_72px_-64px_rgba(42,33,24,.55)]">
                 <CardHeader>
                   <CardTitle className="text-lg">Resumen de tu orden</CardTitle>
                 </CardHeader>
@@ -649,14 +649,14 @@ export default function Checkout() {
                     </Label>
 
                     {discountResult ? (
-                      <div className="flex items-center justify-between rounded-[1rem] border border-[#A6776A]/24 bg-[#E6D0CA]/30 p-3">
+                      <div className="flex items-center justify-between rounded-[1rem] border border-[#2E4A35]/24 bg-[#DDE4D5]/30 p-3">
                         <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-[#A6776A]" />
+                          <CheckCircle2 className="h-4 w-4 text-[#2E4A35]" />
                           <div>
                             <p className="text-sm font-medium text-[#6F4D45]">
                               {discountResult.code}
                             </p>
-                            <p className="text-xs text-[#A6776A]">
+                            <p className="text-xs text-[#2E4A35]">
                               {discountResult.discountType === 'percentage'
                                 ? `${discountResult.discountValue}% de descuento`
                                 : `${formatPrice(discountResult.discountValue)} de descuento`}
@@ -666,7 +666,7 @@ export default function Checkout() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-[#A6776A] hover:bg-[#DCCCC0]/50 hover:text-[#2A2118]"
+                          className="h-8 w-8 text-[#2E4A35] hover:bg-[#D6D5C2]/50 hover:text-[#2E1B22]"
                           onClick={handleRemoveDiscount}
                         >
                           <X className="h-4 w-4" />
@@ -720,7 +720,7 @@ export default function Checkout() {
                         <span>{formatPrice(selectedPlan.price)}</span>
                       </div>
                       {discountResult && (
-                        <div className="flex items-center justify-between text-sm text-[#A6776A]">
+                        <div className="flex items-center justify-between text-sm text-[#2E4A35]">
                           <span className="flex items-center gap-1">
                             <Tag className="h-3 w-3" />
                             Descuento ({discountResult.code})
@@ -734,7 +734,7 @@ export default function Checkout() {
                   {/* Total */}
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-lg">Total</span>
-                    <span className="font-bold text-lg text-[#A6776A]">
+                    <span className="font-bold text-lg text-[#2E4A35]">
                       {formatPrice(finalTotal)}
                     </span>
                   </div>
@@ -753,7 +753,7 @@ export default function Checkout() {
 
                   {/* Bank transfer info preview */}
                   {selectedPaymentMethod === 'bank_transfer' && bankInfo && (
-                    <div className="space-y-3 rounded-[1.25rem] bg-[#E6D0CA]/28 p-4 ring-1 ring-[#DCCCC0]/65">
+                    <div className="space-y-3 rounded-[1.25rem] bg-[#DDE4D5]/28 p-4 ring-1 ring-[#D6D5C2]/65">
                       <p className="text-sm font-medium flex items-center gap-2">
                         <Building2 className="h-4 w-4" />
                         Datos para transferencia
@@ -776,7 +776,7 @@ export default function Checkout() {
                             className="h-10 w-10 shrink-0"
                             onClick={() => copyToClipboard(bankInfo.account_holder, 'holder')}
                           >
-                            {copiedField === 'holder' ? <Check className="h-3.5 w-3.5 text-[#A6776A]" /> : <Copy className="h-3.5 w-3.5" />}
+                            {copiedField === 'holder' ? <Check className="h-3.5 w-3.5 text-[#2E4A35]" /> : <Copy className="h-3.5 w-3.5" />}
                           </Button>
                         </div>
                         {bankInfo.account_number && (
@@ -791,7 +791,7 @@ export default function Checkout() {
                               className="h-10 w-10 shrink-0"
                               onClick={() => copyToClipboard(bankInfo.account_number, 'account')}
                             >
-                              {copiedField === 'account' ? <Check className="h-3.5 w-3.5 text-[#A6776A]" /> : <Copy className="h-3.5 w-3.5" />}
+                              {copiedField === 'account' ? <Check className="h-3.5 w-3.5 text-[#2E4A35]" /> : <Copy className="h-3.5 w-3.5" />}
                             </Button>
                           </div>
                         )}
@@ -806,12 +806,12 @@ export default function Checkout() {
                             className="h-10 w-10 shrink-0"
                             onClick={() => copyToClipboard(bankInfo.clabe, 'clabe')}
                           >
-                            {copiedField === 'clabe' ? <Check className="h-3.5 w-3.5 text-[#A6776A]" /> : <Copy className="h-3.5 w-3.5" />}
+                            {copiedField === 'clabe' ? <Check className="h-3.5 w-3.5 text-[#2E4A35]" /> : <Copy className="h-3.5 w-3.5" />}
                           </Button>
                         </div>
-                        <div className="rounded-[0.625rem] border border-[#A6776A]/22 bg-[#E6D0CA]/35 p-2.5">
+                        <div className="rounded-[0.625rem] border border-[#2E4A35]/22 bg-[#DDE4D5]/35 p-2.5">
                           <p className="text-xs text-muted-foreground">Monto a transferir</p>
-                          <p className="font-bold text-[#A6776A]">{formatPrice(finalTotal)}</p>
+                          <p className="font-bold text-[#2E4A35]">{formatPrice(finalTotal)}</p>
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
@@ -837,7 +837,7 @@ export default function Checkout() {
                 <CardFooter className="flex-col gap-3">
                   <Button
                     onClick={handleConfirmOrder}
-                    className="w-full rounded-full bg-[#A6776A] text-[#FFF8EE] hover:bg-[#8F6258]"
+                    className="w-full rounded-full bg-[#2E4A35] text-[#FEF7E6] hover:bg-[#16261A]"
                     disabled={createOrder.isPending}
                   >
                     {createOrder.isPending ? (

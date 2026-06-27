@@ -190,9 +190,9 @@ export default function MapsExport() {
           --lum-ink-20: rgba(28,28,30,0.18);
           --lum-ink-08: rgba(28,28,30,0.08);
           --lum-cream: #fbf8f2;
-          --lum-cream-2: #f5f1e8;
+          --lum-cream-2: #F6F1E2;
           --lum-sand: #ebe6d9;
-          --lum-sand-dark: #d9d3c4;
+          --lum-sand-dark: #D6D5C2;
           --lum-accent: #7e8579;
           --lum-accent-soft: #a8b09f;
         }
@@ -279,7 +279,7 @@ export default function MapsExport() {
         .lum-spot .tile {
           position:absolute; inset:0;
           border-radius: 16px;
-          background: linear-gradient(160deg, #ebe6d9 0%, #d9d3c4 55%, #ebe6d9 100%);
+          background: linear-gradient(160deg, #ebe6d9 0%, #D6D5C2 55%, #ebe6d9 100%);
           border: 1px solid rgba(126,133,121,.40);
           box-shadow: 0 12px 24px -12px rgba(126,133,121,.28), inset 0 1px 0 rgba(255,255,255,.55);
           overflow:hidden;

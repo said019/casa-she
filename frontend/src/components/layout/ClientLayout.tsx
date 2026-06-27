@@ -118,7 +118,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                                     className={cn(
                                         'flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-semibold transition-[background,color,transform] duration-200 ease-admin-flow active:scale-[0.98]',
                                         isActive
-                                            ? 'bg-[#E6D0CA] text-balance-dark app-soft-shadow'
+                                            ? 'bg-[#DDE4D5] text-balance-dark app-soft-shadow'
                                             : 'text-balance-dark/58 hover:bg-balance-cream/80 hover:text-balance-dark'
                                     )}
                                 >
@@ -218,14 +218,14 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                                         className={cn(
                                             'flex items-center justify-between rounded-[1rem] px-3 py-3 text-sm font-semibold transition-[background,color,transform] duration-200 ease-admin-flow active:scale-[0.99]',
                                             isActive
-                                                ? 'bg-[#E6D0CA] text-balance-dark app-soft-shadow'
+                                                ? 'bg-[#DDE4D5] text-balance-dark app-soft-shadow'
                                                 : 'text-balance-dark/64 hover:bg-balance-cream/80 hover:text-balance-dark'
                                         )}
                                     >
                                         <span className="flex items-center gap-3">
                                             <span className={cn(
                                                 'flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.85rem] transition-colors',
-                                                isActive ? 'bg-balance-cream/62 text-[#AD6C20]' : 'bg-[#E6D0CA]/35 text-[#AD6C20]'
+                                                isActive ? 'bg-balance-cream/62 text-[#B5512F]' : 'bg-[#DDE4D5]/35 text-[#B5512F]'
                                             )}>
                                                 <MSym name={item.icon} size={20} filled={isActive} />
                                             </span>
@@ -257,7 +257,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                                 to={item.href}
                                 className={cn(
                                     'relative flex min-w-0 flex-col items-center gap-0.5 rounded-[1rem] px-1 py-2 text-xs font-semibold transition-[background,color,transform] duration-200 ease-admin-flow active:scale-[0.96]',
-                                    isActive ? 'bg-[#E6D0CA] text-balance-dark app-soft-shadow' : 'text-balance-dark/52 hover:text-balance-dark'
+                                    isActive ? 'bg-[#DDE4D5] text-balance-dark app-soft-shadow' : 'text-balance-dark/52 hover:text-balance-dark'
                                 )}
                             >
                                 <MSym name={item.icon} size={24} filled={isActive} />

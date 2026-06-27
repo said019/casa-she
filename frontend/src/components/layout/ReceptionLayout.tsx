@@ -95,7 +95,7 @@ export default function ReceptionLayout() {
                             className={cn(
                                 'group flex items-center gap-3 rounded-[1rem] px-3 py-2.5 text-sm font-semibold transition-[background,color,transform] duration-200 ease-admin-flow active:scale-[0.99]',
                                 active
-                                    ? 'bg-[#E6D0CA] text-balance-dark shadow-[0_14px_34px_-28px_rgba(166,119,106,0.42)]'
+                                    ? 'bg-[#DDE4D5] text-balance-dark shadow-[0_14px_34px_-28px_rgba(166,119,106,0.42)]'
                                     : 'text-balance-dark/62 hover:bg-balance-cream/80 hover:text-balance-dark',
                             )}
                         >
@@ -103,8 +103,8 @@ export default function ReceptionLayout() {
                                 className={cn(
                                     'flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.85rem] transition-colors',
                                     active
-                                        ? 'bg-balance-cream/62 text-[#AD6C20]'
-                                        : 'bg-[#E6D0CA]/35 text-[#AD6C20] group-hover:bg-[#E6D0CA]/55',
+                                        ? 'bg-balance-cream/62 text-[#B5512F]'
+                                        : 'bg-[#DDE4D5]/35 text-[#B5512F] group-hover:bg-[#DDE4D5]/55',
                                 )}
                             >
                                 <Icon className="h-[18px] w-[18px]" />
@@ -147,7 +147,7 @@ export default function ReceptionLayout() {
                         size="icon"
                         onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
                         className={cn(
-                            'h-10 w-10 rounded-full border border-[#E6D0CA] bg-[#E6D0CA]/40 text-[#AD6C20] transition-all duration-200 hover:bg-[#E6D0CA] hover:text-balance-dark active:scale-[0.96]',
+                            'h-10 w-10 rounded-full border border-[#DDE4D5] bg-[#DDE4D5]/40 text-[#B5512F] transition-all duration-200 hover:bg-[#DDE4D5] hover:text-balance-dark active:scale-[0.96]',
                             sidebarCollapsed && 'mx-auto',
                         )}
                         aria-label={sidebarCollapsed ? 'Expandir navegación' : 'Contraer navegación'}
