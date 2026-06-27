@@ -77,15 +77,15 @@ function isMembershipFeePlan(plan: Plan) {
 
 // Tarjetas de marca del index ("Nuestros Paquetes"): imagen, precio anterior,
 // detalle y orden. Se mapea cada plan de la BD por su nombre.
-type PlanCardMeta = { img: string; was?: string; hint: string; oferta?: boolean; order: number };
+type PlanCardMeta = { title: string; img: string; was?: string; hint: string; oferta?: boolean; order: number };
 const PLAN_CARDS: { match: (n: string) => boolean; meta: PlanCardMeta }[] = [
-  { match: (n) => n.includes('black'), meta: { img: '/casashe/card-black.jpeg', was: '$4,800', hint: '24 créditos · acceso total', oferta: true, order: 1 } },
-  { match: (n) => n.includes('360'), meta: { img: '/casashe/card-360.jpeg', was: '$3,800', hint: '16 créditos al mes', oferta: true, order: 2 } },
-  { match: (n) => n.includes('12'), meta: { img: '/casashe/card-12.jpeg', hint: '12 créditos · vigencia 1 mes', order: 3 } },
-  { match: (n) => n.includes('8'), meta: { img: '/casashe/card-8.jpeg', hint: '8 créditos · vigencia 1 mes', order: 4 } },
-  { match: (n) => n.includes('5'), meta: { img: '/casashe/card-5.jpeg', hint: '5 créditos · vigencia 1 mes', order: 5 } },
-  { match: (n) => n.includes('drop') || n.includes('suelta'), meta: { img: '/casashe/card-suelta.jpeg', was: '$300', hint: '1 clase drop-in', oferta: true, order: 6 } },
-  { match: (n) => n.includes('prueba') || n.includes('muestra'), meta: { img: '/casashe/card-muestra.jpeg', hint: 'Tu primera vez en casa', order: 7 } },
+  { match: (n) => n.includes('black'), meta: { title: 'Membresía She Black', img: '/casashe/card-black.jpeg', was: '$4,800', hint: '24 créditos · acceso total', oferta: true, order: 1 } },
+  { match: (n) => n.includes('360'), meta: { title: 'Membresía 360', img: '/casashe/card-360.jpeg', was: '$3,800', hint: '16 créditos al mes', oferta: true, order: 2 } },
+  { match: (n) => n.includes('12'), meta: { title: 'Paquete 12 clases', img: '/casashe/card-12.jpeg', hint: '12 créditos · vigencia 1 mes', order: 3 } },
+  { match: (n) => n.includes('8'), meta: { title: 'Paquete 8 clases', img: '/casashe/card-8.jpeg', hint: '8 créditos · vigencia 1 mes', order: 4 } },
+  { match: (n) => n.includes('5'), meta: { title: 'Paquete 5 clases', img: '/casashe/card-5.jpeg', hint: '5 créditos · vigencia 1 mes', order: 5 } },
+  { match: (n) => n.includes('drop') || n.includes('suelta'), meta: { title: 'Clase suelta', img: '/casashe/card-suelta.jpeg', was: '$300', hint: '1 clase drop-in', oferta: true, order: 6 } },
+  { match: (n) => n.includes('prueba') || n.includes('muestra'), meta: { title: 'Clase muestra', img: '/casashe/card-muestra.jpeg', hint: 'Tu primera vez en casa', order: 7 } },
 ];
 
 function getPlanCardMeta(name: string): PlanCardMeta | undefined {
@@ -471,7 +471,7 @@ export default function Checkout() {
                             )}
                           </div>
                           <div className="flex flex-1 flex-col items-center px-6 py-7 text-center">
-                            <h3 className="font-heading text-lg uppercase tracking-[0.14em] text-[#2A4E36]">{plan.name}</h3>
+                            <h3 className="font-heading text-lg uppercase tracking-[0.14em] text-[#2A4E36]">{meta?.title ?? plan.name}</h3>
                             <p className="mt-1 text-[13px] tracking-wide text-[#2A4E36]/55">
                               {meta?.hint ?? `${plan.duration_days} días`}
                             </p>
