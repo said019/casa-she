@@ -49,6 +49,15 @@ interface ScheduleProps {
   defaultFirstFacility?: boolean;
 }
 
+// Disciplinas de Casa Shé con su color de la paleta de marca (para la leyenda).
+const DISCIPLINES: { label: string; color: string }[] = [
+  { label: "Pilates Mat", color: "#2A4E36" }, // Verde Casa
+  { label: "Yoga", color: "#6C8424" },        // Musgo
+  { label: "Aeroyoga", color: "#AE4836" },    // Arcilla
+  { label: "Telas", color: "#B4A248" },       // Mostaza
+  { label: "Taller", color: "#2E1B22" },      // Ciruela
+];
+
 export default function Schedule({ bookedIds, defaultFirstFacility }: ScheduleProps = {}) {
   const navigate = useNavigate();
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
@@ -167,7 +176,7 @@ export default function Schedule({ bookedIds, defaultFirstFacility }: SchedulePr
               Semana {format(weekStart, "w")} · {format(weekStart, "d MMM", { locale: es })} — {format(addDays(weekStart, 6), "d MMM", { locale: es })}
             </p>
             <h2 className="mt-1 font-heading text-2xl sm:text-3xl text-bmb-ink lg:text-5xl">
-              Horarios <span className="italic text-bmb-gold">Casa Shé</span>
+              Horarios <span className="italic" style={{ color: "#AE4836" }}>Casa Shé</span>
             </h2>
           </div>
           <div className="flex flex-col gap-2 lg:items-end">
@@ -303,7 +312,10 @@ function EmptyWeek({
 
       {/* Tarjeta de estado vacío */}
       <div className="mt-5 flex flex-col items-center rounded-[1.6rem] border border-dashed border-bmb-ink/15 bg-bmb-paper/60 px-6 py-14 text-center sm:py-16">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-bmb-gold/10 text-bmb-gold">
+        <div
+          className="flex h-16 w-16 items-center justify-center rounded-full"
+          style={{ backgroundColor: "rgba(174,72,54,0.12)", color: "#AE4836" }}
+        >
           {activeFilters ? <SlidersHorizontal className="h-7 w-7" /> : <CalendarRange className="h-7 w-7" />}
         </div>
         <h3 className="mt-5 font-heading text-2xl text-bmb-ink sm:text-3xl">
@@ -322,6 +334,19 @@ function EmptyWeek({
           {activeFilters ? "Limpiar filtros" : "Ver próxima semana"}
           {!activeFilters && <ChevronRight className="h-4 w-4" />}
         </button>
+
+        {/* Leyenda de disciplinas — muestra la paleta de marca */}
+        <div className="mt-10 w-full max-w-md border-t border-bmb-ink/10 pt-6">
+          <p className="editorial-caption-sm text-bmb-ink/45">Nuestras disciplinas</p>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+            {DISCIPLINES.map((d) => (
+              <span key={d.label} className="inline-flex items-center gap-2 font-heading italic text-[14px] text-bmb-ink/75">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.color }} aria-hidden="true" />
+                {d.label}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
     </motion.div>
   );

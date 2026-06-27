@@ -1,6 +1,20 @@
-import { ScheduleClass, TimeOfDay } from "@/lib/schedule-state";
+import { ScheduleClass, TimeOfDay, categoryColor } from "@/lib/schedule-state";
 
 type Category = ScheduleClass["category"] | "all";
+
+const CREAM = "#F6F0E4";
+const INK = "#2E1B22";
+const VERDE = "#2A4E36";
+
+// Texto legible (crema sobre oscuros, tinta sobre claros como Mostaza/Arena).
+function readableOn(hex: string): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? INK : CREAM;
+}
 
 interface Props {
   facilities: string[];
@@ -75,9 +89,9 @@ export function FilterPills({
       <div className="hidden lg:flex lg:flex-wrap lg:items-end lg:gap-x-6 lg:gap-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="editorial-caption text-bmb-ink/55">Tipo</span>
-          <PillButton active={category === "all"} onClick={() => onCategoryChange("all")}>Todas</PillButton>
+          <PillButton active={category === "all"} color={VERDE} onClick={() => onCategoryChange("all")}>Todas</PillButton>
           {categories.map((c) => (
-            <PillButton key={c} active={category === c} gold={c === "pole"} onClick={() => onCategoryChange(c)}>
+            <PillButton key={c} active={category === c} color={categoryColor(c)} dot onClick={() => onCategoryChange(c)}>
               {CATEGORY_LABEL[c as Exclude<Category, "all">]}
             </PillButton>
           ))}
@@ -124,20 +138,35 @@ function FilterSelect({
 }
 
 function PillButton({
-  children, active, gold = false, onClick,
+  children, active, color, dot = false, onClick,
 }: {
   children: React.ReactNode;
   active: boolean;
-  gold?: boolean;
+  color: string;
+  dot?: boolean;
   onClick: () => void;
 }) {
-  const base = "px-3 py-1 font-heading italic text-[13px] border transition-none";
-  const inactive = "border-bmb-ink/25 text-bmb-ink/75 hover:border-bmb-ink/55";
-  const activeStyle = gold
-    ? "bg-bmb-gold border-bmb-gold text-bmb-ink"
-    : "bg-bmb-gold border-bmb-gold text-bmb-ink";
+  const base =
+    "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 font-heading italic text-[13px] transition-[background-color,border-color,transform] duration-200 active:scale-[0.97]";
+  if (active) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={base}
+        style={{ backgroundColor: color, borderColor: color, color: readableOn(color) }}
+      >
+        {children}
+      </button>
+    );
+  }
   return (
-    <button type="button" onClick={onClick} className={`${base} ${active ? activeStyle : inactive}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${base} border-bmb-ink/25 text-bmb-ink/75 hover:border-bmb-ink/55`}
+    >
+      {dot && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />}
       {children}
     </button>
   );

@@ -54,25 +54,27 @@ export function classifyCategory(name: string): ScheduleClass["category"] {
   return "general";
 }
 
+// Paleta de marca Casa Shé por categoría (manual): Verde Casa, Musgo, Arcilla,
+// Mostaza, Ciruela. Cada disciplina con su color para escanear el grid de un vistazo.
 const CATEGORY_COLORS: Record<ScheduleClass["category"], string> = {
-  reformer: "#CE9B25",
-  general:  "#CE9B25",
-  pole:     "#A6776A",
-  hot:      "#A6776A",
-  barre:    "#CE9B25",
-  sculpt:   "#CE9B25",
-  yoga:     "#7C8265",
+  reformer: "#2A4E36", // Verde Casa
+  general:  "#6C8424", // Musgo
+  pole:     "#2E1B22", // Ciruela
+  hot:      "#AE4836", // Arcilla
+  barre:    "#B4A248", // Mostaza
+  sculpt:   "#6C8424", // Musgo
+  yoga:     "#2A4E36", // Verde Casa
 };
 
 export function categoryColor(category: ScheduleClass["category"]): string {
   return CATEGORY_COLORS[category];
 }
 
-// Paleta cálida/terrosa de marca para distinguir CADA tipo de clase por su nombre
+// Paleta de marca Casa Shé para distinguir CADA tipo de clase por su nombre
 // (cuando el admin no le puso color propio al tipo). Estable por nombre.
 const CLASS_PALETTE = [
-  "#CE9B25", "#B5742A", "#A6776A", "#C2603F", "#9B6A86", "#7C8265",
-  "#8A7E66", "#C99A57", "#A85D4E", "#6E8E84", "#B08968", "#94785B",
+  "#2A4E36", "#6C8424", "#AE4836", "#B4A248", "#2E1B22", "#3E6B4A",
+  "#C2603F", "#8A7B3F", "#16261A", "#94785B",
 ];
 
 function hashName(s: string): number {
