@@ -215,7 +215,7 @@ export function AdminSearch() {
                                     >
                                         <span
                                             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-balance-olive"
-                                            style={{ backgroundColor: (cl.class_type_color || '#CE9B25') + '22' }}
+                                            style={{ backgroundColor: (cl.class_type_color || '#AE4836') + '22' }}
                                         >
                                             <CalendarDays className="h-4 w-4" />
                                         </span>

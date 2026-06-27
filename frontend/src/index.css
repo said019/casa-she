@@ -7,24 +7,24 @@
 @layer base {
   :root {
     /* Casa Shé Palette
-     * Avena:       #FBF3DD — Background (44 78% 93%)
+     * Avena:       #F6F0E4 — Background (40 50% 93%)
      * Arena:       #D8D2BC — Borders / quiet surfaces (47 26% 79%)
-     * Verde Casa:  #2E4A35 — Primary actions & accents (135 23% 24%)
-     * Arcilla:     #B5512F — Deep warm accent / destructive (15 59% 45%)
+     * Verde Casa:  #2A4E36 — Primary actions & accents (140 30% 24%)
+     * Arcilla:     #AE4836 — Deep warm accent / destructive (15 59% 45%)
      * Ciruela:     #2E1B22 — Foreground / text (338 26% 14%)
      * Musgo:       #B6A43C — Mustard accent / warning (51 50% 47%)
      */
-    --background: 44 78% 93%;
+    --background: 40 50% 93%;
     --foreground: 338 26% 14%;
 
-    --card: 44 64% 96%;
+    --card: 40 47% 96%;
     --card-foreground: 338 26% 14%;
 
-    --popover: 44 64% 96%;
+    --popover: 40 47% 96%;
     --popover-foreground: 338 26% 14%;
 
-    --primary: 135 23% 24%;
-    --primary-foreground: 44 78% 95%;
+    --primary: 140 30% 24%;
+    --primary-foreground: 40 50% 95%;
 
     --secondary: 47 26% 79%;
     --secondary-foreground: 338 26% 16%;
@@ -40,7 +40,7 @@
 
     --border: 47 22% 78%;
     --input: 47 22% 78%;
-    --ring: 135 23% 24%;
+    --ring: 140 30% 24%;
 
     --radius: 0.5rem;
 
@@ -61,8 +61,8 @@
     --transition-bounce: all 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 
     /* Admin shell tokens */
-    --admin-bg: 44 40% 90%;
-    --admin-panel: 44 50% 96%;
+    --admin-bg: 40 33% 91%;
+    --admin-panel: 40 45% 96%;
     --admin-rail: 47 28% 88%;
 
     /* Casa Shé semantic status colors */
@@ -73,14 +73,14 @@
     --info: 47 26% 55%;
     --info-foreground: 338 26% 14%;
 
-    --sidebar-background: 44 56% 96%;
+    --sidebar-background: 40 45% 96%;
     --sidebar-foreground: 338 26% 14%;
-    --sidebar-primary: 135 23% 24%;
-    --sidebar-primary-foreground: 44 78% 95%;
+    --sidebar-primary: 140 30% 24%;
+    --sidebar-primary-foreground: 40 50% 95%;
     --sidebar-accent: 47 34% 89%;
     --sidebar-accent-foreground: 338 26% 14%;
     --sidebar-border: 47 22% 82%;
-    --sidebar-ring: 135 23% 24%;
+    --sidebar-ring: 140 30% 24%;
   }
 
   .dark {
@@ -260,7 +260,7 @@
   /* Landing público: usa la serif editorial (Instrument Serif) como el resto de la marca. */
 
   /* === Atmósfera de marca Casa Shé — gradientes orgánicos verde/musgo/avena ===
-   * Recoloreado a la paleta Casa Shé (Verde Casa #2E4A35 / Avena #FBF3DD /
+   * Recoloreado a la paleta Casa Shé (Verde Casa #2A4E36 / Avena #F6F0E4 /
    * Musgo #B6A43C). Mantiene el fondo luminoso para que el texto oscuro sea
    * legible encima. */
   .bmb-aura-field {
@@ -320,7 +320,7 @@
       radial-gradient(ellipse 74% 60% at 84% 16%, hsla(51, 48%, 56%, 0.72) 0%, transparent 60%),
       radial-gradient(ellipse 70% 58% at 86% 90%, hsla(135, 28%, 30%, 0.5) 0%, transparent 62%),
       radial-gradient(ellipse 80% 64% at 22% 88%, hsla(44, 70%, 82%, 0.66) 0%, transparent 60%),
-      linear-gradient(135deg, #FBF3DD 0%, #B6A43C 55%, #2E4A35 105%);
+      linear-gradient(135deg, #F6F0E4 0%, #B6A43C 55%, #2A4E36 105%);
   }
 
   /* Material Symbols Outlined — íconos de nav/acciones del /app del cliente. */

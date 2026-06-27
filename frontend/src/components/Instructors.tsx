@@ -113,7 +113,7 @@ export default function Instructors() {
                     decoding="async"
                   />
                 ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[linear-gradient(135deg,#ECE1CE_0%,#DCCCC0_100%)] transition-transform duration-200 group-hover:scale-[1.02]">
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[linear-gradient(135deg,#ECE1CE_0%,#D6D5C2_100%)] transition-transform duration-200 group-hover:scale-[1.02]">
                     <span className="font-heading text-5xl font-medium leading-none text-bmb-ink/25">
                       {initials(c.name)}
                     </span>

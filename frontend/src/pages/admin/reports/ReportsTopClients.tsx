@@ -21,7 +21,7 @@ interface TopClient {
     attended: number;
 }
 
-const COLORS = ['#C8A24B', '#D9B66A', '#E6CB8C', '#B8902F', '#A87F28', '#E0C078', '#CDA855', '#D4AF61', '#BF9A40', '#C8A24B'];
+const COLORS = ['#AE4836', '#D9B66A', '#E6CB8C', '#B8902F', '#A87F28', '#E0C078', '#CDA855', '#D4AF61', '#BF9A40', '#AE4836'];
 
 export default function ReportsTopClients() {
     const [period, setPeriod] = useState('30days');

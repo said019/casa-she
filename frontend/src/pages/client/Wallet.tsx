@@ -59,12 +59,13 @@ function ReferralCodePanel() {
   return (
     <div className="relative overflow-hidden p-6 text-balance-cream md:p-8">
       {/* Fondo dorado con profundidad + aura cálida */}
-      <div className="absolute inset-0 bg-[linear-gradient(150deg,#d0a23f_0%,#bb8526_48%,#a06d16_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(150deg,#C58A3A_0%,#B5512F_48%,#B5512F_100%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(125%_85%_at_12%_-5%,rgba(255,248,228,0.34)_0%,transparent_55%)]" />
       {/* Watermark del monograma Casa Shé */}
       <CasaSheMark
         aria-hidden="true"
-        className="pointer-events-none absolute -right-10 -top-12 h-52 w-52 select-none text-balance-cream opacity-[0.08]"
+        tone="cream"
+        className="pointer-events-none absolute -right-10 -top-12 h-52 w-52 select-none opacity-[0.08]"
       />
 
       <div className="relative space-y-5">

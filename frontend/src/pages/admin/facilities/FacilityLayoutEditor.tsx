@@ -252,7 +252,7 @@ export default function FacilityLayoutEditor() {
             <div className="flex-1">
               <div
                 ref={canvasRef}
-                className="relative w-full overflow-hidden rounded-[2rem] border border-balance-sand/65 bg-[#f5f1e8] select-none"
+                className="relative w-full overflow-hidden rounded-[2rem] border border-balance-sand/65 bg-[#F6F1E2] select-none"
                 style={{ aspectRatio: '16/10' }}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}

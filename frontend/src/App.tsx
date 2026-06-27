@@ -9,6 +9,7 @@ import UpdatePrompt from "@/components/UpdatePrompt";
 
 // Public pages
 import Index from "./pages/Index";
+import CasaSheLanding from "./pages/CasaSheLanding";
 import NotFound from "./pages/NotFound";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
@@ -207,7 +208,8 @@ const App = () => (
         <AuthInitializer>
           <Routes>
             {/* Public Routes */}
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={<CasaSheLanding />} />
+            <Route path="/inicio-clasico" element={<Index />} />
             <Route path="/clases/:classId" element={<LegacyClientBookRedirect />} />
             <Route path="/coaches/:slug" element={<Navigate to="/#equipo" replace />} />
             <Route path="/pricing" element={<Checkout />} />

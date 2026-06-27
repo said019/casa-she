@@ -92,12 +92,12 @@ export default function CashShiftsList() {
         <AdminLayout>
             <div className="space-y-6">
                 <div>
-                    <h1 className="font-heading text-3xl font-bold text-[#2A2118]">Cortes de Caja</h1>
+                    <h1 className="font-heading text-3xl font-bold text-[#2E1B22]">Cortes de Caja</h1>
                     <p className="text-[#6B554D]">Historial de aperturas y cierres de caja.</p>
                 </div>
 
                 {/* Filters */}
-                <div className="rounded-[1.5rem] border border-[#DCCCC0]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
+                <div className="rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
                     <div className="flex flex-wrap items-end gap-4">
                         {/* Status */}
                         <div className="space-y-1 min-w-[150px]">
@@ -139,17 +139,17 @@ export default function CashShiftsList() {
                 {/* Shifts list — cards (mobile-first) */}
                 {isLoading ? (
                     <div className="flex justify-center py-12">
-                        <Loader2 className="h-6 w-6 animate-spin text-[#AD6C20]" />
+                        <Loader2 className="h-6 w-6 animate-spin text-[#AE4836]" />
                     </div>
                 ) : error ? (
-                    <div className="rounded-[1.5rem] border border-[#DCCCC0]/70 bg-white p-8 text-center text-destructive shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
+                    <div className="rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-8 text-center text-destructive shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
                         <div className="flex items-center justify-center gap-2">
                             <AlertCircle className="h-4 w-4" />
                             {getErrorMessage(error)}
                         </div>
                     </div>
                 ) : shifts.length === 0 ? (
-                    <div className="rounded-[1.5rem] border border-[#DCCCC0]/70 bg-white p-8 text-center text-[#6B554D] shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
+                    <div className="rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-8 text-center text-[#6B554D] shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
                         No hay cortes de caja en este período.
                     </div>
                 ) : (
@@ -159,11 +159,11 @@ export default function CashShiftsList() {
                                 key={shift.id}
                                 type="button"
                                 onClick={() => navigate(`/admin/cash-shifts/${shift.id}`)}
-                                className="block w-full rounded-[1.5rem] border border-[#DCCCC0]/70 bg-white p-5 text-left shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)] transition hover:border-[#AD6C20]/40 hover:shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]"
+                                className="block w-full rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-5 text-left shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)] transition hover:border-[#AE4836]/40 hover:shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]"
                             >
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
-                                        <p className="truncate text-sm font-semibold text-[#2A2118]">
+                                        <p className="truncate text-sm font-semibold text-[#2E1B22]">
                                             {facilityMap.get(shift.facility_id) ?? shift.facility_id ?? '—'}
                                         </p>
                                         <p className="mt-0.5 text-xs text-[#6B554D]">
@@ -176,19 +176,19 @@ export default function CashShiftsList() {
                                 </div>
 
                                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                    <div className="rounded-xl bg-[#FBF3EC]/70 px-3 py-2">
+                                    <div className="rounded-xl bg-[#F6F0E4]/70 px-3 py-2">
                                         <p className="text-[11px] uppercase tracking-wide text-[#6B554D]">Fondo inicial</p>
-                                        <p className="font-semibold tabular-nums text-[#2A2118]">{mxn(shift.opening_float)}</p>
+                                        <p className="font-semibold tabular-nums text-[#2E1B22]">{mxn(shift.opening_float)}</p>
                                     </div>
-                                    <div className="rounded-xl bg-[#FBF3EC]/70 px-3 py-2">
+                                    <div className="rounded-xl bg-[#F6F0E4]/70 px-3 py-2">
                                         <p className="text-[11px] uppercase tracking-wide text-[#6B554D]">Esperado</p>
-                                        <p className="font-semibold tabular-nums text-[#2A2118]">{mxn(shift.expected_cash)}</p>
+                                        <p className="font-semibold tabular-nums text-[#2E1B22]">{mxn(shift.expected_cash)}</p>
                                     </div>
-                                    <div className="rounded-xl bg-[#FBF3EC]/70 px-3 py-2">
+                                    <div className="rounded-xl bg-[#F6F0E4]/70 px-3 py-2">
                                         <p className="text-[11px] uppercase tracking-wide text-[#6B554D]">Contado</p>
-                                        <p className="font-semibold tabular-nums text-[#2A2118]">{mxn(shift.counted_cash)}</p>
+                                        <p className="font-semibold tabular-nums text-[#2E1B22]">{mxn(shift.counted_cash)}</p>
                                     </div>
-                                    <div className="rounded-xl bg-[#FBF3EC]/70 px-3 py-2">
+                                    <div className="rounded-xl bg-[#F6F0E4]/70 px-3 py-2">
                                         <p className="text-[11px] uppercase tracking-wide text-[#6B554D]">Diferencia</p>
                                         <p className={`font-semibold tabular-nums ${diffColor(shift.difference)}`}>
                                             {mxn(shift.difference)}

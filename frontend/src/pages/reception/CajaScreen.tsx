@@ -480,17 +480,17 @@ export default function CajaScreen() {
     return (
       <div className="p-4 md:p-6 space-y-5 max-w-2xl mx-auto">
         {/* Hero: estado sin turno */}
-        <div className="relative overflow-hidden rounded-[1.75rem] border border-[#DCCCC0]/70 bg-gradient-to-br from-[#FBF3EC] via-[#F7ECE0] to-[#F1E2D2] p-5 sm:p-6 shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]">
+        <div className="relative overflow-hidden rounded-[1.75rem] border border-[#D6D5C2]/70 bg-gradient-to-br from-[#F6F0E4] via-[#F7ECE0] to-[#F1E2D2] p-5 sm:p-6 shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
             <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Sin turno
           </span>
-          <h1 className="mt-3 font-heading text-3xl font-bold text-[#2A2118]">Caja</h1>
+          <h1 className="mt-3 font-heading text-3xl font-bold text-[#2E1B22]">Caja</h1>
           <p className="mt-1 text-sm text-[#6B554D]">No hay turno abierto.</p>
         </div>
 
         {/* Panel: abrir caja */}
-        <div className="rounded-[1.5rem] border border-[#DCCCC0]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#AD6C20]">
+        <div className="rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#AE4836]">
             <Wallet className="h-4 w-4" /> Abrir caja
           </div>
           <p className="mt-1.5 text-sm text-[#6B554D]">Ingresa el fondo inicial en efectivo para abrir el turno.</p>
@@ -537,13 +537,13 @@ export default function CajaScreen() {
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-2xl mx-auto">
       {/* Hero: estado del turno + efectivo esperado como número protagonista */}
-      <div className="relative overflow-hidden rounded-[1.75rem] border border-[#DCCCC0]/70 bg-gradient-to-br from-[#FBF3EC] via-[#F7ECE0] to-[#F1E2D2] p-5 sm:p-6 shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]">
+      <div className="relative overflow-hidden rounded-[1.75rem] border border-[#D6D5C2]/70 bg-gradient-to-br from-[#F6F0E4] via-[#F7ECE0] to-[#F1E2D2] p-5 sm:p-6 shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Turno abierto
             </span>
-            <h1 className="mt-3 font-heading text-3xl font-bold text-[#2A2118]">Caja</h1>
+            <h1 className="mt-3 font-heading text-3xl font-bold text-[#2E1B22]">Caja</h1>
             <p className="mt-1 text-sm text-[#6B554D]">Abierta {openedAtFormatted}</p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -554,22 +554,22 @@ export default function CajaScreen() {
         </div>
 
         <div className="mt-5 rounded-2xl border border-white/70 bg-white/70 px-5 py-4 backdrop-blur-sm">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#AD6C20]">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#AE4836]">
             <Wallet className="h-4 w-4" /> Efectivo esperado en caja
           </div>
-          <p className="mt-1.5 font-heading text-[2.5rem] leading-none font-bold tabular-nums text-[#2A2118]">
+          <p className="mt-1.5 font-heading text-[2.5rem] leading-none font-bold tabular-nums text-[#2E1B22]">
             {mxn.format(expectedCash)}
           </p>
         </div>
       </div>
 
       {/* Desglose del turno */}
-      <div className="rounded-[1.5rem] border border-[#DCCCC0]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
-        <p className="text-sm font-semibold text-[#2A2118]">Resumen del turno</p>
+      <div className="rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
+        <p className="text-sm font-semibold text-[#2E1B22]">Resumen del turno</p>
         <div className="mt-3.5 space-y-3">
           <div className="flex items-center justify-between text-sm">
             <span className="text-[#6B554D]">Fondo inicial</span>
-            <span className="font-semibold tabular-nums text-[#2A2118]">{mxn.format(shift.opening_float ?? 0)}</span>
+            <span className="font-semibold tabular-nums text-[#2E1B22]">{mxn.format(shift.opening_float ?? 0)}</span>
           </div>
 
           {totals && (
@@ -599,24 +599,24 @@ export default function CajaScreen() {
             </>
           )}
 
-          <div className="my-1 h-px bg-[#DCCCC0]/60" />
+          <div className="my-1 h-px bg-[#D6D5C2]/60" />
 
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-[#2A2118]">Efectivo esperado</span>
-            <span className="font-heading text-lg font-bold tabular-nums text-[#AD6C20]">{mxn.format(expectedCash)}</span>
+            <span className="text-sm font-semibold text-[#2E1B22]">Efectivo esperado</span>
+            <span className="font-heading text-lg font-bold tabular-nums text-[#AE4836]">{mxn.format(expectedCash)}</span>
           </div>
         </div>
       </div>
 
       {/* Ventas por método de pago */}
       {totals?.byMethod && totals.byMethod.length > 0 && (
-        <div className="rounded-[1.5rem] border border-[#DCCCC0]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
-          <p className="text-sm font-semibold text-[#2A2118]">Ventas por método de pago</p>
+        <div className="rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
+          <p className="text-sm font-semibold text-[#2E1B22]">Ventas por método de pago</p>
           <div className="mt-3 space-y-2">
             {totals.byMethod.map((bm) => (
-              <div key={bm.method} className="flex items-center justify-between rounded-xl bg-[#FBF3EC]/70 px-3 py-2 text-sm">
+              <div key={bm.method} className="flex items-center justify-between rounded-xl bg-[#F6F0E4]/70 px-3 py-2 text-sm">
                 <span className="text-[#6B554D]">{formatMethod(bm.method)}</span>
-                <span className="font-semibold tabular-nums text-[#2A2118]">{mxn.format(bm.total)}</span>
+                <span className="font-semibold tabular-nums text-[#2E1B22]">{mxn.format(bm.total)}</span>
               </div>
             ))}
           </div>
@@ -654,8 +654,8 @@ function MyShiftsHistory() {
   const closed = shifts.filter((s) => s.status === 'closed');
 
   return (
-    <div className="rounded-[1.5rem] border border-[#DCCCC0]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
-      <p className="text-sm font-semibold text-[#2A2118]">Historial de mis cajas</p>
+    <div className="rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
+      <p className="text-sm font-semibold text-[#2E1B22]">Historial de mis cajas</p>
       {isLoading ? (
         <p className="mt-3 text-sm text-muted-foreground">Cargando…</p>
       ) : closed.length === 0 ? (
@@ -666,14 +666,14 @@ function MyShiftsHistory() {
             const diff = s.difference == null ? null : Number(s.difference);
             const isOpen = expanded === s.id;
             return (
-              <li key={s.id} className="rounded-xl border border-[#DCCCC0]/50">
+              <li key={s.id} className="rounded-xl border border-[#D6D5C2]/50">
                 <button
                   type="button"
                   onClick={() => setExpanded(isOpen ? null : s.id)}
                   className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-[#2A2118]">
+                    <p className="truncate text-sm font-medium text-[#2E1B22]">
                       {format(parseISO(s.opened_at), "d MMM yyyy", { locale: es })}
                       {s.facility_name ? ` · ${s.facility_name}` : ''}
                     </p>
@@ -689,11 +689,11 @@ function MyShiftsHistory() {
                         {diff < 0 ? 'Faltó ' : 'Sobró '}{mxn.format(Math.abs(diff))}
                       </span>
                     )}
-                    <span className="text-xs text-[#AD6C20]">{isOpen ? 'Ocultar' : 'Ver ventas'}</span>
+                    <span className="text-xs text-[#AE4836]">{isOpen ? 'Ocultar' : 'Ver ventas'}</span>
                   </span>
                 </button>
                 {isOpen && (
-                  <div className="border-t border-[#DCCCC0]/50 p-3">
+                  <div className="border-t border-[#D6D5C2]/50 p-3">
                     <ShiftSales shiftId={s.id} />
                   </div>
                 )}
@@ -726,9 +726,9 @@ function ShiftSales({ shiftId }: { shiftId: string }) {
   });
 
   return (
-    <div className="rounded-[1.5rem] border border-[#DCCCC0]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
+    <div className="rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-[#2A2118]">Ventas del turno</p>
+        <p className="text-sm font-semibold text-[#2E1B22]">Ventas del turno</p>
         {sales.length > 0 && (
           <span className="text-xs text-[#6B554D] tabular-nums">{sales.length} venta{sales.length === 1 ? '' : 's'}</span>
         )}
@@ -740,14 +740,14 @@ function ShiftSales({ shiftId }: { shiftId: string }) {
       ) : (
         <ul className="mt-3 space-y-2">
           {sales.map((s) => (
-            <li key={`${s.tipo}-${s.id}`} className="rounded-xl border border-[#DCCCC0]/50 bg-[#FBF3EC]/40 p-3">
+            <li key={`${s.tipo}-${s.id}`} className="rounded-xl border border-[#D6D5C2]/50 bg-[#F6F0E4]/40 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase ${s.tipo === 'membresía' ? 'bg-[#E9C5BE] text-[#2A2118]' : 'bg-emerald-100 text-emerald-700'}`}>
+                    <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase ${s.tipo === 'membresía' ? 'bg-[#DDE4D5] text-[#2E1B22]' : 'bg-emerald-100 text-emerald-700'}`}>
                       {s.tipo === 'membresía' ? 'Membresía' : 'Producto'}
                     </span>
-                    <span className="truncate text-sm font-medium text-[#2A2118]">{s.detalle}</span>
+                    <span className="truncate text-sm font-medium text-[#2E1B22]">{s.detalle}</span>
                   </div>
                   <p className="mt-0.5 truncate text-xs text-[#6B554D]">
                     {s.cliente ? `${s.cliente} · ` : ''}{formatMethod(s.metodo)}
@@ -756,7 +756,7 @@ function ShiftSales({ shiftId }: { shiftId: string }) {
                     {new Date(s.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
-                <span className="shrink-0 font-semibold tabular-nums text-[#2A2118]">{mxn.format(Number(s.monto))}</span>
+                <span className="shrink-0 font-semibold tabular-nums text-[#2E1B22]">{mxn.format(Number(s.monto))}</span>
               </div>
             </li>
           ))}

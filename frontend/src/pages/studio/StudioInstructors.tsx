@@ -25,13 +25,13 @@ const CHAPTER_SCENES = [
     // 0 — cream con tipo dark
     { bg: 'bg-bmb-cream', text: 'text-bmb-dark', numTone: 'text-bmb-gold/55', tag: 'text-bmb-dark/70', accent: 'bg-bmb-gold' },
     // 1 — blush warm
-    { bg: 'bg-[#E6D0CA]', text: 'text-bmb-dark', numTone: 'text-bmb-deepgold/65', tag: 'text-bmb-dark/72', accent: 'bg-bmb-deepgold' },
+    { bg: 'bg-[#DDE4D5]', text: 'text-bmb-dark', numTone: 'text-bmb-deepgold/65', tag: 'text-bmb-dark/72', accent: 'bg-bmb-deepgold' },
     // 2 — dark brown drenched
     { bg: 'bg-bmb-dark', text: 'text-bmb-cream', numTone: 'text-bmb-gold/70', tag: 'text-bmb-cream/72', accent: 'bg-bmb-gold' },
     // 3 — taupe — calmer
-    { bg: 'bg-[#DCCCC0]', text: 'text-bmb-dark', numTone: 'text-[#7E5A36]/55', tag: 'text-bmb-dark/70', accent: 'bg-[#7E5A36]' },
+    { bg: 'bg-[#D6D5C2]', text: 'text-bmb-dark', numTone: 'text-[#7E5A36]/55', tag: 'text-bmb-dark/70', accent: 'bg-[#7E5A36]' },
     // 4 — mauve warm (rare, used for accent chapter)
-    { bg: 'bg-[#A6776A]', text: 'text-bmb-cream', numTone: 'text-bmb-cream/45', tag: 'text-bmb-cream/82', accent: 'bg-bmb-cream' },
+    { bg: 'bg-[#2A4E36]', text: 'text-bmb-cream', numTone: 'text-bmb-cream/45', tag: 'text-bmb-cream/82', accent: 'bg-bmb-cream' },
 ];
 
 function scene(i: number) { return CHAPTER_SCENES[i % CHAPTER_SCENES.length]; }
@@ -92,7 +92,7 @@ function ContactIndex({
                                             loading="lazy"
                                         />
                                     ) : (
-                                        <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#ECE1CE_0%,#DCCCC0_100%)]">
+                                        <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#ECE1CE_0%,#D6D5C2_100%)]">
                                             <span className="font-heading text-5xl text-bmb-dark/22">{initial}</span>
                                         </div>
                                     )}
@@ -197,7 +197,7 @@ function Chapter({
                                 loading="lazy"
                             />
                         ) : (
-                            <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#ECE1CE_0%,#DCCCC0_100%)]">
+                            <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#ECE1CE_0%,#D6D5C2_100%)]">
                                 <span className="font-heading text-[clamp(7rem,18vw,12rem)] text-bmb-dark/18">{initial}</span>
                             </div>
                         )}

@@ -318,7 +318,7 @@ function Row({
                     ? "bg-bmb-deepgold text-bmb-cream"
                     : "";
 
-              const accent = isFree ? "#2f7a3a" : isBooked ? "#CE9B25" : color;
+              const accent = isFree ? "#2f7a3a" : isBooked ? "#AE4836" : color;
 
               return (
                 <button

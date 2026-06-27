@@ -142,7 +142,7 @@ export default function ClientDashboard() {
       <ClientLayout>
         <ProfilerInviteBanner />
         <div className="relative space-y-10 pb-4">
-          <section className="relative overflow-hidden rounded-[1.6rem] border border-[#DCCCC0]/70 bg-[#FCEFEC]/72 shadow-[0_24px_80px_-68px_rgba(42,33,24,.72)]">
+          <section className="relative overflow-hidden rounded-[1.6rem] border border-[#D6D5C2]/70 bg-[#F6F0E4]/72 shadow-[0_24px_80px_-68px_rgba(42,33,24,.72)]">
             <div className="absolute inset-0 opacity-[0.2]">
               <img src="/studio/barre.webp" alt="" aria-hidden="true" className="h-full w-full object-cover object-center" />
               <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,248,245,.94)_0%,rgba(255,248,245,.82)_46%,rgba(236,225,206,.78)_100%)]" />
@@ -155,14 +155,14 @@ export default function ClientDashboard() {
             />
             <div className="relative grid gap-8 p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:p-12">
               <div className="max-w-4xl">
-                <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#A6776A]/24 bg-[#FCEFEC]/72 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#A6776A]">
+                <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#2A4E36]/24 bg-[#F6F0E4]/72 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#2A4E36]">
                   <Leaf className="h-3.5 w-3.5" />
                   Bienvenido de vuelta
                 </div>
                 <p className="font-heading text-2xl font-medium tracking-[-0.03em] text-[#6B554D] sm:text-3xl">
                   {firstName}
                 </p>
-                <h1 className="mt-2 max-w-4xl font-heading text-[clamp(3.2rem,8vw,7rem)] font-medium leading-[0.88] tracking-[-0.055em] text-[#2A2118]">
+                <h1 className="mt-2 max-w-4xl font-heading text-[clamp(3.2rem,8vw,7rem)] font-medium leading-[0.88] tracking-[-0.055em] text-[#2E1B22]">
                   Encuentra tu centro hoy.
                 </h1>
                 <p className="mt-6 max-w-[64ch] text-sm leading-7 text-[#6B554D] sm:text-base">
@@ -170,15 +170,15 @@ export default function ClientDashboard() {
                 </p>
               </div>
 
-              <aside className="flex flex-col justify-end rounded-[1.25rem] border border-[#DCCCC0]/80 bg-[#FCEFEC]/70 p-5 text-right">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#2A2118]/46">
+              <aside className="flex flex-col justify-end rounded-[1.25rem] border border-[#D6D5C2]/80 bg-[#F6F0E4]/70 p-5 text-right">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#2E1B22]/46">
                   {monthLabel} · {today.getFullYear()}
                 </p>
                 <div className="mt-4 flex items-end justify-end gap-3">
                   <span className="font-heading text-4xl font-medium italic leading-none text-[#6B554D] capitalize">
                     {weekdayLabel}
                   </span>
-                  <span className="font-heading text-[6.5rem] font-semibold leading-[0.78] tracking-[-0.06em] text-[#AD6C20]">
+                  <span className="font-heading text-[6.5rem] font-semibold leading-[0.78] tracking-[-0.06em] text-[#AE4836]">
                     {dayNumber}
                   </span>
                 </div>
@@ -190,27 +190,27 @@ export default function ClientDashboard() {
           <PendingReviewsList />
 
           <div className="flex flex-wrap gap-3">
-            <Button asChild size="lg" className="h-auto rounded-full border border-[#AD6C20]/18 bg-[#A6776A] px-6 py-3 text-[#FFF8EE] shadow-[0_14px_40px_-32px_rgba(166,119,106,.8)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#8F6258]">
+            <Button asChild size="lg" className="h-auto rounded-full border border-[#AE4836]/18 bg-[#2A4E36] px-6 py-3 text-[#F6F0E4] shadow-[0_14px_40px_-32px_rgba(166,119,106,.8)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#16261A]">
               <Link to="/app/book">
                 <Plus className="h-5 w-5" />
                 Reservar clase
               </Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="h-auto rounded-full border-[#DCCCC0]/80 bg-[#FCEFEC]/66 px-6 py-3 text-[#2A2118] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#E9C5BE]/34">
+            <Button asChild variant="outline" size="lg" className="h-auto rounded-full border-[#D6D5C2]/80 bg-[#F6F0E4]/66 px-6 py-3 text-[#2E1B22] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#DDE4D5]/34">
               <Link to="/app/classes">
                 <Calendar className="h-5 w-5" />
                 Mis reservas
               </Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="h-auto rounded-full border-[#DCCCC0]/80 bg-[#FCEFEC]/66 px-6 py-3 text-[#2A2118] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#E9C5BE]/34">
+            <Button asChild variant="outline" size="lg" className="h-auto rounded-full border-[#D6D5C2]/80 bg-[#F6F0E4]/66 px-6 py-3 text-[#2E1B22] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#DDE4D5]/34">
               <Link to="/app/checkout">
                 <Plus className="h-5 w-5" />
                 Adquirir plan
               </Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="h-auto rounded-full border-[#DCCCC0]/80 bg-[#FCEFEC]/66 px-6 py-3 text-[#2A2118] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#E9C5BE]/34">
+            <Button asChild variant="outline" size="lg" className="h-auto rounded-full border-[#D6D5C2]/80 bg-[#F6F0E4]/66 px-6 py-3 text-[#2E1B22] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#DDE4D5]/34">
               <Link to="/app/wallet">
-                <Gift className="h-5 w-5 text-[#AD6C20]" />
+                <Gift className="h-5 w-5 text-[#AE4836]" />
                 Lealtad
               </Link>
             </Button>
@@ -218,26 +218,26 @@ export default function ClientDashboard() {
 
           <section className="space-y-4">
             <p className="pl-2 text-sm font-medium text-[#6B554D]">Mi membresía</p>
-            <div className="rounded-[1.55rem] border border-[#DCCCC0]/72 bg-[#FCEFEC]/76 p-4 shadow-[0_18px_58px_-52px_rgba(42,33,24,.55)] sm:p-6">
-              <div className="relative overflow-hidden rounded-[1.15rem] bg-[#F3E2DC]/56 p-5 sm:p-7">
+            <div className="rounded-[1.55rem] border border-[#D6D5C2]/72 bg-[#F6F0E4]/76 p-4 shadow-[0_18px_58px_-52px_rgba(42,33,24,.55)] sm:p-6">
+              <div className="relative overflow-hidden rounded-[1.15rem] bg-[#F2E9D2]/56 p-5 sm:p-7">
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.06]">
                   <CasaSheMark className="h-52 w-52 text-bmb-deepgold" />
                 </div>
                 <div className="relative space-y-8">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#DCCCC0]/80 bg-[#FCEFEC]/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#6B554D]">
-                        <span className="h-2 w-2 rounded-full bg-[#AD6C20]" />
+                      <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#D6D5C2]/80 bg-[#F6F0E4]/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#6B554D]">
+                        <span className="h-2 w-2 rounded-full bg-[#AE4836]" />
                         Membresía
                       </div>
                       {membershipLoading ? (
                         <div className="space-y-3">
-                          <Skeleton className="h-9 w-64 bg-[#DCCCC0]/45" />
-                          <Skeleton className="h-4 w-44 bg-[#DCCCC0]/45" />
+                          <Skeleton className="h-9 w-64 bg-[#D6D5C2]/45" />
+                          <Skeleton className="h-4 w-44 bg-[#D6D5C2]/45" />
                         </div>
                       ) : (
                         <>
-                          <h2 className="font-heading text-3xl font-medium tracking-[-0.035em] text-[#2A2118] sm:text-5xl">
+                          <h2 className="font-heading text-3xl font-medium tracking-[-0.035em] text-[#2E1B22] sm:text-5xl">
                             {membership?.plan_name || 'Activa tu plan'}
                           </h2>
                           <p className="mt-2 text-sm text-[#6B554D]">
@@ -250,7 +250,7 @@ export default function ClientDashboard() {
                       variant={membership?.status === 'active' ? 'default' : 'secondary'}
                       className={
                         membership?.status === 'active' && !isOutOfCredits
-                          ? 'w-fit rounded-full bg-[#E9C5BE] px-3 py-1 text-[#2A2118]'
+                          ? 'w-fit rounded-full bg-[#DDE4D5] px-3 py-1 text-[#2E1B22]'
                           : 'w-fit rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-amber-800'
                       }
                     >
@@ -259,7 +259,7 @@ export default function ClientDashboard() {
                   </div>
 
                   {membershipLoading ? (
-                    <Skeleton className="h-20 w-full bg-[#DCCCC0]/45" />
+                    <Skeleton className="h-20 w-full bg-[#D6D5C2]/45" />
                   ) : membership && (isOutOfCredits || isExpiredOrCancelled) ? (
                     <div className="flex items-start gap-3 rounded-[1rem] border border-amber-200/70 bg-amber-50/72 p-4">
                       <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
@@ -273,14 +273,14 @@ export default function ClientDashboard() {
                       </div>
                     </div>
                   ) : membership ? (
-                    <div className="space-y-4 border-t border-[#2A2118]/10 pt-5">
+                    <div className="space-y-4 border-t border-[#2E1B22]/10 pt-5">
                       {credits.length > 0 ? (
                         <div className="space-y-3">
                           {credits.map((c) => (
                             <div key={c.key} className="space-y-1.5">
                               <div className="flex justify-between text-sm">
                                 <span className="text-[#6B554D]">{c.label}</span>
-                                <span className="font-semibold text-[#2A2118] tabular-nums">
+                                <span className="font-semibold text-[#2E1B22] tabular-nums">
                                   {c.unlimited
                                     ? 'Ilimitado'
                                     : c.total
@@ -301,7 +301,7 @@ export default function ClientDashboard() {
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm">
                             <span className="text-[#6B554D]">Clases restantes</span>
-                            <span className="font-semibold text-[#2A2118]">{classesRemaining ?? 0} de {classLimit}</span>
+                            <span className="font-semibold text-[#2E1B22]">{classesRemaining ?? 0} de {classLimit}</span>
                           </div>
                           <Progress value={classesProgress ?? 0} className="h-2" />
                         </div>
@@ -313,13 +313,13 @@ export default function ClientDashboard() {
                           <Clock className="h-4 w-4" />
                           {daysRemaining !== null ? `${daysRemaining} días restantes` : 'Sin fecha de vencimiento'}
                         </span>
-                        <span className="rounded-full border border-[#DCCCC0]/80 bg-[#FCEFEC]/58 px-3 py-1 font-semibold text-[#2A2118]">
+                        <span className="rounded-full border border-[#D6D5C2]/80 bg-[#F6F0E4]/58 px-3 py-1 font-semibold text-[#2E1B22]">
                           {membership.end_date ? `Vence ${format(membershipEndDate!, 'dd MMM yyyy', { locale: es })}` : 'Sin vencimiento'}
                         </span>
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-[1rem] border border-[#DCCCC0]/70 bg-[#FCEFEC]/58 p-4 text-sm text-[#6B554D]">
+                    <div className="rounded-[1rem] border border-[#D6D5C2]/70 bg-[#F6F0E4]/58 p-4 text-sm text-[#6B554D]">
                       Aún no tienes una membresía activa.
                     </div>
                   )}
@@ -331,20 +331,20 @@ export default function ClientDashboard() {
           {showRenewPrompt && (
             <Link
               to="/app/checkout"
-              className="group flex items-center justify-between rounded-[1.2rem] border border-[#DCCCC0]/76 bg-[#FCEFEC]/72 p-5 shadow-[0_14px_48px_-42px_rgba(42,33,24,.55)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#E9C5BE]/30"
+              className="group flex items-center justify-between rounded-[1.2rem] border border-[#D6D5C2]/76 bg-[#F6F0E4]/72 p-5 shadow-[0_14px_48px_-42px_rgba(42,33,24,.55)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#DDE4D5]/30"
             >
               <div className="flex items-center gap-4">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E9C5BE]/65 text-[#AD6C20] transition-transform duration-300 group-hover:scale-105">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#DDE4D5]/65 text-[#AE4836] transition-transform duration-300 group-hover:scale-105">
                   <Sparkles className="h-5 w-5" />
                 </span>
                 <div>
-                  <h3 className="font-semibold text-[#2A2118]">Renueva tu plan</h3>
+                  <h3 className="font-semibold text-[#2E1B22]">Renueva tu plan</h3>
                   <p className="text-sm text-[#6B554D]">
                     {membership && classLimit ? `Te quedan ${classesRemaining ?? 0} clases.` : 'Activa tu membresía para seguir entrenando.'}
                   </p>
                 </div>
               </div>
-              <ChevronRight className="h-5 w-5 text-[#A6776A] transition-transform duration-300 group-hover:translate-x-1" />
+              <ChevronRight className="h-5 w-5 text-[#2A4E36] transition-transform duration-300 group-hover:translate-x-1" />
             </Link>
           )}
 
@@ -358,18 +358,18 @@ export default function ClientDashboard() {
                 </Link>
               </Button>
             </div>
-            <div className="rounded-[1.55rem] border border-[#DCCCC0]/72 bg-[#FCEFEC]/76 p-3 shadow-[0_18px_58px_-52px_rgba(42,33,24,.55)] sm:p-4">
+            <div className="rounded-[1.55rem] border border-[#D6D5C2]/72 bg-[#F6F0E4]/76 p-3 shadow-[0_18px_58px_-52px_rgba(42,33,24,.55)] sm:p-4">
               {bookingsLoading ? (
                 <div className="space-y-3">
-                  <Skeleton className="h-20 w-full bg-[#DCCCC0]/45" />
-                  <Skeleton className="h-20 w-full bg-[#DCCCC0]/45" />
+                  <Skeleton className="h-20 w-full bg-[#D6D5C2]/45" />
+                  <Skeleton className="h-20 w-full bg-[#D6D5C2]/45" />
                 </div>
               ) : upcomingClasses.length > 0 ? (
-                <div className="divide-y divide-[#DCCCC0]/60">
+                <div className="divide-y divide-[#D6D5C2]/60">
                   {upcomingClasses.map((cls) => (
                     <div
                       key={cls.booking_id}
-                      className="flex flex-col gap-3 p-4 transition-colors hover:bg-[#F3E2DC]/35 sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col gap-3 p-4 transition-colors hover:bg-[#F2E9D2]/35 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <div 
@@ -384,13 +384,13 @@ export default function ClientDashboard() {
                           />
                         </div>
                         <div>
-                          <p className="font-heading text-2xl font-medium tracking-[-0.025em] text-[#2A2118]">{cls.class_type_name}</p>
+                          <p className="font-heading text-2xl font-medium tracking-[-0.025em] text-[#2E1B22]">{cls.class_type_name}</p>
                           <p className="text-sm text-[#6B554D]">
                             {format(parseISO(cls.date), 'EEEE d MMM', { locale: es })} · {cls.start_time.slice(0, 5)} · {cls.instructor_name}
                           </p>
                         </div>
                       </div>
-                      <Badge className="w-fit rounded-full border border-[#DCCCC0]/80 bg-[#F3E2DC]/62 px-3 py-1 text-[#AD6C20] shadow-none">
+                      <Badge className="w-fit rounded-full border border-[#D6D5C2]/80 bg-[#F2E9D2]/62 px-3 py-1 text-[#AE4836] shadow-none">
                         Confirmada
                       </Badge>
                     </div>
@@ -398,11 +398,11 @@ export default function ClientDashboard() {
                 </div>
               ) : (
                 <div className="text-center py-6">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#E9C5BE]/55 text-[#A6776A]">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#DDE4D5]/55 text-[#2A4E36]">
                     <Calendar className="h-7 w-7" />
                   </div>
                   <p className="mt-3 text-[#6B554D]">No tienes clases próximas</p>
-                  <Button asChild className="mt-4 rounded-full bg-[#A6776A] text-[#FFF8EE] hover:bg-[#8F6258]">
+                  <Button asChild className="mt-4 rounded-full bg-[#2A4E36] text-[#F6F0E4] hover:bg-[#16261A]">
                     <Link to="/app/book">Reservar ahora</Link>
                   </Button>
                 </div>
@@ -412,12 +412,12 @@ export default function ClientDashboard() {
 
           <div className={`grid gap-6 ${latestVideos && latestVideos.length > 0 ? 'lg:grid-cols-[1.08fr_0.92fr]' : ''}`}>
             {latestVideos && latestVideos.length > 0 && (
-            <Card className="rounded-[1.35rem] border-[#DCCCC0]/72 bg-[#FCEFEC]/76 shadow-none">
+            <Card className="rounded-[1.35rem] border-[#D6D5C2]/72 bg-[#F6F0E4]/76 shadow-none">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 font-heading text-2xl font-medium tracking-[-0.03em] text-[#2A2118]">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-[0.75rem] bg-[#E9C5BE]/55">
-                      <Play className="h-4 w-4 text-[#AD6C20]" />
+                  <CardTitle className="flex items-center gap-2 font-heading text-2xl font-medium tracking-[-0.03em] text-[#2E1B22]">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-[0.75rem] bg-[#DDE4D5]/55">
+                      <Play className="h-4 w-4 text-[#AE4836]" />
                     </div>
                     Videos on-demand
                   </CardTitle>

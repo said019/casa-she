@@ -105,39 +105,39 @@ export default function CashShiftDetail() {
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
                     <div>
-                        <h1 className="font-heading text-3xl font-bold text-[#2A2118]">Detalle de Corte</h1>
+                        <h1 className="font-heading text-3xl font-bold text-[#2E1B22]">Detalle de Corte</h1>
                         <p className="text-[#6B554D]">Información completa del turno de caja.</p>
                     </div>
                 </div>
 
                 {/* Summary — hero panel */}
-                <div className="relative overflow-hidden rounded-[1.75rem] border border-[#DCCCC0]/70 bg-gradient-to-br from-[#FBF3EC] via-[#F7ECE0] to-[#F1E2D2] p-5 sm:p-6 shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]">
+                <div className="relative overflow-hidden rounded-[1.75rem] border border-[#D6D5C2]/70 bg-gradient-to-br from-[#F6F0E4] via-[#F7ECE0] to-[#F1E2D2] p-5 sm:p-6 shadow-[0_24px_60px_-46px_rgba(51,42,34,0.55)]">
                     <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-[#2A2118]">Resumen del Turno</p>
+                        <p className="text-sm font-semibold text-[#2E1B22]">Resumen del Turno</p>
                         <StatusBadge status={shift.status} />
                     </div>
                     <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                         <div className="space-y-1">
                             <p className="text-xs uppercase tracking-wide text-[#6B554D]">Apertura</p>
-                            <p className="font-medium text-[#2A2118]">{formatDate(shift.opened_at)}</p>
+                            <p className="font-medium text-[#2E1B22]">{formatDate(shift.opened_at)}</p>
                             <p className="text-xs text-[#6B554D]">Por: {shift.opened_by_name ?? '—'}</p>
                         </div>
                         <div className="space-y-1">
                             <p className="text-xs uppercase tracking-wide text-[#6B554D]">Cierre</p>
-                            <p className="font-medium text-[#2A2118]">{formatDate(shift.closed_at)}</p>
+                            <p className="font-medium text-[#2E1B22]">{formatDate(shift.closed_at)}</p>
                             <p className="text-xs text-[#6B554D]">Por: {shift.closed_by_name ?? '—'}</p>
                         </div>
                         <div className="space-y-1">
                             <p className="text-xs uppercase tracking-wide text-[#6B554D]">Fondo inicial</p>
-                            <p className="text-xl sm:text-2xl font-bold tabular-nums truncate text-[#2A2118]">{mxn(shift.opening_float)}</p>
+                            <p className="text-xl sm:text-2xl font-bold tabular-nums truncate text-[#2E1B22]">{mxn(shift.opening_float)}</p>
                         </div>
                         <div className="space-y-1">
                             <p className="text-xs uppercase tracking-wide text-[#6B554D]">Efectivo esperado</p>
-                            <p className="text-xl sm:text-2xl font-bold tabular-nums truncate text-[#2A2118]">{mxn(shift.expected_cash)}</p>
+                            <p className="text-xl sm:text-2xl font-bold tabular-nums truncate text-[#2E1B22]">{mxn(shift.expected_cash)}</p>
                         </div>
                         <div className="space-y-1">
                             <p className="text-xs uppercase tracking-wide text-[#6B554D]">Efectivo contado</p>
-                            <p className="text-xl sm:text-2xl font-bold tabular-nums truncate text-[#2A2118]">{mxn(shift.counted_cash)}</p>
+                            <p className="text-xl sm:text-2xl font-bold tabular-nums truncate text-[#2E1B22]">{mxn(shift.counted_cash)}</p>
                         </div>
                         <div className="space-y-1">
                             <p className="text-xs uppercase tracking-wide text-[#6B554D]">Diferencia</p>
@@ -150,18 +150,18 @@ export default function CashShiftDetail() {
 
                 {/* By payment method */}
                 {byMethod.length > 0 && (
-                    <div className="rounded-[1.5rem] border border-[#DCCCC0]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
-                        <p className="text-sm font-semibold text-[#2A2118]">Ventas por Método de Pago</p>
+                    <div className="rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
+                        <p className="text-sm font-semibold text-[#2E1B22]">Ventas por Método de Pago</p>
                         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             {byMethod.map((item: any, idx: number) => (
-                                <div key={idx} className="flex items-center justify-between rounded-xl bg-[#FBF3EC]/70 px-3 py-2">
+                                <div key={idx} className="flex items-center justify-between rounded-xl bg-[#F6F0E4]/70 px-3 py-2">
                                     <span className="text-sm font-medium text-[#6B554D]">{getPaymentMethodLabel(item.method)}</span>
-                                    <span className="font-semibold tabular-nums text-[#2A2118]">{mxn(item.total)}</span>
+                                    <span className="font-semibold tabular-nums text-[#2E1B22]">{mxn(item.total)}</span>
                                 </div>
                             ))}
                         </div>
                         {(totals.cashSales != null || totals.cashIn != null || totals.cashOut != null) && (
-                            <div className="mt-4 grid gap-3 sm:grid-cols-3 border-t border-[#DCCCC0]/60 pt-4">
+                            <div className="mt-4 grid gap-3 sm:grid-cols-3 border-t border-[#D6D5C2]/60 pt-4">
                                 <div className="space-y-1 text-center">
                                     <p className="text-xs text-[#6B554D]">Ventas en Efectivo</p>
                                     <p className="font-bold tabular-nums text-emerald-600">{mxn(totals.cashSales)}</p>
@@ -181,22 +181,22 @@ export default function CashShiftDetail() {
 
                 {/* Cobrado por recepcionista — esencial cuando 2+ comparten la caja */}
                 {sellerGroups.length > 0 && (
-                    <div className="rounded-[1.5rem] border border-[#DCCCC0]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
-                        <p className="text-sm font-semibold text-[#2A2118]">Cobrado por recepcionista</p>
+                    <div className="rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
+                        <p className="text-sm font-semibold text-[#2E1B22]">Cobrado por recepcionista</p>
                         <p className="mt-1 text-sm text-[#6B554D]">
                             Quién cobró qué en este turno (la caja física es compartida; el conteo del corte es uno solo).
                         </p>
                         <div className="mt-4 space-y-3">
                             {sellerGroups.map((g: any, gi: number) => (
-                                <div key={gi} className="rounded-xl border border-[#DCCCC0]/50 p-3">
+                                <div key={gi} className="rounded-xl border border-[#D6D5C2]/50 p-3">
                                     <div className="mb-2 flex items-center justify-between">
-                                        <span className="font-semibold text-[#2A2118]">{g.seller}</span>
-                                        <span className="font-bold tabular-nums text-[#2A2118]">{mxn(g.total)}</span>
+                                        <span className="font-semibold text-[#2E1B22]">{g.seller}</span>
+                                        <span className="font-bold tabular-nums text-[#2E1B22]">{mxn(g.total)}</span>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
                                         {g.rows.map((r: any, ri: number) => (
-                                            <span key={ri} className="rounded-md bg-[#FBF3EC] px-2 py-1 text-xs text-[#6B554D]">
-                                                <span>{getPaymentMethodLabel(r.method)}</span>: <span className="tabular-nums text-[#2A2118]">{mxn(r.total)}</span> ({r.n})
+                                            <span key={ri} className="rounded-md bg-[#F6F0E4] px-2 py-1 text-xs text-[#6B554D]">
+                                                <span>{getPaymentMethodLabel(r.method)}</span>: <span className="tabular-nums text-[#2E1B22]">{mxn(r.total)}</span> ({r.n})
                                             </span>
                                         ))}
                                     </div>
@@ -207,14 +207,14 @@ export default function CashShiftDetail() {
                 )}
 
                 {/* Movimientos — tarjetas (mobile-first) */}
-                <div className="rounded-[1.5rem] border border-[#DCCCC0]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
-                    <p className="text-sm font-semibold text-[#2A2118]">Movimientos</p>
+                <div className="rounded-[1.5rem] border border-[#D6D5C2]/70 bg-white p-5 shadow-[0_20px_58px_-52px_rgba(51,42,34,0.5)]">
+                    <p className="text-sm font-semibold text-[#2E1B22]">Movimientos</p>
                     {movements.length === 0 ? (
                         <p className="mt-3 text-sm text-[#6B554D]">Sin movimientos registrados.</p>
                     ) : (
                         <div className="mt-3 space-y-2">
                             {movements.map((mov: any, idx: number) => (
-                                <div key={idx} className="rounded-xl border border-[#DCCCC0]/50 bg-[#FBF3EC]/40 p-3">
+                                <div key={idx} className="rounded-xl border border-[#D6D5C2]/50 bg-[#F6F0E4]/40 p-3">
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2">
@@ -227,7 +227,7 @@ export default function CashShiftDetail() {
                                                         Salida
                                                     </span>
                                                 )}
-                                                <span className="truncate text-sm text-[#2A2118]">{mov.reason ?? '—'}</span>
+                                                <span className="truncate text-sm text-[#2E1B22]">{mov.reason ?? '—'}</span>
                                             </div>
                                             <p className="mt-0.5 truncate text-xs text-[#6B554D]">
                                                 {mov.created_by_name ?? '—'}
@@ -235,7 +235,7 @@ export default function CashShiftDetail() {
                                                 {formatDate(mov.created_at)}
                                             </p>
                                         </div>
-                                        <span className="shrink-0 font-semibold tabular-nums text-[#2A2118]">{mxn(mov.amount)}</span>
+                                        <span className="shrink-0 font-semibold tabular-nums text-[#2E1B22]">{mxn(mov.amount)}</span>
                                     </div>
                                 </div>
                             ))}
