@@ -65,12 +65,15 @@ type SidebarItem = {
     children?: SidebarChild[];
 };
 
-// v1 Casa Shé: menú acotado al core de reservas. Las rutas de módulos fuera de v1
-// (eventos, descuentos, videos, caja/POS, lealtad, egresos, nómina, comisiones,
-// bitácora, WhatsApp, mapa de salas, rutinas) siguen existiendo pero no se enlazan.
+// Menú completo del admin (paridad con BMB-Studio). Todas las páginas, rutas y
+// endpoints existen; aquí se enlaza el set completo de módulos. Recepción se
+// mantiene detrás del feature flag RECEPTION_ENABLED (apagada por ahora).
 const sidebarItems: SidebarItem[] = [
     { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/admin/events', label: 'Eventos', icon: PartyPopper },
+    { href: '/admin/discount-codes', label: 'Descuentos', icon: Tag },
     { href: '/admin/calendar', label: 'Calendario', icon: Calendar },
+    { href: '/admin/substitutions', label: 'Sustituciones', icon: ArrowLeftRight },
     {
         label: 'Reservas',
         icon: ClipboardList,
@@ -85,7 +88,9 @@ const sidebarItems: SidebarItem[] = [
         children: [
             { href: '/admin/classes/schedules', label: 'Horarios' },
             { href: '/admin/classes/types', label: 'Disciplinas' },
+            { href: '/admin/facilities', label: 'Mapa de salas' },
             { href: '/admin/classes/prices', label: 'Precios y paquetes' },
+            { href: '/admin/classes/templates', label: 'Rutinas' },
         ],
     },
     {
@@ -107,6 +112,24 @@ const sidebarItems: SidebarItem[] = [
             { href: '/admin/memberships/paquetes', label: 'Planes' },
         ],
     },
+    {
+        label: 'Contenido',
+        icon: Video,
+        children: [
+            { href: '/admin/videos', label: 'Biblioteca' },
+            { href: '/admin/videos/upload', label: 'Subir video' },
+            { href: '/admin/videos/sales', label: 'Ventas por transferencia' },
+        ],
+    },
+    {
+        label: 'Caja',
+        icon: ShoppingBag,
+        children: [
+            { href: '/admin/pos', label: 'Punto de venta' },
+            { href: '/admin/cash-shifts', label: 'Cortes de caja' },
+            { href: '/admin/products', label: 'Productos' },
+        ],
+    },
     { href: '/admin/payments', label: 'Pagos', icon: CreditCard },
     {
         label: 'Lealtad',
@@ -122,12 +145,23 @@ const sidebarItems: SidebarItem[] = [
         label: 'Reportes',
         icon: TrendingUp,
         children: [
+            { kind: 'header', label: 'Resumen' },
             { href: '/admin/reports/overview', label: 'Vista general' },
+            { kind: 'header', label: 'Finanzas' },
             { href: '/admin/reports/revenue', label: 'Ingresos' },
+            { href: '/admin/reports/egresos', label: 'Egresos' },
+            { kind: 'header', label: 'Clientes' },
             { href: '/admin/reports/retention', label: 'Retención' },
             { href: '/admin/reports/top-clients', label: 'Top clientes' },
             { href: '/admin/reports/membership-movements', label: 'Movimientos de membresías' },
+            { kind: 'header', label: 'Coaches' },
+            { href: '/admin/reports/instructors', label: 'Coaches' },
+            { href: '/admin/payroll/coaches', label: 'Nómina de Coaches' },
+            { kind: 'header', label: 'Equipo y control' },
             { href: '/admin/reports/classes', label: 'Clases' },
+            { href: '/admin/reports/sales-by-staff', label: 'Ventas por staff' },
+            { href: '/admin/commissions', label: 'Comisiones' },
+            { href: '/admin/audit', label: 'Bitácora' },
         ],
     },
     {
@@ -139,6 +173,7 @@ const sidebarItems: SidebarItem[] = [
             { href: '/admin/settings/policies', label: 'Políticas' },
             { href: '/admin/settings/cancellations', label: 'Cancelaciones' },
             { href: '/admin/settings/notifications', label: 'Notificaciones' },
+            { href: '/admin/settings/whatsapp', label: 'WhatsApp' },
             { href: '/admin/settings/closed-days', label: 'Días cerrados' },
             { href: '/admin/settings/onboarding', label: 'Perfilador' },
         ],
