@@ -109,6 +109,16 @@ const sidebarItems: SidebarItem[] = [
     },
     { href: '/admin/payments', label: 'Pagos', icon: CreditCard },
     {
+        label: 'Lealtad',
+        icon: Gift,
+        children: [
+            { href: '/admin/loyalty/config', label: 'Configuración' },
+            { href: '/admin/loyalty/rewards', label: 'Recompensas' },
+            { href: '/admin/loyalty/redemptions', label: 'Canjes' },
+            { href: '/admin/loyalty/adjust', label: 'Ajustar puntos' },
+        ],
+    },
+    {
         label: 'Reportes',
         icon: TrendingUp,
         children: [
