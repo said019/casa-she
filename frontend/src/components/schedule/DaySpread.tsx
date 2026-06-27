@@ -29,14 +29,14 @@ export function DaySpread({ weekDays, selectedDate, onSelectDate, classes, now, 
               onClick={() => onSelectDate(d)}
               className={`min-w-[60px] sm:min-w-[64px] border px-2 py-2 text-center transition-none ${
                 selected
-                  ? "bg-bmb-gold text-bmb-ink border-bmb-gold"
+                  ? "bg-bmb-gold text-bmb-cream border-bmb-gold"
                   : today
                     ? "border-bmb-gold text-bmb-ink"
                     : "border-bmb-ink/20 text-bmb-ink/75"
               }`}
             >
               <div className="editorial-caption-sm opacity-70">{format(d, "EEE", { locale: es })}</div>
-              <div className={`mt-1 font-heading italic text-lg sm:text-2xl leading-none ${selected ? "text-bmb-ink" : ""}`}>
+              <div className={`mt-1 font-heading italic text-lg sm:text-2xl leading-none ${selected ? "text-bmb-cream" : ""}`}>
                 {format(d, "d")}
               </div>
             </button>

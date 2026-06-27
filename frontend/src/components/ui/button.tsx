@@ -10,7 +10,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-bmb-dark hover:bg-primary/90 shadow-sm rounded-sm",
+          "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm rounded-sm",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm",
         outline:
@@ -19,8 +19,8 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-sm",
         ghost: "hover:bg-accent hover:text-accent-foreground rounded-sm",
         link: "text-primary underline-offset-4 hover:underline",
-        hero: "bg-primary text-bmb-dark hover:bg-primary/90 shadow-lg hover:shadow-xl hover:-translate-y-0.5 rounded-sm",
-        heroOutline: "border-2 border-primary/40 bg-transparent text-foreground hover:bg-primary hover:text-bmb-dark hover:border-primary rounded-sm",
+        hero: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg hover:shadow-xl hover:-translate-y-0.5 rounded-sm",
+        heroOutline: "border-2 border-primary/40 bg-transparent text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary rounded-sm",
         sage: "bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-md hover:shadow-lg rounded-sm",
         minimal: "bg-transparent text-foreground hover:text-primary underline-offset-4 hover:underline",
       },
