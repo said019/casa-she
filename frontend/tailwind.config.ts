@@ -88,6 +88,19 @@ export default {
           // `ink` es alias semántico para texto/editorial.
           ink: "#2E1B22",      // Ciruela — texto
         },
+        // Casa Shé — tokens canónicos del sistema visual (preferir estos de aquí en adelante)
+        casa: {
+          verde: "#2A4E36",    // Verde Casa — primario
+          profundo: "#16261A", // Verde profundo — secciones oscuras
+          avena: "#F6F0E4",    // Avena — fondo
+          musgo: "#6C8424",    // Musgo — éxito / disciplina
+          ciruela: "#2E1B22",  // Ciruela — texto
+          arcilla: "#AE4836",  // Arcilla — acento cálido
+          arena: "#D6D5C2",    // Arena — bordes / superficies suaves
+          mostaza: "#B4A248",  // Mostaza — oro / aviso
+        },
+        arcilla: "#AE4836",    // acento de marca (distinto del semántico destructive)
+        mostaza: "#B4A248",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
