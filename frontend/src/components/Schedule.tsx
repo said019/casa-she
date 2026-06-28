@@ -51,11 +51,12 @@ interface ScheduleProps {
 
 // Disciplinas de Casa Shé con su color de la paleta de marca (para la leyenda).
 const DISCIPLINES: { label: string; color: string }[] = [
-  { label: "Pilates Mat", color: "#2A4E36" }, // Verde Casa
-  { label: "Yoga", color: "#6C8424" },        // Musgo
-  { label: "Aeroyoga", color: "#AE4836" },    // Arcilla
-  { label: "Telas", color: "#B4A248" },       // Mostaza
-  { label: "Taller", color: "#2E1B22" },      // Ciruela
+  { label: "Pilates Mat", color: "#2A4E36" },    // Verde Casa
+  { label: "Barre", color: "#B4A248" },          // Mostaza
+  { label: "Sculpt", color: "#AE4836" },         // Arcilla
+  { label: "Yoga Ashtanga", color: "#6C8424" },  // Musgo
+  { label: "Yoga Vinyasa", color: "#3E6B4A" },   // Verde medio
+  { label: "Salsa", color: "#2E1B22" },          // Ciruela
 ];
 
 export default function Schedule({ bookedIds, defaultFirstFacility }: ScheduleProps = {}) {

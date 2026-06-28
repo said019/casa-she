@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 const STATS = [
-  { value: "4", label: "disciplinas" },
+  { value: "6", label: "disciplinas" },
   { value: "6–7", label: "lugares por clase" },
   { value: "Condesa", label: "Ciudad de México" },
 ];
@@ -37,7 +37,7 @@ export default function Hero() {
           </h1>
 
           <p className="mt-6 max-w-xl font-heading italic text-lg leading-relaxed text-bmb-cream/85 lg:text-xl">
-            Pilates Mat, Yoga, Aeroyoga y Telas. Una casa para moverte, nutrirte y
+            Pilates Mat, Barre, Sculpt, Yoga y Salsa. Una casa para moverte, nutrirte y
             reconectar con tu cuerpo en comunidad. Aquí, la comunidad es la medicina.
           </p>
 

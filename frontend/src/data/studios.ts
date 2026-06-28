@@ -67,7 +67,7 @@ const studioDirectory: Record<string, StudioInfo> = {
   bmb: {
     slug: 'bmb',
     name: 'Casa Shé',
-    tagline: 'Pilates Mat, Yoga, Aeroyoga y Telas — en Condesa, CDMX.',
+    tagline: 'Pilates Mat, Barre, Sculpt, Yoga y Salsa — en Condesa, CDMX.',
     description:
       'Estudio de wellness para mujeres con clases en grupos pequeños y atención personalizada. Membresías por créditos: Mat, Multiclases y Mixtas.',
     addressLine: 'Alfonso Reyes 131, Condesa',

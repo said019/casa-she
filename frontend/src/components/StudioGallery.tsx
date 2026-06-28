@@ -14,7 +14,7 @@ type Shot = { src: string; alt: string; tag: string; index: string; span: string
 const SHOTS: Shot[] = [
   { src: "/studio/reformers-vertical.webp", alt: "Salón y espejo luna en Casa Shé Condesa", tag: "Mat", index: "01", span: "md:col-span-2 md:row-span-2" },
   { src: "/studio/recepcion.webp", alt: "Recepción de Casa Shé Condesa", tag: "Recepción", index: "02", span: "md:col-span-4" },
-  { src: "/studio/barre.webp", alt: "Salón con espejos en Casa Shé Condesa", tag: "Telas", index: "03", span: "md:col-span-2" },
+  { src: "/studio/barre.webp", alt: "Salón con espejos en Casa Shé Condesa", tag: "Barre", index: "03", span: "md:col-span-2" },
   { src: "/studio/ambiente.webp", alt: "Salón de Casa Shé Condesa en luz cálida de ambiente", tag: "Ambiente", index: "04", span: "md:col-span-2" },
   { src: "/studio/salon.webp", alt: "Salón principal de Casa Shé Condesa en luz de tarde", tag: "Salón", index: "05", span: "md:col-span-6" },
 ];
