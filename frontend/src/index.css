@@ -35,8 +35,13 @@
     --accent: 47 32% 84%;
     --accent-foreground: 338 26% 16%;
 
-    --destructive: 15 59% 45%;
+    /* Error separado del Arcilla (más rojo) para no confundirse con el acento cálido */
+    --destructive: 5 62% 44%;
     --destructive-foreground: 44 78% 96%;
+
+    /* Arcilla como token de acento de marca (ya no es el semántico de error) */
+    --arcilla: 9 53% 45%;
+    --mostaza: 50 43% 49%;
 
     --border: 47 22% 78%;
     --input: 47 22% 78%;
@@ -65,13 +70,13 @@
     --admin-panel: 40 45% 96%;
     --admin-rail: 47 28% 88%;
 
-    /* Casa Shé semantic status colors */
-    --success: 135 23% 30%;
+    /* Casa Shé semantic status colors (armonizados con el sistema) */
+    --success: 78 56% 33%;        /* Musgo #6C8424 */
     --success-foreground: 44 78% 96%;
-    --warning: 51 50% 47%;
+    --warning: 50 43% 49%;        /* Mostaza #B4A248 */
     --warning-foreground: 338 26% 14%;
-    --info: 47 26% 55%;
-    --info-foreground: 338 26% 14%;
+    --info: 174 16% 37%;          /* Teal apagado #4F6D6A */
+    --info-foreground: 44 78% 96%;
 
     --sidebar-background: 40 45% 96%;
     --sidebar-foreground: 338 26% 14%;
@@ -106,18 +111,18 @@
     --accent: 51 30% 32%;
     --accent-foreground: 44 60% 92%;
 
-    --destructive: 15 55% 44%;
+    --destructive: 6 60% 52%;
     --destructive-foreground: 44 60% 96%;
 
     --border: 135 12% 20%;
     --input: 135 12% 20%;
     --ring: 135 22% 50%;
 
-    --success: 135 25% 48%;
+    --success: 78 45% 45%;        /* Musgo */
     --success-foreground: 135 27% 10%;
-    --warning: 51 50% 55%;
+    --warning: 50 46% 56%;        /* Mostaza */
     --warning-foreground: 135 27% 10%;
-    --info: 47 24% 58%;
+    --info: 174 22% 50%;          /* Teal */
     --info-foreground: 135 27% 10%;
 
     --sidebar-background: 135 27% 11%;
