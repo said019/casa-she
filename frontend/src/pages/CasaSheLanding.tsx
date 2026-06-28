@@ -41,10 +41,10 @@ const CARDS: Card[] = [
 
 const PILLARS = [
   {
-    eyebrow: "Pilates Mat · Yoga · Aeroyoga · Telas",
+    eyebrow: "Pilates Mat · Barre · Sculpt · Yoga · Salsa",
     title: "Movimiento",
     img: "/casashe/pilates.jpg",
-    text: "Desde la precisión de Pilates Mat hasta la intensidad transformadora de Esculpe, nuestras clases fortalecen cada parte de tu cuerpo. Complementamos con la serenidad del Yoga y Aeroyoga, cerrando el círculo con la expresión artística de Telas.",
+    text: "Desde la precisión del Pilates Mat hasta la definición del Sculpt y la postura del Barre, nuestras clases fortalecen cada parte de tu cuerpo. Complementamos con la serenidad del Yoga —Ashtanga y Vinyasa— y cerramos el círculo con la energía de la Salsa.",
   },
   {
     eyebrow: "Diseña tu estilo de vida",
@@ -70,30 +70,31 @@ const NAV = [
 ];
 
 // Horario de muestra (se usa cuando aún no hay clases cargadas en el sistema).
-// Refleja las franjas reales: L–V 7–13 y 17–22, fines 8–13, talleres fin de semana.
+// Refleja las franjas reales: L–V 7–13 y 17–22, fines de semana 8–14.
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"] as const;
 
-// Meta por disciplina — color de la paleta secundaria del brand book
-// (Verde Casa, Musgo, Arcilla, Ciruela, Arena), duración y cupo reales del catálogo.
+// Meta por disciplina — color de la paleta de marca (Verde Casa, Mostaza, Arcilla,
+// Musgo, Ciruela), igual que la leyenda del calendario. Duración y cupo del catálogo.
 const DISCIPLINE_META: Record<string, { color: string; dur: number; cupo: number }> = {
-  "Pilates Mat": { color: "#2E5D3F", dur: 50, cupo: 7 }, // Verde Casa
-  Yoga: { color: "#6C8424", dur: 60, cupo: 7 }, // Musgo
-  Aeroyoga: { color: "#B0805F", dur: 60, cupo: 6 }, // Arcilla
-  Telas: { color: "#7A4F57", dur: 60, cupo: 6 }, // Ciruela
-  Taller: { color: "#C0A06A", dur: 90, cupo: 7 }, // Arena
+  "Pilates Mat": { color: "#2A4E36", dur: 50, cupo: 7 },   // Verde Casa
+  "Barre": { color: "#B4A248", dur: 50, cupo: 8 },         // Mostaza
+  "Sculpt": { color: "#AE4836", dur: 50, cupo: 8 },        // Arcilla
+  "Yoga Ashtanga": { color: "#6C8424", dur: 60, cupo: 7 }, // Musgo
+  "Yoga Vinyasa": { color: "#3E6B4A", dur: 60, cupo: 7 },  // Verde medio
+  "Salsa": { color: "#2E1B22", dur: 60, cupo: 10 },        // Ciruela
 };
 const metaFor = (name: string) => DISCIPLINE_META[name] ?? { color: GREEN, dur: 60, cupo: 7 };
 
 type ClassSlot = { time: string; name: string; coach?: string };
 
 const SAMPLE_WEEK: Record<string, ClassSlot[]> = {
-  Lun: [{ time: "07:00", name: "Pilates Mat", coach: "Renata" }, { time: "09:00", name: "Yoga", coach: "Sofía" }, { time: "19:00", name: "Pilates Mat", coach: "Camila" }],
-  Mar: [{ time: "07:00", name: "Aeroyoga", coach: "Valentina" }, { time: "18:00", name: "Pilates Mat", coach: "Renata" }, { time: "19:00", name: "Telas", coach: "Daniela" }],
-  Mié: [{ time: "08:00", name: "Yoga", coach: "Sofía" }, { time: "10:00", name: "Pilates Mat", coach: "Camila" }, { time: "20:00", name: "Telas", coach: "Daniela" }],
-  Jue: [{ time: "07:00", name: "Aeroyoga", coach: "Valentina" }, { time: "18:00", name: "Pilates Mat", coach: "Renata" }, { time: "19:00", name: "Yoga", coach: "Mariana" }],
-  Vie: [{ time: "07:00", name: "Pilates Mat", coach: "Camila" }, { time: "09:00", name: "Yoga", coach: "Sofía" }, { time: "20:00", name: "Telas", coach: "Daniela" }],
-  Sáb: [{ time: "09:00", name: "Yoga", coach: "Mariana" }, { time: "10:00", name: "Aeroyoga", coach: "Valentina" }, { time: "14:00", name: "Taller", coach: "Andrea" }],
-  Dom: [{ time: "10:00", name: "Pilates Mat", coach: "Renata" }, { time: "11:00", name: "Taller", coach: "Andrea" }],
+  Lun: [{ time: "07:00", name: "Pilates Mat", coach: "Renata" }, { time: "09:00", name: "Yoga Vinyasa", coach: "Sofía" }, { time: "19:00", name: "Barre", coach: "Camila" }],
+  Mar: [{ time: "07:00", name: "Yoga Ashtanga", coach: "Valentina" }, { time: "18:00", name: "Pilates Mat", coach: "Renata" }, { time: "19:00", name: "Sculpt", coach: "Daniela" }],
+  Mié: [{ time: "08:00", name: "Yoga Vinyasa", coach: "Sofía" }, { time: "10:00", name: "Pilates Mat", coach: "Camila" }, { time: "20:00", name: "Salsa", coach: "Daniela" }],
+  Jue: [{ time: "07:00", name: "Barre", coach: "Valentina" }, { time: "18:00", name: "Pilates Mat", coach: "Renata" }, { time: "19:00", name: "Yoga Ashtanga", coach: "Mariana" }],
+  Vie: [{ time: "07:00", name: "Pilates Mat", coach: "Camila" }, { time: "09:00", name: "Sculpt", coach: "Sofía" }, { time: "20:00", name: "Salsa", coach: "Daniela" }],
+  Sáb: [{ time: "09:00", name: "Yoga Vinyasa", coach: "Mariana" }, { time: "10:00", name: "Barre", coach: "Valentina" }, { time: "14:00", name: "Salsa", coach: "Andrea" }],
+  Dom: [{ time: "10:00", name: "Pilates Mat", coach: "Renata" }, { time: "11:00", name: "Yoga Ashtanga", coach: "Andrea" }],
 };
 
 interface ApiClass {
@@ -220,7 +221,7 @@ function Hero() {
           className="mx-auto w-[min(82vw,620px)]"
         />
         <p className={`${body} mx-auto mt-8 max-w-xl text-base tracking-[0.12em] sm:text-lg`}>
-          Pilates · Nutrición · Community · Talleres · Salsa
+          Pilates · Barre · Sculpt · Yoga · Salsa · Community
         </p>
         <p className={`${body} mt-2 text-sm tracking-[0.18em] opacity-80`}>
           Alfonso Reyes 131, Condesa · CDMX
@@ -316,7 +317,7 @@ function Servicios() {
             Una experiencia 360°
           </h2>
           <p className={`${body} mt-4 text-base tracking-[0.18em]`} style={{ color: GREEN, opacity: 0.7 }}>
-            Pilates Mat · Yoga · Aeroyoga · Telas
+            Pilates Mat · Barre · Sculpt · Yoga · Salsa
           </p>
         </div>
 

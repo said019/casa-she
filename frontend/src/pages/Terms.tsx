@@ -144,8 +144,8 @@ export default function Terms() {
                             <section id="servicios" className="space-y-4">
                                 <h2 className="font-heading text-2xl font-semibold">Servicios</h2>
                                 <p className="text-muted-foreground leading-relaxed">
-                                    Casa Shé ofrece clases de entrenamiento físico (incluyendo pero no limitado a Pilates,
-                                    Yoga, Aeroyoga y Telas), talleres y eventos relacionados con el bienestar.
+                                    Casa Shé ofrece clases de entrenamiento físico (incluyendo pero no limitado a Pilates Mat,
+                                    Barre, Sculpt, Yoga y Salsa), talleres y eventos relacionados con el bienestar.
                                 </p>
                                 <p className="text-muted-foreground leading-relaxed">
                                     Nos reservamos el derecho de modificar horarios, instructores y tipos de clase según sea necesario
