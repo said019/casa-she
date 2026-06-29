@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { CasaShePattern } from "@/components/CasaShePattern";
 
 /**
  * Landing público de Casa Shé — réplica fiel de https://casashe.mx/
@@ -270,14 +271,7 @@ function Paquetes() {
                   />
                 ) : (
                   <div className="relative h-full w-full transition-transform duration-500 group-hover:scale-105" style={{ backgroundColor: c.color || GREEN }}>
-                    <svg className="absolute inset-0 h-full w-full" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style={{ opacity: 0.14 }}>
-                      <g fill="none" stroke={CREAM} strokeWidth="11" strokeLinecap="round">
-                        <path d="M-20 120 C 120 80, 180 220, 340 180 S 470 120, 470 120" />
-                        <path d="M-20 270 C 120 240, 220 370, 360 330 S 470 290, 470 290" />
-                        <path d="M90 -20 C 110 130, 30 230, 120 430" />
-                        <path d="M300 -20 C 350 140, 270 250, 360 430" />
-                      </g>
-                    </svg>
+                    <CasaShePattern className="absolute inset-0 h-full w-full" accent="rgba(246,240,228,0.12)" />
                     <img src="/casashe/logo-monogram-cream.png" alt="" aria-hidden="true" className="absolute right-5 top-5 h-12 w-12 object-contain" style={{ opacity: 0.92 }} />
                     <span className={`${display} absolute bottom-6 left-6 right-6 text-[2.6rem] leading-none`} style={{ color: CREAM }}>
                       {c.artTitle || c.title}
