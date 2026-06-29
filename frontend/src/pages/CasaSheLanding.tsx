@@ -271,7 +271,7 @@ function Paquetes() {
                   />
                 ) : (
                   <div className="relative h-full w-full transition-transform duration-500 group-hover:scale-105" style={{ backgroundColor: c.color || GREEN }}>
-                    <CasaShePattern className="absolute inset-0 h-full w-full" accent="rgba(246,240,228,0.12)" />
+                    <CasaShePattern className="absolute inset-0 h-full w-full" opacity={0.5} />
                     <img src="/casashe/logo-monogram-cream.png" alt="" aria-hidden="true" className="absolute right-5 top-5 h-12 w-12 object-contain" style={{ opacity: 0.92 }} />
                     <span className={`${display} absolute bottom-6 left-6 right-6 text-[2.6rem] leading-none`} style={{ color: CREAM }}>
                       {c.artTitle || c.title}
