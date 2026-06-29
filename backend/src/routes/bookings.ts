@@ -350,7 +350,7 @@ router.post('/bulk-month', authenticate, requireRole('admin'), async (req: Reque
         if (bulkCatRemaining !== null && bulkCatRemaining < targetClasses.length) {
             await client.query('ROLLBACK');
             return res.status(400).json({
-                error: `Membresía insuficiente. Se requieren ${targetClasses.length} créditos de ${bulkCategory === 'reformer' ? 'Reformer' : 'Multiclases'}, tiene ${bulkCatRemaining}.`
+                error: `Membresía insuficiente. Se requieren ${targetClasses.length} créditos de ${bulkCategory === 'reformer' ? 'Salsa' : 'Clases'}, tiene ${bulkCatRemaining}.`
             });
         }
 
@@ -667,7 +667,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                         await client.query('ROLLBACK');
                         releaseClient();
                         return res.status(403).json({
-                            error: `Tu membresía no incluye clases de ${cat === 'reformer' ? 'Reformer' : 'Multiclases'} o ya no te quedan créditos.`,
+                            error: `Tu membresía no incluye clases de ${cat === 'reformer' ? 'Salsa' : 'Clases'} o ya no te quedan créditos.`,
                         });
                     }
                     const studioErr = studioBookingError(
