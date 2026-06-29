@@ -22,11 +22,13 @@ const display = "font-heading"; // Instrument Serif (display oficial de marca)
 
 type Card = {
   title: string;
-  img: string;
+  img?: string;            // foto de tarjeta; si falta, se genera un panel con `color`
   price: string;
   was?: string;
   hint: string;
   oferta?: boolean;
+  color?: string;          // panel generado (sin imagen), p. ej. Salsa
+  artTitle?: string;       // título grande dentro del panel generado
 };
 
 const CARDS: Card[] = [
@@ -37,6 +39,8 @@ const CARDS: Card[] = [
   { title: "PAQUETE 5 CLASES", img: "/casashe/card-5.jpeg", price: "$1,350", hint: "5 créditos · vigencia 1 mes" },
   { title: "CLASE SUELTA", img: "/casashe/card-suelta.jpeg", price: "$280", was: "$300", hint: "1 clase drop-in", oferta: true },
   { title: "CLASE MUESTRA", img: "/casashe/card-muestra.jpeg", price: "$150", hint: "Tu primera vez en casa" },
+  { title: "SALSA · 1 CLASE", price: "$180", hint: "1 clase de Salsa", color: "#2E1B22", artTitle: "Salsa" },
+  { title: "SALSA · 4 CLASES", price: "$600", hint: "4 clases de Salsa · vigencia 1 mes", color: "#2E1B22", artTitle: "Salsa" },
 ];
 
 const PILLARS = [
@@ -258,11 +262,28 @@ function Paquetes() {
               style={{ borderColor: "rgba(39,74,42,0.10)", boxShadow: "0 1px 0 rgba(39,74,42,0.06)" }}
             >
               <div className="relative aspect-square overflow-hidden">
-                <img
-                  src={c.img}
-                  alt={c.title}
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
+                {c.img ? (
+                  <img
+                    src={c.img}
+                    alt={c.title}
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="relative h-full w-full transition-transform duration-500 group-hover:scale-105" style={{ backgroundColor: c.color || GREEN }}>
+                    <svg className="absolute inset-0 h-full w-full" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style={{ opacity: 0.14 }}>
+                      <g fill="none" stroke={CREAM} strokeWidth="11" strokeLinecap="round">
+                        <path d="M-20 120 C 120 80, 180 220, 340 180 S 470 120, 470 120" />
+                        <path d="M-20 270 C 120 240, 220 370, 360 330 S 470 290, 470 290" />
+                        <path d="M90 -20 C 110 130, 30 230, 120 430" />
+                        <path d="M300 -20 C 350 140, 270 250, 360 430" />
+                      </g>
+                    </svg>
+                    <img src="/casashe/logo-monogram-cream.png" alt="" aria-hidden="true" className="absolute right-5 top-5 h-12 w-12 object-contain" style={{ opacity: 0.92 }} />
+                    <span className={`${display} absolute bottom-6 left-6 right-6 text-[2.6rem] leading-none`} style={{ color: CREAM }}>
+                      {c.artTitle || c.title}
+                    </span>
+                  </div>
+                )}
                 {c.oferta && (
                   <span
                     className={`${body} absolute left-4 top-4 rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.2em]`}
