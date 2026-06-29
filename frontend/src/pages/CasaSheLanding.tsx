@@ -34,7 +34,7 @@ const CARDS: Card[] = [
   { title: "MEMBRESÍA 360", img: "/casashe/card-360.jpeg", price: "$3,600", was: "$3,800", hint: "16 créditos al mes", oferta: true },
   { title: "PAQUETE 12 CLASES", img: "/casashe/card-12.jpeg", price: "$2,880", hint: "12 créditos · vigencia 1 mes" },
   { title: "PAQUETE 8 CLASES", img: "/casashe/card-8.jpeg", price: "$2,000", hint: "8 créditos · vigencia 1 mes" },
-  { title: "PAQUETE 5 CLASES", img: "/casashe/card-5.jpeg", price: "$1,300", hint: "5 créditos · vigencia 1 mes" },
+  { title: "PAQUETE 5 CLASES", img: "/casashe/card-5.jpeg", price: "$1,350", hint: "5 créditos · vigencia 1 mes" },
   { title: "CLASE SUELTA", img: "/casashe/card-suelta.jpeg", price: "$280", was: "$300", hint: "1 clase drop-in", oferta: true },
   { title: "CLASE MUESTRA", img: "/casashe/card-muestra.jpeg", price: "$150", hint: "Tu primera vez en casa" },
 ];
