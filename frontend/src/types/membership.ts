@@ -55,7 +55,7 @@ export function categoryCredits(m?: ClientMembership | null): CategoryCredit[] {
   const includesMulti = m.multi_credits === null || (m.multi_credits ?? 0) > 0;
   if (includesReformer) {
     out.push({
-      key: 'reformer', label: 'Reformer',
+      key: 'reformer', label: 'Salsa',
       remaining: m.reformer_remaining ?? null,
       total: m.reformer_credits ?? null,
       unlimited: m.reformer_remaining === null || m.reformer_remaining === undefined,
@@ -63,7 +63,7 @@ export function categoryCredits(m?: ClientMembership | null): CategoryCredit[] {
   }
   if (includesMulti) {
     out.push({
-      key: 'multi', label: 'Multi',
+      key: 'multi', label: 'Clases',
       remaining: m.multi_remaining ?? null,
       total: m.multi_credits ?? null,
       unlimited: m.multi_remaining === null || m.multi_remaining === undefined,
