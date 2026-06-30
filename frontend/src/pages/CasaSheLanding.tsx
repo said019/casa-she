@@ -83,15 +83,15 @@ const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"] as const;
 
 // Meta por disciplina — color de la paleta de marca (Verde Casa, Mostaza, Arcilla,
 // Musgo, Ciruela), igual que la leyenda del calendario. Duración y cupo del catálogo.
-const DISCIPLINE_META: Record<string, { color: string; dur: number; cupo: number }> = {
-  "Pilates Mat": { color: "#2A4E36", dur: 50, cupo: 7 },   // Verde Casa
-  "Barre": { color: "#B4A248", dur: 50, cupo: 8 },         // Mostaza
-  "Sculpt": { color: "#AE4836", dur: 50, cupo: 8 },        // Arcilla
-  "Yoga Ashtanga": { color: "#6C8424", dur: 60, cupo: 7 }, // Musgo
-  "Yoga Vinyasa": { color: "#3E6B4A", dur: 60, cupo: 7 },  // Verde medio
-  "Salsa": { color: "#2E1B22", dur: 60, cupo: 10 },        // Ciruela
+const DISCIPLINE_META: Record<string, { color: string; dur: number; cupo: number; desc: string }> = {
+  "Pilates Mat": { color: "#2A4E36", dur: 50, cupo: 7, desc: "Core, control y alineación en colchoneta. Fuerza profunda sin impacto, ideal para todos los niveles." },   // Verde Casa
+  "Barre": { color: "#B4A248", dur: 50, cupo: 8, desc: "Ballet, yoga y pilates en una sola clase. Movimientos pequeños y precisos para tonificar y mejorar la postura." },         // Mostaza
+  "Sculpt": { color: "#AE4836", dur: 50, cupo: 8, desc: "Pesos ligeros y muchas repeticiones para definir, tonificar y subir el ritmo cardíaco." },        // Arcilla
+  "Yoga Ashtanga": { color: "#6C8424", dur: 60, cupo: 7, desc: "Secuencia dinámica y estructurada que construye fuerza, flexibilidad y enfoque mental." }, // Musgo
+  "Yoga Vinyasa": { color: "#3E6B4A", dur: 60, cupo: 7, desc: "Flujo de posturas al ritmo de la respiración. Movilidad, equilibrio y calma en movimiento." },  // Verde medio
+  "Salsa": { color: "#2E1B22", dur: 60, cupo: 10, desc: "Ritmo, cuerpo y comunidad. Suelta el cuerpo, aprende pasos y conéctate con la energía del grupo." },        // Ciruela
 };
-const metaFor = (name: string) => DISCIPLINE_META[name] ?? { color: GREEN, dur: 60, cupo: 7 };
+const metaFor = (name: string) => DISCIPLINE_META[name] ?? { color: GREEN, dur: 60, cupo: 7, desc: "Una clase pensada para moverte, sentirte bien y conectar contigo misma." };
 
 type ClassSlot = { time: string; name: string; coach?: string };
 
@@ -366,31 +366,118 @@ function Servicios() {
 
 function ClassChip({ c }: { c: ClassSlot }) {
   const m = metaFor(c.name);
+  const [open, setOpen] = useState(false);
+
+  // Cerrar con Escape y bloquear el scroll del fondo mientras el detalle está abierto.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+  }, [open]);
+
   return (
-    <Link
-      to="/register"
-      className="group block rounded-xl p-3 text-left transition-all hover:-translate-y-0.5"
-      style={{ backgroundColor: CREAM, boxShadow: `inset 0 0 0 1px rgba(39,74,42,0.10)`, borderLeft: `3px solid ${m.color}` }}
-    >
-      <div className="flex items-baseline justify-between gap-2">
-        <span className={`${display} text-xl leading-none`} style={{ color: GREEN }}>{c.time}</span>
-        <span className={`${body} text-[10px] uppercase tracking-[0.12em]`} style={{ color: GREEN, opacity: 0.45 }}>
-          {m.dur}′
-        </span>
-      </div>
-      <p className={`${body} mt-1.5 flex items-center gap-1.5 text-[13px] font-medium leading-tight`} style={{ color: GREEN }}>
-        <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: m.color }} />
-        {c.name}
-      </p>
-      {c.coach && (
-        <p className={`${body} mt-0.5 text-[11px] leading-tight`} style={{ color: GREEN, opacity: 0.55 }}>
-          con {c.coach}
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="group block w-full rounded-xl p-3 text-left transition-all hover:-translate-y-0.5 active:scale-[0.98]"
+        style={{ backgroundColor: CREAM, boxShadow: `inset 0 0 0 1px rgba(39,74,42,0.10)`, borderLeft: `3px solid ${m.color}` }}
+      >
+        <div className="flex items-baseline justify-between gap-2">
+          <span className={`${display} text-xl leading-none`} style={{ color: GREEN }}>{c.time}</span>
+          <span className={`${body} text-[10px] uppercase tracking-[0.12em]`} style={{ color: GREEN, opacity: 0.45 }}>
+            {m.dur}′
+          </span>
+        </div>
+        <p className={`${body} mt-1.5 flex items-center gap-1.5 text-[13px] font-medium leading-tight`} style={{ color: GREEN }}>
+          <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: m.color }} />
+          {c.name}
         </p>
+        {c.coach && (
+          <p className={`${body} mt-0.5 text-[11px] leading-tight`} style={{ color: GREEN, opacity: 0.55 }}>
+            con {c.coach}
+          </p>
+        )}
+        <p className={`${body} mt-1 text-[10px] uppercase tracking-[0.1em] transition-opacity group-hover:opacity-100`} style={{ color: m.color, opacity: 0.7 }}>
+          Ver detalles →
+        </p>
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-[120] flex items-end justify-center p-0 sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Detalle de ${c.name}`}
+          onClick={() => setOpen(false)}
+        >
+          <div className="absolute inset-0" style={{ backgroundColor: "rgba(22,38,26,0.55)", backdropFilter: "blur(2px)" }} />
+          <div
+            className="relative w-full max-w-sm overflow-hidden rounded-t-[1.8rem] shadow-2xl sm:rounded-[1.8rem]"
+            style={{ backgroundColor: CREAM, animation: "scaleIn 220ms cubic-bezier(0.23,1,0.32,1)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Encabezado con el color de la disciplina + patrón tonal */}
+            <div className="relative overflow-hidden p-6 pb-7" style={{ backgroundColor: m.color }}>
+              <CasaShePattern className="pointer-events-none absolute inset-0 h-full w-full opacity-90" color="rgba(0,0,0,0.18)" />
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Cerrar"
+                className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none transition-transform active:scale-90"
+                style={{ backgroundColor: "rgba(255,255,255,0.16)", color: CREAM }}
+              >
+                ✕
+              </button>
+              <p className={`${body} relative text-[11px] uppercase tracking-[0.28em]`} style={{ color: CREAM, opacity: 0.85 }}>
+                {c.time} · {m.dur} min
+              </p>
+              <h3 className={`${display} relative mt-1.5 text-4xl font-light leading-none`} style={{ color: CREAM }}>
+                {c.name}
+              </h3>
+            </div>
+
+            {/* Cuerpo con descripción y datos de la clase */}
+            <div className="p-6">
+              <p className={`${body} text-[15px] leading-relaxed`} style={{ color: GREEN, opacity: 0.85 }}>
+                {m.desc}
+              </p>
+
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                {c.coach && (
+                  <div className="rounded-xl p-3" style={{ backgroundColor: "rgba(39,74,42,0.06)" }}>
+                    <p className={`${body} text-[10px] uppercase tracking-[0.16em]`} style={{ color: GREEN, opacity: 0.5 }}>Coach</p>
+                    <p className={`${body} mt-0.5 text-sm font-medium`} style={{ color: GREEN }}>{c.coach}</p>
+                  </div>
+                )}
+                <div className="rounded-xl p-3" style={{ backgroundColor: "rgba(39,74,42,0.06)" }}>
+                  <p className={`${body} text-[10px] uppercase tracking-[0.16em]`} style={{ color: GREEN, opacity: 0.5 }}>Cupo</p>
+                  <p className={`${body} mt-0.5 text-sm font-medium`} style={{ color: GREEN }}>{m.cupo} lugares</p>
+                </div>
+              </div>
+
+              <Link
+                to="/register"
+                className={`${body} mt-6 block rounded-full py-3.5 text-center text-[12px] uppercase tracking-[0.22em] transition-transform active:scale-[0.98]`}
+                style={{ backgroundColor: GREEN, color: CREAM }}
+              >
+                Crear cuenta para reservar
+              </Link>
+              <Link
+                to="/login"
+                className={`${body} mt-3 block text-center text-[12px]`}
+                style={{ color: GREEN, opacity: 0.6 }}
+              >
+                Ya tengo cuenta · Iniciar sesión
+              </Link>
+            </div>
+          </div>
+        </div>
       )}
-      <p className={`${body} mt-1 text-[10px] uppercase tracking-[0.1em]`} style={{ color: m.color, opacity: 0.85 }}>
-        {m.cupo} lugares
-      </p>
-    </Link>
+    </>
   );
 }
 
