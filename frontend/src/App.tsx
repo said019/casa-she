@@ -125,6 +125,7 @@ import CommissionsPage from "./pages/admin/commissions/CommissionsPage";
 import CoachPayrollPage from "./pages/admin/payroll/CoachPayrollPage";
 import ReceptionStaffList from "./pages/admin/reception/ReceptionStaffList";
 import SubstitutionsAdmin from "./pages/admin/substitutions/SubstitutionsAdmin";
+import PushBroadcast from "./pages/admin/notifications/Broadcast";
 
 // Reception layout + pages
 import { AuthGuard } from "./components/layout/AuthGuard";
@@ -313,6 +314,8 @@ const App = () => (
             <Route path="/admin/settings/whatsapp" element={<WhatsAppSettings />} />
             <Route path="/admin/settings/onboarding" element={<AdminOnboardingRules />} />
             <Route path="/admin/settings" element={<Navigate to="/admin/settings/general" replace />} />
+
+            <Route path="/admin/notifications/difusion" element={<PushBroadcast />} />
 
             {/* Migration History Route - Only for reports */}
             <Route path="/admin/migrations/history" element={<ClientMigrationPage />} />
