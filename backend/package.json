@@ -20,6 +20,7 @@
         "@types/node": "^20.10.5",
         "@types/nodemailer": "^7.0.5",
         "@types/pg": "^8.10.9",
+        "@types/web-push": "^3.6.4",
         "axios": "^1.7.2",
         "bcryptjs": "^2.4.3",
         "cloudinary": "^2.9.0",
@@ -43,7 +44,6 @@
     },
     "devDependencies": {
         "@types/node-cron": "^3.0.11",
-        "@types/web-push": "^3.6.4",
         "tsx": "^4.7.0"
     }
 }
