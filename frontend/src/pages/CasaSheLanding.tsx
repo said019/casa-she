@@ -29,21 +29,22 @@ type Card = {
   oferta?: boolean;
   color: string;           // color del panel generado (nítido, sin imagen pixelada)
   artTitle: string;        // título grande dentro del panel
+  tagline: string;         // frase descriptiva bajo el título (como el diseño original)
   light?: boolean;         // fondo claro → texto/monograma oscuros
 };
 
-// Todas las tarjetas se generan con CSS (panel + patrón + título serif) para que
-// sean nítidas a cualquier tamaño (las fotos card-*.jpeg eran de baja resolución).
+// Todas las tarjetas se generan con CSS (panel + patrón + título serif + frase) para
+// que sean nítidas a cualquier tamaño (las fotos card-*.jpeg eran de baja resolución).
 const CARDS: Card[] = [
-  { title: "MEMBRESÍA SHE BLACK", color: "#2E1B22", artTitle: "Membresía She Black", price: "$4,200", was: "$4,800", hint: "24 créditos · acceso total", oferta: true },
-  { title: "MEMBRESÍA 360", color: "#2A4E36", artTitle: "Membresía 360", price: "$3,600", was: "$3,800", hint: "16 créditos al mes", oferta: true },
-  { title: "PAQUETE 12 CLASES", color: "#AE4836", artTitle: "Paquete 12 clases", price: "$2,880", hint: "12 créditos · vigencia 1 mes" },
-  { title: "PAQUETE 8 CLASES", color: "#8F7F36", artTitle: "Paquete 8 clases", price: "$2,000", hint: "8 créditos · vigencia 1 mes" },
-  { title: "PAQUETE 5 CLASES", color: "#6E4B34", artTitle: "Paquete 5 clases", price: "$1,350", hint: "5 créditos · vigencia 1 mes" },
-  { title: "CLASE SUELTA", color: "#D6D5C2", light: true, artTitle: "Clase suelta", price: "$280", was: "$300", hint: "1 clase drop-in", oferta: true },
-  { title: "CLASE MUESTRA", color: "#E7E0CE", light: true, artTitle: "Clase muestra", price: "$150", hint: "Tu primera vez en casa" },
-  { title: "SALSA · 1 CLASE", color: "#2E1B22", artTitle: "Salsa", price: "$180", hint: "1 clase de Salsa" },
-  { title: "SALSA · 4 CLASES", color: "#2E1B22", artTitle: "Salsa", price: "$600", hint: "4 clases de Salsa · vigencia 1 mes" },
+  { title: "MEMBRESÍA SHE BLACK", color: "#2E1B22", artTitle: "Membresía She Black", tagline: "Nuestra membresía más completa. Bienestar integral para volver a ti.", price: "$4,200", was: "$4,800", hint: "24 créditos · acceso total", oferta: true },
+  { title: "MEMBRESÍA 360", color: "#2A4E36", artTitle: "Membresía 360", tagline: "Tu bienestar integral empieza aquí. Movimiento, balance y comunidad en un solo lugar.", price: "$3,600", was: "$3,800", hint: "16 créditos al mes", oferta: true },
+  { title: "PAQUETE 12 CLASES", color: "#AE4836", artTitle: "Paquete 12 clases", tagline: "Constancia que se siente. Más sesiones para sostener tu práctica.", price: "$2,880", hint: "12 créditos · vigencia 1 mes" },
+  { title: "PAQUETE 8 CLASES", color: "#8F7F36", artTitle: "Paquete 8 clases", tagline: "Tu práctica, a tu ritmo. El balance ideal entre flexibilidad y constancia.", price: "$2,000", hint: "8 créditos · vigencia 1 mes" },
+  { title: "PAQUETE 5 CLASES", color: "#6E4B34", artTitle: "Paquete 5 clases", tagline: "Ideal para empezar. Una forma amable de volver a ti.", price: "$1,350", hint: "5 créditos · vigencia 1 mes" },
+  { title: "CLASE SUELTA", color: "#D6D5C2", light: true, artTitle: "Clase suelta", tagline: "Muévete cuando lo necesites. Flexibilidad para acompañar tu día.", price: "$280", was: "$300", hint: "1 clase drop-in", oferta: true },
+  { title: "CLASE MUESTRA", color: "#E7E0CE", light: true, artTitle: "Clase muestra", tagline: "Ven a sentirlo. Tu primer encuentro con Casa Shé.", price: "$150", hint: "Tu primera vez en casa" },
+  { title: "SALSA · 1 CLASE", color: "#2E1B22", artTitle: "Salsa", tagline: "Ritmo, cuerpo y comunidad. Baila y reconéctate.", price: "$180", hint: "1 clase de Salsa" },
+  { title: "SALSA · 4 CLASES", color: "#2E1B22", artTitle: "Salsa", tagline: "Ritmo, cuerpo y comunidad. Baila y reconéctate.", price: "$600", hint: "4 clases de Salsa · vigencia 1 mes" },
 ];
 
 const PILLARS = [
@@ -267,17 +268,22 @@ function Paquetes() {
               <div className="relative aspect-square overflow-hidden">
                 <div className="relative h-full w-full transition-transform duration-500 group-hover:scale-105" style={{ backgroundColor: c.color }}>
                   <CasaShePattern className="absolute inset-0 h-full w-full" color={c.light ? "rgba(0,0,0,0.10)" : "rgba(0,0,0,0.22)"} />
-                  <img src={c.light ? "/casashe/logo-monogram.png" : "/casashe/logo-monogram-cream.png"} alt="" aria-hidden="true" className="absolute right-5 top-5 h-12 w-12 object-contain" style={{ opacity: 0.9 }} />
-                  <span className={`${display} absolute bottom-6 left-6 right-6 text-[2.5rem] leading-[1.02]`} style={{ color: c.light ? GREEN : CREAM }}>
-                    {c.artTitle}
-                  </span>
+                  <img src={c.light ? "/casashe/logo-monogram.png" : "/casashe/logo-monogram-cream.png"} alt="" aria-hidden="true" className="absolute left-1/2 top-6 h-12 w-12 -translate-x-1/2 object-contain" style={{ opacity: 0.9 }} />
+                  <div className="absolute bottom-6 left-6 right-6">
+                    <span className={`${display} block text-[2.3rem] leading-[1.02]`} style={{ color: c.light ? GREEN : CREAM }}>
+                      {c.artTitle}
+                    </span>
+                    <p className={`${body} mt-3 max-w-[26ch] text-[0.92rem] leading-snug`} style={{ color: c.light ? GREEN : CREAM, opacity: 0.78 }}>
+                      {c.tagline}
+                    </p>
+                  </div>
                 </div>
                 {c.oferta && (
                   <span
-                    className={`${body} absolute left-4 top-4 rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.2em]`}
-                    style={{ backgroundColor: GREEN, color: CREAM }}
+                    className={`${body} absolute right-4 top-4 flex h-[4.2rem] w-[4.2rem] items-center justify-center rounded-full text-center text-[13px]`}
+                    style={{ backgroundColor: "#AE4836", color: CREAM }}
                   >
-                    Oferta
+                    ¡Oferta!
                   </span>
                 )}
               </div>
