@@ -13,7 +13,7 @@
 // strategy or precached files change. The activate handler removes any caches
 // that don't match the current version.
 
-const VERSION = 'br-v4';
+const VERSION = 'br-v5';
 const STATIC_CACHE = `${VERSION}-static`;
 
 self.addEventListener('install', (event) => {
@@ -109,4 +109,34 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+});
+
+// Web Push — mostrar la notificación recibida (aunque la pantalla esté bloqueada)
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try { payload = event.data ? event.data.json() : {}; } catch { payload = {}; }
+  const title = payload.title || 'Casa Shé';
+  const options = {
+    body: payload.body || '',
+    icon: '/casashe/favicon-casashe.png',
+    badge: '/casashe/favicon-casashe.png',
+    tag: payload.tag || undefined,
+    data: { url: payload.url || '/app' },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Click en la notificación — enfocar una pestaña abierta o abrir la app en la pantalla correcta
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/app';
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of all) {
+        if ('focus' in client) { client.focus(); client.navigate(targetUrl); return; }
+      }
+      if (self.clients.openWindow) await self.clients.openWindow(targetUrl);
+    })()
+  );
 });
