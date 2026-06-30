@@ -3351,6 +3351,24 @@ async function runStartupMigrations(): Promise<void> {
       console.log('Onboarding Perfilador: columnas, tabla y reglas aseguradas.');
     } catch (e) { console.error('Onboarding Perfilador migration error:', e); }
 
+    // === Web Push: suscripciones (push_subscriptions) ===
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+          id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id        uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          endpoint       text NOT NULL UNIQUE,
+          p256dh         text NOT NULL,
+          auth           text NOT NULL,
+          user_agent     text,
+          created_at     timestamptz NOT NULL DEFAULT now(),
+          last_active_at timestamptz NOT NULL DEFAULT now()
+        );
+      `);
+      await query(`CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);`);
+      console.log('Web Push: tabla push_subscriptions e índice asegurados.');
+    } catch (e) { console.error('push_subscriptions migration error:', e); }
+
     // ===========================================================================
     // Casa Shé v1 — catálogo, reglas y branding del estudio (CONSOLIDADO).
     // Corre AL FINAL, así gana sobre los seeds heredados de BMB/Balance Room.
