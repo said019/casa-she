@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuthStore } from '@/stores/authStore';
+import { usePush } from '@/hooks/usePush';
 import api, { getErrorMessage } from '@/lib/api';
 import type { UpdateProfileData, User } from '@/types/auth';
 import { Link } from 'react-router-dom';
@@ -19,6 +20,7 @@ interface ProfileResponse {
 export default function ProfilePreferences() {
   const { toast } = useToast();
   const { user: authUser, updateUser } = useAuthStore();
+  const push = usePush();
   const [receiveReminders, setReceiveReminders] = useState(false);
   const [receivePromotions, setReceivePromotions] = useState(false);
   const [receiveWeeklySummary, setReceiveWeeklySummary] = useState(false);
@@ -123,6 +125,36 @@ export default function ProfilePreferences() {
                   </Button>
                 </>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Notificaciones push</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-2xl border border-[#D6D5C2]/70 bg-[#F6F0E4]/70 p-5">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-heading text-lg text-[#2E1B22]">Notificaciones push</p>
+                    <p className="text-sm text-[#6B554D]">
+                      Recibe recordatorios de clase y avisos en tu celular, aunque esté bloqueado.
+                    </p>
+                  </div>
+                  {push.state === 'unsupported' ? (
+                    <span className="text-xs text-[#6B554D]/70">No disponible en este dispositivo</span>
+                  ) : push.state === 'denied' ? (
+                    <span className="text-xs text-[#AE4836]">Bloqueado en el navegador</span>
+                  ) : push.state === 'subscribed' ? (
+                    <button onClick={() => push.disable()} className="rounded-full border border-[#D6D5C2] px-4 py-2 text-sm text-[#2E1B22]">Desactivar</button>
+                  ) : (
+                    <button onClick={() => push.enable()} className="rounded-full bg-[#2A4E36] px-4 py-2 text-sm text-[#F6F0E4]">Activar</button>
+                  )}
+                </div>
+                <p className="mt-3 text-xs text-[#6B554D]/70">
+                  En iPhone: agrega Casa Shé a tu pantalla de inicio y ábrela desde ahí para poder activar.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
