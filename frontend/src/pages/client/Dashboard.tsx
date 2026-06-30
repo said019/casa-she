@@ -11,6 +11,7 @@ import type { ClientMembership } from '@/types/membership';
 import { categoryCredits } from '@/types/membership';
 import { ClientLayout } from '@/components/layout/ClientLayout';
 import { ProfilerInviteBanner } from '@/components/onboarding/ProfilerInviteBanner';
+import { PushOptInBanner } from '@/components/notifications/PushOptInBanner';
 import { CasaSheMark } from '@/components/CasaSheLogo';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -160,6 +161,7 @@ export default function ClientDashboard() {
     <AuthGuard requiredRoles={['client']}>
       <ClientLayout>
         <ProfilerInviteBanner />
+        <PushOptInBanner />
         <div className="relative space-y-10 pb-4">
           <motion.section
             variants={heroStagger} initial="hidden" animate="show"

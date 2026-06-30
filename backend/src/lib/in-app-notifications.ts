@@ -8,6 +8,7 @@
 
 import { query } from '../config/database.js';
 import { isPlatformMember } from './platformMember.js';
+import { sendWebPushToUser } from './web-push.js';
 
 export type InAppNotificationType =
     | 'booking_reminder'
@@ -33,6 +34,22 @@ export interface InAppNotificationInput {
     data?: Record<string, unknown>;
 }
 
+const PUSH_URL_BY_TYPE: Partial<Record<InAppNotificationType, string>> = {
+    booking_reminder: '/app/classes',
+    class_cancelled: '/app/classes',
+    class_updated: '/app/classes',
+    waitlist_promoted: '/app/classes',
+    coach_assigned: '/app/classes',
+    coach_substituted: '/app/classes',
+    membership_expiring: '/app/checkout',
+    points_earned: '/app/wallet',
+    review_received: '/app',
+};
+
+export function pushUrlForType(type: InAppNotificationType): string {
+    return PUSH_URL_BY_TYPE[type] ?? '/app';
+}
+
 /**
  * Inserta una notificación in-app para un usuario. Idempotente solo en el sentido de
  * que la app la marca como nueva cada vez; el caller debe decidir si llamar o no.
@@ -49,6 +66,13 @@ export async function writeInAppNotification(input: InAppNotificationInput): Pro
              RETURNING id`,
             [input.userId, input.title, input.body, input.type, JSON.stringify(input.data ?? {})]
         );
+        // Canal push (no bloquea ni rompe el flujo). Mismo aviso que la campana.
+        void sendWebPushToUser(input.userId, {
+            title: input.title,
+            body: input.body,
+            url: pushUrlForType(input.type),
+            tag: input.type,
+        });
         return rows[0]?.id ?? null;
     } catch (err) {
         console.error('[in-app-notification] write failed:', err);

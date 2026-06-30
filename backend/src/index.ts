@@ -48,6 +48,8 @@ import closedDaysRoutes from './routes/closed-days.js';
 import statsRoutes from './routes/stats.js';
 import onboardingRoutes from './routes/onboarding.js';
 import referralsRoutes from './routes/referrals.js';
+import pushRoutes from './routes/push.js';
+import adminPushRoutes from './routes/admin-push.js';
 import stripeWebhook from './routes/stripe-webhook.js';
 import { validateStripeConfig } from './lib/stripe.js';
 import { query, queryOne } from './config/database.js';
@@ -3351,6 +3353,24 @@ async function runStartupMigrations(): Promise<void> {
       console.log('Onboarding Perfilador: columnas, tabla y reglas aseguradas.');
     } catch (e) { console.error('Onboarding Perfilador migration error:', e); }
 
+    // === Web Push: suscripciones (push_subscriptions) ===
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+          id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id        uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          endpoint       text NOT NULL UNIQUE,
+          p256dh         text NOT NULL,
+          auth           text NOT NULL,
+          user_agent     text,
+          created_at     timestamptz NOT NULL DEFAULT now(),
+          last_active_at timestamptz NOT NULL DEFAULT now()
+        );
+      `);
+      await query(`CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);`);
+      console.log('Web Push: tabla push_subscriptions e índice asegurados.');
+    } catch (e) { console.error('push_subscriptions migration error:', e); }
+
     // ===========================================================================
     // Casa Shé v1 — catálogo, reglas y branding del estudio (CONSOLIDADO).
     // Corre AL FINAL, así gana sobre los seeds heredados de BMB/Balance Room.
@@ -3444,6 +3464,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/clients', clientsRouter);
 app.use('/api/memberships', membershipRoutes);
 app.use('/api/admin/audit', auditRoutes);
+app.use('/api/admin/push', adminPushRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/checkin', checkinRoutes);
@@ -3476,6 +3497,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/reception', receptionDashboardRoutes);
 app.use('/api/onboarding', onboardingRoutes);
+app.use('/api/push', pushRoutes);
 
 // 404 handler
 app.use((req, res) => {

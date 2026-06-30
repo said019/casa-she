@@ -8,6 +8,7 @@ import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { sendBookingConfirmation, sendCancellationNotice, sendWhatsAppMessage } from '../lib/whatsapp.js';
 import { sendBookingConfirmationEmail } from '../services/email.js';
 import { notifyAllUserDevices } from '../lib/apple-wallet.js';
+import { sendWebPushToUser } from '../lib/web-push.js';
 import { upsertGoogleLoyaltyObject } from '../lib/google-wallet.js';
 import { studioBookingError } from '../lib/membershipStudio.js';
 import { selectMembershipForBooking, toDbClient, pickBestMembership } from '../lib/membershipSelection.js';
@@ -819,6 +820,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
         // Update Apple + Google Wallet passes (credits changed)
         notifyAllUserDevices(userId, '✅ Reserva confirmada', 'Tu pase se actualizó con tu nueva reserva')
             .catch(e => console.error('Apple Wallet booking notify error:', e));
+        void sendWebPushToUser(userId, { title: 'Reserva confirmada', body: 'Tu clase quedó agendada. Te esperamos.', url: '/app/classes', tag: 'booking_confirmed' });
         if (membershipId) {
             upsertGoogleLoyaltyObject(membershipId).catch(e => console.error('Google Wallet booking error:', e));
         }
