@@ -8,7 +8,7 @@
         "dev": "tsx watch src/index.ts",
         "build": "tsc",
         "start": "node dist/index.js",
-        "test": "tsx scripts/test-membership-studio.ts && tsx scripts/test-dashboard-studio.ts && tsx scripts/test-manual-income.ts && tsx scripts/test-membership-selection.ts && tsx scripts/test-can-buy-sample.ts && tsx scripts/test-permissions.ts && tsx scripts/test-class-waitlist.ts && tsx scripts/test-orders-proof-flow.ts && tsx scripts/test-recurring-classes.ts && tsx scripts/test-attendees-booked-by.ts && tsx scripts/test-nomina-egreso.ts && tsx scripts/test-payroll-period.ts && tsx scripts/test-commission-integration.ts && tsx scripts/test-onboarding-recommend.ts && tsx scripts/test-onboarding-submit.ts"
+        "test": "tsx scripts/test-membership-studio.ts && tsx scripts/test-dashboard-studio.ts && tsx scripts/test-manual-income.ts && tsx scripts/test-membership-selection.ts && tsx scripts/test-can-buy-sample.ts && tsx scripts/test-permissions.ts && tsx scripts/test-class-waitlist.ts && tsx scripts/test-orders-proof-flow.ts && tsx scripts/test-recurring-classes.ts && tsx scripts/test-attendees-booked-by.ts && tsx scripts/test-nomina-egreso.ts && tsx scripts/test-payroll-period.ts && tsx scripts/test-commission-integration.ts && tsx scripts/test-onboarding-recommend.ts && tsx scripts/test-onboarding-submit.ts && tsx scripts/test-push-prune.ts"
     },
     "dependencies": {
         "@types/bcryptjs": "^2.4.6",
