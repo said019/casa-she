@@ -305,6 +305,15 @@ async function notifyExpiringMemberships(): Promise<void> {
                         ).catch(err => logError(jobName, `WhatsApp error: ${err}`));
                     }
 
+                    // Notificación in-app + push (vía el hook de writeInAppNotification).
+                    // Dentro del dedup para no reenviarla en cada corrida.
+                    await writeInAppNotification({
+                        userId: membership.user_id,
+                        type: 'membership_expiring',
+                        title: 'Tu membresía está por vencer',
+                        body: `Te quedan ${days} días. Renueva para no perder tus créditos.`,
+                    });
+
                     // Marcar como notificado
                     await query(`
                         INSERT INTO expiry_notifications (membership_id, days_before, sent_at)

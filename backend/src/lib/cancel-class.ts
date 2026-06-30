@@ -1,4 +1,5 @@
 import { query, queryOne } from '../config/database.js';
+import { sendWebPushToUser } from './web-push.js';
 
 /**
  * Cancel a class and all its active bookings, refunding membership credits.
@@ -46,6 +47,11 @@ export async function cancelClassWithRefunds(
             [reason, booking.id]
         );
         cancelledBookings++;
+
+        // Aviso push al usuario afectado (fire-and-forget; nunca rompe el flujo)
+        if (booking.user_id) {
+            void sendWebPushToUser(booking.user_id, { title: 'Clase cancelada', body: 'El estudio canceló una de tus clases. Revisa tus reservas.', url: '/app/classes', tag: 'class_cancelled' });
+        }
 
         // Refund credit to the bucket the booking consumed
         if (booking.status === 'confirmed' && booking.membership_id && booking.consumed_category) {

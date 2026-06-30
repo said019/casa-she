@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { query } from '../config/database.js';
 import { sendWebPushToUser } from '../lib/web-push.js';
+import { logAction } from '../lib/audit.js';
 
 const router = Router();
 
@@ -38,6 +39,7 @@ router.post('/broadcast', authenticate, requireRole('admin', 'super_admin'),
                 );
                 for (const r of results) { sent += r.sent; pruned += r.pruned; }
             }
+            await logAction(query, { adminUserId: (req as any).user?.userId, actionType: 'push_broadcast', entityType: 'push', description: title, newData: { title, body, url, recipients: targets.length, sent } });
             res.json({ recipients: targets.length, sent, pruned });
         } catch (err) {
             console.error('broadcast error:', err);

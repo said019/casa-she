@@ -9,6 +9,7 @@ import { sendMembershipActivatedEmail } from '../services/email.js';
 import { sendMembershipActivatedNotice } from '../lib/whatsapp.js';
 import { awardPaymentLoyaltyPoints, reversePaymentLoyaltyPoints, consumeFounderFirstPackageDiscount } from '../lib/loyalty.js';
 import { notifyMembershipRenewed, notifyPointsEarnedExternal } from '../lib/notifications.js';
+import { sendWebPushToUser } from '../lib/web-push.js';
 import { hasPermission } from '../lib/permissions.js';
 import { isElevated } from '../lib/elevation.js';
 import { openShiftForUser } from '../lib/openShift.js';
@@ -874,6 +875,7 @@ router.post('/:id/activate', authenticate, requireElevated, async (req: Request,
 
             // Send notifications
             const activated = updatedResult.rows[0];
+            void sendWebPushToUser(activated.user_id, { title: '¡Membresía activada!', body: 'Ya puedes reservar tus clases.', url: '/app', tag: 'membership_activated' });
             const user = await queryOne<any>('SELECT display_name, email, phone FROM users WHERE id = $1', [activated.user_id]);
             const planInfo = await queryOne<any>('SELECT name, class_limit FROM plans WHERE id = $1', [activated.plan_id]);
             if (user && planInfo) {
