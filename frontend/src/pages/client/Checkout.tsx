@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { ClientLayout } from '@/components/layout/ClientLayout';
 import { CasaSheMark } from '@/components/CasaSheLogo';
+import { CasaShePattern } from '@/components/CasaShePattern';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -75,17 +76,22 @@ function isMembershipFeePlan(plan: Plan) {
   );
 }
 
-// Tarjetas de marca del index ("Nuestros Paquetes"): imagen, precio anterior,
-// detalle y orden. Se mapea cada plan de la BD por su nombre.
-type PlanCardMeta = { title: string; img: string; was?: string; hint: string; oferta?: boolean; order: number };
+// Tarjetas de marca del index ("Nuestros Paquetes"): panel generado (nítido,
+// vectorial — NO imagen raster), precio anterior, detalle y orden. Se mapea cada
+// plan de la BD por su nombre. Mismos colores/taglines que CasaSheLanding.
+type PlanCardMeta = { title: string; color: string; artTitle: string; tagline: string; light?: boolean; was?: string; hint: string; oferta?: boolean; order: number };
+const SALSA_TAGLINE = 'Ritmo, cuerpo y comunidad. Baila y reconéctate.';
 const PLAN_CARDS: { match: (n: string) => boolean; meta: PlanCardMeta }[] = [
-  { match: (n) => n.includes('black'), meta: { title: 'Membresía She Black', img: '/casashe/card-black.jpeg', was: '$4,800', hint: '24 créditos · acceso total', oferta: true, order: 1 } },
-  { match: (n) => n.includes('360'), meta: { title: 'Membresía 360', img: '/casashe/card-360.jpeg', was: '$3,800', hint: '16 créditos al mes', oferta: true, order: 2 } },
-  { match: (n) => n.includes('12'), meta: { title: 'Paquete 12 clases', img: '/casashe/card-12.jpeg', hint: '12 créditos · vigencia 1 mes', order: 3 } },
-  { match: (n) => n.includes('8'), meta: { title: 'Paquete 8 clases', img: '/casashe/card-8.jpeg', hint: '8 créditos · vigencia 1 mes', order: 4 } },
-  { match: (n) => n.includes('5'), meta: { title: 'Paquete 5 clases', img: '/casashe/card-5.jpeg', hint: '5 créditos · vigencia 1 mes', order: 5 } },
-  { match: (n) => n.includes('drop') || n.includes('suelta'), meta: { title: 'Clase suelta', img: '/casashe/card-suelta.jpeg', was: '$300', hint: '1 clase drop-in', oferta: true, order: 6 } },
-  { match: (n) => n.includes('prueba') || n.includes('muestra'), meta: { title: 'Clase muestra', img: '/casashe/card-muestra.jpeg', hint: 'Tu primera vez en casa', order: 7 } },
+  { match: (n) => n.includes('black'), meta: { title: 'Membresía She Black', color: '#2E1B22', artTitle: 'Membresía She Black', tagline: 'Nuestra membresía más completa. Bienestar integral para volver a ti.', was: '$4,800', hint: '24 créditos · acceso total', oferta: true, order: 1 } },
+  { match: (n) => n.includes('360'), meta: { title: 'Membresía 360', color: '#2A4E36', artTitle: 'Membresía 360', tagline: 'Tu bienestar integral empieza aquí. Movimiento, balance y comunidad en un solo lugar.', was: '$3,800', hint: '16 créditos al mes', oferta: true, order: 2 } },
+  { match: (n) => n.includes('12'), meta: { title: 'Paquete 12 clases', color: '#AE4836', artTitle: 'Paquete 12 clases', tagline: 'Constancia que se siente. Más sesiones para sostener tu práctica.', hint: '12 créditos · vigencia 1 mes', order: 3 } },
+  { match: (n) => n.includes('8'), meta: { title: 'Paquete 8 clases', color: '#8F7F36', artTitle: 'Paquete 8 clases', tagline: 'Tu práctica, a tu ritmo. El balance ideal entre flexibilidad y constancia.', hint: '8 créditos · vigencia 1 mes', order: 4 } },
+  { match: (n) => n.includes('5'), meta: { title: 'Paquete 5 clases', color: '#6E4B34', artTitle: 'Paquete 5 clases', tagline: 'Ideal para empezar. Una forma amable de volver a ti.', hint: '5 créditos · vigencia 1 mes', order: 5 } },
+  { match: (n) => n.includes('drop') || n.includes('suelta'), meta: { title: 'Clase suelta', color: '#D6D5C2', light: true, artTitle: 'Clase suelta', tagline: 'Muévete cuando lo necesites. Flexibilidad para acompañar tu día.', was: '$300', hint: '1 clase drop-in', oferta: true, order: 6 } },
+  { match: (n) => n.includes('prueba') || n.includes('muestra'), meta: { title: 'Clase muestra', color: '#E7E0CE', light: true, artTitle: 'Clase muestra', tagline: 'Ven a sentirlo. Tu primer encuentro con Casa Shé.', hint: 'Tu primera vez en casa', order: 7 } },
+  // Salsa (bucket de créditos independiente). La regla específica (4 clases) va antes de la genérica.
+  { match: (n) => n.includes('salsa') && (n.includes('4') || n.includes('paquete')), meta: { title: 'Salsa · 4 clases', color: '#2E1B22', artTitle: 'Salsa', tagline: SALSA_TAGLINE, hint: '4 clases de Salsa · vigencia 1 mes', order: 9 } },
+  { match: (n) => n.includes('salsa'), meta: { title: 'Salsa · 1 clase', color: '#2E1B22', artTitle: 'Salsa', tagline: SALSA_TAGLINE, hint: '1 clase de Salsa', order: 8 } },
 ];
 
 function getPlanCardMeta(name: string): PlanCardMeta | undefined {
@@ -445,11 +451,36 @@ export default function Checkout() {
                         >
                           <div className="relative aspect-square overflow-hidden">
                             {meta ? (
-                              <img
-                                src={meta.img}
-                                alt={plan.name}
-                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                              />
+                              <div
+                                className="relative h-full w-full transition-transform duration-500 group-hover:scale-105"
+                                style={{ backgroundColor: meta.color }}
+                              >
+                                <CasaShePattern
+                                  className="absolute inset-0 h-full w-full"
+                                  color={meta.light ? 'rgba(0,0,0,0.10)' : 'rgba(0,0,0,0.22)'}
+                                />
+                                <img
+                                  src={meta.light ? '/casashe/logo-monogram.png' : '/casashe/logo-monogram-cream.png'}
+                                  alt=""
+                                  aria-hidden="true"
+                                  className="absolute left-1/2 top-6 h-12 w-12 -translate-x-1/2 object-contain"
+                                  style={{ opacity: 0.9 }}
+                                />
+                                <div className="absolute bottom-6 left-6 right-6">
+                                  <span
+                                    className="block font-heading text-[2.3rem] leading-[1.02]"
+                                    style={{ color: meta.light ? '#2A4E36' : '#F6F0E4' }}
+                                  >
+                                    {meta.artTitle}
+                                  </span>
+                                  <p
+                                    className="mt-3 max-w-[26ch] font-['Baskervville'] text-[0.92rem] leading-snug"
+                                    style={{ color: meta.light ? '#2A4E36' : '#F6F0E4', opacity: 0.78 }}
+                                  >
+                                    {meta.tagline}
+                                  </p>
+                                </div>
+                              </div>
                             ) : (
                               <div className="flex h-full w-full items-center justify-center bg-[#2A4E36]/10">
                                 <CasaSheMark className="h-20 w-20 opacity-40" />
@@ -457,10 +488,10 @@ export default function Checkout() {
                             )}
                             {meta?.oferta && (
                               <span
-                                className="absolute left-4 top-4 rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.2em]"
-                                style={{ backgroundColor: '#2A4E36', color: '#F6F0E4' }}
+                                className="absolute left-4 top-4 flex h-[4.2rem] w-[4.2rem] items-center justify-center rounded-full text-center font-['Baskervville'] text-[13px]"
+                                style={{ backgroundColor: '#AE4836', color: '#F6F0E4' }}
                               >
-                                Oferta
+                                ¡Oferta!
                               </span>
                             )}
                             {isSelected && (
