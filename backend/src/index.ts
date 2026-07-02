@@ -3379,19 +3379,23 @@ async function runStartupMigrations(): Promise<void> {
     // admin cree después.
     // ===========================================================================
     try {
-        const CS_PLANS = ['Clase de prueba', 'Drop-in', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Membresía 360', 'Membresía Black'];
-        const CS_TYPES = ['Pilates Mat', 'Yoga', 'Aeroyoga', 'Telas', 'Taller'];
+        const CS_PLANS = ['Clase de prueba', 'Drop-in', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Membresía 360', 'Membresía Black', 'Salsa · 1 clase', 'Salsa · 4 clases'];
+        const CS_TYPES = ['Pilates Mat', 'Barre', 'Sculpt', 'Yoga Ashtanga', 'Yoga Vinyasa', 'Salsa'];
 
         // Reglamento obligatorio: marca de aceptación por usuaria (NULL = no aceptado aún).
         await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reglamento_accepted_at TIMESTAMPTZ`);
 
-        // (a) Disciplinas Casa Shé (categoría 'multi'; cupo 6-7). Valores iniciales SOLO al crear;
+        // (a) Disciplinas Casa Shé. Multi: Pilates Mat, Barre, Sculpt, Yoga Ashtanga, Yoga Vinyasa.
+        //     Salsa va en el bucket 'reformer' (créditos solo-salsa). Valores iniciales SOLO al crear;
         //     después la admin puede editarlas desde el panel y NO se sobreescriben.
         await query(`INSERT INTO class_types (name, category, level, duration_minutes, max_capacity, is_active)
             SELECT v.name, 'multi'::class_category, 'all'::class_level, v.dur, v.cap, true
-            FROM (VALUES ('Pilates Mat',50,7),('Yoga',60,7),('Aeroyoga',60,6),('Telas',60,6),('Taller',90,7))
+            FROM (VALUES ('Pilates Mat',50,7),('Barre',50,8),('Sculpt',50,8),('Yoga Ashtanga',60,7),('Yoga Vinyasa',60,7))
               AS v(name, dur, cap)
             WHERE NOT EXISTS (SELECT 1 FROM class_types ct WHERE ct.name = v.name)`);
+        await query(`INSERT INTO class_types (name, category, level, duration_minutes, max_capacity, is_active)
+            SELECT 'Salsa', 'reformer'::class_category, 'all'::class_level, 60, 10, true
+            WHERE NOT EXISTS (SELECT 1 FROM class_types ct WHERE ct.name = 'Salsa')`);
 
         // (b) Planes/paquetes Casa Shé (multi_credits; reformer=0). Valores iniciales SOLO al crear,
         //     así los precios/créditos que ajuste la admin persisten entre reinicios.
@@ -3402,6 +3406,12 @@ async function runStartupMigrations(): Promise<void> {
               ('Paquete 8',8,2000,30,4),('Paquete 12',12,2880,30,5),
               ('Membresía 360',16,3600,30,6),('Membresía Black',24,4200,30,7)
             ) AS v(name, credits, price, days, sort)
+            WHERE NOT EXISTS (SELECT 1 FROM plans p WHERE p.name = v.name)`);
+
+        // (b.2) Planes de Salsa — bucket reformer reutilizado como "Salsa" (créditos solo-salsa; multi=0).
+        await query(`INSERT INTO plans (name, reformer_credits, multi_credits, price, duration_days, is_active, sort_order)
+            SELECT v.name, v.credits, 0, v.price, v.days, true, v.sort
+            FROM (VALUES ('Salsa · 1 clase',1,180,30,8),('Salsa · 4 clases',4,600,30,9)) AS v(name, credits, price, days, sort)
             WHERE NOT EXISTS (SELECT 1 FROM plans p WHERE p.name = v.name)`);
 
         // (c) Sede única Casa Shé — Condesa.
