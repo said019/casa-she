@@ -1150,7 +1150,7 @@ const EventQrPayloadSchema = z.object({
 });
 
 const computeEventHash = (userId: string, eventId: string, regId: string, expiresAt: number) => {
-  const secret = process.env.CHECKIN_SECRET || 'catarsis-studio-secret';
+  const secret = process.env.CHECKIN_SECRET || 'walletclub-dev';
   const base = `event:${userId}:${eventId}:${regId}:${expiresAt}:${secret}`;
   return createHash('sha256').update(base).digest('hex');
 };

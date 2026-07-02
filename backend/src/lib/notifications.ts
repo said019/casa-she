@@ -423,7 +423,7 @@ export type PointsReason =
 
 const REASON_LABELS: Record<PointsReason, string> = {
     package_purchase: 'tu compra de paquete',
-    welcome: 'tu bienvenida a BMB Studio',
+    welcome: 'tu bienvenida a Casa Shé',
     referral: 'una compra con tu código de referido',
     class: 'asistir a tu clase',
     streak: 'tu racha de constancia',

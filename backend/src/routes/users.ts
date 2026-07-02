@@ -415,7 +415,7 @@ router.post('/:id/message', requirePermission('clientes'), async (req: Request, 
                 const ok = await sendWhatsAppMessage(user.phone as string, body);
                 if (!ok) { status = 'failed'; errMsg = 'No se pudo enviar el WhatsApp.'; }
             } else {
-                await sendPlainEmail(user.email as string, (subject && subject.trim()) || 'Mensaje de BMB Studio', body);
+                await sendPlainEmail(user.email as string, (subject && subject.trim()) || 'Mensaje de Casa Shé', body);
             }
         } catch (e: any) {
             status = 'failed';

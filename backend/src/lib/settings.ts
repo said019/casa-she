@@ -101,13 +101,13 @@ export type SettingKey = keyof SettingsMap;
 
 const DEFAULTS: SettingsMap = {
     studio_info: {
-        name: 'BMB Studio',
-        address: 'Calle Primero de Mayo 1, Diamante, 54763 Cuautitlán Izcalli, Méx.',
-        phone: '5543860391',
-        email: 'hola@bmbstudio.mx',
-        website: '',
-        description: '',
-        social_media: { instagram: '@bmbstudio', facebook: '', whatsapp: '5543860391' },
+        name: 'Casa Shé',
+        address: 'Alfonso Reyes 131, Condesa, CDMX',
+        phone: '',
+        email: 'casashecondesa@gmail.com',
+        website: 'https://casashe.mx',
+        description: 'Wellness para mujeres en la Condesa, CDMX.',
+        social_media: { instagram: '@casashe.mx', facebook: '', whatsapp: '' },
     },
     booking_policies: {
         cancellation_hours: 5,
@@ -150,7 +150,7 @@ const DEFAULTS: SettingsMap = {
         maintenance_mode: false,
     },
     whatsapp_templates: {
-        send_booking_confirmation: '✅ *Reserva Confirmada*\n\nHola {nombre}!\n\nTu reserva para *{clase}* ha sido confirmada.\n\n📅 {fecha}\n⏰ {hora}\n👨‍🏫 {instructor}\n\n¡Te esperamos en Catarsis Studio!',
+        send_booking_confirmation: '✅ *Reserva Confirmada*\n\nHola {nombre}!\n\nTu reserva para *{clase}* ha sido confirmada.\n\n📅 {fecha}\n⏰ {hora}\n👨‍🏫 {instructor}\n\n¡Te esperamos en Casa Shé!',
         send_cancellation_notice: '❌ *Reserva Cancelada*\n\nHola {nombre},\n\nTu reserva para *{clase}* del {fecha} a las {hora} ha sido cancelada.',
         send_class_reminder: '🔔 *Recordatorio de Clase*\n\nHola {nombre}!\n\nTu clase *{clase}* es en {hora}.\n\n¡No faltes! 🧘',
         send_membership_expiring: '⏰ *Membresía por vencer*\n\nHola {nombre},\n\nTu plan *{plan}* vence pronto.\n\nRenueva para seguir disfrutando.',

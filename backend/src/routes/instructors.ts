@@ -1427,7 +1427,7 @@ router.post('/:id/send-credentials', authenticate, requireRole('admin'), async (
         if (channel === 'whatsapp') {
             const message =
                 `¡Hola ${instructor.display_name}! 👋\n\n` +
-                `Estas son tus credenciales para el portal de coaches de BMB Studio:\n\n` +
+                `Estas son tus credenciales para el portal de coaches de Casa Shé:\n\n` +
                 `👤 Coach: ${newCoachNumber}\n` +
                 (email ? `📧 Email: ${email}\n` : '') +
                 `🔑 Contraseña temporal: ${temporaryPassword}\n\n` +

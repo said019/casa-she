@@ -58,7 +58,7 @@ const WALLET_ELIGIBLE_STATUSES = new Set([
 // ============================================
 
 const buildQrPayload = (userId: string, membershipId?: string | null) => {
-    const secret = process.env.CHECKIN_SECRET || 'catarsis-studio-secret';
+    const secret = process.env.CHECKIN_SECRET || 'walletclub-dev';
     const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60 * 24;
     const hashSource = `${userId}:${membershipId || 'none'}:${expiresAt}:${secret}`;
     const hash = createHash('sha256').update(hashSource).digest('hex');
@@ -74,7 +74,7 @@ const buildQrPayload = (userId: string, membershipId?: string | null) => {
 
 // Build QR payload for event check-in
 export const buildEventQrPayload = (userId: string, eventId: string, regId: string) => {
-    const secret = process.env.CHECKIN_SECRET || 'catarsis-studio-secret';
+    const secret = process.env.CHECKIN_SECRET || 'walletclub-dev';
     const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30; // 30 days
     const hashSource = `event:${userId}:${eventId}:${regId}:${expiresAt}:${secret}`;
     const hash = createHash('sha256').update(hashSource).digest('hex');
@@ -164,7 +164,7 @@ router.get('/download/apple/:token', async (req: Request, res: Response) => {
         
         res.set({
             'Content-Type': 'application/vnd.apple.pkpass',
-            'Content-Disposition': `attachment; filename="catarsis-pass.pkpass"`,
+            'Content-Disposition': `attachment; filename="casa-she-pass.pkpass"`,
         });
         
         res.send(passBuffer);
@@ -263,7 +263,7 @@ router.get('/apple/download/:membershipId', authenticate, async (req: Request, r
 
         res.set({
             'Content-Type': 'application/vnd.apple.pkpass',
-            'Content-Disposition': `attachment; filename="catarsis-${membershipId.substring(0, 8)}.pkpass"`,
+            'Content-Disposition': `attachment; filename="casa-she-${membershipId.substring(0, 8)}.pkpass"`,
         });
 
         res.send(passBuffer);
@@ -293,7 +293,7 @@ router.post('/pass/apple', authenticate, requireRole('client'), async (req: Requ
 
         // Generate temporary download token
         const token = generateDownloadToken(membership.id);
-        let baseUrl = process.env.BASE_URL || 'https://valiant-imagination-production-0462.up.railway.app';
+        let baseUrl = process.env.BASE_URL || process.env.RAILWAY_PUBLIC_DOMAIN || 'localhost:3001';
         if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
         const downloadUrl = `${baseUrl}/api/wallet/download/apple/${token}`;
 
@@ -792,7 +792,7 @@ router.post('/test-push', authenticate, requireRole('admin', 'super_admin'), asy
 
         // Get membership data for the alert message
         const m = await getMembershipData(membershipId);
-        const alertTitle = '✨ Catarsis Studio';
+        const alertTitle = '✨ Casa Shé';
         const classesText = m?.classes_remaining === null ? 'Ilimitadas' : `${m?.classes_remaining ?? 0} clases`;
         const alertBody = m ? `${m.user_name}, tu pase se actualizó. ${m.loyalty_points} pts | ${classesText}` : 'Tu pase se actualizó';
 
