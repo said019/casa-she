@@ -1,5 +1,5 @@
 /**
- * Google Wallet Integration for Catarsis Studio
+ * Google Wallet Integration for Casa Shé
  * 
  * Implements OAuth2, Loyalty Class/Object creation, and messaging
  * Adapted for Pilates studio with memberships, classes, and loyalty points
@@ -51,7 +51,7 @@ type PlanType = 'basico' | 'premium' | 'ilimitado' | 'intro';
 const GOOGLE_WALLET_API = 'https://walletobjects.googleapis.com/walletobjects/v1';
 const GOOGLE_OAUTH_URL = 'https://oauth2.googleapis.com/token';
 
-// Estilos por tier — paleta BMB Studio (dorado golden-hour). Google auto-contrasta
+// Estilos por tier — paleta Casa Shé (dorado golden-hour). Google auto-contrasta
 // el texto según el fondo. Progresión: crema → dorado → dorado profundo.
 const PLAN_STYLES: Record<PlanType, {
     hexBackgroundColor: string;
@@ -264,27 +264,27 @@ export async function createGoogleLoyaltyClass(
         const token = await getGoogleWalletAccessToken();
         const style = PLAN_STYLES[planType];
 
-        const classId = `${creds.issuerId}.catarsis_membership_${planType}_v1`;
-        const frontendUrl = process.env.FRONTEND_URL || 'https://www.bmbstudio.com.mx';
-        let baseUrl = process.env.BASE_URL || 'https://valiant-imagination-production-0462.up.railway.app';
+        const classId = `${creds.issuerId}.casashe_membership_${planType}_v1`;
+        const frontendUrl = process.env.FRONTEND_URL || 'https://casashe.mx';
+        let baseUrl = process.env.BASE_URL || process.env.RAILWAY_PUBLIC_DOMAIN || 'localhost:3001';
         if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
 
-        // Logo BMB servido desde el frontend (existe en public/).
-        const logoUrl = `${frontendUrl}/bmb-studio-logo-dark.png`;
+        // Logo Casa Shé servido desde el frontend (existe en public/casashe/).
+        const logoUrl = `${frontendUrl}/casashe/favicon-casashe.png`;
 
         const loyaltyClass = {
             id: classId,
-            issuerName: 'BMB Studio',
+            issuerName: 'Casa Shé',
             programName: style.programName,
             hexBackgroundColor: style.hexBackgroundColor,
 
             programLogo: {
                 sourceUri: { uri: logoUrl },
-                contentDescription: { defaultValue: { language: 'es', value: 'Logo de BMB Studio' } },
+                contentDescription: { defaultValue: { language: 'es', value: 'Logo de Casa Shé' } },
             },
 
             localizedIssuerName: {
-                defaultValue: { language: 'es', value: 'BMB Studio' },
+                defaultValue: { language: 'es', value: 'Casa Shé' },
             },
 
             localizedProgramName: {
@@ -307,7 +307,7 @@ export async function createGoogleLoyaltyClass(
             // Welcome messages
             messages: [
                 {
-                    header: '¡Bienvenido a BMB Studio!',
+                    header: '¡Bienvenido a Casa Shé!',
                     body: 'Tu bienestar comienza aquí. Reserva tus clases y acumula puntos con cada visita. 🧘‍♀️',
                     id: 'welcome_msg_v1',
                 },
@@ -410,8 +410,8 @@ export async function upsertGoogleLoyaltyObject(
         const style = PLAN_STYLES[planType];
 
         const objectId = `${creds.issuerId}.${membership.id}_v1`;
-        const classId = `${creds.issuerId}.catarsis_membership_${planType}_v1`;
-        const frontendUrl = process.env.FRONTEND_URL || 'https://www.bmbstudio.com.mx';
+        const classId = `${creds.issuerId}.casashe_membership_${planType}_v1`;
+        const frontendUrl = process.env.FRONTEND_URL || 'https://casashe.mx';
 
         const startDate = parseValidDate(membership.start_date);
         const endDate = parseValidDate(membership.end_date);
@@ -604,7 +604,7 @@ export async function buildGoogleSaveUrl(membershipId: string): Promise<string> 
     const claims = {
         iss: creds.email,
         aud: 'google',
-        origins: [process.env.FRONTEND_URL || 'https://www.bmbstudio.com.mx'],
+        origins: [process.env.FRONTEND_URL || 'https://casashe.mx'],
         typ: 'savetowallet',
         payload: {
             loyaltyObjects: [{ id: objectId }],

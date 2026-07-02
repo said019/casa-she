@@ -1,5 +1,5 @@
 /**
- * Apple Wallet Integration for Catarsis Studio
+ * Apple Wallet Integration for Casa Shé
  */
 
 import fs from 'fs';
@@ -25,7 +25,7 @@ const APPLE_TEAM_ID = process.env.APPLE_TEAM_ID;
 const APPLE_PASS_TYPE_ID = process.env.APPLE_PASS_TYPE_ID;
 const APPLE_KEY_ID = process.env.APPLE_KEY_ID;
 const APPLE_APNS_KEY_BASE64 = process.env.APPLE_APNS_KEY_BASE64;
-const APPLE_ORG_NAME = process.env.APPLE_ORG_NAME || 'BMB Studio';
+const APPLE_ORG_NAME = process.env.APPLE_ORG_NAME || 'Casa Shé';
 
 interface MembershipData {
     id: string;
@@ -55,10 +55,10 @@ interface MembershipData {
 
 type PlanType = 'basico' | 'premium' | 'ilimitado' | 'intro';
 
-// Catarsis Studio wallet palette.
+// Casa Shé wallet palette.
 // Warm gold: #A48550, olive: #81836F, sand: #D3C39F, cream: #F6F6EA, dark chocolate: #322A1E.
 
-// Paleta BMB Studio (dorado golden-hour). Progresión por tier:
+// Paleta Casa Shé (dorado golden-hour). Progresión por tier:
 //   intro/básico → crema (claro, amable) · premium → dorado · ilimitado → dorado profundo.
 // crema #ECE1CE, dorado #CE9B25, dorado profundo #AD6C20, tinta #2A2118, papel #FCFAF5.
 const PLAN_STYLES: Record<PlanType, { badge: string; backgroundColor: string; foregroundColor: string; labelColor: string; stripPrefix: string; }> = {
@@ -362,7 +362,7 @@ function buildTempModelDir(m: MembershipData, style: typeof PLAN_STYLES.basico, 
     const base = fs.mkdtempSync(path.join(os.tmpdir(), 'apple-pass-'));
     const dir = base + '.pass';
     fs.mkdirSync(dir, { recursive: true });
-    let baseUrl = process.env.BASE_URL || 'https://valiant-imagination-production-0462.up.railway.app';
+    let baseUrl = process.env.BASE_URL || process.env.RAILWAY_PUBLIC_DOMAIN || 'localhost:3001';
     if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
 
     const endDate = getValidDate(m.end_date);
@@ -376,14 +376,14 @@ function buildTempModelDir(m: MembershipData, style: typeof PLAN_STYLES.basico, 
         webServiceURL: baseUrl + '/api/wallet',
         authenticationToken: computePassAuthToken(m.id),
         organizationName: APPLE_ORG_NAME,
-        description: 'Membresía ' + m.plan_name + ' · BMB Studio',
-        logoText: 'BMB Studio',
+        description: 'Membresía ' + m.plan_name + ' · Casa Shé',
+        logoText: 'Casa Shé',
         storeCard: {
             headerFields: [{ key: 'plan_badge', label: 'PLAN', value: m.plan_name.toUpperCase() }],
             primaryFields: [],
             secondaryFields: [
                 { key: 'member_name', label: 'NOMBRE', value: m.user_name },
-                { key: 'classes', label: 'CLASES', value: formatClassesRemaining(m.classes_remaining), changeMessage: 'BMB Studio: %@ clases disponibles 🧘' },
+                { key: 'classes', label: 'CLASES', value: formatClassesRemaining(m.classes_remaining), changeMessage: 'Casa Shé: %@ clases disponibles 🧘' },
                 { key: 'valid_until', label: 'VENCE', value: formatDate(endDate) }
             ],
             auxiliaryFields: [
@@ -399,8 +399,8 @@ function buildTempModelDir(m: MembershipData, style: typeof PLAN_STYLES.basico, 
                 { key: 'member_since', label: 'Miembro desde', value: formatDate(m.member_since) },
                 { key: 'classes_used', label: 'Clases tomadas', value: m.classes_used + ' clases' },
                 ...(m.referral_code ? [{ key: 'referral', label: 'Tu codigo de referido', value: `${m.referral_code} — Comparte con tus amigas y gana puntos` }] : []),
-                { key: 'contact', label: 'Contacto', value: 'WhatsApp: 55 4386 0391\n\nBMB Studio Tepa\nAv. Primero de Mayo Mz 4 Lote 1, Santiago Tepalcapa, 54743 Cuautitlán Izcalli, Méx.\n\nBMB Studio San Miguel\nCam. a Tepotzotlán 6D, Axotlan, 54715 Cuautitlán Izcalli, Méx.' },
-                { key: 'website', label: 'Reserva en', value: 'www.bmbstudio.com.mx' },
+                { key: 'contact', label: 'Contacto', value: 'Casa Shé\nAlfonso Reyes 131, Condesa, CDMX\n\nInstagram: @casashe.mx\ncasashecondesa@gmail.com' },
+                { key: 'website', label: 'Reserva en', value: 'casashe.mx' },
                 { key: 'terms', label: 'Terminos', value: `Membresia personal e intransferible.\nCancelaciones: minimo ${cancelInfo.minHours} hora${cancelInfo.minHours === 1 ? '' : 's'} antes.\nMaximo ${cancelInfo.maxCancel} cancelaciones por membresia.` }
             ]
         },
@@ -423,13 +423,15 @@ function buildTempModelDir(m: MembershipData, style: typeof PLAN_STYLES.basico, 
                 .sort()[0] || null;
             return relevantDateStr ? { relevantDate: relevantDateStr } : {};
         })(),
-        // Location-based: show pass when near the studio
-        // Lock-screen cerca de las sucursales. Coordenadas geocodificadas de las
-        // direcciones reales (Cuautitlán Izcalli): Tepa = Av. Primero de Mayo,
-        // Santiago Tepalcapa; San Miguel = Cam. a Tepotzotlán/Axotlan (CP 54715).
+        // Location-based: show pass when near the studio.
+        // Lock-screen cerca de Casa Shé — Alfonso Reyes 131, Condesa, CDMX
+        // (coordenadas aprox.; ajustar con BUSINESS_LATITUDE/LONGITUDE si se definen).
         locations: [
-            { latitude: 19.6734, longitude: -99.2140, relevantText: '¡Prepárate para tu clase en BMB Studio Tepa!' },
-            { latitude: 19.6947, longitude: -99.2240, relevantText: '¡Prepárate para tu clase en BMB Studio San Miguel!' },
+            {
+                latitude: parseFloat(process.env.BUSINESS_LATITUDE || '19.4092'),
+                longitude: parseFloat(process.env.BUSINESS_LONGITUDE || '-99.1782'),
+                relevantText: '¡Prepárate para tu clase en Casa Shé!',
+            },
         ],
     };
     fs.writeFileSync(path.join(dir, 'pass.json'), JSON.stringify(passJson, null, 2));

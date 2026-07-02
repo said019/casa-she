@@ -388,7 +388,7 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
                 user.phone,
                 `🔑 *Restablecer contraseña*\n\n` +
                 `Hola ${user.display_name},\n\n` +
-                `Solicitaste restablecer tu contraseña en BMB Studio. Abre este enlace para crear una nueva:\n\n` +
+                `Solicitaste restablecer tu contraseña en Casa Shé. Abre este enlace para crear una nueva:\n\n` +
                 `${resetLink}\n\n` +
                 `Si no fuiste tú, ignora este mensaje.`,
             ).catch(waError => {

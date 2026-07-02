@@ -120,7 +120,7 @@ router.post('/test', async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Se requiere número de teléfono' });
         }
         const instance = resolveInstance(req);
-        const testMessage = message || '🧘 Mensaje de prueba desde BMB Studio ✨';
+        const testMessage = message || '🧘 Mensaje de prueba desde Casa Shé ✨';
         const success = await sendWhatsAppMessage(phone, testMessage, instance);
 
         if (success) {
