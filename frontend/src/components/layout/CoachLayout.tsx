@@ -24,6 +24,8 @@ import {
     Music,
     Dumbbell,
     Wallet,
+    Users,
+    TrendingUp,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import CasaSheLogo from '@/components/CasaSheLogo';
@@ -36,6 +38,8 @@ const navigation = [
     { name: 'Dashboard', href: '/coach', icon: LayoutDashboard },
     { name: 'Mi Horario', href: '/coach/schedule', icon: Calendar },
     { name: 'Historial', href: '/coach/history', icon: History },
+    { name: 'Mis Alumnas', href: '/coach/students', icon: Users },
+    { name: 'Tendencias', href: '/coach/trends', icon: TrendingUp },
     { name: 'Sustituciones', href: '/coach/substitutions', icon: UserCheck },
     { name: 'Playlists', href: '/coach/playlists', icon: Music },
     { name: 'Plantillas', href: '/coach/templates', icon: Dumbbell },
