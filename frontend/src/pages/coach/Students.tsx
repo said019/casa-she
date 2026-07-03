@@ -10,6 +10,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import CoachLayout from '@/components/layout/CoachLayout';
 import { AuthGuard } from '@/components/layout/AuthGuard';
+import { CoachPageHero, CoachStat, CoachEmptyState } from '@/components/coach/CoachUI';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -81,60 +82,25 @@ export default function CoachStudents() {
         <AuthGuard requiredRoles={['instructor', 'admin']}>
             <CoachLayout>
                 <div className="max-w-5xl mx-auto space-y-6">
-                    <div>
-                        <h1 className="font-heading text-3xl font-bold">Mis Alumnas</h1>
-                        <p className="text-muted-foreground">
-                            Todas las clientas que han asistido a tus clases.
-                        </p>
-                    </div>
+                    <CoachPageHero
+                        eyebrow="Coach Panel"
+                        title="Mis Alumnas"
+                        subtitle="Clientas que han asistido a tus clases."
+                        icon={Users}
+                        className="-mt-6"
+                    />
 
                     {/* Stats */}
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                        <Card>
-                            <CardContent className="pt-4 pb-3 flex items-center gap-3">
-                                <div className="h-9 w-9 rounded-xl bg-balance-gold/10 flex items-center justify-center flex-shrink-0">
-                                    <Users className="h-4 w-4 text-balance-gold" />
-                                </div>
-                                <div className="min-w-0">
-                                    {isLoading ? (
-                                        <Skeleton className="h-6 w-10 mb-1" />
-                                    ) : (
-                                        <p className="font-heading text-2xl font-bold">{data?.total ?? 0}</p>
-                                    )}
-                                    <p className="text-xs text-muted-foreground">Total alumnas</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="pt-4 pb-3 flex items-center gap-3">
-                                <div className="h-9 w-9 rounded-xl bg-balance-gold/10 flex items-center justify-center flex-shrink-0">
-                                    <Star className="h-4 w-4 text-balance-gold" />
-                                </div>
-                                <div className="min-w-0">
-                                    {isLoading ? (
-                                        <Skeleton className="h-6 w-10 mb-1" />
-                                    ) : (
-                                        <p className="font-heading text-2xl font-bold">{regulares}</p>
-                                    )}
-                                    <p className="text-xs text-muted-foreground">Regulares (≥3)</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card className="col-span-2 sm:col-span-1">
-                            <CardContent className="pt-4 pb-3 flex items-center gap-3">
-                                <div className="h-9 w-9 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                    <TrendingUp className="h-4 w-4 text-green-600" />
-                                </div>
-                                <div className="min-w-0">
-                                    {isLoading ? (
-                                        <Skeleton className="h-6 w-12 mb-1" />
-                                    ) : (
-                                        <p className="font-heading text-2xl font-bold">{totalCheckins}</p>
-                                    )}
-                                    <p className="text-xs text-muted-foreground">Check-ins totales</p>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        {isLoading ? (
+                            [...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
+                        ) : (
+                            <>
+                                <CoachStat label="Total alumnas" value={data?.total ?? 0} icon={Users} tone="arcilla" />
+                                <CoachStat label="Regulares (≥3)" value={regulares} icon={Star} tone="verde" />
+                                <CoachStat label="Check-ins totales" value={totalCheckins} icon={TrendingUp} tone="success" className="col-span-2 sm:col-span-1" />
+                            </>
+                        )}
                     </div>
 
                     {/* Search */}
@@ -178,9 +144,13 @@ export default function CoachStudents() {
                                     Error al cargar alumnas.
                                 </p>
                             ) : filtered.length === 0 ? (
-                                <p className="text-center text-muted-foreground py-10">
-                                    {search.trim() ? 'Sin resultados para esa búsqueda.' : 'Aún no tienes alumnas registradas.'}
-                                </p>
+                                <div className="p-4">
+                                    <CoachEmptyState
+                                        icon={Users}
+                                        title={search.trim() ? 'Sin resultados' : 'Sin alumnas aún'}
+                                        description={search.trim() ? 'Prueba otra búsqueda.' : 'Cuando imparta clases con alumnas, aparecerán aquí.'}
+                                    />
+                                </div>
                             ) : (
                                 <div className="divide-y">
                                     {filtered.map((student) => {

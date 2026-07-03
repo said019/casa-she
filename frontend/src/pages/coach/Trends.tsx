@@ -6,6 +6,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import CoachLayout from '@/components/layout/CoachLayout';
 import { AuthGuard } from '@/components/layout/AuthGuard';
+import { CoachPageHero, CoachStat } from '@/components/coach/CoachUI';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -138,63 +139,26 @@ export default function CoachTrends() {
         <AuthGuard requiredRoles={['instructor', 'admin']}>
             <CoachLayout>
                 <div className="max-w-5xl mx-auto space-y-6">
-                    <div>
-                        <h1 className="font-heading text-3xl font-bold">Tendencias</h1>
-                        <p className="text-muted-foreground">
-                            Ocupación y asistencia de las últimas 12 semanas.
-                        </p>
-                    </div>
+                    <CoachPageHero
+                        eyebrow="Coach Panel"
+                        title="Tendencias"
+                        subtitle="Ocupación y asistencia de las últimas 12 semanas."
+                        icon={TrendingUp}
+                        className="-mt-6"
+                    />
 
                     {/* Stats */}
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        {[
-                            {
-                                label: 'Ocupación promedio',
-                                value: isLoading ? null : `${avgOccupancy}%`,
-                                icon: TrendingUp,
-                                color: 'text-balance-gold',
-                                bg: 'bg-balance-gold/10',
-                            },
-                            {
-                                label: 'Mejor semana',
-                                value: isLoading || !bestWeek
-                                    ? null
-                                    : `${bestWeek.avg_occupancy_pct}%`,
-                                icon: CheckCircle2,
-                                color: 'text-green-600',
-                                bg: 'bg-green-500/10',
-                            },
-                            {
-                                label: 'Check-ins totales',
-                                value: isLoading ? null : totalCheckins.toString(),
-                                icon: Users,
-                                color: 'text-balance-gold',
-                                bg: 'bg-balance-gold/10',
-                            },
-                            {
-                                label: 'Tasa no-show',
-                                value: isLoading ? null : `${noshowRate}%`,
-                                icon: AlertCircle,
-                                color: 'text-orange-500',
-                                bg: 'bg-orange-500/10',
-                            },
-                        ].map((stat) => (
-                            <Card key={stat.label}>
-                                <CardContent className="pt-4 pb-3 flex items-center gap-3">
-                                    <div className={`h-9 w-9 rounded-xl ${stat.bg} flex items-center justify-center flex-shrink-0`}>
-                                        <stat.icon className={`h-4 w-4 ${stat.color}`} />
-                                    </div>
-                                    <div className="min-w-0">
-                                        {stat.value === null ? (
-                                            <Skeleton className="h-6 w-12 mb-1" />
-                                        ) : (
-                                            <p className="font-heading text-2xl font-bold">{stat.value}</p>
-                                        )}
-                                        <p className="text-xs text-muted-foreground leading-tight">{stat.label}</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
+                        {isLoading ? (
+                            [...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
+                        ) : (
+                            <>
+                                <CoachStat label="Ocupación promedio" value={`${avgOccupancy}%`} icon={TrendingUp} tone="arcilla" />
+                                <CoachStat label="Mejor semana" value={bestWeek ? `${bestWeek.avg_occupancy_pct}%` : '—'} icon={CheckCircle2} tone="success" />
+                                <CoachStat label="Check-ins totales" value={totalCheckins} icon={Users} tone="verde" />
+                                <CoachStat label="Tasa no-show" value={`${noshowRate}%`} icon={AlertCircle} tone="neutral" />
+                            </>
+                        )}
                     </div>
 
                     {/* Bar chart */}
