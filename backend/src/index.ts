@@ -563,22 +563,9 @@ async function runStartupMigrations(): Promise<void> {
         console.error('Error applying Migration 029:', e);
     }
 
-    // Cleanup: borra planes viejos inactivos que ya no tienen membresías ni
-    // órdenes. Idempotente y seguro: los planes aún referenciados se respetan
-    // (no rompe integridad). Corre en cada arranque.
-    try {
-        const del = await query(`
-            DELETE FROM plans p
-            WHERE p.is_active = false
-              AND NOT EXISTS (SELECT 1 FROM memberships m WHERE m.plan_id = p.id)
-              AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.plan_id = p.id)
-            RETURNING p.id`);
-        if (Array.isArray(del) && del.length > 0) {
-            console.log(`Cleanup: removed ${del.length} unreferenced legacy plan(s).`);
-        }
-    } catch (e) {
-        console.error('Error cleaning legacy plans:', e);
-    }
+    // Cleanup de planes inactivos: DESACTIVADO. El catálogo Casa Shé está limpio;
+    // borrar automáticamente en cada arranque destruiría planes que la admin
+    // desactive temporalmente. Borrado manual desde el panel de admin.
 
     // Backstop de idempotencia: una orden no puede generar 2 membresías.
     // Bloquea la carrera webhook-vs-cron de reconciliación a nivel BD
