@@ -156,6 +156,8 @@ import CoachSubstitutions from "./pages/coach/Substitutions";
 import CoachPlaylists from "./pages/coach/Playlists";
 import CoachTemplates from "./pages/coach/Templates";
 import CoachEarnings from "./pages/coach/Earnings";
+import CoachStudents from "./pages/coach/Students";
+import CoachTrends from "./pages/coach/Trends";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -384,6 +386,8 @@ const App = () => (
             <Route path="/coach/playlists" element={<CoachPlaylists />} />
             <Route path="/coach/templates" element={<CoachTemplates />} />
             <Route path="/coach/earnings" element={<CoachEarnings />} />
+            <Route path="/coach/students" element={<CoachStudents />} />
+            <Route path="/coach/trends" element={<CoachTrends />} />
 
             {/* Legacy redirects */}
             <Route path="/admin/clients" element={<ClientsList />} />

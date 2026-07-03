@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import CoachLayout from '@/components/layout/CoachLayout';
 import { AuthGuard } from '@/components/layout/AuthGuard';
+import { CoachPageHero, CoachStat } from '@/components/coach/CoachUI';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -183,50 +184,33 @@ export default function CoachDashboard() {
         <AuthGuard requiredRoles={['instructor', 'admin']}>
             <CoachLayout>
                 <div className="space-y-6">
-                    {/* Header with gradient */}
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-balance-dark via-[#3D3229] to-balance-dark p-6 sm:p-8">
-                        <div className="absolute top-0 right-0 w-56 h-56 rounded-full bg-balance-gold/[0.08] blur-3xl" />
-                        <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-balance-olive/[0.1] blur-3xl" />
-                        <div className="relative z-10">
-                            <div className="flex items-center gap-2 mb-1">
-                                <Flame className="h-4 w-4 text-balance-gold/70" />
-                                <p className="text-[10px] uppercase tracking-[3px] text-balance-gold/60 font-semibold font-body">
-                                    Coach Panel
-                                </p>
-                            </div>
-                            <h1 className="font-heading text-2xl sm:text-3xl font-bold text-white">
-                                Hola, {user?.display_name?.split(' ')[0]} 👋
-                            </h1>
-                            <p className="text-balance-sand/60 font-body text-sm mt-1">
-                                {format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
-                            </p>
-                        </div>
-                    </div>
+                    {/* Hero de página */}
+                    <CoachPageHero
+                        eyebrow="Coach Panel"
+                        title={`Hola, ${user?.display_name?.split(' ')[0] ?? 'Coach'}`}
+                        subtitle={format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
+                        icon={Flame}
+                        className="-mt-6"
+                    />
 
-                    {/* Stats Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {[
-                            { label: 'Clases hoy', value: stats?.classes_today || 0, icon: Calendar, color: 'bg-balance-gold/10 text-balance-gold', border: 'border-balance-gold/20' },
-                            { label: 'Esta semana', value: stats?.classes_this_week || 0, icon: Clock, color: 'bg-blue-500/10 text-blue-600', border: 'border-blue-500/20' },
-                            { label: 'Reservaciones', value: stats?.bookings_this_week || 0, icon: Users, color: 'bg-emerald-500/10 text-emerald-600', border: 'border-emerald-500/20' },
-                            { label: 'Ocupación', value: `${stats?.avg_occupancy || 0}%`, icon: TrendingUp, color: 'bg-violet-500/10 text-violet-600', border: 'border-violet-500/20' },
-                        ].map((stat) => (
-                            <Card key={stat.label} className={`border ${stat.border} hover:shadow-md transition-all duration-300 hover:-translate-y-0.5`}>
-                                <CardContent className="p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`p-2.5 rounded-xl ${stat.color}`}>
-                                            <stat.icon className="h-5 w-5" />
-                                        </div>
-                                        <div>
-                                            <p className="text-2xl font-bold font-heading">
-                                                {loadingStats ? <Skeleton className="h-8 w-8" /> : stat.value}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground font-body">{stat.label}</p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
+                    {/* Stats */}
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                        {loadingStats
+                            ? [...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
+                            : [
+                                  { label: 'Clases hoy', value: stats?.classes_today ?? 0, icon: Calendar, tone: 'arcilla' as const },
+                                  { label: 'Esta semana', value: stats?.classes_this_week ?? 0, icon: Clock, tone: 'verde' as const },
+                                  { label: 'Reservaciones', value: stats?.bookings_this_week ?? 0, icon: Users, tone: 'success' as const },
+                                  { label: 'Ocupación', value: `${stats?.avg_occupancy ?? 0}%`, icon: TrendingUp, tone: 'arcilla' as const },
+                              ].map((stat) => (
+                                  <CoachStat
+                                      key={stat.label}
+                                      label={stat.label}
+                                      value={stat.value}
+                                      icon={stat.icon}
+                                      tone={stat.tone}
+                                  />
+                              ))}
                     </div>
 
                     {/* Today's Classes */}

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -26,9 +25,12 @@ import {
     KeyRound,
     Clock,
     Star,
+    User,
 } from 'lucide-react';
 import CoachLayout from '@/components/layout/CoachLayout';
 import { AuthGuard } from '@/components/layout/AuthGuard';
+import { CoachStat } from '@/components/coach/CoachUI';
+import { CasaShePattern } from '@/components/CasaShePattern';
 import api, { getErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/use-toast';
@@ -69,15 +71,14 @@ interface InstructorStats {
     total_reviews: number;
 }
 
-// Lun → Dom (orden de visualización; el valor PG es 0=Dom..6=Sáb)
-const DAY_ROWS: { value: number; label: string }[] = [
-    { value: 1, label: 'Lunes' },
-    { value: 2, label: 'Martes' },
-    { value: 3, label: 'Miércoles' },
-    { value: 4, label: 'Jueves' },
-    { value: 5, label: 'Viernes' },
-    { value: 6, label: 'Sábado' },
-    { value: 0, label: 'Domingo' },
+const DAY_ROWS: { value: number; label: string; short: string }[] = [
+    { value: 1, label: 'Lunes', short: 'Lun' },
+    { value: 2, label: 'Martes', short: 'Mar' },
+    { value: 3, label: 'Miércoles', short: 'Mié' },
+    { value: 4, label: 'Jueves', short: 'Jue' },
+    { value: 5, label: 'Viernes', short: 'Vie' },
+    { value: 6, label: 'Sábado', short: 'Sáb' },
+    { value: 0, label: 'Domingo', short: 'Dom' },
 ];
 
 function getInitials(name: string) {
@@ -86,8 +87,84 @@ function getInitials(name: string) {
 
 function trimTime(t: string | null | undefined) {
     if (!t) return '';
-    // PG TIME usually comes as "HH:MM:SS"; HTML input type=time needs "HH:MM"
     return t.length >= 5 ? t.slice(0, 5) : t;
+}
+
+function SectionCard({
+    title,
+    description,
+    icon: Icon,
+    editing,
+    onEdit,
+    onCancel,
+    onSave,
+    saving,
+    children,
+}: {
+    title: string;
+    description?: string;
+    icon: React.ElementType;
+    editing: boolean;
+    onEdit: () => void;
+    onCancel: () => void;
+    onSave: () => void;
+    saving: boolean;
+    children: React.ReactNode;
+}) {
+    return (
+        <Card className="overflow-hidden">
+            <CardHeader className="flex flex-row items-start justify-between pb-4 border-b border-border/50">
+                <div className="flex items-center gap-3">
+                    <div
+                        className="flex h-9 w-9 items-center justify-center rounded-lg flex-shrink-0"
+                        style={{ backgroundColor: 'rgba(42,78,54,0.1)' }}
+                    >
+                        <Icon className="h-4.5 w-4.5" style={{ color: '#2A4E36' }} />
+                    </div>
+                    <div>
+                        <CardTitle className="text-base font-heading">{title}</CardTitle>
+                        {description && (
+                            <p className="text-xs text-muted-foreground font-body mt-0.5">{description}</p>
+                        )}
+                    </div>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                    {!editing ? (
+                        <Button variant="outline" size="sm" onClick={onEdit} className="font-body text-xs h-8">
+                            <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                            Editar
+                        </Button>
+                    ) : (
+                        <>
+                            <Button variant="ghost" size="sm" onClick={onCancel} disabled={saving} className="font-body text-xs h-8">
+                                <X className="h-3.5 w-3.5 mr-1" />
+                                Cancelar
+                            </Button>
+                            <Button size="sm" onClick={onSave} disabled={saving}
+                                className="font-body text-xs h-8 active:scale-[0.97] transition-transform duration-100"
+                                style={{ backgroundColor: '#2A4E36' }}
+                            >
+                                {saving ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
+                                Guardar
+                            </Button>
+                        </>
+                    )}
+                </div>
+            </CardHeader>
+            <CardContent className="pt-5">{children}</CardContent>
+        </Card>
+    );
+}
+
+function FieldRow({ label, value }: { label: string; value: string | null | undefined }) {
+    return (
+        <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-3">
+            <span className="font-body text-[10px] uppercase tracking-[2px] text-muted-foreground/70 sm:w-28 flex-shrink-0">
+                {label}
+            </span>
+            <span className="font-body text-sm text-foreground/80">{value || '—'}</span>
+        </div>
+    );
 }
 
 export default function CoachProfile() {
@@ -98,23 +175,17 @@ export default function CoachProfile() {
 
     const { data: instructor, isLoading } = useQuery<InstructorProfile>({
         queryKey: ['instructor-me'],
-        queryFn: async () => {
-            const response = await api.get('/instructors/me');
-            return response.data;
-        },
+        queryFn: async () => (await api.get('/instructors/me')).data,
         enabled: !!user?.id,
     });
 
     const { data: stats, isLoading: loadingStats } = useQuery<InstructorStats>({
         queryKey: ['instructor-me-stats', instructor?.id],
-        queryFn: async () => {
-            const response = await api.get(`/instructors/${instructor?.id}/stats`);
-            return response.data;
-        },
+        queryFn: async () => (await api.get(`/instructors/${instructor?.id}/stats`)).data,
         enabled: !!instructor?.id,
     });
 
-    // ===== Sección: Información personal =====
+    // ── Info personal ──
     const [editingInfo, setEditingInfo] = useState(false);
     const [infoForm, setInfoForm] = useState({ displayName: '', bio: '', tagline: '', phone: '' });
 
@@ -130,10 +201,7 @@ export default function CoachProfile() {
     }, [instructor, editingInfo]);
 
     const updateInfoMutation = useMutation({
-        mutationFn: async () => {
-            const res = await api.put('/instructors/me', infoForm);
-            return res.data;
-        },
+        mutationFn: async () => (await api.put('/instructors/me', infoForm)).data,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['instructor-me'] });
             setEditingInfo(false);
@@ -142,7 +210,7 @@ export default function CoachProfile() {
         onError: (e) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(e) }),
     });
 
-    // ===== Sección: Especialidades / Certificaciones =====
+    // ── Tags ──
     const [specialties, setSpecialties] = useState<string[]>([]);
     const [certifications, setCertifications] = useState<string[]>([]);
     const [editingTags, setEditingTags] = useState(false);
@@ -157,31 +225,22 @@ export default function CoachProfile() {
     }, [instructor, editingTags]);
 
     const updateTagsMutation = useMutation({
-        mutationFn: async () => {
-            const res = await api.put('/instructors/me', { specialties, certifications });
-            return res.data;
-        },
+        mutationFn: async () => (await api.put('/instructors/me', { specialties, certifications })).data,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['instructor-me'] });
             setEditingTags(false);
-            toast({ title: 'Especialidades y certificaciones guardadas' });
+            toast({ title: 'Especialidades guardadas' });
         },
         onError: (e) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(e) }),
     });
 
-    // ===== Sección: Foto =====
+    // ── Foto ──
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        if (!file.type.startsWith('image/')) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Solo se permiten imágenes' });
-            return;
-        }
-        if (file.size > 10 * 1024 * 1024) {
-            toast({ variant: 'destructive', title: 'Error', description: 'La imagen no debe superar 10MB' });
-            return;
-        }
+        if (!file.type.startsWith('image/')) return toast({ variant: 'destructive', title: 'Solo se permiten imágenes' });
+        if (file.size > 10 * 1024 * 1024) return toast({ variant: 'destructive', title: 'Máximo 10MB' });
         setUploadingPhoto(true);
         try {
             const formData = new FormData();
@@ -197,7 +256,7 @@ export default function CoachProfile() {
         }
     };
 
-    // ===== Sección: Disponibilidad =====
+    // ── Disponibilidad ──
     type DayState = { is_available: boolean; start_time: string; end_time: string };
     const [editingAvail, setEditingAvail] = useState(false);
     const [availByDay, setAvailByDay] = useState<Record<number, DayState>>({});
@@ -205,9 +264,7 @@ export default function CoachProfile() {
     useEffect(() => {
         if (!instructor || editingAvail) return;
         const map: Record<number, DayState> = {};
-        for (const row of DAY_ROWS) {
-            map[row.value] = { is_available: false, start_time: '09:00', end_time: '18:00' };
-        }
+        for (const row of DAY_ROWS) map[row.value] = { is_available: false, start_time: '09:00', end_time: '18:00' };
         for (const slot of instructor.availability || []) {
             map[slot.day_of_week] = {
                 is_available: !!slot.is_available,
@@ -222,14 +279,8 @@ export default function CoachProfile() {
         mutationFn: async () => {
             const availability = Object.entries(availByDay)
                 .filter(([, v]) => v.is_available)
-                .map(([day, v]) => ({
-                    day_of_week: Number(day),
-                    start_time: v.start_time,
-                    end_time: v.end_time,
-                    is_available: true,
-                }));
-            const res = await api.put('/instructors/me/availability', { availability });
-            return res.data;
+                .map(([day, v]) => ({ day_of_week: Number(day), start_time: v.start_time, end_time: v.end_time, is_available: true }));
+            return (await api.put('/instructors/me/availability', { availability })).data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['instructor-me'] });
@@ -239,17 +290,13 @@ export default function CoachProfile() {
         onError: (e) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(e) }),
     });
 
-    // ===== Sección: Contraseña =====
+    // ── Contraseña ──
     const [pwd, setPwd] = useState({ current: '', next: '', confirm: '' });
     const changePwdMutation = useMutation({
         mutationFn: async () => {
             if (pwd.next.length < 6) throw new Error('La nueva contraseña debe tener al menos 6 caracteres');
             if (pwd.next !== pwd.confirm) throw new Error('Las contraseñas no coinciden');
-            const res = await api.post('/auth/change-password', {
-                currentPassword: pwd.current,
-                newPassword: pwd.next,
-            });
-            return res.data;
+            return (await api.post('/auth/change-password', { currentPassword: pwd.current, newPassword: pwd.next })).data;
         },
         onSuccess: () => {
             setPwd({ current: '', next: '', confirm: '' });
@@ -262,9 +309,10 @@ export default function CoachProfile() {
         return (
             <AuthGuard requiredRoles={['instructor', 'admin']}>
                 <CoachLayout>
-                    <div className="max-w-4xl mx-auto space-y-6">
-                        <Skeleton className="h-64 w-full" />
-                        <Skeleton className="h-48 w-full" />
+                    <div className="max-w-4xl mx-auto space-y-5">
+                        <Skeleton className="h-52 w-full rounded-2xl" />
+                        <Skeleton className="h-40 w-full rounded-2xl" />
+                        <Skeleton className="h-48 w-full rounded-2xl" />
                     </div>
                 </CoachLayout>
             </AuthGuard>
@@ -275,7 +323,7 @@ export default function CoachProfile() {
         return (
             <AuthGuard requiredRoles={['instructor', 'admin']}>
                 <CoachLayout>
-                    <div className="max-w-4xl mx-auto py-8 text-center text-muted-foreground">
+                    <div className="max-w-4xl mx-auto py-12 text-center text-muted-foreground font-body">
                         No se encontró tu perfil de instructor.
                     </div>
                 </CoachLayout>
@@ -283,203 +331,227 @@ export default function CoachProfile() {
         );
     }
 
+    const name = instructor.display_name || user?.display_name || '';
+
     return (
         <AuthGuard requiredRoles={['instructor', 'admin']}>
             <CoachLayout>
-                <div className="max-w-4xl mx-auto space-y-6">
-                    {/* ====== Header: Foto + nombre + identidad ====== */}
-                    <Card>
-                        <CardContent className="p-6">
-                            <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-                                <div className="relative">
-                                    <Avatar className="h-32 w-32">
+                <div className="max-w-4xl mx-auto space-y-5">
+
+                    {/* ── Hero de perfil ── */}
+                    <div
+                        className="relative -mx-4 sm:-mx-6 overflow-hidden"
+                        style={{ backgroundColor: '#16261A' }}
+                    >
+                        <CasaShePattern className="pointer-events-none absolute inset-0 h-full w-full" color="#F6F0E4" opacity={0.07} />
+                        <div
+                            aria-hidden
+                            className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full"
+                            style={{ background: 'radial-gradient(circle, rgba(174,72,54,0.2) 0%, transparent 65%)' }}
+                        />
+                        <div
+                            aria-hidden
+                            className="pointer-events-none absolute -bottom-10 -left-10 h-48 w-48 rounded-full"
+                            style={{ background: 'radial-gradient(circle, rgba(42,78,54,0.5) 0%, transparent 65%)' }}
+                        />
+
+                        <div className="relative z-10 px-6 py-8 sm:px-10">
+                            <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6">
+                                {/* Avatar */}
+                                <div className="relative flex-shrink-0">
+                                    <Avatar className="h-28 w-28 ring-4 shadow-xl" style={{ '--tw-ring-color': 'rgba(246,240,228,0.15)' } as React.CSSProperties}>
                                         <AvatarImage src={instructor.photo_url || undefined} />
-                                        <AvatarFallback className="text-3xl bg-primary/10 text-primary">
-                                            {getInitials(instructor.display_name || user?.display_name || 'U')}
+                                        <AvatarFallback
+                                            className="text-3xl font-bold"
+                                            style={{ backgroundColor: 'rgba(174,72,54,0.3)', color: '#F6F0E4' }}
+                                        >
+                                            {getInitials(name)}
                                         </AvatarFallback>
                                     </Avatar>
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept="image/*"
-                                        className="hidden"
-                                        onChange={handlePhotoChange}
-                                    />
-                                    <Button
-                                        size="icon"
-                                        variant="secondary"
-                                        className="absolute bottom-0 right-0 h-9 w-9 rounded-full shadow"
+                                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+                                    <button
+                                        type="button"
                                         onClick={() => fileInputRef.current?.click()}
                                         disabled={uploadingPhoto}
                                         aria-label="Cambiar foto"
+                                        className="absolute bottom-1 right-1 flex h-8 w-8 items-center justify-center rounded-full shadow-lg transition-transform duration-100 active:scale-[0.94]"
+                                        style={{ backgroundColor: '#AE4836' }}
                                     >
-                                        {uploadingPhoto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-                                    </Button>
+                                        {uploadingPhoto
+                                            ? <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                                            : <Camera className="h-3.5 w-3.5 text-white" />
+                                        }
+                                    </button>
                                 </div>
 
-                                <div className="flex-1 text-center md:text-left">
-                                    <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
-                                        <h1 className="font-heading text-3xl font-bold">
-                                            {instructor.display_name || user?.display_name}
+                                {/* Nombre + meta */}
+                                <div className="text-center sm:text-left flex-1 pb-1">
+                                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
+                                        <h1 className="font-heading text-3xl sm:text-4xl" style={{ color: '#F6F0E4' }}>
+                                            {name}
                                         </h1>
                                         {instructor.is_active && (
-                                            <Badge className="bg-success">
-                                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                                Activo
-                                            </Badge>
+                                            <span
+                                                className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-body text-[10px] font-semibold uppercase tracking-[1.5px]"
+                                                style={{ backgroundColor: 'rgba(42,78,54,0.5)', color: '#9CC69B' }}
+                                            >
+                                                <CheckCircle2 className="h-3 w-3" />
+                                                Activa
+                                            </span>
                                         )}
                                         {instructor.coach_number != null && (
-                                            <Badge variant="outline">Coach #{instructor.coach_number}</Badge>
+                                            <span
+                                                className="inline-flex items-center rounded-full px-2.5 py-0.5 font-body text-[10px] uppercase tracking-[1.5px]"
+                                                style={{ backgroundColor: 'rgba(174,72,54,0.2)', color: 'rgba(174,72,54,0.85)' }}
+                                            >
+                                                Coach #{instructor.coach_number}
+                                            </span>
                                         )}
                                     </div>
-                                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-3 text-sm text-muted-foreground">
-                                        <span className="flex items-center gap-1">
-                                            <Mail className="h-4 w-4" />
+                                    {instructor.tagline && (
+                                        <p className="font-heading text-lg leading-snug mb-2" style={{ color: 'rgba(246,240,228,0.65)' }}>
+                                            {instructor.tagline}
+                                        </p>
+                                    )}
+                                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4">
+                                        <span className="flex items-center gap-1.5 font-body text-xs" style={{ color: 'rgba(246,240,228,0.45)' }}>
+                                            <Mail className="h-3.5 w-3.5" />
                                             {instructor.email || user?.email}
                                         </span>
                                         {instructor.phone && (
-                                            <span className="flex items-center gap-1">
-                                                <Phone className="h-4 w-4" />
+                                            <span className="flex items-center gap-1.5 font-body text-xs" style={{ color: 'rgba(246,240,228,0.45)' }}>
+                                                <Phone className="h-3.5 w-3.5" />
                                                 {instructor.phone}
                                             </span>
                                         )}
                                     </div>
-                                    {instructor.bio && !editingInfo && (
-                                        <p className="text-muted-foreground mt-3 max-w-lg">{instructor.bio}</p>
-                                    )}
                                 </div>
                             </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
 
-                    {/* ====== Información personal (editable) ====== */}
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <div>
-                                <CardTitle>Información personal</CardTitle>
-                                <CardDescription>Nombre, biografía y teléfono</CardDescription>
-                            </div>
-                            {!editingInfo ? (
-                                <Button variant="outline" size="sm" onClick={() => setEditingInfo(true)}>
-                                    <Pencil className="h-4 w-4 mr-2" />
-                                    Editar
-                                </Button>
-                            ) : (
-                                <div className="flex gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => setEditingInfo(false)} disabled={updateInfoMutation.isPending}>
-                                        <X className="h-4 w-4 mr-2" />
-                                        Cancelar
-                                    </Button>
-                                    <Button size="sm" onClick={() => updateInfoMutation.mutate()} disabled={updateInfoMutation.isPending}>
-                                        {updateInfoMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                                        Guardar
-                                    </Button>
-                                </div>
-                            )}
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {editingInfo ? (
-                                <>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="displayName">Nombre para mostrar</Label>
-                                        <Input
-                                            id="displayName"
-                                            value={infoForm.displayName}
-                                            onChange={(e) => setInfoForm({ ...infoForm, displayName: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="phone">Teléfono</Label>
-                                        <Input
-                                            id="phone"
-                                            value={infoForm.phone}
-                                            onChange={(e) => setInfoForm({ ...infoForm, phone: e.target.value })}
-                                            placeholder="55 1234 5678"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="tagline">Frase del sitio público</Label>
-                                        <Input
-                                            id="tagline"
-                                            maxLength={200}
-                                            value={infoForm.tagline}
-                                            onChange={(e) => setInfoForm({ ...infoForm, tagline: e.target.value })}
-                                            placeholder="Reformer & fuerza · reinventa tu mejor versión ⚡"
-                                        />
-                                        <p className="text-xs text-muted-foreground">
-                                            Frase corta bajo tu nombre en la tarjeta de “El Equipo”.
-                                        </p>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="bio">Biografía</Label>
-                                        <Textarea
-                                            id="bio"
-                                            rows={4}
-                                            value={infoForm.bio}
-                                            onChange={(e) => setInfoForm({ ...infoForm, bio: e.target.value })}
-                                            placeholder="Cuéntale a tus clientes sobre ti..."
-                                        />
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="text-sm space-y-2">
-                                    <div><span className="text-muted-foreground">Nombre:</span> {instructor.display_name}</div>
-                                    <div><span className="text-muted-foreground">Teléfono:</span> {instructor.phone || '—'}</div>
-                                    <div><span className="text-muted-foreground">Frase:</span> {instructor.tagline || '—'}</div>
-                                    <div><span className="text-muted-foreground">Biografía:</span> {instructor.bio || '—'}</div>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                    {/* ── Stats ── */}
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        {loadingStats ? (
+                            [...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)
+                        ) : (
+                            <>
+                                <CoachStat label="Clases impartidas" value={stats?.total_classes_taught ?? 0} icon={Calendar} tone="arcilla" />
+                                <CoachStat label="Check-ins totales" value={stats?.total_checkins ?? 0} icon={Users} tone="verde" />
+                                <CoachStat label="Tasa asistencia" value={`${stats?.attendance_rate ?? 0}%`} icon={TrendingUp} tone="success" />
+                                <CoachStat label="Ocupación prom." value={`${stats?.avg_occupancy ?? 0}%`} icon={Award} tone="neutral" />
+                            </>
+                        )}
+                    </div>
 
-                    {/* ====== Especialidades + Certificaciones ====== */}
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <div>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Award className="h-5 w-5" />
-                                    Especialidades y certificaciones
-                                </CardTitle>
-                                <CardDescription>Visibles en tu perfil público</CardDescription>
-                            </div>
-                            {!editingTags ? (
-                                <Button variant="outline" size="sm" onClick={() => setEditingTags(true)}>
-                                    <Pencil className="h-4 w-4 mr-2" />
-                                    Editar
-                                </Button>
-                            ) : (
-                                <div className="flex gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => setEditingTags(false)} disabled={updateTagsMutation.isPending}>
-                                        <X className="h-4 w-4 mr-2" />
-                                        Cancelar
-                                    </Button>
-                                    <Button size="sm" onClick={() => updateTagsMutation.mutate()} disabled={updateTagsMutation.isPending}>
-                                        {updateTagsMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                                        Guardar
-                                    </Button>
+                    {/* ── Calificación ── */}
+                    {(loadingStats || (stats?.avg_rating != null)) && (
+                        <Card className="overflow-hidden border-amber-100">
+                            <CardContent className="p-5">
+                                <div className="flex items-center gap-4">
+                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-50">
+                                        <Star className="h-6 w-6 fill-amber-400 text-amber-400" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="font-body text-[10px] uppercase tracking-[2px] text-muted-foreground/70">Mi calificación</p>
+                                        {loadingStats ? (
+                                            <Skeleton className="h-8 w-28 mt-1" />
+                                        ) : (
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <span className="font-heading text-3xl font-bold leading-none">{stats!.avg_rating!.toFixed(1)}</span>
+                                                <span className="font-body text-sm text-muted-foreground">/ 5</span>
+                                                <div className="flex items-center gap-0.5 ml-1">
+                                                    {[1, 2, 3, 4, 5].map((n) => (
+                                                        <Star key={n} className={`h-4 w-4 ${n <= Math.round(stats!.avg_rating!) ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/25'}`} />
+                                                    ))}
+                                                </div>
+                                                {stats?.total_reviews ? (
+                                                    <span className="font-body text-xs text-muted-foreground">({stats.total_reviews} reseñas)</span>
+                                                ) : null}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            )}
-                        </CardHeader>
-                        <CardContent className="space-y-6">
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* ── Información personal ── */}
+                    <SectionCard
+                        title="Información personal"
+                        description="Nombre, biografía y teléfono"
+                        icon={User}
+                        editing={editingInfo}
+                        onEdit={() => setEditingInfo(true)}
+                        onCancel={() => setEditingInfo(false)}
+                        onSave={() => updateInfoMutation.mutate()}
+                        saving={updateInfoMutation.isPending}
+                    >
+                        {editingInfo ? (
+                            <div className="space-y-4">
+                                {[
+                                    { id: 'displayName', label: 'Nombre para mostrar', placeholder: 'Tu nombre', field: 'displayName' as const },
+                                    { id: 'phone', label: 'Teléfono', placeholder: '55 1234 5678', field: 'phone' as const },
+                                    { id: 'tagline', label: 'Frase del sitio público', placeholder: 'Reformer & fuerza · reinventa tu mejor versión', field: 'tagline' as const },
+                                ].map(({ id, label, placeholder, field }) => (
+                                    <div key={id} className="space-y-1.5">
+                                        <Label htmlFor={id} className="font-body text-[10px] uppercase tracking-[2px] text-muted-foreground/70">{label}</Label>
+                                        <Input id={id} value={infoForm[field]} onChange={(e) => setInfoForm({ ...infoForm, [field]: e.target.value })} placeholder={placeholder} className="font-body" />
+                                    </div>
+                                ))}
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="bio" className="font-body text-[10px] uppercase tracking-[2px] text-muted-foreground/70">Biografía</Label>
+                                    <Textarea id="bio" rows={4} value={infoForm.bio} onChange={(e) => setInfoForm({ ...infoForm, bio: e.target.value })} placeholder="Cuéntale a tus clientes sobre ti..." className="font-body resize-none" />
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <FieldRow label="Nombre" value={instructor.display_name} />
+                                <FieldRow label="Teléfono" value={instructor.phone} />
+                                <FieldRow label="Frase" value={instructor.tagline} />
+                                {instructor.bio && (
+                                    <div className="pt-1">
+                                        <span className="font-body text-[10px] uppercase tracking-[2px] text-muted-foreground/70">Biografía</span>
+                                        <p className="font-body text-sm text-foreground/70 mt-1 leading-relaxed">{instructor.bio}</p>
+                                    </div>
+                                )}
+                                {!instructor.bio && <FieldRow label="Biografía" value={null} />}
+                            </div>
+                        )}
+                    </SectionCard>
+
+                    {/* ── Especialidades y certificaciones ── */}
+                    <SectionCard
+                        title="Especialidades y certificaciones"
+                        description="Visibles en tu perfil público"
+                        icon={Award}
+                        editing={editingTags}
+                        onEdit={() => setEditingTags(true)}
+                        onCancel={() => setEditingTags(false)}
+                        onSave={() => updateTagsMutation.mutate()}
+                        saving={updateTagsMutation.isPending}
+                    >
+                        <div className="space-y-5">
+                            {/* Especialidades */}
                             <div>
-                                <Label className="text-sm">Especialidades</Label>
-                                <div className="flex flex-wrap gap-2 mt-2">
+                                <p className="font-body text-[10px] uppercase tracking-[2px] text-muted-foreground/70 mb-2">Especialidades</p>
+                                <div className="flex flex-wrap gap-2">
                                     {specialties.length === 0 && !editingTags && (
-                                        <span className="text-sm text-muted-foreground">Sin especialidades</span>
+                                        <span className="font-body text-sm text-muted-foreground">Sin especialidades</span>
                                     )}
                                     {specialties.map((s, idx) => (
-                                        <Badge key={`spec-${idx}`} variant="secondary" className="gap-1">
+                                        <span
+                                            key={`spec-${idx}`}
+                                            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-body text-xs font-medium"
+                                            style={{ backgroundColor: 'rgba(42,78,54,0.1)', color: '#2A4E36' }}
+                                        >
                                             {s}
                                             {editingTags && (
-                                                <button
-                                                    onClick={() => setSpecialties(specialties.filter((_, i) => i !== idx))}
-                                                    className="ml-1 opacity-70 hover:opacity-100"
-                                                    aria-label={`Quitar ${s}`}
-                                                >
+                                                <button onClick={() => setSpecialties(specialties.filter((_, i) => i !== idx))} className="opacity-60 hover:opacity-100 transition-opacity" aria-label={`Quitar ${s}`}>
                                                     <X className="h-3 w-3" />
                                                 </button>
                                             )}
-                                        </Badge>
+                                        </span>
                                     ))}
                                 </div>
                                 {editingTags && (
@@ -488,51 +560,41 @@ export default function CoachProfile() {
                                             value={newSpecialty}
                                             onChange={(e) => setNewSpecialty(e.target.value)}
                                             onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    e.preventDefault();
-                                                    const v = newSpecialty.trim();
-                                                    if (v && !specialties.includes(v)) setSpecialties([...specialties, v]);
-                                                    setNewSpecialty('');
-                                                }
+                                                if (e.key === 'Enter') { e.preventDefault(); const v = newSpecialty.trim(); if (v && !specialties.includes(v)) setSpecialties([...specialties, v]); setNewSpecialty(''); }
                                             }}
-                                            placeholder="Ej. Reformer, Mat, Embarazadas..."
+                                            placeholder="Ej. Reformer, Mat, Embarazadas…"
+                                            className="font-body text-sm"
                                         />
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                                const v = newSpecialty.trim();
-                                                if (v && !specialties.includes(v)) setSpecialties([...specialties, v]);
-                                                setNewSpecialty('');
-                                            }}
-                                        >
+                                        <Button type="button" variant="outline" size="sm" className="px-3" onClick={() => { const v = newSpecialty.trim(); if (v && !specialties.includes(v)) setSpecialties([...specialties, v]); setNewSpecialty(''); }}>
                                             <Plus className="h-4 w-4" />
                                         </Button>
                                     </div>
                                 )}
                             </div>
 
+                            <div className="border-t border-border/40" />
+
+                            {/* Certificaciones */}
                             <div>
-                                <Label className="text-sm">Certificaciones</Label>
-                                <div className="flex flex-wrap gap-2 mt-2">
+                                <p className="font-body text-[10px] uppercase tracking-[2px] text-muted-foreground/70 mb-2">Certificaciones</p>
+                                <div className="flex flex-wrap gap-2">
                                     {certifications.length === 0 && !editingTags && (
-                                        <span className="text-sm text-muted-foreground">Sin certificaciones</span>
+                                        <span className="font-body text-sm text-muted-foreground">Sin certificaciones</span>
                                     )}
                                     {certifications.map((c, idx) => (
-                                        <Badge key={`cert-${idx}`} variant="outline" className="gap-1">
-                                            <CheckCircle2 className="h-3 w-3 text-success" />
+                                        <span
+                                            key={`cert-${idx}`}
+                                            className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-body text-xs font-medium"
+                                            style={{ borderColor: 'rgba(174,72,54,0.3)', color: '#AE4836', backgroundColor: 'rgba(174,72,54,0.05)' }}
+                                        >
+                                            <CheckCircle2 className="h-3 w-3" />
                                             {c}
                                             {editingTags && (
-                                                <button
-                                                    onClick={() => setCertifications(certifications.filter((_, i) => i !== idx))}
-                                                    className="ml-1 opacity-70 hover:opacity-100"
-                                                    aria-label={`Quitar ${c}`}
-                                                >
+                                                <button onClick={() => setCertifications(certifications.filter((_, i) => i !== idx))} className="opacity-60 hover:opacity-100 transition-opacity" aria-label={`Quitar ${c}`}>
                                                     <X className="h-3 w-3" />
                                                 </button>
                                             )}
-                                        </Badge>
+                                        </span>
                                     ))}
                                 </div>
                                 {editingTags && (
@@ -541,279 +603,119 @@ export default function CoachProfile() {
                                             value={newCertification}
                                             onChange={(e) => setNewCertification(e.target.value)}
                                             onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    e.preventDefault();
-                                                    const v = newCertification.trim();
-                                                    if (v && !certifications.includes(v)) setCertifications([...certifications, v]);
-                                                    setNewCertification('');
-                                                }
+                                                if (e.key === 'Enter') { e.preventDefault(); const v = newCertification.trim(); if (v && !certifications.includes(v)) setCertifications([...certifications, v]); setNewCertification(''); }
                                             }}
-                                            placeholder="Ej. Stott Pilates Nivel 2..."
+                                            placeholder="Ej. Stott Pilates Nivel 2…"
+                                            className="font-body text-sm"
                                         />
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                                const v = newCertification.trim();
-                                                if (v && !certifications.includes(v)) setCertifications([...certifications, v]);
-                                                setNewCertification('');
-                                            }}
-                                        >
+                                        <Button type="button" variant="outline" size="sm" className="px-3" onClick={() => { const v = newCertification.trim(); if (v && !certifications.includes(v)) setCertifications([...certifications, v]); setNewCertification(''); }}>
                                             <Plus className="h-4 w-4" />
                                         </Button>
                                     </div>
                                 )}
                             </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </SectionCard>
 
-                    {/* ====== Disponibilidad ====== */}
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between">
+                    {/* ── Disponibilidad semanal ── */}
+                    <SectionCard
+                        title="Disponibilidad semanal"
+                        description="Días y horarios en que puedes dar clase"
+                        icon={Clock}
+                        editing={editingAvail}
+                        onEdit={() => setEditingAvail(true)}
+                        onCancel={() => setEditingAvail(false)}
+                        onSave={() => updateAvailMutation.mutate()}
+                        saving={updateAvailMutation.isPending}
+                    >
+                        <div className="space-y-1.5">
+                            {DAY_ROWS.map((row) => {
+                                const state = availByDay[row.value] || { is_available: false, start_time: '09:00', end_time: '18:00' };
+                                const active = state.is_available;
+                                return (
+                                    <div
+                                        key={row.value}
+                                        className="flex items-center gap-3 rounded-xl px-4 py-3 transition-colors"
+                                        style={{ backgroundColor: active ? 'rgba(42,78,54,0.06)' : 'transparent', border: `1px solid ${active ? 'rgba(42,78,54,0.15)' : 'rgba(0,0,0,0.06)'}` }}
+                                    >
+                                        <Switch
+                                            checked={active}
+                                            onCheckedChange={(checked) => setAvailByDay((p) => ({ ...p, [row.value]: { ...state, is_available: checked } }))}
+                                            disabled={!editingAvail}
+                                            aria-label={`Activar ${row.label}`}
+                                        />
+                                        <span className="font-body text-sm font-medium w-20 flex-shrink-0" style={{ color: active ? '#2A4E36' : undefined }}>
+                                            {row.label}
+                                        </span>
+                                        {active ? (
+                                            <div className="flex items-center gap-2 ml-auto">
+                                                <Input
+                                                    type="time"
+                                                    value={state.start_time}
+                                                    onChange={(e) => setAvailByDay((p) => ({ ...p, [row.value]: { ...state, start_time: e.target.value } }))}
+                                                    disabled={!editingAvail}
+                                                    className="w-28 font-body text-sm h-8"
+                                                />
+                                                <span className="text-muted-foreground text-xs">–</span>
+                                                <Input
+                                                    type="time"
+                                                    value={state.end_time}
+                                                    onChange={(e) => setAvailByDay((p) => ({ ...p, [row.value]: { ...state, end_time: e.target.value } }))}
+                                                    disabled={!editingAvail}
+                                                    className="w-28 font-body text-sm h-8"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <span className="ml-auto font-body text-xs text-muted-foreground/50">No disponible</span>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </SectionCard>
+
+                    {/* ── Seguridad ── */}
+                    <Card className="overflow-hidden">
+                        <CardHeader className="flex flex-row items-center gap-3 pb-4 border-b border-border/50">
+                            <div
+                                className="flex h-9 w-9 items-center justify-center rounded-lg flex-shrink-0"
+                                style={{ backgroundColor: 'rgba(174,72,54,0.1)' }}
+                            >
+                                <KeyRound className="h-4.5 w-4.5" style={{ color: '#AE4836' }} />
+                            </div>
                             <div>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Clock className="h-5 w-5" />
-                                    Disponibilidad semanal
-                                </CardTitle>
-                                <CardDescription>Indica los días y horarios en que puedes dar clase</CardDescription>
+                                <CardTitle className="text-base font-heading">Cambiar contraseña</CardTitle>
+                                <p className="text-xs text-muted-foreground font-body mt-0.5">Actualiza tu contraseña periódicamente</p>
                             </div>
-                            {!editingAvail ? (
-                                <Button variant="outline" size="sm" onClick={() => setEditingAvail(true)}>
-                                    <Pencil className="h-4 w-4 mr-2" />
-                                    Editar
-                                </Button>
-                            ) : (
-                                <div className="flex gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => setEditingAvail(false)} disabled={updateAvailMutation.isPending}>
-                                        <X className="h-4 w-4 mr-2" />
-                                        Cancelar
-                                    </Button>
-                                    <Button size="sm" onClick={() => updateAvailMutation.mutate()} disabled={updateAvailMutation.isPending}>
-                                        {updateAvailMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                                        Guardar
-                                    </Button>
-                                </div>
-                            )}
                         </CardHeader>
-                        <CardContent>
-                            <div className="space-y-2">
-                                {DAY_ROWS.map((row) => {
-                                    const state = availByDay[row.value] || { is_available: false, start_time: '09:00', end_time: '18:00' };
-                                    return (
-                                        <div
-                                            key={row.value}
-                                            className="flex items-center gap-3 p-3 rounded-lg border bg-card"
-                                        >
-                                            <Switch
-                                                checked={state.is_available}
-                                                onCheckedChange={(checked) =>
-                                                    setAvailByDay((prev) => ({
-                                                        ...prev,
-                                                        [row.value]: { ...state, is_available: checked },
-                                                    }))
-                                                }
-                                                disabled={!editingAvail}
-                                                aria-label={`Activar ${row.label}`}
-                                            />
-                                            <span className="w-24 text-sm font-medium">{row.label}</span>
-                                            {state.is_available ? (
-                                                <div className="flex items-center gap-2 flex-1 justify-end">
-                                                    <Input
-                                                        type="time"
-                                                        value={state.start_time}
-                                                        onChange={(e) =>
-                                                            setAvailByDay((prev) => ({
-                                                                ...prev,
-                                                                [row.value]: { ...state, start_time: e.target.value },
-                                                            }))
-                                                        }
-                                                        disabled={!editingAvail}
-                                                        className="w-32"
-                                                    />
-                                                    <span className="text-muted-foreground text-sm">a</span>
-                                                    <Input
-                                                        type="time"
-                                                        value={state.end_time}
-                                                        onChange={(e) =>
-                                                            setAvailByDay((prev) => ({
-                                                                ...prev,
-                                                                [row.value]: { ...state, end_time: e.target.value },
-                                                            }))
-                                                        }
-                                                        disabled={!editingAvail}
-                                                        className="w-32"
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <span className="text-sm text-muted-foreground ml-auto">No disponible</span>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                        <CardContent className="pt-5 space-y-4">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="current-pwd" className="font-body text-[10px] uppercase tracking-[2px] text-muted-foreground/70">Contraseña actual</Label>
+                                <Input id="current-pwd" type="password" value={pwd.current} onChange={(e) => setPwd({ ...pwd, current: e.target.value })} autoComplete="current-password" className="font-body" />
                             </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* ====== Seguridad: cambiar contraseña ====== */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <KeyRound className="h-5 w-5" />
-                                Cambiar contraseña
-                            </CardTitle>
-                            <CardDescription>Actualiza tu contraseña periódicamente</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="current-pwd">Contraseña actual</Label>
-                                <Input
-                                    id="current-pwd"
-                                    type="password"
-                                    value={pwd.current}
-                                    onChange={(e) => setPwd({ ...pwd, current: e.target.value })}
-                                    autoComplete="current-password"
-                                />
-                            </div>
-                            <div className="grid md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="new-pwd">Nueva contraseña</Label>
-                                    <Input
-                                        id="new-pwd"
-                                        type="password"
-                                        value={pwd.next}
-                                        onChange={(e) => setPwd({ ...pwd, next: e.target.value })}
-                                        autoComplete="new-password"
-                                    />
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="new-pwd" className="font-body text-[10px] uppercase tracking-[2px] text-muted-foreground/70">Nueva contraseña</Label>
+                                    <Input id="new-pwd" type="password" value={pwd.next} onChange={(e) => setPwd({ ...pwd, next: e.target.value })} autoComplete="new-password" className="font-body" />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="confirm-pwd">Confirmar nueva contraseña</Label>
-                                    <Input
-                                        id="confirm-pwd"
-                                        type="password"
-                                        value={pwd.confirm}
-                                        onChange={(e) => setPwd({ ...pwd, confirm: e.target.value })}
-                                        autoComplete="new-password"
-                                    />
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="confirm-pwd" className="font-body text-[10px] uppercase tracking-[2px] text-muted-foreground/70">Confirmar contraseña</Label>
+                                    <Input id="confirm-pwd" type="password" value={pwd.confirm} onChange={(e) => setPwd({ ...pwd, confirm: e.target.value })} autoComplete="new-password" className="font-body" />
                                 </div>
                             </div>
-                            <div className="flex justify-end">
+                            <div className="flex justify-end pt-1">
                                 <Button
                                     onClick={() => changePwdMutation.mutate()}
-                                    disabled={
-                                        changePwdMutation.isPending ||
-                                        !pwd.current ||
-                                        !pwd.next ||
-                                        !pwd.confirm
-                                    }
+                                    disabled={changePwdMutation.isPending || !pwd.current || !pwd.next || !pwd.confirm}
+                                    className="font-body active:scale-[0.97] transition-transform duration-100"
+                                    style={{ backgroundColor: '#2A4E36' }}
                                 >
-                                    {changePwdMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                                    Actualizar contraseña
+                                    {changePwdMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando…</> : <><Save className="h-4 w-4 mr-2" /> Actualizar contraseña</>}
                                 </Button>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* ====== Stats (read-only) ====== */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <Card>
-                            <CardContent className="p-4 text-center">
-                                <Calendar className="h-8 w-8 mx-auto text-primary mb-2" />
-                                <p className="text-3xl font-bold">
-                                    {loadingStats ? <Skeleton className="h-8 w-12 mx-auto" /> : stats?.total_classes_taught || 0}
-                                </p>
-                                <p className="text-xs text-muted-foreground">Clases impartidas</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-4 text-center">
-                                <Users className="h-8 w-8 mx-auto text-info mb-2" />
-                                <p className="text-3xl font-bold">
-                                    {loadingStats ? <Skeleton className="h-8 w-12 mx-auto" /> : stats?.total_checkins || 0}
-                                </p>
-                                <p className="text-xs text-muted-foreground">Check-ins totales</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-4 text-center">
-                                <TrendingUp className="h-8 w-8 mx-auto text-success mb-2" />
-                                <p className="text-3xl font-bold">
-                                    {loadingStats ? <Skeleton className="h-8 w-12 mx-auto" /> : `${stats?.attendance_rate || 0}%`}
-                                </p>
-                                <p className="text-xs text-muted-foreground">Tasa de asistencia</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-4 text-center">
-                                <Award className="h-8 w-8 mx-auto text-purple-500 mb-2" />
-                                <p className="text-3xl font-bold">
-                                    {loadingStats ? <Skeleton className="h-8 w-12 mx-auto" /> : `${stats?.avg_occupancy || 0}%`}
-                                </p>
-                                <p className="text-xs text-muted-foreground">Ocupación promedio</p>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* ====== Mi calificación (cómo te califican tus clientes) ====== */}
-                    <Card>
-                        <CardContent className="p-5">
-                            <div className="flex items-center gap-4">
-                                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-amber-100">
-                                    <Star className="h-7 w-7 fill-amber-400 text-amber-400" />
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="text-xs font-medium text-muted-foreground">Mi calificación</p>
-                                    {loadingStats ? (
-                                        <Skeleton className="h-8 w-28 mt-1" />
-                                    ) : stats?.avg_rating != null ? (
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-3xl font-bold leading-none">{stats.avg_rating.toFixed(1)}</span>
-                                            <span className="text-sm text-muted-foreground">/ 5</span>
-                                            <div className="flex items-center gap-0.5 ml-1">
-                                                {[1, 2, 3, 4, 5].map((n) => (
-                                                    <Star
-                                                        key={n}
-                                                        className={`h-4 w-4 ${n <= Math.round(stats.avg_rating!) ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'}`}
-                                                    />
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground mt-1">Aún no tienes reseñas.</p>
-                                    )}
-                                    <p className="text-xs text-muted-foreground mt-0.5">
-                                        {stats?.total_reviews
-                                            ? `Basado en ${stats.total_reviews} ${stats.total_reviews === 1 ? 'reseña' : 'reseñas'} de tus clientes.`
-                                            : 'Así te califican tus clientes después de cada clase.'}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* ====== Esta semana ====== */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Esta semana</CardTitle>
-                            <CardDescription>Tu actividad de los últimos 7 días</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="text-center p-4 rounded-lg bg-primary/5">
-                                    <p className="text-4xl font-bold text-primary">
-                                        {loadingStats ? <Skeleton className="h-10 w-12 mx-auto" /> : stats?.classes_this_week || 0}
-                                    </p>
-                                    <p className="text-sm text-muted-foreground mt-1">Clases programadas</p>
-                                </div>
-                                <div className="text-center p-4 rounded-lg bg-info/5">
-                                    <p className="text-4xl font-bold text-info">
-                                        {loadingStats ? <Skeleton className="h-10 w-12 mx-auto" /> : stats?.bookings_this_week || 0}
-                                    </p>
-                                    <p className="text-sm text-muted-foreground mt-1">Reservaciones</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
                 </div>
             </CoachLayout>
         </AuthGuard>

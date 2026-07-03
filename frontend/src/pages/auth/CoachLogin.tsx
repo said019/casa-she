@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { LogIn, Loader2, Key, User as UserIcon, Smartphone, Share, MoreVertical, PlusSquare } from 'lucide-react';
+import { Loader2, Key, User as UserIcon, Smartphone, Share, MoreVertical, PlusSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
+import CasaSheLogo from '@/components/CasaSheLogo';
+import { CasaShePattern } from '@/components/CasaShePattern';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -18,14 +19,16 @@ const coachLoginSchema = z.object({
     password: z.string().min(1, 'Ingresa tu contraseña'),
 });
 
-const changePasswordSchema = z.object({
-    currentPassword: z.string().min(1, 'Ingresa tu contraseña actual'),
-    newPassword: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
-    confirmPassword: z.string().min(1, 'Confirma tu nueva contraseña'),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Las contraseñas no coinciden",
-    path: ["confirmPassword"],
-});
+const changePasswordSchema = z
+    .object({
+        currentPassword: z.string().min(1, 'Ingresa tu contraseña actual'),
+        newPassword: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+        confirmPassword: z.string().min(1, 'Confirma tu nueva contraseña'),
+    })
+    .refine((d) => d.newPassword === d.confirmPassword, {
+        message: 'Las contraseñas no coinciden',
+        path: ['confirmPassword'],
+    });
 
 type CoachLoginForm = z.infer<typeof coachLoginSchema>;
 type ChangePasswordForm = z.infer<typeof changePasswordSchema>;
@@ -33,10 +36,8 @@ type ChangePasswordForm = z.infer<typeof changePasswordSchema>;
 export default function CoachLogin() {
     const navigate = useNavigate();
     const { toast } = useToast();
-    const setAuth = useAuthStore((state) => state.setAuth);
+    const setAuth = useAuthStore((s) => s.setAuth);
     const [showChangePassword, setShowChangePassword] = useState(false);
-    const [tempPasswordData, setTempPasswordData] = useState<{ token: string } | null>(null);
-    // Instructivo para guardar el portal como acceso directo (igual que el login de cliente).
     const [installOS, setInstallOS] = useState<'ios' | 'android'>(() =>
         typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios' : 'android',
     );
@@ -45,65 +46,51 @@ export default function CoachLogin() {
         (window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone === true);
 
     const {
-        register: registerLogin,
-        handleSubmit: handleSubmitLogin,
-        formState: { errors: loginErrors, isSubmitting: isLoggingIn }
-    } = useForm<CoachLoginForm>({
-        resolver: zodResolver(coachLoginSchema),
-    });
+        register: regLogin,
+        handleSubmit: submitLogin,
+        formState: { errors: loginErr, isSubmitting: loggingIn },
+    } = useForm<CoachLoginForm>({ resolver: zodResolver(coachLoginSchema) });
 
     const {
-        register: registerPassword,
-        handleSubmit: handleSubmitPassword,
-        formState: { errors: passwordErrors, isSubmitting: isChangingPassword },
-        reset: resetPasswordForm
-    } = useForm<ChangePasswordForm>({
-        resolver: zodResolver(changePasswordSchema),
-    });
+        register: regPwd,
+        handleSubmit: submitPwd,
+        formState: { errors: pwdErr, isSubmitting: changingPwd },
+        reset: resetPwd,
+    } = useForm<ChangePasswordForm>({ resolver: zodResolver(changePasswordSchema) });
 
     const onLogin = async (data: CoachLoginForm) => {
         try {
-            const response = await api.post('/auth/coach/login', {
+            const { data: res } = await api.post('/auth/coach/login', {
                 identifier: data.identifier.trim(),
                 password: data.password,
             });
-
-            const { token, instructor, tempPassword } = response.data;
-
-            // Store user and token
-            setAuth({
-                id: instructor.userId,
-                email: instructor.email,
-                display_name: instructor.displayName,
-                role: 'instructor',
-                photo_url: null,
-                phone: '',
-                emergency_contact_name: null,
-                emergency_contact_phone: null,
-                health_notes: null,
-                accepts_communications: false,
-                date_of_birth: null,
-                receive_reminders: false,
-                receive_promotions: false,
-                receive_weekly_summary: false,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            }, token);
-
-            // Check if temp password
+            const { token, instructor, tempPassword } = res;
+            setAuth(
+                {
+                    id: instructor.userId,
+                    email: instructor.email,
+                    display_name: instructor.displayName,
+                    role: 'instructor',
+                    photo_url: null,
+                    phone: '',
+                    emergency_contact_name: null,
+                    emergency_contact_phone: null,
+                    health_notes: null,
+                    accepts_communications: false,
+                    date_of_birth: null,
+                    receive_reminders: false,
+                    receive_promotions: false,
+                    receive_weekly_summary: false,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                },
+                token,
+            );
             if (tempPassword) {
-                setTempPasswordData({ token });
                 setShowChangePassword(true);
-                toast({
-                    title: 'Cambio de contraseña requerido',
-                    description: 'Por seguridad, debes cambiar tu contraseña temporal.',
-                    variant: 'default',
-                });
+                toast({ title: 'Cambio de contraseña requerido', description: 'Por seguridad, elige una contraseña nueva.' });
             } else {
-                toast({
-                    title: 'Bienvenido',
-                    description: `Hola ${instructor.displayName}`,
-                });
+                toast({ title: `Bienvenida, ${instructor.displayName}` });
                 navigate('/coach');
             }
         } catch (error: any) {
@@ -121,15 +108,9 @@ export default function CoachLogin() {
                 currentPassword: data.currentPassword,
                 newPassword: data.newPassword,
             });
-
-            toast({
-                title: 'Contraseña actualizada',
-                description: 'Tu contraseña ha sido cambiada exitosamente.',
-            });
-
+            toast({ title: 'Contraseña actualizada' });
             setShowChangePassword(false);
-            setTempPasswordData(null);
-            resetPasswordForm();
+            resetPwd();
             navigate('/coach');
         } catch (error: any) {
             toast({
@@ -141,211 +122,239 @@ export default function CoachLogin() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background p-4">
-            <div className="w-full max-w-md space-y-4">
-            <Card className="w-full shadow-lg">
-                <CardHeader className="space-y-1 text-center">
-                    <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                        <UserIcon className="h-8 w-8 text-primary" />
-                    </div>
-                    <CardTitle className="text-2xl font-heading">Portal de Coaches</CardTitle>
-                    <CardDescription>
-                        Ingresa con tu número de coach o email
-                    </CardDescription>
-                </CardHeader>
+        <>
+            {/* ── Layout split: panel izquierdo (verde) + panel derecho (crema) ── */}
+            <div className="flex min-h-screen">
+                {/* ── Panel izquierdo: marca y ambiente ── */}
+                <div
+                    className="relative hidden w-[42%] flex-col items-center justify-center overflow-hidden p-12 lg:flex"
+                    style={{ backgroundColor: '#16261A' }}
+                >
+                    {/* Patrón de ramas */}
+                    <CasaShePattern
+                        className="pointer-events-none absolute inset-0 h-full w-full"
+                        color="#F6F0E4"
+                        opacity={0.09}
+                    />
+                    {/* Orbe cálido */}
+                    <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -bottom-16 -right-16 h-64 w-64 rounded-full"
+                        style={{ background: 'radial-gradient(circle, rgba(174,72,54,0.25) 0%, transparent 65%)' }}
+                    />
+                    {/* Orbe frío arriba */}
+                    <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -left-10 -top-10 h-48 w-48 rounded-full"
+                        style={{ background: 'radial-gradient(circle, rgba(42,78,54,0.4) 0%, transparent 65%)' }}
+                    />
 
-                <form onSubmit={handleSubmitLogin(onLogin)}>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="identifier">Número de Coach / Email</Label>
-                            <div className="relative">
-                                <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    id="identifier"
-                                    type="text"
-                                    autoComplete="username"
-                                    placeholder="COACH-0001 o email@ejemplo.com"
-                                    className="pl-10"
-                                    {...registerLogin('identifier')}
-                                />
-                            </div>
-                            {loginErrors.identifier && (
-                                <p className="text-xs text-destructive">{loginErrors.identifier.message}</p>
-                            )}
+                    <div className="relative z-10 text-center">
+                        {/* Wordmark */}
+                        <CasaSheLogo variant="full" tone="cream" className="mx-auto h-12 w-auto" />
+
+                        {/* Separador ornamental */}
+                        <div className="mx-auto my-8 flex items-center gap-3" style={{ color: 'rgba(174,72,54,0.5)' }}>
+                            <div className="h-px flex-1" style={{ backgroundColor: 'rgba(246,240,228,0.12)' }} />
+                            <span className="font-body text-xs tracking-[3px] uppercase" style={{ color: 'rgba(246,240,228,0.35)' }}>
+                                Portal de Coach
+                            </span>
+                            <div className="h-px flex-1" style={{ backgroundColor: 'rgba(246,240,228,0.12)' }} />
                         </div>
 
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="password">Contraseña</Label>
-                                <Button
-                                    variant="link"
-                                    className="p-0 h-auto text-xs text-primary"
-                                    type="button"
-                                    onClick={() => navigate('/instructor/access')}
-                                >
-                                    ¿Olvidaste tu contraseña?
-                                </Button>
-                            </div>
-                            <div className="relative">
-                                <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    id="password"
-                                    type="password"
-                                    placeholder="••••••••"
-                                    className="pl-10"
-                                    {...registerLogin('password')}
-                                />
-                            </div>
-                            {loginErrors.password && (
-                                <p className="text-xs text-destructive">{loginErrors.password.message}</p>
-                            )}
-                        </div>
-                    </CardContent>
-
-                    <CardFooter className="flex flex-col gap-3">
-                        <Button type="submit" className="w-full" disabled={isLoggingIn}>
-                            {isLoggingIn ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Iniciando sesión...
-                                </>
-                            ) : (
-                                <>
-                                    <LogIn className="mr-2 h-4 w-4" />
-                                    Iniciar Sesión
-                                </>
-                            )}
-                        </Button>
-
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            className="w-full text-sm"
-                            onClick={() => navigate('/')}
+                        <p
+                            className="mx-auto max-w-[22ch] font-heading text-2xl leading-snug"
+                            style={{ color: 'rgba(246,240,228,0.75)' }}
                         >
-                            Volver al sitio principal
-                        </Button>
-                    </CardFooter>
-                </form>
-            </Card>
+                            Tu espacio para gestionar clases, alumnas y crecimiento.
+                        </p>
 
-            {/* Instructivo: guardar el portal de coaches como acceso directo */}
-            {!isStandalone && (
-                <div className="rounded-xl border bg-muted/30 p-4">
-                    <div className="flex items-center justify-center gap-1.5">
-                        <Smartphone className="h-4 w-4 text-primary" />
-                        <p className="text-xs font-semibold text-foreground/80">Agrega el portal a tu celular</p>
+                        <p className="mt-8 font-body text-xs tracking-widest uppercase" style={{ color: 'rgba(174,72,54,0.7)' }}>
+                            Condesa · Ciudad de México
+                        </p>
                     </div>
-                    <p className="mt-1 text-center text-[11px] leading-relaxed text-muted-foreground">
-                        Para abrir el portal de coaches como app, sin escribir la dirección cada vez.
-                    </p>
-                    <div className="mx-auto mt-3 flex w-fit rounded-full border bg-background p-0.5">
-                        {([['ios', 'iPhone'], ['android', 'Android']] as const).map(([os, label]) => (
-                            <button
-                                key={os}
-                                type="button"
-                                onClick={() => setInstallOS(os)}
-                                className={`rounded-full px-4 py-1 text-[11px] font-semibold transition-colors ${
-                                    installOS === os ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                                }`}
-                            >
-                                {label}
-                            </button>
-                        ))}
-                    </div>
-                    <ol className="mt-3 space-y-2 text-left">
-                        {(installOS === 'ios'
-                            ? [
-                                  <>Abre esta página en <strong>Safari</strong> (estando en el portal de coaches).</>,
-                                  <>Toca <strong>Compartir</strong> <Share className="inline h-3.5 w-3.5 -mt-0.5 text-primary" /> en la barra de abajo.</>,
-                                  <>Elige <strong>«Agregar a inicio»</strong> → <strong>Agregar</strong>.</>,
-                              ]
-                            : [
-                                  <>Abre esta página en <strong>Chrome</strong>.</>,
-                                  <>Toca el menú <MoreVertical className="inline h-3.5 w-3.5 -mt-0.5 text-primary" /> (o el ícono <PlusSquare className="inline h-3.5 w-3.5 -mt-0.5 text-primary" />).</>,
-                                  <>Elige <strong>«Instalar app»</strong>.</>,
-                              ]
-                        ).map((step, i) => (
-                            <li key={i} className="flex items-start gap-2 text-[11px] leading-relaxed text-foreground/70">
-                                <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">{i + 1}</span>
-                                <span>{step}</span>
-                            </li>
-                        ))}
-                    </ol>
-                    <p className="mt-2.5 text-center text-[11px] text-muted-foreground">Listo: el ícono abrirá directo el portal de coaches.</p>
                 </div>
-            )}
-            </div>
 
-            {/* Change Password Dialog */}
-            <Dialog open={showChangePassword} onOpenChange={setShowChangePassword}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Cambiar Contraseña Temporal</DialogTitle>
-                        <DialogDescription>
-                            Por seguridad, debes establecer una nueva contraseña para continuar.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <form onSubmit={handleSubmitPassword(onChangePassword)} className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="currentPassword">Contraseña Temporal</Label>
-                            <Input
-                                id="currentPassword"
-                                type="password"
-                                placeholder="Contraseña actual"
-                                {...registerPassword('currentPassword')}
-                            />
-                            {passwordErrors.currentPassword && (
-                                <p className="text-xs text-destructive">{passwordErrors.currentPassword.message}</p>
-                            )}
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="newPassword">Nueva Contraseña</Label>
-                            <Input
-                                id="newPassword"
-                                type="password"
-                                placeholder="Mínimo 8 caracteres"
-                                {...registerPassword('newPassword')}
-                            />
-                            {passwordErrors.newPassword && (
-                                <p className="text-xs text-destructive">{passwordErrors.newPassword.message}</p>
-                            )}
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="confirmPassword">Confirmar Nueva Contraseña</Label>
-                            <Input
-                                id="confirmPassword"
-                                type="password"
-                                placeholder="Repite la contraseña"
-                                {...registerPassword('confirmPassword')}
-                            />
-                            {passwordErrors.confirmPassword && (
-                                <p className="text-xs text-destructive">{passwordErrors.confirmPassword.message}</p>
-                            )}
-                        </div>
-
-                        <div className="bg-info/10 border border-info/30 rounded-md p-3">
-                            <p className="text-sm text-foreground">
-                                💡 Usa una contraseña segura con al menos 8 caracteres, combinando letras, números y símbolos.
+                {/* ── Panel derecho: formulario ── */}
+                <div className="flex flex-1 flex-col items-center justify-center bg-background px-6 py-12">
+                    <div className="w-full max-w-sm space-y-8">
+                        {/* Logo mobile (solo < lg) */}
+                        <div className="flex flex-col items-center gap-3 lg:hidden">
+                            <CasaSheLogo variant="mark" tone="green" className="h-12 w-12" />
+                            <p
+                                className="font-body text-xs uppercase tracking-[3px]"
+                                style={{ color: '#AE4836' }}
+                            >
+                                Portal de Coach
                             </p>
                         </div>
 
-                        <Button type="submit" className="w-full" disabled={isChangingPassword}>
-                            {isChangingPassword ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Cambiando...
-                                </>
-                            ) : (
-                                'Cambiar Contraseña'
-                            )}
+                        {/* Heading */}
+                        <div className="space-y-1">
+                            <h1 className="font-heading text-3xl" style={{ color: '#2E1B22' }}>
+                                Bienvenida
+                            </h1>
+                            <p className="font-body text-sm text-muted-foreground">
+                                Ingresa con tu número de coach o email.
+                            </p>
+                        </div>
+
+                        {/* Form */}
+                        <form onSubmit={submitLogin(onLogin)} className="space-y-5">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="identifier" className="font-body text-xs uppercase tracking-wide text-muted-foreground">
+                                    N.º de Coach / Email
+                                </Label>
+                                <div className="relative">
+                                    <UserIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        id="identifier"
+                                        type="text"
+                                        autoComplete="username"
+                                        placeholder="COACH-0001 o email@ejemplo.com"
+                                        className="pl-10 font-body"
+                                        {...regLogin('identifier')}
+                                    />
+                                </div>
+                                {loginErr.identifier && (
+                                    <p className="font-body text-xs text-destructive">{loginErr.identifier.message}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="password" className="font-body text-xs uppercase tracking-wide text-muted-foreground">
+                                        Contraseña
+                                    </Label>
+                                    <button
+                                        type="button"
+                                        className="font-body text-xs text-muted-foreground underline-offset-2 hover:underline transition-colors"
+                                        onClick={() => navigate('/instructor/access')}
+                                    >
+                                        ¿Olvidaste tu contraseña?
+                                    </button>
+                                </div>
+                                <div className="relative">
+                                    <Key className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        id="password"
+                                        type="password"
+                                        placeholder="••••••••"
+                                        className="pl-10 font-body"
+                                        {...regLogin('password')}
+                                    />
+                                </div>
+                                {loginErr.password && (
+                                    <p className="font-body text-xs text-destructive">{loginErr.password.message}</p>
+                                )}
+                            </div>
+
+                            <Button
+                                type="submit"
+                                className="w-full font-body active:scale-[0.97] transition-transform duration-100"
+                                disabled={loggingIn}
+                            >
+                                {loggingIn ? (
+                                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Ingresando…</>
+                                ) : (
+                                    'Iniciar sesión'
+                                )}
+                            </Button>
+                        </form>
+
+                        {/* Volver */}
+                        <p className="text-center font-body text-xs text-muted-foreground">
+                            <button
+                                type="button"
+                                onClick={() => navigate('/')}
+                                className="underline-offset-2 hover:underline transition-colors"
+                            >
+                                Volver al sitio principal
+                            </button>
+                        </p>
+
+                        {/* PWA install hint */}
+                        {!isStandalone && (
+                            <div className="rounded-xl border bg-card p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Smartphone className="h-4 w-4 shrink-0 text-primary" />
+                                    <p className="font-body text-xs font-semibold">Agrega el portal a tu celular</p>
+                                </div>
+                                <div className="mx-auto mb-3 flex w-fit rounded-full border bg-background p-0.5">
+                                    {(['ios', 'android'] as const).map((os) => (
+                                        <button
+                                            key={os}
+                                            type="button"
+                                            onClick={() => setInstallOS(os)}
+                                            className={`rounded-full px-4 py-1 font-body text-[11px] font-semibold transition-colors ${
+                                                installOS === os
+                                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                                    : 'text-muted-foreground hover:text-foreground'
+                                            }`}
+                                        >
+                                            {os === 'ios' ? 'iPhone' : 'Android'}
+                                        </button>
+                                    ))}
+                                </div>
+                                <ol className="space-y-1.5">
+                                    {(installOS === 'ios'
+                                        ? [
+                                              <>Abre en <strong>Safari</strong></>,
+                                              <>Toca <strong>Compartir</strong> <Share className="inline h-3 w-3 text-primary" /></>,
+                                              <>Elige <strong>«Agregar a inicio»</strong></>,
+                                          ]
+                                        : [
+                                              <>Abre en <strong>Chrome</strong></>,
+                                              <>Menú <MoreVertical className="inline h-3 w-3 text-primary" /> → <strong>Instalar app</strong></>,
+                                          ]
+                                    ).map((step, i) => (
+                                        <li key={i} className="flex items-start gap-2 font-body text-[11px] text-foreground/70">
+                                            <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+                                                {i + 1}
+                                            </span>
+                                            <span>{step}</span>
+                                        </li>
+                                    ))}
+                                </ol>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Dialog cambio de contraseña temporal ── */}
+            <Dialog open={showChangePassword} onOpenChange={setShowChangePassword}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="font-heading text-xl">Cambiar contraseña temporal</DialogTitle>
+                        <DialogDescription className="font-body">
+                            Por seguridad, elige una contraseña nueva para continuar.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={submitPwd(onChangePassword)} className="space-y-4 pt-2">
+                        {(
+                            [
+                                { id: 'currentPassword', label: 'Contraseña temporal', placeholder: 'Contraseña actual' },
+                                { id: 'newPassword', label: 'Nueva contraseña', placeholder: 'Mínimo 8 caracteres' },
+                                { id: 'confirmPassword', label: 'Confirmar contraseña', placeholder: 'Repite la contraseña' },
+                            ] as const
+                        ).map(({ id, label, placeholder }) => (
+                            <div key={id} className="space-y-1.5">
+                                <Label htmlFor={id} className="font-body text-xs uppercase tracking-wide text-muted-foreground">
+                                    {label}
+                                </Label>
+                                <Input id={id} type="password" placeholder={placeholder} className="font-body" {...regPwd(id)} />
+                                {pwdErr[id] && (
+                                    <p className="font-body text-xs text-destructive">{pwdErr[id]?.message}</p>
+                                )}
+                            </div>
+                        ))}
+                        <Button type="submit" className="w-full font-body active:scale-[0.97] transition-transform duration-100" disabled={changingPwd}>
+                            {changingPwd ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando…</> : 'Cambiar contraseña'}
                         </Button>
                     </form>
                 </DialogContent>
             </Dialog>
-        </div>
+        </>
     );
 }

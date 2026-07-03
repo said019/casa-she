@@ -2320,4 +2320,108 @@ router.get('/playlist-metadata', async (req: Request, res: Response) => {
     }
 });
 
+// GET /api/instructors/:id/students - Mis Alumnas: distinct students who've attended this instructor's classes
+router.get('/:id/students', authenticate, requireSelfInstructorOrStaff, async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        const students = await query(`
+            SELECT
+                u.id AS user_id,
+                u.display_name,
+                u.email,
+                u.phone,
+                u.photo_url,
+                COUNT(DISTINCT b.class_id)::int AS total_classes,
+                COUNT(DISTINCT CASE WHEN b.status = 'checked_in' THEN b.class_id END)::int AS checked_in_classes,
+                MAX(c.date) AS last_class_date,
+                (
+                    SELECT ct2.name
+                    FROM bookings b2
+                    JOIN classes c2 ON b2.class_id = c2.id
+                    JOIN class_types ct2 ON c2.class_type_id = ct2.id
+                    WHERE b2.user_id = u.id AND c2.instructor_id = $1
+                    ORDER BY c2.date DESC
+                    LIMIT 1
+                ) AS last_class_name,
+                (
+                    SELECT b3.channel
+                    FROM bookings b3
+                    JOIN classes c3 ON b3.class_id = c3.id
+                    WHERE b3.user_id = u.id AND c3.instructor_id = $1
+                      AND b3.channel IS NOT NULL AND b3.channel != 'app'
+                    LIMIT 1
+                ) AS primary_channel
+            FROM bookings b
+            JOIN classes c ON b.class_id = c.id
+            JOIN users u ON b.user_id = u.id
+            WHERE c.instructor_id = $1
+              AND b.status IN ('confirmed', 'checked_in', 'no_show')
+            GROUP BY u.id, u.display_name, u.email, u.phone, u.photo_url
+            ORDER BY total_classes DESC, u.display_name
+        `, [id]);
+
+        res.json({ total: students.length, students });
+    } catch (error) {
+        console.error('Get students error:', error);
+        res.status(500).json({ error: 'Error al obtener alumnas' });
+    }
+});
+
+// GET /api/instructors/:id/trends - Weekly occupancy trends + busy time slots
+router.get('/:id/trends', authenticate, requireSelfInstructorOrStaff, async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        const weeks = await query(`
+            SELECT
+                date_trunc('week', c.date::timestamp)::date AS week_start,
+                (date_trunc('week', c.date::timestamp) + interval '6 days')::date AS week_end,
+                COUNT(DISTINCT c.id)::int AS total_classes,
+                COALESCE(SUM(c.max_capacity), 0)::int AS total_slots,
+                COUNT(b.id) FILTER (WHERE b.status IN ('confirmed', 'checked_in'))::int AS total_bookings,
+                COUNT(b.id) FILTER (WHERE b.status = 'checked_in')::int AS total_checkins,
+                COUNT(b.id) FILTER (WHERE b.status = 'no_show')::int AS total_noshows,
+                CASE
+                    WHEN COALESCE(SUM(c.max_capacity), 0) > 0
+                    THEN ROUND(
+                        COUNT(b.id) FILTER (WHERE b.status IN ('confirmed', 'checked_in'))::numeric
+                        / SUM(c.max_capacity) * 100, 1)
+                    ELSE 0
+                END AS avg_occupancy_pct
+            FROM classes c
+            LEFT JOIN bookings b ON b.class_id = c.id AND b.status IN ('confirmed', 'checked_in', 'no_show')
+            WHERE c.instructor_id = $1
+              AND c.date >= CURRENT_DATE - INTERVAL '12 weeks'
+              AND c.date < CURRENT_DATE
+            GROUP BY date_trunc('week', c.date::timestamp)
+            ORDER BY week_start DESC
+            LIMIT 12
+        `, [id]);
+
+        const busySlots = await query(`
+            SELECT
+                EXTRACT(DOW FROM c.date)::int AS day_of_week,
+                EXTRACT(HOUR FROM c.start_time::time)::int AS hour,
+                ROUND(AVG(
+                    CASE WHEN c.max_capacity > 0
+                         THEN c.current_bookings::numeric / c.max_capacity * 100
+                         ELSE 0 END
+                ), 1) AS avg_pct,
+                COUNT(*)::int AS classes_count
+            FROM classes c
+            WHERE c.instructor_id = $1
+              AND c.date >= CURRENT_DATE - INTERVAL '12 weeks'
+            GROUP BY EXTRACT(DOW FROM c.date), EXTRACT(HOUR FROM c.start_time::time)
+            ORDER BY avg_pct DESC
+            LIMIT 5
+        `, [id]);
+
+        res.json({ weeks, busySlots });
+    } catch (error) {
+        console.error('Get trends error:', error);
+        res.status(500).json({ error: 'Error al obtener tendencias' });
+    }
+});
+
 export default router;
