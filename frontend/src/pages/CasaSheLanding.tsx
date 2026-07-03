@@ -23,28 +23,27 @@ const display = "font-heading"; // Instrument Serif (display oficial de marca)
 
 type Card = {
   title: string;
-  price: string;
-  was?: string;
+  planName: string;        // nombre exacto en la tabla plans (para cruzar precio/is_active)
   hint: string;
   oferta?: boolean;
-  color: string;           // color del panel generado (nítido, sin imagen pixelada)
-  artTitle: string;        // título grande dentro del panel
-  tagline: string;         // frase descriptiva bajo el título (como el diseño original)
-  light?: boolean;         // fondo claro → texto/monograma oscuros
+  color: string;
+  artTitle: string;
+  tagline: string;
+  light?: boolean;
 };
 
-// Todas las tarjetas se generan con CSS (panel + patrón + título serif + frase) para
-// que sean nítidas a cualquier tamaño (las fotos card-*.jpeg eran de baja resolución).
+// El precio real se obtiene del API (/plans). Solo se muestra la tarjeta si el plan
+// está activo en la DB. planName debe coincidir exactamente con plans.name.
 const CARDS: Card[] = [
-  { title: "MEMBRESÍA SHE BLACK", color: "#2E1B22", artTitle: "Membresía She Black", tagline: "Nuestra membresía más completa. Bienestar integral para volver a ti.", price: "$4,200", was: "$4,800", hint: "24 créditos · acceso total", oferta: true },
-  { title: "MEMBRESÍA 360", color: "#2A4E36", artTitle: "Membresía 360", tagline: "Tu bienestar integral empieza aquí. Movimiento, balance y comunidad en un solo lugar.", price: "$3,600", was: "$3,800", hint: "16 créditos al mes", oferta: true },
-  { title: "PAQUETE 12 CLASES", color: "#AE4836", artTitle: "Paquete 12 clases", tagline: "Constancia que se siente. Más sesiones para sostener tu práctica.", price: "$2,880", hint: "12 créditos · vigencia 1 mes" },
-  { title: "PAQUETE 8 CLASES", color: "#8F7F36", artTitle: "Paquete 8 clases", tagline: "Tu práctica, a tu ritmo. El balance ideal entre flexibilidad y constancia.", price: "$2,000", hint: "8 créditos · vigencia 1 mes" },
-  { title: "PAQUETE 5 CLASES", color: "#6E4B34", artTitle: "Paquete 5 clases", tagline: "Ideal para empezar. Una forma amable de volver a ti.", price: "$1,350", hint: "5 créditos · vigencia 1 mes" },
-  { title: "CLASE SUELTA", color: "#D6D5C2", light: true, artTitle: "Clase suelta", tagline: "Muévete cuando lo necesites. Flexibilidad para acompañar tu día.", price: "$280", was: "$300", hint: "1 clase drop-in", oferta: true },
-  { title: "CLASE MUESTRA", color: "#E7E0CE", light: true, artTitle: "Clase muestra", tagline: "Ven a sentirlo. Tu primer encuentro con Casa Shé.", price: "$150", hint: "Tu primera vez en casa" },
-  { title: "SALSA · 1 CLASE", color: "#2E1B22", artTitle: "Salsa", tagline: "Ritmo, cuerpo y comunidad. Baila y reconéctate.", price: "$180", hint: "1 clase de Salsa" },
-  { title: "SALSA · 4 CLASES", color: "#2E1B22", artTitle: "Salsa", tagline: "Ritmo, cuerpo y comunidad. Baila y reconéctate.", price: "$600", hint: "4 clases de Salsa · vigencia 1 mes" },
+  { title: "MEMBRESÍA SHE BLACK", planName: "Membresía Black",  color: "#2E1B22", artTitle: "Membresía She Black", tagline: "Nuestra membresía más completa. Bienestar integral para volver a ti.", hint: "24 créditos · acceso total", oferta: true },
+  { title: "MEMBRESÍA 360",       planName: "Membresía 360",    color: "#2A4E36", artTitle: "Membresía 360",       tagline: "Tu bienestar integral empieza aquí. Movimiento, balance y comunidad en un solo lugar.", hint: "16 créditos al mes", oferta: true },
+  { title: "PAQUETE 12 CLASES",   planName: "Paquete 12",       color: "#AE4836", artTitle: "Paquete 12 clases",  tagline: "Constancia que se siente. Más sesiones para sostener tu práctica.", hint: "12 créditos · vigencia 1 mes" },
+  { title: "PAQUETE 8 CLASES",    planName: "Paquete 8",        color: "#8F7F36", artTitle: "Paquete 8 clases",   tagline: "Tu práctica, a tu ritmo. El balance ideal entre flexibilidad y constancia.", hint: "8 créditos · vigencia 1 mes" },
+  { title: "PAQUETE 5 CLASES",    planName: "Paquete 5",        color: "#6E4B34", artTitle: "Paquete 5 clases",   tagline: "Ideal para empezar. Una forma amable de volver a ti.", hint: "5 créditos · vigencia 1 mes" },
+  { title: "CLASE SUELTA",        planName: "Drop-in",          color: "#D6D5C2", light: true, artTitle: "Clase suelta",   tagline: "Muévete cuando lo necesites. Flexibilidad para acompañar tu día.", hint: "1 clase drop-in", oferta: true },
+  { title: "CLASE MUESTRA",       planName: "Clase de prueba",  color: "#E7E0CE", light: true, artTitle: "Clase muestra",  tagline: "Ven a sentirlo. Tu primer encuentro con Casa Shé.", hint: "Tu primera vez en casa" },
+  { title: "SALSA · 1 CLASE",     planName: "Salsa · 1 clase",  color: "#2E1B22", artTitle: "Salsa",              tagline: "Ritmo, cuerpo y comunidad. Baila y reconéctate.", hint: "1 clase de Salsa" },
+  { title: "SALSA · 4 CLASES",    planName: "Salsa · 4 clases", color: "#2E1B22", artTitle: "Salsa",              tagline: "Ritmo, cuerpo y comunidad. Baila y reconéctate.", hint: "4 clases de Salsa · vigencia 1 mes" },
 ];
 
 const PILLARS = [
@@ -247,6 +246,24 @@ function Hero() {
 }
 
 function Paquetes() {
+  const { data: apiPlans = [] } = useQuery<{ id: string; name: string; price: number; is_active: boolean }[]>({
+    queryKey: ["landing-plans"],
+    queryFn: async () => (await api.get("/plans")).data,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Índice rápido: nombre → plan
+  const planByName = Object.fromEntries(apiPlans.map((p) => [p.name, p]));
+
+  // Solo muestra tarjetas cuyo plan existe Y está activo en la DB
+  const visible = CARDS.filter((c) => {
+    const p = planByName[c.planName];
+    return p && p.is_active;
+  });
+
+  const fmt = (price: number) =>
+    "$" + Number(price).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
   return (
     <section id="paquetes" className="px-6 py-24" style={{ backgroundColor: CREAM }}>
       <div className="mx-auto max-w-6xl">
@@ -259,61 +276,59 @@ function Paquetes() {
           </h2>
         </div>
         <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-3">
-          {CARDS.map((c) => (
-            <article
-              key={c.title}
-              className="group flex flex-col overflow-hidden rounded-2xl bg-white/60 ring-1 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
-              style={{ borderColor: "rgba(39,74,42,0.10)", boxShadow: "0 1px 0 rgba(39,74,42,0.06)" }}
-            >
-              <div className="relative aspect-square overflow-hidden">
-                <div className="relative h-full w-full transition-transform duration-500 group-hover:scale-105" style={{ backgroundColor: c.color }}>
-                  <CasaShePattern className="absolute inset-0 h-full w-full" color={c.light ? "rgba(0,0,0,0.10)" : "rgba(0,0,0,0.22)"} />
-                  <img src={c.light ? "/casashe/logo-monogram.png" : "/casashe/logo-monogram-cream.png"} alt="" aria-hidden="true" className="absolute left-1/2 top-6 h-12 w-12 -translate-x-1/2 object-contain" style={{ opacity: 0.9 }} />
-                  <div className="absolute bottom-6 left-6 right-6">
-                    <span className={`${display} block text-[2.3rem] leading-[1.02]`} style={{ color: c.light ? GREEN : CREAM }}>
-                      {c.artTitle}
-                    </span>
-                    <p className={`${body} mt-3 max-w-[26ch] text-[0.92rem] leading-snug`} style={{ color: c.light ? GREEN : CREAM, opacity: 0.78 }}>
-                      {c.tagline}
-                    </p>
+          {visible.map((c) => {
+            const plan = planByName[c.planName];
+            return (
+              <article
+                key={c.title}
+                className="group flex flex-col overflow-hidden rounded-2xl bg-white/60 ring-1 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                style={{ borderColor: "rgba(39,74,42,0.10)", boxShadow: "0 1px 0 rgba(39,74,42,0.06)" }}
+              >
+                <div className="relative aspect-square overflow-hidden">
+                  <div className="relative h-full w-full transition-transform duration-500 group-hover:scale-105" style={{ backgroundColor: c.color }}>
+                    <CasaShePattern className="absolute inset-0 h-full w-full" color={c.light ? "rgba(0,0,0,0.10)" : "rgba(0,0,0,0.22)"} />
+                    <img src={c.light ? "/casashe/logo-monogram.png" : "/casashe/logo-monogram-cream.png"} alt="" aria-hidden="true" className="absolute left-1/2 top-6 h-12 w-12 -translate-x-1/2 object-contain" style={{ opacity: 0.9 }} />
+                    <div className="absolute bottom-6 left-6 right-6">
+                      <span className={`${display} block text-[2.3rem] leading-[1.02]`} style={{ color: c.light ? GREEN : CREAM }}>
+                        {c.artTitle}
+                      </span>
+                      <p className={`${body} mt-3 max-w-[26ch] text-[0.92rem] leading-snug`} style={{ color: c.light ? GREEN : CREAM, opacity: 0.78 }}>
+                        {c.tagline}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                {c.oferta && (
-                  <span
-                    className={`${body} absolute right-4 top-4 flex h-[4.2rem] w-[4.2rem] items-center justify-center rounded-full text-center text-[13px]`}
-                    style={{ backgroundColor: "#AE4836", color: CREAM }}
-                  >
-                    ¡Oferta!
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-1 flex-col items-center px-6 py-7 text-center">
-                <h3 className={`${body} text-lg uppercase tracking-[0.14em]`} style={{ color: GREEN }}>
-                  {c.title}
-                </h3>
-                <p className={`${body} mt-1 text-[13px] tracking-wide`} style={{ color: GREEN, opacity: 0.55 }}>
-                  {c.hint}
-                </p>
-                <div className={`${display} mt-4 flex items-baseline justify-center gap-2`}>
-                  {c.was && (
-                    <span className="text-lg line-through" style={{ color: GREEN, opacity: 0.4 }}>
-                      {c.was}
+                  {c.oferta && (
+                    <span
+                      className={`${body} absolute right-4 top-4 flex h-[4.2rem] w-[4.2rem] items-center justify-center rounded-full text-center text-[13px]`}
+                      style={{ backgroundColor: "#AE4836", color: CREAM }}
+                    >
+                      ¡Oferta!
                     </span>
                   )}
-                  <span className="text-4xl font-medium" style={{ color: GREEN }}>
-                    {c.price}
-                  </span>
                 </div>
-                <Link
-                  to="/register"
-                  className={`${body} mt-6 w-full rounded-full py-3 text-[12px] uppercase tracking-[0.24em] transition-colors`}
-                  style={{ backgroundColor: GREEN, color: CREAM }}
-                >
-                  Comprar
-                </Link>
-              </div>
-            </article>
-          ))}
+                <div className="flex flex-1 flex-col items-center px-6 py-7 text-center">
+                  <h3 className={`${body} text-lg uppercase tracking-[0.14em]`} style={{ color: GREEN }}>
+                    {c.title}
+                  </h3>
+                  <p className={`${body} mt-1 text-[13px] tracking-wide`} style={{ color: GREEN, opacity: 0.55 }}>
+                    {c.hint}
+                  </p>
+                  <div className={`${display} mt-4 flex items-baseline justify-center gap-2`}>
+                    <span className="text-4xl font-medium" style={{ color: GREEN }}>
+                      {fmt(plan.price)}
+                    </span>
+                  </div>
+                  <Link
+                    to={`/register?plan=${plan.id}`}
+                    className={`${body} mt-6 w-full rounded-full py-3 text-[12px] uppercase tracking-[0.24em] transition-colors`}
+                    style={{ backgroundColor: GREEN, color: CREAM }}
+                  >
+                    Comprar
+                  </Link>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     </section>
