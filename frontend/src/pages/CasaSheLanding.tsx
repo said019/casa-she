@@ -96,16 +96,6 @@ const metaFor = (name: string) => DISCIPLINE_META[name] ?? { color: GREEN, dur: 
 
 type ClassSlot = { time: string; name: string; coach?: string };
 
-const SAMPLE_WEEK: Record<string, ClassSlot[]> = {
-  Lun: [{ time: "07:00", name: "Pilates Mat", coach: "Renata" }, { time: "09:00", name: "Yoga Vinyasa", coach: "Sofía" }, { time: "19:00", name: "Barre", coach: "Camila" }],
-  Mar: [{ time: "07:00", name: "Yoga Ashtanga", coach: "Valentina" }, { time: "18:00", name: "Pilates Mat", coach: "Renata" }, { time: "19:00", name: "Sculpt", coach: "Daniela" }],
-  Mié: [{ time: "08:00", name: "Yoga Vinyasa", coach: "Sofía" }, { time: "10:00", name: "Pilates Mat", coach: "Camila" }, { time: "20:00", name: "Salsa", coach: "Daniela" }],
-  Jue: [{ time: "07:00", name: "Barre", coach: "Valentina" }, { time: "18:00", name: "Pilates Mat", coach: "Renata" }, { time: "19:00", name: "Yoga Ashtanga", coach: "Mariana" }],
-  Vie: [{ time: "07:00", name: "Pilates Mat", coach: "Camila" }, { time: "09:00", name: "Sculpt", coach: "Sofía" }, { time: "20:00", name: "Salsa", coach: "Daniela" }],
-  Sáb: [{ time: "09:00", name: "Yoga Vinyasa", coach: "Mariana" }, { time: "10:00", name: "Barre", coach: "Valentina" }, { time: "14:00", name: "Salsa", coach: "Andrea" }],
-  Dom: [{ time: "10:00", name: "Pilates Mat", coach: "Renata" }, { time: "11:00", name: "Yoga Ashtanga", coach: "Andrea" }],
-};
-
 interface ApiClass {
   id: string;
   date: string;        // YYYY-MM-DD (día real de la clase)
@@ -119,20 +109,26 @@ function localYMD(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function useWeekSchedule() {
-  return useQuery<Record<string, ClassSlot[]> | null>({
-    queryKey: ["landing-horario"],
+// Lunes de la semana en curso desplazada `weekOffset` semanas.
+function mondayForOffset(weekOffset: number) {
+  const now = new Date();
+  const day = (now.getDay() + 6) % 7; // 0 = lunes
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - day + weekOffset * 7);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
+
+function useWeekSchedule(weekOffset: number) {
+  return useQuery<Record<string, ClassSlot[]>>({
+    queryKey: ["landing-horario", weekOffset],
     queryFn: async () => {
-      // Semana en curso (lun–dom) calculada en cliente.
-      const now = new Date();
-      const day = (now.getDay() + 6) % 7; // 0 = lunes
-      const monday = new Date(now);
-      monday.setDate(now.getDate() - day);
+      const monday = mondayForOffset(weekOffset);
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
-      const { data } = await api.get<ApiClass[]>(`/classes?start=${localYMD(monday)}&end=${localYMD(sunday)}`);
-      if (!Array.isArray(data) || data.length === 0) return null; // sin datos → usar muestra
       const grouped: Record<string, ClassSlot[]> = {};
+      const { data } = await api.get<ApiClass[]>(`/classes?start=${localYMD(monday)}&end=${localYMD(sunday)}`);
+      if (!Array.isArray(data)) return grouped;
       for (const c of data) {
         if (!c.date) continue;
         // El día se toma de c.date (no de start_time, que sólo trae HH:MM).
@@ -147,19 +143,16 @@ function useWeekSchedule() {
         });
       }
       for (const k of Object.keys(grouped)) grouped[k].sort((a, b) => a.time.localeCompare(b.time));
-      return Object.keys(grouped).length ? grouped : null;
+      return grouped;
     },
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
 }
 
-function currentWeekLabel(): { range: string; todayIdx: number; dayNums: number[] } {
+function weekLabel(weekOffset: number): { range: string; todayIdx: number; dayNums: number[] } {
   try {
-    const now = new Date();
-    const todayIdx = (now.getDay() + 6) % 7; // 0 = lunes
-    const monday = new Date(now);
-    monday.setDate(now.getDate() - todayIdx);
+    const monday = mondayForOffset(weekOffset);
     const dayNums: number[] = [];
     for (let i = 0; i < 7; i++) {
       const dd = new Date(monday);
@@ -169,6 +162,9 @@ function currentWeekLabel(): { range: string; todayIdx: number; dayNums: number[
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
     const d = (x: Date) => x.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
+    // Sólo resaltar "hoy" en la semana en curso (offset 0).
+    const now = new Date();
+    const todayIdx = weekOffset === 0 ? (now.getDay() + 6) % 7 : -1;
     return { range: `Semana del ${d(monday)} al ${d(sunday)}`, todayIdx, dayNums };
   } catch {
     return { range: "", todayIdx: -1, dayNums: [] };
@@ -514,11 +510,12 @@ function ClassChip({ c }: { c: ClassSlot }) {
 }
 
 function Horario() {
-  const { data } = useWeekSchedule();
-  const isSample = !data;
-  const week = data ?? SAMPLE_WEEK;
-  const { range, todayIdx, dayNums } = currentWeekLabel();
+  const [weekOffset, setWeekOffset] = useState(0);
+  const { data } = useWeekSchedule(weekOffset);
+  const week = data ?? {};
+  const { range, todayIdx, dayNums } = weekLabel(weekOffset);
   const totalClases = DAYS.reduce((n, d) => n + (week[d]?.length ?? 0), 0);
+  const navBtn = "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg leading-none transition-all hover:scale-105 active:scale-95";
 
   return (
     <section id="horario" className="px-6 py-24" style={{ backgroundColor: CREAM }}>
@@ -531,9 +528,22 @@ function Horario() {
             Nuestra semana
           </h2>
           {range && (
-            <p className={`${body} mt-3 text-[13px] uppercase tracking-[0.22em]`} style={{ color: GREEN, opacity: 0.55 }}>
-              {range} · {totalClases} clases
-            </p>
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <button type="button" onClick={() => setWeekOffset((o) => o - 1)} aria-label="Semana anterior" className={navBtn} style={{ border: "1px solid rgba(42,78,54,0.3)", color: GREEN }}>
+                ‹
+              </button>
+              <p className={`${body} min-w-[240px] text-[13px] uppercase tracking-[0.22em]`} style={{ color: GREEN, opacity: 0.65 }}>
+                {range} · {totalClases} {totalClases === 1 ? "clase" : "clases"}
+              </p>
+              <button type="button" onClick={() => setWeekOffset((o) => o + 1)} aria-label="Semana siguiente" className={navBtn} style={{ border: "1px solid rgba(42,78,54,0.3)", color: GREEN }}>
+                ›
+              </button>
+            </div>
+          )}
+          {weekOffset !== 0 && (
+            <button type="button" onClick={() => setWeekOffset(0)} className={`${body} mt-3 text-[12px] uppercase tracking-[0.2em] underline underline-offset-4 transition-opacity hover:opacity-70`} style={{ color: GREEN, opacity: 0.6 }}>
+              Volver a esta semana
+            </button>
           )}
         </div>
 
@@ -584,11 +594,6 @@ function Horario() {
         </div>
 
         <div className="mt-10 text-center">
-          {isSample && (
-            <p className={`${body} mb-4 text-[13px] tracking-wide`} style={{ color: GREEN, opacity: 0.55 }}>
-              Horario de muestra · crea tu cuenta para ver disponibilidad y reservar en vivo.
-            </p>
-          )}
           <Link
             to="/register"
             className={`${body} inline-block rounded-full px-9 py-3.5 text-[13px] uppercase tracking-[0.28em] transition-all hover:scale-[1.03]`}

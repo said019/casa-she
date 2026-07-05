@@ -659,7 +659,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                     if (mEnd && mEnd < dateStr) {
                         await client.query('ROLLBACK');
                         releaseClient();
-                        return res.status(403).json({ error: 'Membresía vencida para la fecha de la clase' });
+                        return res.status(403).json({ error: 'Membresía vencida para la fecha de la clase', code: 'NEEDS_PURCHASE' });
                     }
                     const cat: 'reformer' | 'multi' = classDetails.class_category;
                     const catCol = cat === 'reformer' ? 'reformer_remaining' : 'multi_remaining';
@@ -669,6 +669,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                         releaseClient();
                         return res.status(403).json({
                             error: `Tu membresía no incluye clases de ${cat === 'reformer' ? 'Salsa' : 'Clases'} o ya no te quedan créditos.`,
+                            code: 'NEEDS_PURCHASE',
                         });
                     }
                     const studioErr = studioBookingError(
@@ -698,7 +699,8 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                         await client.query('ROLLBACK');
                         releaseClient();
                         return res.status(400).json({
-                            error: 'No tienes una membresía válida con créditos para una clase en este estudio.'
+                            error: 'No tienes una membresía válida con créditos para una clase en este estudio.',
+                            code: 'NEEDS_PURCHASE',
                         });
                     }
                     membershipId = picked.id;
@@ -723,7 +725,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                     if (dec.rowCount === 0) {
                         await client.query('ROLLBACK');
                         releaseClient();
-                        return res.status(403).json({ error: 'Sin créditos disponibles en esta membresía' });
+                        return res.status(403).json({ error: 'Sin créditos disponibles en esta membresía', code: 'NEEDS_PURCHASE' });
                     }
                     consumedCategory = cat2;
                 }

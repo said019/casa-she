@@ -94,6 +94,15 @@ export default function BookClassConfirm() {
         setRegOpen(true);
         return;
       }
+      // Sin créditos / sin membresía válida → llevar a comprar en vez de solo mostrar el error.
+      if (err?.response?.data?.code === 'NEEDS_PURCHASE') {
+        toast({
+          title: 'Necesitas créditos para reservar',
+          description: 'Te llevamos a comprar un paquete o membresía.',
+        });
+        navigate('/app/checkout');
+        return;
+      }
       toast({
         variant: 'destructive',
         title: 'No se pudo reservar',
