@@ -88,6 +88,8 @@ const DISCIPLINE_META: Record<string, { color: string; dur: number; cupo: number
   "Sculpt": { color: "#AE4836", dur: 50, cupo: 8, desc: "Pesos ligeros y muchas repeticiones para definir, tonificar y subir el ritmo cardíaco." },        // Arcilla
   "Yoga Ashtanga": { color: "#6C8424", dur: 60, cupo: 7, desc: "Secuencia dinámica y estructurada que construye fuerza, flexibilidad y enfoque mental." }, // Musgo
   "Yoga Vinyasa": { color: "#3E6B4A", dur: 60, cupo: 7, desc: "Flujo de posturas al ritmo de la respiración. Movilidad, equilibrio y calma en movimiento." },  // Verde medio
+  "Yoga": { color: "#5A7D3F", dur: 50, cupo: 12, desc: "Posturas, respiración y calma. Flexibilidad, equilibrio y conexión cuerpo-mente." },      // Verde fresco
+  "Flex": { color: "#5E8B87", dur: 50, cupo: 12, desc: "Movilidad y estiramiento profundo. Libera tensión y gana rango de movimiento." },        // Verde azulado
   "Salsa": { color: "#2E1B22", dur: 60, cupo: 10, desc: "Ritmo, cuerpo y comunidad. Suelta el cuerpo, aprende pasos y conéctate con la energía del grupo." },        // Ciruela
 };
 const metaFor = (name: string) => DISCIPLINE_META[name] ?? { color: GREEN, dur: 60, cupo: 7, desc: "Una clase pensada para moverte, sentirte bien y conectar contigo misma." };
@@ -106,9 +108,15 @@ const SAMPLE_WEEK: Record<string, ClassSlot[]> = {
 
 interface ApiClass {
   id: string;
-  start_time: string;
+  date: string;        // YYYY-MM-DD (día real de la clase)
+  start_time: string;  // HH:MM
   class_type_name?: string;
   instructor_name?: string;
+}
+
+// Fecha local YYYY-MM-DD (evita el corrimiento de día de toISOString en UTC).
+function localYMD(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function useWeekSchedule() {
@@ -122,39 +130,48 @@ function useWeekSchedule() {
       monday.setDate(now.getDate() - day);
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
-      const fmt = (d: Date) => d.toISOString().slice(0, 10);
-      const { data } = await api.get<ApiClass[]>(`/classes?start=${fmt(monday)}&end=${fmt(sunday)}`);
+      const { data } = await api.get<ApiClass[]>(`/classes?start=${localYMD(monday)}&end=${localYMD(sunday)}`);
       if (!Array.isArray(data) || data.length === 0) return null; // sin datos → usar muestra
       const grouped: Record<string, ClassSlot[]> = {};
       for (const c of data) {
-        const dt = new Date(c.start_time);
-        const key = DAYS[(dt.getDay() + 6) % 7];
+        if (!c.date) continue;
+        // El día se toma de c.date (no de start_time, que sólo trae HH:MM).
+        const [y, mo, dd] = c.date.slice(0, 10).split("-").map(Number);
+        const dow = new Date(y, mo - 1, dd).getDay(); // 0 = domingo
+        const key = DAYS[(dow + 6) % 7];
+        if (!key) continue;
         (grouped[key] ||= []).push({
-          time: dt.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }),
+          time: (c.start_time || "").slice(0, 5),
           name: c.class_type_name || "Clase",
           coach: c.instructor_name,
         });
       }
       for (const k of Object.keys(grouped)) grouped[k].sort((a, b) => a.time.localeCompare(b.time));
-      return grouped;
+      return Object.keys(grouped).length ? grouped : null;
     },
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
 }
 
-function currentWeekLabel(): { range: string; todayIdx: number } {
+function currentWeekLabel(): { range: string; todayIdx: number; dayNums: number[] } {
   try {
     const now = new Date();
     const todayIdx = (now.getDay() + 6) % 7; // 0 = lunes
     const monday = new Date(now);
     monday.setDate(now.getDate() - todayIdx);
+    const dayNums: number[] = [];
+    for (let i = 0; i < 7; i++) {
+      const dd = new Date(monday);
+      dd.setDate(monday.getDate() + i);
+      dayNums.push(dd.getDate());
+    }
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
     const d = (x: Date) => x.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
-    return { range: `Semana del ${d(monday)} al ${d(sunday)}`, todayIdx };
+    return { range: `Semana del ${d(monday)} al ${d(sunday)}`, todayIdx, dayNums };
   } catch {
-    return { range: "", todayIdx: -1 };
+    return { range: "", todayIdx: -1, dayNums: [] };
   }
 }
 
@@ -500,7 +517,7 @@ function Horario() {
   const { data } = useWeekSchedule();
   const isSample = !data;
   const week = data ?? SAMPLE_WEEK;
-  const { range, todayIdx } = currentWeekLabel();
+  const { range, todayIdx, dayNums } = currentWeekLabel();
   const totalClases = DAYS.reduce((n, d) => n + (week[d]?.length ?? 0), 0);
 
   return (
@@ -545,7 +562,7 @@ function Horario() {
               >
                 <div className="mb-3 flex items-center justify-center gap-2">
                   <p className={`${body} text-[12px] uppercase tracking-[0.26em]`} style={{ color: GREEN, opacity: isToday ? 1 : 0.7 }}>
-                    {d}
+                    {d}{dayNums[idx] != null ? ` ${dayNums[idx]}` : ""}
                   </p>
                   {isToday && (
                     <span className={`${body} rounded-full px-2 py-0.5 text-[9px] uppercase tracking-[0.14em]`} style={{ backgroundColor: GREEN, color: CREAM }}>
