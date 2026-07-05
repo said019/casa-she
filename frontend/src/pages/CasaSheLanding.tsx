@@ -62,7 +62,7 @@ const PILLARS = [
   {
     eyebrow: "Restaura y potencia tu cuerpo",
     title: "Cuidado Especializado",
-    img: "/casashe/spa.jpg",
+    img: "/casashe/espacio-bano.jpg",
     text: "Masajes reductivos para definir tu silueta, drenaje linfático para desintoxicar y desinflamar, y faciales personalizados que devuelven la luminosidad y vitalidad a tu piel. El toque final para consentirte.",
   },
 ];
@@ -214,7 +214,7 @@ function Hero() {
   return (
     <section id="inicio" className="relative flex min-h-screen items-center justify-center overflow-hidden">
       <img
-        src="/casashe/hero.png"
+        src="/casashe/espacio-salon.jpg"
         alt="Interior de Casa Shé — estudio en la Condesa"
         className="absolute inset-0 h-full w-full object-cover"
       />
@@ -588,7 +588,7 @@ function Horario() {
 function FuelBar() {
   return (
     <section id="bar" className="relative overflow-hidden">
-      <img src="/casashe/fuelbar.jpg" alt="Fuel Bar de Casa Shé" className="absolute inset-0 h-full w-full object-cover" />
+      <img src="/casashe/espacio-hidratacion.jpg" alt="Fuel Bar de Casa Shé" className="absolute inset-0 h-full w-full object-cover" />
       <div className="absolute inset-0" style={{ backgroundColor: "rgba(28,51,32,0.64)" }} />
       <div className="relative z-10 mx-auto max-w-3xl px-6 py-32 text-center" style={{ color: CREAM }}>
         <p className={`${body} text-[12px] uppercase tracking-[0.4em]`} style={{ opacity: 0.8 }}>

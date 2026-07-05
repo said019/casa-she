@@ -23,8 +23,8 @@ export default function AuthShell({ eyebrow, title, subtitle, children, footer }
                 className="relative hidden overflow-hidden lg:fixed lg:inset-y-0 lg:left-0 lg:block lg:w-[45%]"
             >
                 <img
-                    src="/casashe/hero.png"
-                    alt="Interior de Casa Shé"
+                    src="/casashe/espacio-salon.jpg"
+                    alt="Salón de Casa Shé"
                     className="absolute inset-0 h-full w-full object-cover"
                 />
                 <div className="absolute inset-0" style={{ backgroundColor: 'rgba(22,38,26,0.62)' }} />
