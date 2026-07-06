@@ -51,6 +51,7 @@ import referralsRoutes from './routes/referrals.js';
 import pushRoutes from './routes/push.js';
 import adminPushRoutes from './routes/admin-push.js';
 import stripeWebhook from './routes/stripe-webhook.js';
+import mercadopagoWebhook from './routes/mercadopago-webhook.js';
 import { validateStripeConfig } from './lib/stripe.js';
 import { query, queryOne } from './config/database.js';
 import { buildScheduleRows } from './lib/schedule.js';
@@ -88,6 +89,7 @@ const apiLimiter = rateLimit({
     skip: (req) =>
         req.path === '/api/health' ||
         req.path.startsWith('/api/stripe/webhook') ||
+        req.path.startsWith('/webhooks/mercadopago') ||
         req.path.startsWith('/api/evolution/webhook'),
     message: { error: 'Demasiadas solicitudes. Intenta de nuevo en un momento.' },
 });
@@ -126,6 +128,13 @@ if (process.env.STRIPE_SECRET_KEY) {
 }
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Webhook de MercadoPago. NO necesita raw body (la firma se calcula sobre data.id),
+// así que va DESPUÉS de express.json. Se monta ANTES del rate limiter para no
+// limitar los reintentos de MP. Solo si MercadoPago está configurado.
+if (process.env.MP_ACCESS_TOKEN) {
+    app.use('/webhooks/mercadopago', mercadopagoWebhook);
+}
 
 // Límite global de tasa (excluye health y webhooks vía skip).
 app.use(apiLimiter);

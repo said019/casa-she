@@ -9,7 +9,8 @@ import { sendMembershipActivatedNotice, sendWhatsAppMessage } from '../lib/whats
 import { awardPaymentLoyaltyPoints, awardReferralBonus, consumeSampleClassDiscount, canBuySamplePlan } from '../lib/loyalty.js';
 import { toDbClient } from '../lib/membershipSelection.js';
 import { notifyMembershipRenewed, notifyPointsEarnedExternal } from '../lib/notifications.js';
-import { createOrGetStripeCustomer, createCheckoutSession, buildLineItem } from '../lib/stripe.js';
+import { mpConfigured, createPreference, syncPayment } from '../lib/mercadopago.js';
+import { finalizePaidOrder } from '../lib/orderFulfillment.js';
 
 const router = Router();
 
@@ -435,32 +436,31 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
             }
         }
 
-        // Stripe Hosted Checkout para pago con tarjeta
+        // MercadoPago Checkout Pro para pago con tarjeta
         let checkout_url: string | null = null;
         if (payment_method === 'card') {
-            if (!process.env.STRIPE_SECRET_KEY) {
+            if (!mpConfigured()) {
                 await query(`DELETE FROM orders WHERE id = $1`, [order.id]);
                 return res.status(503).json({ error: 'Pago con tarjeta no disponible' });
             }
             const user = await queryOne<{ display_name: string; email: string }>(
                 `SELECT display_name, email FROM users WHERE id = $1`, [userId]);
             try {
-                const customerId = await createOrGetStripeCustomer({ userId: userId!, email: user?.email || '', name: user?.display_name });
-                const co = await createCheckoutSession({
-                    orderId: order.id, orderType: 'membership', customerId,
-                    lineItems: [buildLineItem({ name: plan.name, amountMxn: Number(order.total_amount) })],
-                    metadata: { orderNumber: order.order_number },
-                    successUrl: `${process.env.FRONTEND_URL}/app/orders/${order.id}`,
-                    cancelUrl: `${process.env.FRONTEND_URL}/app/orders/${order.id}`,
+                const pref = await createPreference({
+                    orderId: order.id,
+                    orderNumber: order.order_number,
+                    items: [{ title: plan.name, quantity: 1, unit_price: Number(order.total_amount) }],
+                    payerEmail: user?.email || undefined,
+                    backUrl: `${process.env.FRONTEND_URL}/app/orders/${order.id}`,
+                    notificationUrl: process.env.BACKEND_URL ? `${process.env.BACKEND_URL}/webhooks/mercadopago` : undefined,
                 });
-                checkout_url = co.url;
+                checkout_url = pref.checkoutUrl;
                 await query(
-                    `UPDATE orders SET payment_provider='stripe', stripe_session_id=$1,
-                            stripe_checkout_url=$2, stripe_payment_intent_id=$3, updated_at=NOW()
-                     WHERE id=$4`,
-                    [co.sessionId, co.url, co.paymentIntentId, order.id]);
-            } catch (stripeErr: any) {
-                console.error('Stripe checkout error:', stripeErr.message);
+                    `UPDATE orders SET payment_provider='mercadopago', mp_checkout_url=$1, updated_at=NOW()
+                     WHERE id=$2`,
+                    [pref.checkoutUrl, order.id]);
+            } catch (mpErr: any) {
+                console.error('MercadoPago checkout error:', mpErr.message);
                 await query(`DELETE FROM orders WHERE id = $1`, [order.id]);
                 return res.status(502).json({ error: 'CARD_PAYMENT_FAILED' });
             }
@@ -501,29 +501,58 @@ router.post('/:id/pay-with-card', authenticate, async (req: Request, res: Respon
             return res.status(400).json({ error: 'Esta orden ya no acepta pagos' });
         }
 
-        if (!process.env.STRIPE_SECRET_KEY) {
+        if (!mpConfigured()) {
             return res.status(503).json({ error: 'Pago con tarjeta no disponible' });
         }
-        if (order.stripe_checkout_url) {
-            return res.json({ checkout_url: order.stripe_checkout_url });
+        if (order.mp_checkout_url) {
+            return res.json({ checkout_url: order.mp_checkout_url });
         }
-        const customerId = await createOrGetStripeCustomer({ userId: userId!, email: order.user_email, name: order.user_name });
-        const co = await createCheckoutSession({
-            orderId: order.id, orderType: 'membership', customerId,
-            lineItems: [buildLineItem({ name: order.plan_name, amountMxn: Number(order.total_amount) })],
-            metadata: { orderNumber: order.order_number },
-            successUrl: `${process.env.FRONTEND_URL}/app/orders/${order.id}`,
-            cancelUrl: `${process.env.FRONTEND_URL}/app/orders/${order.id}`,
+        const pref = await createPreference({
+            orderId: order.id,
+            orderNumber: order.order_number,
+            items: [{ title: order.plan_name, quantity: 1, unit_price: Number(order.total_amount) }],
+            payerEmail: order.user_email || undefined,
+            backUrl: `${process.env.FRONTEND_URL}/app/orders/${order.id}`,
+            notificationUrl: process.env.BACKEND_URL ? `${process.env.BACKEND_URL}/webhooks/mercadopago` : undefined,
         });
         await query(
-            `UPDATE orders SET payment_method='card', payment_provider='stripe', stripe_session_id=$1,
-                    stripe_checkout_url=$2, stripe_payment_intent_id=$3, updated_at=NOW()
-             WHERE id=$4`,
-            [co.sessionId, co.url, co.paymentIntentId, order.id]);
-        res.json({ checkout_url: co.url });
+            `UPDATE orders SET payment_method='card', payment_provider='mercadopago',
+                    mp_checkout_url=$1, updated_at=NOW()
+             WHERE id=$2`,
+            [pref.checkoutUrl, order.id]);
+        res.json({ checkout_url: pref.checkoutUrl });
     } catch (err: any) {
         console.error('Pay with card error:', err.message);
         res.status(500).json({ error: 'No se pudo generar el checkout' });
+    }
+});
+
+// ============================================
+// POST /api/orders/:id/sync-mp - Reconciliar manualmente un pago de MercadoPago (admin)
+// Si el webhook no llegó (p. ej. firma mal configurada), el admin fuerza la
+// re-consulta del estado real y aprueba la orden si el pago está approved.
+// ============================================
+router.post('/:id/sync-mp', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const order = await queryOne<{ id: string; mp_payment_id: string | null }>(
+            `SELECT id, mp_payment_id FROM orders WHERE id = $1`, [id]);
+        if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+        if (!order.mp_payment_id) {
+            return res.status(400).json({ error: 'La orden no tiene un pago de MercadoPago que reconciliar.' });
+        }
+        const payment = await syncPayment(String(order.mp_payment_id));
+        await query(
+            `UPDATE orders SET mp_payment_status=$1, mp_status_detail=$2, provider_synced_at=NOW(), updated_at=NOW()
+             WHERE id=$3`,
+            [payment.status, payment.status_detail, id]);
+        if (payment.status === 'approved') {
+            await finalizePaidOrder(id, { provider: 'mercadopago', paymentRef: String(payment.id) });
+        }
+        res.json({ status: payment.status, status_detail: payment.status_detail });
+    } catch (err: any) {
+        console.error('sync-mp error:', err.message);
+        res.status(500).json({ error: 'No se pudo reconciliar el pago' });
     }
 });
 
@@ -650,12 +679,13 @@ router.post('/:id/approve', authenticate, requireRole('admin', 'super_admin'), a
             return res.status(400).json({ error: `No se puede aprobar una orden con estado: ${order.status}` });
         }
 
-        // Card orders are settled exclusively by the Stripe webhook (checkout hospedado).
+        // Card orders are settled exclusively by the MercadoPago webhook (Checkout Pro).
         // Approving them by hand would grant a membership without a confirmed
-        // payment, so manual approval is forbidden for this method.
+        // payment, so manual approval is forbidden for this method. Para reconciliar
+        // un pago que no se reflejó, usar POST /:id/sync-mp.
         if (order.payment_method === 'card') {
             return res.status(409).json({
-                error: 'Las órdenes con tarjeta se aprueban automáticamente al confirmarse el pago en Stripe. No requieren aprobación manual.',
+                error: 'Las órdenes con tarjeta se aprueban automáticamente al confirmarse el pago. No requieren aprobación manual.',
             });
         }
 

@@ -219,6 +219,14 @@ export default function Checkout() {
     enabled: selectedPaymentMethod === 'bank_transfer',
   });
 
+  // ¿Está habilitado el pago con tarjeta? (solo si MercadoPago está configurado.)
+  const { data: paymentConfig } = useQuery<{ cardEnabled: boolean }>({
+    queryKey: ['payments-config'],
+    queryFn: async () => (await api.get('/payments/config')).data,
+    staleTime: 5 * 60 * 1000,
+  });
+  const cardEnabled = paymentConfig?.cardEnabled === true;
+
   // Create order mutation
   const createOrder = useMutation({
     mutationFn: async (data: CreateOrderRequest) => {
@@ -365,7 +373,7 @@ export default function Checkout() {
       value: 'card',
       label: 'Tarjeta de crédito / débito',
       icon: CreditCard,
-      description: 'Paga con tarjeta de forma segura vía Stripe',
+      description: 'Paga con tarjeta de forma segura vía Mercado Pago',
     },
     {
       value: 'bank_transfer',
@@ -563,7 +571,7 @@ export default function Checkout() {
                     onValueChange={(v) => setSelectedPaymentMethod(v as OrderPaymentMethod)}
                     className="space-y-3"
                   >
-                    {paymentMethods.map((method) => (
+                    {paymentMethods.filter((m) => m.value !== 'card' || cardEnabled).map((method) => (
                       <div
                         key={method.value}
                         className={`flex cursor-pointer items-start space-x-3 rounded-[1.25rem] border p-4 transition-colors ${selectedPaymentMethod === method.value
