@@ -4,8 +4,15 @@ import { authenticate, requireRole } from '../middleware/auth.js';
 import { query, queryOne } from '../config/database.js';
 import { ManualIncomeSchema } from '../lib/manualIncome.js';
 import { openShiftForUser } from '../lib/openShift.js';
+import { mpConfigured } from '../lib/mercadopago.js';
 
 const router = Router();
+
+// Config PÚBLICA de pagos (antes del gate de admin). El checkout del cliente la usa
+// para saber si mostrar la opción "tarjeta" (solo si MercadoPago está configurado).
+router.get('/config', (_req: Request, res: Response) => {
+    res.json({ cardEnabled: mpConfigured() });
+});
 
 router.use(authenticate, requireRole('admin', 'super_admin'));
 

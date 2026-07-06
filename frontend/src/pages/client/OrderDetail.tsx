@@ -79,6 +79,13 @@ export default function OrderDetail() {
     queryKey: ['order', orderId],
     queryFn: async () => (await api.get(`/orders/${orderId}`)).data,
     enabled: !!orderId,
+    // Las órdenes con tarjeta se aprueban por el webhook de MercadoPago (async) cuando
+    // la clienta regresa del checkout. Mientras siga pendiente, refrescamos cada 4s
+    // para reflejar la aprobación sin que tenga que recargar.
+    refetchInterval: (query) => {
+      const o = query.state.data as OrderWithProofs | undefined;
+      return o?.payment_method === 'card' && o?.status === 'pending_payment' ? 4000 : false;
+    },
   });
   
   // Fetch bank info
