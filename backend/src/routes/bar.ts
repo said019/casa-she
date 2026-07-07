@@ -1,9 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { query, queryOne } from '../config/database.js';
+import { query, queryOne, pool } from '../config/database.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { getSetting } from '../lib/settings.js';
-import { isBarOpenAt, BAR_CATEGORY_NAMES, computeBarTotals, canBarTransition, type BarStatus } from '../lib/bar.js';
+import { isBarOpenAt, BAR_CATEGORY_NAMES, computeBarTotals, pointsForTotal, canBarTransition, type BarStatus } from '../lib/bar.js';
+import { spendBarPoints } from '../lib/barPoints.js';
 import { sendWebPushToUser } from '../lib/web-push.js';
 import { createPreference, mpConfigured } from '../lib/mercadopago.js';
 
@@ -32,7 +33,7 @@ router.get('/menu', authenticate, async (_req: Request, res: Response) => {
 const CreateBarOrder = z.object({
   items: z.array(z.object({ productId: z.string().uuid(), quantity: z.number().int().positive() })).min(1),
   pickupTime: z.string(),
-  paymentMethod: z.enum(['reception', 'card']),
+  paymentMethod: z.enum(['reception', 'card', 'points']),
   notes: z.string().max(140).optional(),
   bookingId: z.string().uuid().optional(),
 });
@@ -50,6 +51,10 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'INVALID_PICKUP_TIME' });
   }
 
+  // Gate por config: tarjeta y puntos requieren que estén habilitados.
+  if (paymentMethod === 'card' && !cfg.card_enabled) return res.status(400).json({ error: 'CARD_DISABLED' });
+  if (paymentMethod === 'points' && !cfg.points_enabled) return res.status(400).json({ error: 'POINTS_DISABLED' });
+
   // Cotiza cada producto EN SERVIDOR (el cliente nunca manda precio).
   const priced: { productId: string; name: string; quantity: number; unit_price_mxn: number }[] = [];
   for (const it of items) {
@@ -58,19 +63,53 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
     if (!p || !p.is_active) return res.status(400).json({ error: 'PRODUCT_NOT_FOUND', productId: it.productId });
     priced.push({ productId: p.id, name: p.name, quantity: it.quantity, unit_price_mxn: Number(p.price) });
   }
-  const totals = computeBarTotals(priced);
 
-  // Inserta la orden (pending) + items.
+  // Recargo SOLO para tarjeta.
+  const surchargePct = paymentMethod === 'card' ? Number(cfg.card_surcharge_percent ?? 0) : 0;
+  const totals = computeBarTotals(priced, { surchargePercent: surchargePct });
+
+  // Inserta la orden + items. Puntos se marcan como 'paid' al instante.
   const order = await queryOne<{ id: string }>(
-    `INSERT INTO bar_orders (user_id, booking_id, status, pickup_time, payment_method, payment_status, subtotal_mxn, total_mxn, customer_notes)
-     VALUES ($1, $2, 'pending', $3, $4, 'pending', $5, $6, $7) RETURNING id`,
-    [userId, bookingId ?? null, pickup.toISOString(), paymentMethod, totals.subtotal_mxn, totals.total_mxn, notes ?? null]);
-  const orderId = order!.id;
+    `INSERT INTO bar_orders (user_id, booking_id, status, pickup_time, payment_method, payment_status,
+                             subtotal_mxn, card_surcharge_mxn, total_mxn, customer_notes)
+     VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+    [userId, bookingId ?? null, pickup.toISOString(), paymentMethod,
+     paymentMethod === 'points' ? 'paid' : 'pending',
+     totals.subtotal_mxn, totals.surcharge_mxn, totals.total_mxn, notes ?? null]);
+  if (!order) return res.status(500).json({ error: 'ORDER_CREATION_FAILED' });
+  const orderId = order.id;
   for (const it of priced) {
     await query(
       `INSERT INTO bar_order_items (bar_order_id, product_id, product_name, quantity, unit_price_mxn, line_total_mxn)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [orderId, it.productId, it.name, it.quantity, it.unit_price_mxn, it.unit_price_mxn * it.quantity]);
+  }
+
+  // Rama PUNTOS: transacción atómica con bloqueo de saldo para evitar carreras.
+  if (paymentMethod === 'points') {
+    const rate = Number(cfg.points_redemption_rate ?? 10);
+    const needed = pointsForTotal(totals.total_mxn, rate);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const balRow = await client.query(
+        `SELECT COALESCE(SUM(points),0)::int AS bal FROM loyalty_points WHERE user_id=$1 FOR UPDATE`,
+        [userId]);
+      const balance = Number(balRow.rows[0]?.bal ?? 0);
+      if (balance < needed) {
+        await client.query('ROLLBACK');
+        await query(`DELETE FROM bar_orders WHERE id=$1`, [orderId]);
+        return res.status(400).json({ error: 'INSUFFICIENT_POINTS', needed, balance });
+      }
+      await client.query(`UPDATE bar_orders SET points_spent=$1 WHERE id=$2`, [needed, orderId]);
+      await spendBarPoints(client, userId, needed, orderId);
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      await query(`DELETE FROM bar_orders WHERE id=$1`, [orderId]);
+      return res.status(500).json({ error: 'POINTS_CHARGE_FAILED' });
+    } finally { client.release(); }
+    return res.status(201).json({ id: orderId });
   }
 
   if (paymentMethod === 'card') {
