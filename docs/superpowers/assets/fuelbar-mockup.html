@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Baskervville:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#F6EFE1; --cream2:#FBF5EA; --sand:#EBDFC9; --green:#2A4E36; --deep:#16261A;
+    --arcilla:#AE4836; --berry:#8F3B52;
+    --hair:rgba(22,38,26,.10); --hair2:rgba(22,38,26,.06);
+    --soft:0 36px 74px -42px rgba(22,38,26,.55), 0 12px 26px -18px rgba(22,38,26,.38);
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html,body{overflow-x:hidden}
+  body{
+    font-family:'Baskervville',serif; color:var(--green);
+    background:
+      radial-gradient(1200px 640px at 16% -12%, #FBF4E8 0%, transparent 56%),
+      radial-gradient(1100px 780px at 116% 12%, #E7DABF 0%, transparent 50%),
+      #E8DCC5;
+    padding:66px 46px 74px; position:relative;
+  }
+  .grain{position:fixed; inset:0; pointer-events:none; z-index:60; opacity:.055; mix-blend-mode:multiply;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+  .disp{font-family:'Instrument Serif',serif; font-weight:400}
+  svg{display:block}
+  .i{stroke:currentColor; stroke-width:1.5; fill:none; stroke-linecap:round; stroke-linejoin:round}
+
+  .head{text-align:center; margin-bottom:48px}
+  .head .pill{display:inline-block; font-size:10px; letter-spacing:.34em; text-transform:uppercase;
+    color:var(--arcilla); border:1px solid rgba(174,72,54,.28); border-radius:999px; padding:6px 14px; background:rgba(174,72,54,.05)}
+  .head h1{font-family:'Instrument Serif',serif; font-size:54px; color:var(--green); line-height:1; margin-top:16px}
+  .head p{font-size:15px; color:var(--green); opacity:.6; margin-top:12px; font-style:italic}
+  .row{display:flex; gap:52px; justify-content:center; align-items:flex-start; flex-wrap:wrap}
+  .col{display:flex; flex-direction:column; align-items:center; gap:18px}
+  .cap{font-family:'Instrument Serif',serif; font-size:18px; color:var(--green); opacity:.72}
+
+  .phone{width:384px; height:812px; background:var(--cream); border-radius:52px;
+    border:10px solid #1b140c; position:relative; overflow:hidden;
+    box-shadow:var(--soft), inset 0 1px 0 rgba(255,255,255,.5);}
+  .scr{position:absolute; inset:0; display:flex; flex-direction:column; background:
+      radial-gradient(520px 240px at 50% -6%, var(--cream2) 0%, transparent 70%), var(--cream);}
+  .status{height:40px; display:flex; align-items:center; justify-content:space-between; padding:0 30px; font-size:13px; color:var(--green); opacity:.82; flex:0 0 auto}
+  .status .r{display:flex; gap:8px; align-items:center}
+  .bat{width:22px; height:11px; border:1px solid var(--green); border-radius:3px; position:relative; opacity:.75}
+  .bat::after{content:""; position:absolute; right:-3px; top:3px; width:2px; height:5px; background:var(--green); border-radius:1px}
+  .bat i{position:absolute; left:1.5px; top:1.5px; bottom:1.5px; width:12px; background:var(--green); border-radius:1px; display:block}
+
+  .appbar{display:flex; align-items:center; justify-content:space-between; padding:8px 22px 6px; flex:0 0 auto}
+  .nav-ic{width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--green); background:rgba(22,38,26,.045); border:1px solid var(--hair2)}
+  .nav-ic.ghost{background:none; border:none}
+  .brand{font-family:'Instrument Serif',serif; font-size:20px; color:var(--green)}
+  .cart{position:relative}
+  .cart .badge{position:absolute; top:-3px; right:-3px; background:var(--arcilla); color:#fff; font-size:10.5px; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center}
+
+  .body{flex:1 1 auto; overflow:hidden; padding:8px 22px 0}
+
+  /* photographic hero */
+  .phero{position:relative; border-radius:28px; overflow:hidden; height:184px; box-shadow:0 24px 46px -28px rgba(22,38,26,.65), inset 0 0 0 1px rgba(255,255,255,.08)}
+  .phero img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scale(1.04)}
+  .phero .scrim{position:absolute; inset:0; background:linear-gradient(175deg, rgba(22,38,26,.08) 0%, rgba(22,38,26,.30) 45%, rgba(22,38,26,.72) 100%)}
+  .phero .in{position:absolute; left:20px; right:20px; bottom:18px; z-index:2; color:var(--cream)}
+  .phero .eb{display:inline-block; font-size:9px; letter-spacing:.3em; text-transform:uppercase; color:var(--cream);
+    border:1px solid rgba(246,239,225,.5); border-radius:999px; padding:4px 11px; opacity:.92}
+  .phero h2{font-family:'Instrument Serif',serif; font-size:42px; line-height:.95; margin-top:9px; color:var(--cream)}
+  .phero .st{display:inline-flex; align-items:center; gap:7px; margin-top:7px; font-size:12px; opacity:.9; font-style:italic}
+  .phero .dot{width:7px; height:7px; border-radius:50%; background:#8fd0a0; box-shadow:0 0 0 3px rgba(143,208,160,.25)}
+
+  .chips{display:flex; gap:9px; margin:18px 0 4px; overflow:hidden}
+  .chip{font-size:12.5px; padding:8px 15px; border-radius:999px; border:1px solid var(--hair); color:var(--green); opacity:.78; white-space:nowrap; background:rgba(255,255,255,.42)}
+  .chip.on{background:var(--green); color:var(--cream); border-color:var(--green); opacity:1; box-shadow:0 10px 20px -12px rgba(42,78,54,.6)}
+
+  .cat{display:flex; align-items:center; gap:9px; margin:20px 2px 8px}
+  .cat .cdot{width:8px; height:8px; border-radius:50%}
+  .cat h3{font-family:'Instrument Serif',serif; font-size:21px; color:var(--green)}
+
+  .item{display:flex; align-items:center; gap:14px; padding:11px 2px; border-bottom:1px solid var(--hair2)}
+  .item:last-child{border-bottom:none}
+  .th{width:60px; height:60px; border-radius:18px; flex:0 0 auto; display:flex; align-items:flex-end; justify-content:center; overflow:hidden; position:relative;
+    background:radial-gradient(circle at 50% 32%, #FCF7EE, #EADDC6); box-shadow:inset 0 1px 2px rgba(255,255,255,.7), 0 12px 20px -13px rgba(22,38,26,.42)}
+  .th img{height:80px; object-fit:contain; position:relative; z-index:1; margin-bottom:-5px; filter:drop-shadow(0 6px 8px rgba(22,38,26,.22))}
+  .txt{flex:1; min-width:0}
+  .nm{font-size:16px; color:var(--green); display:flex; align-items:center; gap:8px; letter-spacing:.01em}
+  .ds{font-size:12px; color:var(--green); opacity:.5; margin-top:3px; line-height:1.35}
+  .pr{font-family:'Instrument Serif',serif; font-size:19px; color:var(--green); flex:0 0 auto}
+  .add{flex:0 0 auto; width:32px; height:32px; border-radius:50%; background:var(--green); color:var(--cream);
+    display:flex; align-items:center; justify-content:center; box-shadow:0 10px 18px -10px rgba(42,78,54,.75)}
+  .add .i{width:15px; height:15px; stroke-width:1.6}
+  .tag{font-size:8.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--arcilla); border:1px solid rgba(174,72,54,.32); border-radius:999px; padding:2px 8px}
+
+  .cta{position:absolute; left:0; right:0; bottom:0; padding:18px 22px 30px; background:linear-gradient(to top, var(--cream) 58%, rgba(246,239,225,0))}
+  .btn{background:var(--green); color:var(--cream); border-radius:999px; height:58px; display:flex; align-items:center; justify-content:space-between;
+    padding:0 12px 0 26px; box-shadow:0 22px 40px -22px rgba(42,78,54,.9), inset 0 1px 0 rgba(255,255,255,.12)}
+  .btn .lbl{font-size:13px; letter-spacing:.16em; text-transform:uppercase}
+  .btn .end{display:flex; align-items:center; gap:14px}
+  .btn .amt{font-family:'Instrument Serif',serif; font-size:20px}
+  .btn .circ{width:40px; height:40px; border-radius:50%; background:rgba(246,239,225,.14); display:flex; align-items:center; justify-content:center}
+  .btn .circ .i{width:18px; height:18px; color:var(--cream)}
+
+  .sec{font-family:'Instrument Serif',serif; font-size:19px; color:var(--green); margin:22px 0 12px; opacity:.9}
+  .sec.first{margin-top:8px}
+  .ord{display:flex; align-items:center; gap:14px; padding:12px 0; border-bottom:1px solid var(--hair2)}
+  .othu{width:52px; height:52px; border-radius:15px; flex:0 0 auto; overflow:hidden; display:flex; align-items:flex-end; justify-content:center;
+    background:radial-gradient(circle at 50% 32%, #FCF7EE, #EADDC6); box-shadow:inset 0 1px 2px rgba(255,255,255,.7), 0 10px 16px -11px rgba(22,38,26,.4)}
+  .othu img{height:66px; object-fit:contain; margin-bottom:-4px; filter:drop-shadow(0 5px 6px rgba(22,38,26,.2))}
+  .ord .nm{font-size:15.5px}
+  .ord .sub{font-size:12px; opacity:.5; margin-top:2px; font-style:italic}
+  .ord .pr{margin-left:auto}
+
+  .pick{display:flex; gap:11px}
+  .pk-shell{flex:1; border-radius:20px; padding:4px; border:1px solid transparent}
+  .pk-shell.on{background:rgba(42,78,54,.06); border-color:var(--hair2)}
+  .pk{border-radius:16px; padding:13px 14px; height:100%; border:1px solid var(--hair2); background:rgba(255,255,255,.42)}
+  .pk-shell.on .pk{border-color:rgba(42,78,54,.24); background:var(--cream2); box-shadow:inset 0 1px 0 rgba(255,255,255,.5)}
+  .pk .big{font-family:'Instrument Serif',serif; font-size:17px; color:var(--green); display:block}
+  .pk .sm{font-size:11px; opacity:.55; margin-top:3px; font-style:italic}
+
+  .pay{display:flex; align-items:center; gap:13px; border:1px solid var(--hair2); border-radius:17px; padding:14px 15px; margin-bottom:10px; background:rgba(255,255,255,.4)}
+  .pay.on{border-color:rgba(42,78,54,.24); background:var(--cream2); box-shadow:0 16px 30px -24px rgba(42,78,54,.5), inset 0 1px 0 rgba(255,255,255,.5)}
+  .pay .pi{width:38px; height:38px; border-radius:12px; background:rgba(42,78,54,.07); display:flex; align-items:center; justify-content:center; color:var(--green)}
+  .pay .pi .i{width:19px; height:19px}
+  .pay .pt{font-size:14.5px}
+  .pay .pd{font-size:11.5px; opacity:.52; margin-top:1px; font-style:italic}
+  .pay .radio{margin-left:auto; width:19px; height:19px; border-radius:50%; border:1.5px solid var(--hair)}
+  .pay.on .radio{border-color:var(--green); background:radial-gradient(circle, var(--green) 40%, transparent 44%)}
+
+  .totrow{display:flex; justify-content:space-between; align-items:baseline; margin-top:16px; padding-top:14px; border-top:1px solid var(--hair2)}
+  .totrow .l{font-size:11px; opacity:.55; letter-spacing:.22em; text-transform:uppercase}
+  .totrow .v{font-family:'Instrument Serif',serif; font-size:34px; color:var(--green)}
+
+  .ready{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0 34px; position:relative}
+  .steps{position:absolute; top:80px; left:0; right:0; display:flex; justify-content:center; gap:10px}
+  .step{width:30px; height:4px; border-radius:2px; background:rgba(42,78,54,.15)}
+  .step.on{background:var(--green)}
+  .rthumb{width:118px; height:118px; border-radius:50%; overflow:hidden; display:flex; align-items:flex-end; justify-content:center; margin-bottom:26px; position:relative;
+    background:radial-gradient(circle at 50% 32%, #FCF7EE, #E7DAC2); box-shadow:0 0 0 10px rgba(42,78,54,.08), 0 0 0 24px rgba(42,78,54,.04), 0 26px 44px -24px rgba(22,38,26,.55)}
+  .rthumb img{height:130px; object-fit:contain; margin-bottom:-6px; filter:drop-shadow(0 8px 10px rgba(22,38,26,.28))}
+  .rcheck{position:absolute; right:calc(50% - 74px); bottom:150px; width:40px; height:40px; border-radius:50%; background:var(--green); display:flex; align-items:center; justify-content:center; box-shadow:0 12px 22px -10px rgba(42,78,54,.8); z-index:3}
+  .rcheck .i{width:20px; height:20px; color:var(--cream); stroke-width:1.8}
+  .ready h2{font-family:'Instrument Serif',serif; font-size:38px; line-height:1.02; color:var(--green)}
+  .ready p{font-size:14px; opacity:.58; margin-top:10px; line-height:1.5; font-style:italic}
+  .qr-shell{margin-top:24px; padding:9px; border-radius:24px; background:rgba(42,78,54,.05); border:1px solid var(--hair2)}
+  .qr{width:120px; height:120px; border-radius:16px; background:#fff; padding:13px; box-shadow:inset 0 1px 2px rgba(0,0,0,.06)}
+  .qr svg{width:100%; height:100%}
+  .qr-l{font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; opacity:.42; margin-top:15px}
+</style>
+</head>
+<body>
+  <div class="grain"></div>
+  <div class="head">
+    <span class="pill">Casa Shé · App</span>
+    <h1 class="disp">Fuel Bar</h1>
+    <p>Cómo se vería en la app · menú y fotos reales · pide y recoge en la barra</p>
+  </div>
+
+  <div class="row">
+
+    <!-- MENÚ -->
+    <div class="col">
+      <div class="phone"><div class="scr">
+        <div class="status"><span>9:41</span><span class="r"><span>5G</span><span class="bat"><i></i></span></span></div>
+        <div class="appbar">
+          <div class="nav-ic"><svg class="i" width="18" height="18" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></div>
+          <div class="brand">Casa Shé</div>
+          <div class="nav-ic cart"><svg class="i" width="18" height="18" viewBox="0 0 24 24"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg><span class="badge">2</span></div>
+        </div>
+        <div class="body">
+          <div class="phero">
+            <img src="studio.jpg" alt="">
+            <div class="scrim"></div>
+            <div class="in">
+              <span class="eb">Recarga consciente</span>
+              <h2 class="disp">Fuel Bar</h2>
+              <span class="st"><span class="dot"></span> Abierto · listo en la barra tras tu clase</span>
+            </div>
+          </div>
+
+          <div class="chips">
+            <span class="chip on">Todo</span>
+            <span class="chip">Smoothies</span>
+            <span class="chip">Fríos</span>
+            <span class="chip">Calientes</span>
+          </div>
+
+          <div class="cat"><span class="cdot" style="background:var(--berry)"></span><h3 class="disp">Smoothies</h3></div>
+          <div class="item">
+            <div class="th"><img src="menuimg/thumb-solverde.png" alt=""></div>
+            <div class="txt"><div class="nm">Sol Verde</div><div class="ds">Yogur griego, mango, matcha y miel.</div></div>
+            <div class="pr">$85</div>
+            <div class="add"><svg class="i" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg></div>
+          </div>
+          <div class="item">
+            <div class="th"><img src="menuimg/thumb-rubi.png" alt=""></div>
+            <div class="txt"><div class="nm">Rubí</div><div class="ds">Yogur griego, frutos rojos y miel.</div></div>
+            <div class="pr">$85</div>
+            <div class="add"><svg class="i" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg></div>
+          </div>
+
+          <div class="cat"><span class="cdot" style="background:var(--green)"></span><h3 class="disp">Fríos sin café</h3></div>
+          <div class="item">
+            <div class="th"><img src="menuimg/thumb-coco.png" alt=""></div>
+            <div class="txt"><div class="nm">Coco Matcha Shé <span class="tag">de casa</span></div><div class="ds">Fresa, agua de coco y espuma de matcha.</div></div>
+            <div class="pr">$85</div>
+            <div class="add"><svg class="i" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg></div>
+          </div>
+          <div class="item">
+            <div class="th"><img src="menuimg/thumb-matcha.png" alt=""></div>
+            <div class="txt"><div class="nm">Matcha tradicional</div><div class="ds">Matcha ceremonial con leche cremosa.</div></div>
+            <div class="pr">$75</div>
+            <div class="add"><svg class="i" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg></div>
+          </div>
+        </div>
+        <div class="cta"><div class="btn">
+          <span class="lbl">Ver pedido</span>
+          <span class="end"><span class="amt">2 · $170</span><span class="circ"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></span>
+        </div></div>
+      </div></div>
+      <div class="cap disp">Menú</div>
+    </div>
+
+    <!-- CONFIRMAR -->
+    <div class="col">
+      <div class="phone"><div class="scr">
+        <div class="status"><span>9:42</span><span class="r"><span>5G</span><span class="bat"><i></i></span></span></div>
+        <div class="appbar">
+          <div class="nav-ic"><svg class="i" width="18" height="18" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></div>
+          <div class="brand">Tu pedido</div>
+          <div class="nav-ic ghost"></div>
+        </div>
+        <div class="body">
+          <div class="sec first disp">Tu orden</div>
+          <div class="ord">
+            <div class="othu"><img src="menuimg/thumb-solverde.png" alt=""></div>
+            <div><div class="nm">Sol Verde</div><div class="sub">Smoothie · 1</div></div>
+            <div class="pr disp">$85</div>
+          </div>
+          <div class="ord">
+            <div class="othu"><img src="menuimg/thumb-coco.png" alt=""></div>
+            <div><div class="nm">Coco Matcha Shé</div><div class="sub">Frío sin café · 1</div></div>
+            <div class="pr disp">$85</div>
+          </div>
+
+          <div class="sec disp">¿Para cuándo?</div>
+          <div class="pick">
+            <div class="pk-shell on"><div class="pk"><span class="big disp">Tras tu clase</span><span class="sm">Lista 9:50 · después de Barre</span></div></div>
+            <div class="pk-shell"><div class="pk"><span class="big disp">Ahora</span><span class="sm">Lo antes posible</span></div></div>
+          </div>
+
+          <div class="sec disp">Pago</div>
+          <div class="pay on">
+            <div class="pi"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2.5"/><path d="M3 10h18"/></svg></div>
+            <div><div class="pt">Tarjeta</div><div class="pd">Con Mercado Pago</div></div><div class="radio"></div>
+          </div>
+          <div class="pay">
+            <div class="pi"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l1.9 4.7L18.5 9l-4.6 1.5L12 15l-1.9-4.5L5.5 9l4.6-1.3L12 3z"/></svg></div>
+            <div><div class="pt">Puntos de lealtad</div><div class="pd">Tienes 240 pts</div></div><div class="radio"></div>
+          </div>
+          <div class="pay">
+            <div class="pi"><svg class="i" viewBox="0 0 24 24"><path d="M5 8h11v4a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V8z"/><path d="M16 9h2a2 2 0 0 1 0 4h-2"/></svg></div>
+            <div><div class="pt">Pago en la barra</div><div class="pd">Pagas al recoger</div></div><div class="radio"></div>
+          </div>
+
+          <div class="totrow"><span class="l">Total</span><span class="v disp">$170</span></div>
+        </div>
+        <div class="cta"><div class="btn">
+          <span class="lbl">Confirmar pedido</span>
+          <span class="end"><span class="circ"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></span>
+        </div></div>
+      </div></div>
+      <div class="cap disp">Confirmar</div>
+    </div>
+
+    <!-- LISTA -->
+    <div class="col">
+      <div class="phone"><div class="scr">
+        <div class="status"><span>9:50</span><span class="r"><span>5G</span><span class="bat"><i></i></span></span></div>
+        <div class="appbar">
+          <div class="nav-ic"><svg class="i" width="18" height="18" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></div>
+          <div class="brand">Tu bebida</div>
+          <div class="nav-ic ghost"></div>
+        </div>
+        <div class="ready">
+          <div class="steps"><span class="step on"></span><span class="step on"></span><span class="step on"></span></div>
+          <div class="rcheck"><svg class="i" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+          <div class="rthumb"><img src="menuimg/thumb-solverde.png" alt=""></div>
+          <h2 class="disp">Lista en la barra</h2>
+          <p>Sol Verde · Coco Matcha Shé<br>Muestra este código al recogerla</p>
+          <div class="qr-shell"><div class="qr">
+            <svg viewBox="0 0 100 100" shape-rendering="crispEdges">
+              <rect width="100" height="100" fill="#fff"/>
+              <g fill="#16261A">
+                <rect x="6" y="6" width="24" height="24"/><rect x="12" y="12" width="12" height="12" fill="#fff"/><rect x="15" y="15" width="6" height="6" fill="#16261A"/>
+                <rect x="70" y="6" width="24" height="24"/><rect x="76" y="12" width="12" height="12" fill="#fff"/><rect x="79" y="15" width="6" height="6" fill="#16261A"/>
+                <rect x="6" y="70" width="24" height="24"/><rect x="12" y="76" width="12" height="12" fill="#fff"/><rect x="15" y="79" width="6" height="6" fill="#16261A"/>
+                <rect x="40" y="8" width="6" height="6"/><rect x="52" y="8" width="6" height="6"/><rect x="40" y="20" width="6" height="6"/><rect x="58" y="14" width="6" height="6"/>
+                <rect x="8" y="40" width="6" height="6"/><rect x="20" y="40" width="6" height="6"/><rect x="14" y="52" width="6" height="6"/><rect x="8" y="58" width="6" height="6"/>
+                <rect x="40" y="40" width="6" height="6"/><rect x="52" y="40" width="6" height="6"/><rect x="64" y="40" width="6" height="6"/><rect x="46" y="46" width="6" height="6"/><rect x="58" y="46" width="6" height="6"/><rect x="40" y="52" width="6" height="6"/><rect x="52" y="58" width="6" height="6"/><rect x="64" y="52" width="6" height="6"/>
+                <rect x="76" y="40" width="6" height="6"/><rect x="88" y="46" width="6" height="6"/><rect x="76" y="58" width="6" height="6"/><rect x="70" y="64" width="6" height="6"/>
+                <rect x="40" y="70" width="6" height="6"/><rect x="52" y="70" width="6" height="6"/><rect x="46" y="82" width="6" height="6"/><rect x="58" y="76" width="6" height="6"/><rect x="64" y="82" width="6" height="6"/><rect x="76" y="76" width="6" height="6"/><rect x="88" y="82" width="6" height="6"/><rect x="82" y="70" width="6" height="6"/>
+              </g>
+            </svg>
+          </div></div>
+          <div class="qr-l">Pedido A48 · Casa Shé</div>
+        </div>
+      </div></div>
+      <div class="cap disp">¡Lista!</div>
+    </div>
+
+  </div>
+</body>
+</html>
