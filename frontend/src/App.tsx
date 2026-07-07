@@ -48,6 +48,9 @@ import ClientOrderDetail from "./pages/client/OrderDetail";
 import VideoLibrary from "./pages/client/VideoLibrary";
 import VideoPlayer from "./pages/client/VideoPlayer";
 import ClientEvents from "./pages/client/Events";
+import FuelBar from "./pages/client/FuelBar";
+import FuelBarConfirm from "./pages/client/FuelBarConfirm";
+import FuelBarOrder from "./pages/client/FuelBarOrder";
 import Checkout from "./pages/Checkout";
 
 // Admin pages
@@ -254,6 +257,9 @@ const App = () => (
             <Route path="/app/videos" element={<VideoLibrary />} />
             <Route path="/app/videos/:videoId" element={<VideoPlayer />} />
             <Route path="/app/events" element={<ClientEvents />} />
+            <Route path="/app/fuel-bar" element={<FuelBar />} />
+            <Route path="/app/fuel-bar/confirm" element={<FuelBarConfirm />} />
+            <Route path="/app/fuel-bar/order/:id" element={<FuelBarOrder />} />
 
             {/* Admin Routes */}
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
