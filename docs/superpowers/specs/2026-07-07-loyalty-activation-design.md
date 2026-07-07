@@ -27,11 +27,12 @@ Dejar la lealtad coherente, activada y limpia:
 
 ## Decisiones tomadas (dueño)
 
+- **Principio rector: 100% configurable desde el admin.** Igual que el Fuel Bar Fase 2 — el dueño controla toda la lealtad (encender/apagar, montos, tasas, valor del punto, cada bono) desde el panel, sin env flags, sin números hardcodeados, sin que yo toque código para ajustar el negocio.
 - **Alcance:** activar + limpiar. Sin tiers ni expiración.
-- **Generosidad:** ~5% de vuelta → **1 punto ≈ $0.50**.
+- **Generosidad (default inicial):** ~5% de vuelta → **1 punto ≈ $0.50**. Es un valor por defecto **editable desde admin**, no una constante.
 - **Reseñas:** **quitar** la promesa "gana 50 puntos por reseña" de la UI (no existe código que los otorgue).
 - **Seed BMB:** **dejar de sembrarlo + borrar** las sucursales/planes "BMB Studio Tepa/San Miguel", verificando primero en prod que no tengan reservas/datos reales antes de borrar.
-- **Gating de crons:** **granular** — encender solo los bonos de lealtad, dejando los recordatorios por email apagados (aún sin Resend configurado).
+- **Activación de bonos:** por **toggles en el admin** (maestro + por bono), NO por env flag. El env `ENABLE_CRON_JOBS` queda solo como interruptor de infraestructura ("¿corre el planificador?"); el control de negocio vive en el admin.
 
 ---
 
@@ -51,27 +52,32 @@ Dejar la lealtad coherente, activada y limpia:
 
 **Montos de bonos (quedan; editables desde admin):** con 1 pt = $0.50 los defaults actuales son razonables — bienvenida 10 (~$5), cumpleaños 100 (~$50), aniversario 40 (~$20), referido 40 (~$20), racha 10 (~$5), check-in 2 (~$1). No se cambian en código; el dueño los ajusta desde `LoyaltyConfig`.
 
-### 2. Unificar config de lealtad (bug real)
+### 2. Config de lealtad 100% en el admin (única fuente + panel completo)
 
 Hoy hay **dos fuentes de defaults que no coinciden**:
 - `loyalty.ts` (motor real, 9 campos completos): `points_per_class`, `pesos_per_point`, `welcome_bonus`, `birthday_bonus`, `anniversary_bonus`, `referral_bonus`, `streak_bonus`, y los demás.
 - `settings.ts` (interface, solo 4 campos, defaults hasta 5× distintos).
 
-**Decisión:** `loyalty.ts` es la **única fuente de verdad** de la config de lealtad. Acciones:
+**Decisión:** `loyalty_config` (leído por el motor `loyalty.ts`) es la **única fuente de verdad**, y el panel admin `LoyaltyConfig` lo expone **completo**. Acciones:
 - Alinear o eliminar la definición duplicada en `settings.ts` para que no exista un segundo set de defaults divergente. Si algún código lee la config vía `settings.ts`, redirigirlo a la config del motor.
-- Verificar que la página admin **`LoyaltyConfig`** exponga **los 9 campos** (hoy podría faltar `anniversary_bonus`, `streak_bonus`, `pesos_per_point`) para que el dueño los ajuste sin tocar código.
-- Verificar (o sembrar) la fila real `system_settings.loyalty_config` en prod para que use los valores canónicos.
+- **Ampliar `loyalty_config` y la página `LoyaltyConfig`** para que TODO lo que gobierna la lealtad sea editable desde admin (nada hardcodeado):
+  - **Interruptor maestro** `enabled` (programa de lealtad activo sí/no) — ya existe; exponerlo claro.
+  - **Toggles por bono:** `birthday_enabled`, `anniversary_enabled`, `streak_enabled` (NUEVOS) para prender/apagar cada bono automático desde admin.
+  - **Montos de todos los bonos:** `welcome_bonus`, `birthday_bonus`, `anniversary_bonus`, `referral_bonus`, `streak_bonus`, `points_per_class`.
+  - **Tasa de ganancia:** `pesos_per_point` (cuántos pesos = 1 punto).
+  - **Valor del punto:** exponer el "valor del punto en pesos" que usa el canje. (El bar ya lo tiene como `bar_config.points_redemption_rate` en Ajustes → Barra; el catálogo de recompensas lo fija por `points_cost` por recompensa en `LoyaltyRewards`. Ambas son páginas admin. Se documenta claramente dónde vive cada palanca para que el dueño entienda que 1 pt ≈ $0.50 es su decisión editable.)
+- **Contrato:** `LoyaltyConfig` (GET/PUT `/api/loyalty/config`) devuelve/guarda el objeto completo, con round-trip seguro (no borra campos no editados) y valores numéricos (no strings) — mismo patrón que resultó correcto en el panel del Fuel Bar.
+- Verificar (o sembrar) la fila real `system_settings.loyalty_config` en prod con los valores canónicos + los nuevos toggles.
 
-### 3. Activar los 3 bonos automáticos — gating granular
+### 3. Activar los 3 bonos automáticos — controlados desde el admin (no env flag)
 
 Los crons `BIRTHDAY_BONUS`, `ANNIVERSARY_BONUS`, `STREAK_BONUS` (en `cron-jobs.ts`) ya existen, son idempotentes (chequean descripción), validan `config.enabled` y requieren membresía activa. El enum de tipos (`birthday`/`anniversary`/`streak`) ya está extendido en runtime (migración 023f) — **no hay bug de enum**.
 
-**Problema:** el único gate hoy es `ENABLE_CRON_JOBS` (env), que es **global** — enciende TODOS los crons, incluyendo recordatorios por email que aún no tienen Resend configurado. Prender el flag global mandaría recordatorios rotos.
-
-**Decisión:** introducir **gating granular** para los bonos de lealtad, independiente del flag global:
-- Nuevo control `ENABLE_LOYALTY_CRONS` (env, o sub-flag equivalente) que registra/activa **solo** los 3 crons de bonos de lealtad.
-- Los demás crons (recordatorios email, review-request, etc.) permanecen apagados hasta que sus dependencias (Resend) estén listas.
-- Implementación: separar el registro de los 3 crons de bonos del resto en `cron-jobs.ts`/`index.ts`, gateado por el nuevo flag. No cambiar la lógica interna de los crons.
+**Decisión (100% admin):** el negocio controla los bonos desde los **toggles del admin**, no desde env:
+- Cada cron de bono lee su toggle de `loyalty_config`: corre solo si `enabled` (maestro) **y** su `*_enabled` por bono están en `true`. Así el dueño prende/apaga cada bono desde `LoyaltyConfig` sin deploy.
+- El env `ENABLE_CRON_JOBS` queda como **interruptor de infraestructura** (¿corre el planificador de crons?), no como control de negocio. Se enciende una vez en prod para que el planificador viva; a partir de ahí todo el comportamiento lo deciden los toggles del admin.
+- **Seguridad al encender el planificador:** prender `ENABLE_CRON_JOBS` también levantaría otros crons (recordatorios email) cuyas dependencias (Resend) no están listas. Para que activar el planificador sea seguro, cada cron **no-lealtad que no esté listo debe auto-gate por su propia config/condición** (o quedar explícitamente apagado). En esta fase: garantizar que los 3 crons de lealtad corran gateados por `loyalty_config`, y **verificar que ningún cron de email/recordatorio se dispare** al encender el planificador (si alguno no tiene su propio gate, añadir uno mínimo de "apagado por default"). No se construye la feature de recordatorios aquí — solo se asegura que no se dispare sola.
+- No cambiar la lógica interna de los 3 crons de bono; solo añadir la lectura de su toggle.
 
 ### 4. Limpieza
 
@@ -83,8 +89,9 @@ Los crons `BIRTHDAY_BONUS`, `ANNIVERSARY_BONUS`, `STREAK_BONUS` (en `cron-jobs.t
 
 Siguiendo el patrón del repo (scripts `tsx` con `node:assert/strict`, `*-integration` contra Postgres):
 - **Economía:** test puro que verifique la coherencia — `pointsForTotal` con `rate=0.50`, y que la relación ganancia/valor dé ~5% (1 pt/$10 ganado, 1 pt = $0.50).
-- **Config unificada:** test que confirme que la config de lealtad tiene los 9 campos con los defaults canónicos y que no hay un segundo set divergente.
-- **Gating de crons:** test que confirme que con `ENABLE_LOYALTY_CRONS` on / `ENABLE_CRON_JOBS` off, se registran **solo** los 3 crons de bonos y **ningún** cron de email.
+- **Config unificada + completa:** test que confirme que `loyalty_config` tiene todos los campos (9 montos/tasas + los 3 toggles por bono + maestro), con defaults canónicos, y que no hay un segundo set divergente; y que el round-trip GET/PUT no borra campos.
+- **Gating por admin:** test que confirme que cada cron de bono corre solo si `enabled` (maestro) y su `*_enabled` están en `true`, y no otorga si están en `false` — sin depender de env flags de negocio.
+- **Seguridad del planificador:** verificar que, con el planificador encendido, ningún cron de email/recordatorio se dispara (auto-gate off).
 - **Idempotencia de bonos:** test (o revisión) de que re-correr un bono no duplica el asiento.
 - **Limpieza BMB:** verificación (script/consulta) de que tras la migración de limpieza no quedan facilities/planes BMB, y de que se comprobó la ausencia de datos reales antes de borrar.
 
