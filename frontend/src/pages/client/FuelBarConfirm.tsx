@@ -1,15 +1,38 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { ClientLayout } from '@/components/layout/ClientLayout';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import type { BarCartLine } from '@/lib/api/bar';
+import { useBarConfig, usePickupSuggestions } from '@/lib/api/bar';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function formatPrice(n: number) {
   return `$${Math.round(n).toLocaleString('es-MX')}`;
+}
+
+function fmtTime(iso: string) {
+  try {
+    return format(parseISO(iso), 'HH:mm', { locale: es });
+  } catch {
+    return '';
+  }
+}
+
+// Convert datetime-local input value to ISO bounds for min/max
+function isoToLocalInput(iso: string) {
+  try {
+    const d = parseISO(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch {
+    return '';
+  }
 }
 
 // Small product thumbnail for order review
@@ -33,7 +56,8 @@ function OrderThumb({ src, name }: { src: string | null; name: string }) {
   );
 }
 
-type PayMethod = 'card' | 'reception';
+type PayMethod = 'card' | 'reception' | 'points';
+type PickupMode = 'asap' | 'after_class' | 'other';
 
 // ── component ─────────────────────────────────────────────────────────────────
 
@@ -45,25 +69,61 @@ export default function FuelBarConfirm() {
   const cart: Record<string, BarCartLine> = state?.cart ?? {};
   const lines = Object.values(cart).filter((l) => l.quantity > 0);
 
-  const total = lines.reduce((a, l) => a + l.product.price * l.quantity, 0);
+  const subtotal = lines.reduce((a, l) => a + l.product.price * l.quantity, 0);
+
+  // Config & suggestions
+  const { data: config } = useBarConfig();
+  const { data: suggestions } = usePickupSuggestions();
+
+  // Points balance — real source: GET /wallet/pass → { pointsBalance }
+  const { data: walletData } = useQuery<{ pointsBalance: number }>({
+    queryKey: ['wallet-pass'],
+    queryFn: async () => (await api.get('/wallet/pass')).data,
+  });
+  const pointsBalance = walletData?.pointsBalance ?? 0;
 
   // ¿Para cuándo?
-  const [pickupMode, setPickupMode] = useState<'asap' | 'other'>('asap');
+  const [pickupMode, setPickupMode] = useState<PickupMode>('asap');
   const [customTime, setCustomTime] = useState('');
 
-  // Pago — Fase 1: Tarjeta o Barra (sin puntos)
+  // Pago
   const [payMethod, setPayMethod] = useState<PayMethod>('card');
 
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Build pickupTime ISO string
-  const pickupTime =
-    pickupMode === 'asap'
-      ? new Date(Date.now() + 15 * 60 * 1000).toISOString() // now + 15 min prep
-      : customTime
-        ? new Date(customTime).toISOString()
-        : null;
+  // ── Surcharge & totals ─────────────────────────────────────────────────────
+  const surchargePercent = config?.card_surcharge_percent ?? 0;
+  const surcharge =
+    payMethod === 'card' && surchargePercent > 0
+      ? Math.round(subtotal * (surchargePercent / 100) * 100) / 100
+      : 0;
+  const displayTotal = Math.round((subtotal + surcharge) * 100) / 100;
+
+  // ── Points ─────────────────────────────────────────────────────────────────
+  const rate = config?.points_redemption_rate ?? 0;
+  const pointsNeeded = rate > 0 ? Math.ceil(subtotal / rate) : Infinity;
+  const canPayWithPoints =
+    (config?.points_enabled ?? false) && rate > 0 && pointsBalance >= pointsNeeded;
+
+  // Reset payMethod if currently 'points' and it becomes unavailable
+  // (handled gracefully — option won't render, user can't select it)
+
+  // ── Pickup time ────────────────────────────────────────────────────────────
+  const afterClassIso = suggestions?.after_class?.pickup_iso ?? null;
+
+  const pickupTime: string | null = (() => {
+    if (pickupMode === 'asap') {
+      return new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    }
+    if (pickupMode === 'after_class' && afterClassIso) {
+      return afterClassIso;
+    }
+    if (pickupMode === 'other' && customTime) {
+      return new Date(customTime).toISOString();
+    }
+    return null;
+  })();
 
   const submit = async () => {
     if (lines.length === 0) {
@@ -79,7 +139,7 @@ export default function FuelBarConfirm() {
       const body = {
         items: lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })),
         pickupTime,
-        paymentMethod: payMethod === 'card' ? 'card' : 'reception',
+        paymentMethod: payMethod,
         notes: notes || undefined,
       };
       const { data } = await api.post('/bar/orders', body);
@@ -89,11 +149,21 @@ export default function FuelBarConfirm() {
       }
       nav(`/app/fuel-bar/order/${data.id}`);
     } catch (err: any) {
-      toast({
-        title: 'Error al crear pedido',
-        description: err?.response?.data?.message ?? 'Intenta de nuevo.',
-        variant: 'destructive',
-      });
+      const code = err?.response?.data?.error;
+      if (code === 'INSUFFICIENT_POINTS') {
+        toast({
+          title: 'Puntos insuficientes',
+          description: 'No tienes suficientes puntos para cubrir este pedido.',
+          variant: 'destructive',
+        });
+        setPayMethod('card');
+      } else {
+        toast({
+          title: 'Error al crear pedido',
+          description: err?.response?.data?.message ?? 'Intenta de nuevo.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -155,64 +225,44 @@ export default function FuelBarConfirm() {
             ¿Para cuándo?
           </h2>
 
-          <div className="flex gap-[11px]">
-            {/* Lo antes posible */}
-            <button
-              onClick={() => setPickupMode('asap')}
-              className={[
-                'flex-1 rounded-[20px] border p-1 transition-all',
-                pickupMode === 'asap'
-                  ? 'border-[rgba(22,38,26,.14)] bg-[rgba(42,78,54,.06)]'
-                  : 'border-transparent',
-              ].join(' ')}
-            >
-              <div
-                className={[
-                  'h-full rounded-[16px] border px-[14px] py-[13px] text-left transition-all',
-                  pickupMode === 'asap'
-                    ? 'border-[rgba(42,78,54,.24)] bg-[#FBF5EA] shadow-[inset_0_1px_0_rgba(255,255,255,.5)]'
-                    : 'border-[rgba(22,38,26,.10)] bg-[rgba(255,255,255,.42)]',
-                ].join(' ')}
-              >
-                <span className="font-heading block text-[17px] text-[#2A4E36]">Lo antes posible</span>
-                <span className="mt-[3px] block text-[11px] italic text-[#2A4E36] opacity-55">
-                  Listo ~15 min
-                </span>
-              </div>
-            </button>
+          <div className="flex flex-col gap-[10px]">
+            {/* Después de tu clase — only if after_class is available */}
+            {afterClassIso && suggestions?.after_class && (
+              <PickupChip
+                selected={pickupMode === 'after_class'}
+                onSelect={() => setPickupMode('after_class')}
+                title="Después de tu clase"
+                sub={`Lista ${fmtTime(afterClassIso)} (después de ${suggestions.after_class.class_name})`}
+              />
+            )}
 
-            {/* Otra hora */}
-            <button
-              onClick={() => setPickupMode('other')}
-              className={[
-                'flex-1 rounded-[20px] border p-1 transition-all',
-                pickupMode === 'other'
-                  ? 'border-[rgba(22,38,26,.14)] bg-[rgba(42,78,54,.06)]'
-                  : 'border-transparent',
-              ].join(' ')}
-            >
-              <div
-                className={[
-                  'h-full rounded-[16px] border px-[14px] py-[13px] text-left transition-all',
-                  pickupMode === 'other'
-                    ? 'border-[rgba(42,78,54,.24)] bg-[#FBF5EA] shadow-[inset_0_1px_0_rgba(255,255,255,.5)]'
-                    : 'border-[rgba(22,38,26,.10)] bg-[rgba(255,255,255,.42)]',
-                ].join(' ')}
-              >
-                <span className="font-heading block text-[17px] text-[#2A4E36]">Otra hora</span>
-                <span className="mt-[3px] block text-[11px] italic text-[#2A4E36] opacity-55">
-                  Elige la hora
-                </span>
-              </div>
-            </button>
+            {/* Lo antes posible + Otra hora side by side */}
+            <div className="flex gap-[11px]">
+              <PickupChip
+                selected={pickupMode === 'asap'}
+                onSelect={() => setPickupMode('asap')}
+                title="Lo antes posible"
+                sub="Listo ~15 min"
+                flex
+              />
+              <PickupChip
+                selected={pickupMode === 'other'}
+                onSelect={() => setPickupMode('other')}
+                title="Otra hora"
+                sub="Elige la hora"
+                flex
+              />
+            </div>
           </div>
 
-          {/* datetime picker when "Otra hora" selected */}
+          {/* Time picker when "Otra hora" selected */}
           {pickupMode === 'other' && (
             <div className="mt-2">
               <input
                 type="datetime-local"
                 value={customTime}
+                min={suggestions?.manual_window.earliest_iso ? isoToLocalInput(suggestions.manual_window.earliest_iso) : undefined}
+                max={suggestions?.manual_window.latest_iso ? isoToLocalInput(suggestions.manual_window.latest_iso) : undefined}
                 onChange={(e) => setCustomTime(e.target.value)}
                 className="w-full rounded-[14px] border border-[rgba(22,38,26,.12)] bg-[rgba(255,255,255,.42)] px-4 py-3 text-sm text-[#2A4E36] outline-none focus:border-[#2A4E36]"
               />
@@ -224,19 +274,37 @@ export default function FuelBarConfirm() {
             Pago
           </h2>
 
-          {/* Tarjeta */}
-          <PayOption
-            selected={payMethod === 'card'}
-            onSelect={() => setPayMethod('card')}
-            icon={
-              <svg viewBox="0 0 24 24" className="h-[19px] w-[19px]" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="6" width="18" height="12" rx="2.5" />
-                <path d="M3 10h18" />
-              </svg>
-            }
-            title="Tarjeta"
-            sub="Con Mercado Pago"
-          />
+          {/* Tarjeta — solo si card_enabled */}
+          {(config?.card_enabled !== false) && (
+            <PayOption
+              selected={payMethod === 'card'}
+              onSelect={() => setPayMethod('card')}
+              icon={
+                <svg viewBox="0 0 24 24" className="h-[19px] w-[19px]" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="6" width="18" height="12" rx="2.5" />
+                  <path d="M3 10h18" />
+                </svg>
+              }
+              title="Tarjeta"
+              sub="Con Mercado Pago"
+            />
+          )}
+
+          {/* Puntos — solo si points_enabled && balance suficiente */}
+          {canPayWithPoints && (
+            <PayOption
+              selected={payMethod === 'points'}
+              onSelect={() => setPayMethod('points')}
+              icon={
+                <svg viewBox="0 0 24 24" className="h-[19px] w-[19px]" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 3" />
+                </svg>
+              }
+              title="Puntos"
+              sub={`Pagas con ${pointsNeeded} puntos (tienes ${pointsBalance})`}
+            />
+          )}
 
           {/* Pago en la barra */}
           <PayOption
@@ -253,11 +321,43 @@ export default function FuelBarConfirm() {
           />
 
           {/* ── Total ────────────────────────────────────────────────────────── */}
-          <div className="mt-4 flex items-baseline justify-between border-t border-[rgba(22,38,26,.10)] pt-[14px]">
-            <span className="text-[11px] uppercase tracking-[.22em] text-[#2A4E36] opacity-55">
-              Total
-            </span>
-            <span className="font-heading text-[34px] text-[#2A4E36]">{formatPrice(total)}</span>
+          <div className="mt-4 border-t border-[rgba(22,38,26,.10)] pt-[14px]">
+            {/* Subtotal line — only show when there's a surcharge to break out */}
+            {payMethod === 'card' && surcharge > 0 && (
+              <div className="flex items-baseline justify-between mb-[6px]">
+                <span className="text-[11px] uppercase tracking-[.22em] text-[#2A4E36] opacity-55">
+                  Subtotal
+                </span>
+                <span className="text-[15px] text-[#2A4E36] opacity-70">{formatPrice(subtotal)}</span>
+              </div>
+            )}
+            {/* Surcharge line */}
+            {payMethod === 'card' && surcharge > 0 && (
+              <div className="flex items-baseline justify-between mb-[6px]">
+                <span className="text-[11px] uppercase tracking-[.22em] text-[#2A4E36] opacity-55">
+                  Uso de app ({surchargePercent}%)
+                </span>
+                <span className="text-[15px] text-[#2A4E36] opacity-70">{formatPrice(surcharge)}</span>
+              </div>
+            )}
+            {/* Points line */}
+            {payMethod === 'points' && (
+              <div className="flex items-baseline justify-between mb-[6px]">
+                <span className="text-[11px] uppercase tracking-[.22em] text-[#2A4E36] opacity-55">
+                  Puntos a usar
+                </span>
+                <span className="text-[15px] text-[#2A4E36] opacity-70">{pointsNeeded} pts</span>
+              </div>
+            )}
+            {/* Total */}
+            <div className="flex items-baseline justify-between">
+              <span className="text-[11px] uppercase tracking-[.22em] text-[#2A4E36] opacity-55">
+                Total
+              </span>
+              <span className="font-heading text-[34px] text-[#2A4E36]">
+                {payMethod === 'points' ? formatPrice(subtotal) : formatPrice(displayTotal)}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -343,6 +443,49 @@ function PayOption({
             : undefined
         }
       />
+    </button>
+  );
+}
+
+// ── PickupChip sub-component ──────────────────────────────────────────────────
+
+function PickupChip({
+  selected,
+  onSelect,
+  title,
+  sub,
+  flex = false,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  title: string;
+  sub: string;
+  flex?: boolean;
+}) {
+  return (
+    <button
+      onClick={onSelect}
+      className={[
+        'rounded-[20px] border p-1 transition-all text-left',
+        flex ? 'flex-1' : 'w-full',
+        selected
+          ? 'border-[rgba(22,38,26,.14)] bg-[rgba(42,78,54,.06)]'
+          : 'border-transparent',
+      ].join(' ')}
+    >
+      <div
+        className={[
+          'h-full rounded-[16px] border px-[14px] py-[13px] text-left transition-all',
+          selected
+            ? 'border-[rgba(42,78,54,.24)] bg-[#FBF5EA] shadow-[inset_0_1px_0_rgba(255,255,255,.5)]'
+            : 'border-[rgba(22,38,26,.10)] bg-[rgba(255,255,255,.42)]',
+        ].join(' ')}
+      >
+        <span className="font-heading block text-[17px] text-[#2A4E36]">{title}</span>
+        <span className="mt-[3px] block text-[11px] italic text-[#2A4E36] opacity-55">
+          {sub}
+        </span>
+      </div>
     </button>
   );
 }
