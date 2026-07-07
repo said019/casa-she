@@ -65,7 +65,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Tipo de puntos de lealtad
 DO $$ BEGIN
-    CREATE TYPE loyalty_points_type AS ENUM ('class_attended', 'referral', 'bonus', 'redemption');
+    CREATE TYPE loyalty_points_type AS ENUM ('class_attended', 'referral', 'bonus', 'redemption', 'welcome', 'package_purchase', 'birthday', 'anniversary', 'streak', 'adjustment');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Categorías de recompensa
