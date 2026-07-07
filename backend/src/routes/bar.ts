@@ -129,6 +129,7 @@ router.get('/orders/queue', authenticate, staffOnly, async (_req: Request, res: 
 
 router.patch('/orders/:id/status', authenticate, staffOnly, async (req: Request, res: Response) => {
   const to = req.body?.status as BarStatus;
+  if (!to) return res.status(400).json({ error: 'MISSING_STATUS' });
   const o = await queryOne<{ status: BarStatus; user_id: string }>(`SELECT status, user_id FROM bar_orders WHERE id = $1`, [req.params.id]);
   if (!o) return res.status(404).json({ error: 'NOT_FOUND' });
   if (!canBarTransition(o.status, to, 'staff')) return res.status(400).json({ error: 'INVALID_TRANSITION' });
@@ -160,7 +161,11 @@ router.delete('/orders/:id', authenticate, async (req: Request, res: Response) =
   if (!o) return res.status(404).json({ error: 'NOT_FOUND' });
   if (o.user_id !== req.user!.userId) return res.status(403).json({ error: 'FORBIDDEN' });
   if (!canBarTransition(o.status, 'cancelled', 'customer')) return res.status(400).json({ error: 'CANNOT_CANCEL' });
-  await query(`UPDATE bar_orders SET status='cancelled', cancelled_by='customer', cancelled_at=NOW(), updated_at=NOW() WHERE id=$1 AND status='pending'`, [req.params.id]);
+  const upd = await query(
+    `UPDATE bar_orders SET status='cancelled', cancelled_by='customer', cancelled_at=NOW(), updated_at=NOW()
+     WHERE id=$1 AND status=$2 RETURNING id`,
+    [req.params.id, o.status]);
+  if (upd.length === 0) return res.status(409).json({ error: 'STATE_CHANGED' });
   res.json({ ok: true });
 });
 
