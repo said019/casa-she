@@ -1468,6 +1468,12 @@ router.post('/:id/cancel', authenticate, async (req: Request, res: Response) => 
             upsertGoogleLoyaltyObject(booking.membership_id).catch(e => console.error('Google Wallet cancel error:', e));
         }
 
+        // Cascada barra: cancela bebidas pre-ordenadas ligadas a esta reserva.
+        await query(
+          `UPDATE bar_orders SET status='cancelled', cancelled_by='system_class_cancelled', cancelled_at=NOW(), updated_at=NOW()
+           WHERE booking_id = $1 AND status = 'pending'`,
+          [bookingId]).catch((e: any) => console.error('bar cascade (cancel booking):', e?.message));
+
         res.json({
             ...cancelled,
             refunded: shouldRefund,
