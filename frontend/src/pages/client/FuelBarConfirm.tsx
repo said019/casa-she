@@ -134,6 +134,10 @@ export default function FuelBarConfirm() {
       toast({ title: 'Selecciona una hora', description: 'Elige a qué hora recoges tu pedido.', variant: 'destructive' });
       return;
     }
+    if (pickupMode === 'after_class' && !afterClassIso) {
+      toast({ title: 'Elige una hora de recogida', variant: 'destructive' });
+      return;
+    }
     setLoading(true);
     try {
       const body = {
@@ -275,7 +279,7 @@ export default function FuelBarConfirm() {
           </h2>
 
           {/* Tarjeta — solo si card_enabled */}
-          {(config?.card_enabled !== false) && (
+          {(config?.card_enabled === true) && (
             <PayOption
               selected={payMethod === 'card'}
               onSelect={() => setPayMethod('card')}
