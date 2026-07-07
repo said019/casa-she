@@ -40,7 +40,6 @@ import {
     Command,
     PanelLeftClose,
     ArrowLeftRight,
-    Coffee,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import CasaSheLogo from '@/components/CasaSheLogo';

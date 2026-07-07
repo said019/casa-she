@@ -79,7 +79,7 @@ export default function FuelBarConfirm() {
       const body = {
         items: lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })),
         pickupTime,
-        paymentMethod: payMethod === 'card' ? 'mercadopago' : 'reception',
+        paymentMethod: payMethod === 'card' ? 'card' : 'reception',
         notes: notes || undefined,
       };
       const { data } = await api.post('/bar/orders', body);

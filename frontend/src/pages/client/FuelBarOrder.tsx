@@ -19,7 +19,7 @@ interface BarOrderData {
   id: string;
   status: 'pending' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
   payment_method: string;
-  paid: boolean;
+  payment_status?: string;
   items: OrderItem[];
   created_at: string;
 }
@@ -144,7 +144,7 @@ export default function FuelBarOrder() {
   const firstItem = order.items?.[0];
   const itemNames = (order.items ?? []).map((i) => i.product_name).join(' · ');
 
-  const isReceptionUnpaid = order.payment_method === 'reception' && !order.paid;
+  const isReceptionUnpaid = order.payment_method === 'reception' && order.payment_status !== 'paid';
 
   return (
     <AuthGuard>
