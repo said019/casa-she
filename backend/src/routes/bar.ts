@@ -12,8 +12,41 @@ const router = Router();
 
 // GET /api/bar/config — ¿está habilitada la barra? (para mostrar/ocultar la sección)
 router.get('/config', authenticate, async (_req: Request, res: Response) => {
-  const cfg = await getSetting('bar_config');
-  res.json({ enabled: cfg.enabled === true });
+  const c = await getSetting('bar_config');
+  res.json({
+    enabled: c.enabled === true,
+    card_enabled: c.card_enabled !== false,
+    points_enabled: c.points_enabled === true,
+    points_redemption_rate: Number(c.points_redemption_rate ?? 10),
+    card_surcharge_percent: Number(c.card_surcharge_percent ?? 0),
+    cancellation_window_minutes: Number(c.cancellation_window_minutes ?? 60),
+  });
+});
+
+router.get('/pickup-suggestions', authenticate, async (req: Request, res: Response) => {
+  const c = await getSetting('bar_config');
+  const offset = Number(c.pickup_offset_minutes ?? 0);
+  const lead = Number(c.lead_time_max_hours ?? 4);
+  const now = new Date();
+  // Próxima reserva confirmada + fin de clase
+  const nx = await queryOne<{ date: string; end_time: string; class_name: string }>(
+    `SELECT c.date, c.end_time, COALESCE(ct.name,'Clase') AS class_name
+     FROM bookings b JOIN classes c ON c.id=b.class_id
+     LEFT JOIN class_types ct ON ct.id=c.class_type_id
+     WHERE b.user_id=$1 AND b.status='confirmed'
+       AND (c.date + c.start_time) > (NOW() AT TIME ZONE 'America/Mexico_City')
+     ORDER BY c.date ASC, c.start_time ASC LIMIT 1`, [req.user!.userId]);
+  let after_class = null as any;
+  if (nx) {
+    const ends = new Date(`${String(nx.date).slice(0,10)}T${String(nx.end_time).slice(0,5)}:00-06:00`);
+    const pickup = new Date(ends.getTime() + offset * 60_000);
+    after_class = { pickup_iso: pickup.toISOString(), class_name: nx.class_name, ends_iso: ends.toISOString() };
+  }
+  const manual_window = {
+    earliest_iso: new Date(now.getTime() + 5 * 60_000).toISOString(),
+    latest_iso: new Date(now.getTime() + lead * 3_600_000).toISOString(),
+  };
+  res.json({ after_class, manual_window });
 });
 
 // GET /api/bar/menu — menú (productos de categorías de barra) + estado abierto/cerrado.
