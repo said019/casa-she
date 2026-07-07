@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { query } from '../config/database.js';
 import { verifyWebhookSignature, syncPayment } from '../lib/mercadopago.js';
 import { finalizePaidOrder } from '../lib/orderFulfillment.js';
+import { finalizeBarOrder } from '../lib/barFulfillment.js';
 
 const router = Router();
 
@@ -53,6 +54,20 @@ router.post('/', async (req: Request, res: Response) => {
         // Nunca confiar en el body: consultar el estado real a MP.
         const payment = await syncPayment(dataId);
         const orderId = payment.external_reference;
+
+        // Órdenes de barra van con external_reference "bar:<id>" — nunca las trates como membresía.
+        if (orderId && orderId.startsWith('bar:')) {
+          const barOrderId = orderId.slice(4);
+          await query(
+            `UPDATE bar_orders SET mp_payment_id=$1, provider='mercadopago', updated_at=NOW() WHERE id=$2`,
+            [String(payment.id), barOrderId]);
+          if (payment.status === 'approved') {
+            await finalizeBarOrder(barOrderId, { provider: 'mercadopago', paymentRef: String(payment.id) });
+          } else if (payment.status === 'rejected' || payment.status === 'cancelled') {
+            await query(`UPDATE bar_orders SET payment_status='failed', updated_at=NOW() WHERE id=$1 AND payment_status='pending'`, [barOrderId]);
+          }
+          return res.status(200).json({ received: true, kind: 'bar' });
+        }
 
         if (orderId) {
             await query(

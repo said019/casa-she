@@ -48,6 +48,12 @@ export async function cancelClassWithRefunds(
         );
         cancelledBookings++;
 
+        // Cascada barra: cancela bebidas pre-ordenadas de esta reserva.
+        await query(
+          `UPDATE bar_orders SET status='cancelled', cancelled_by='system_class_cancelled', cancelled_at=NOW(), updated_at=NOW()
+           WHERE booking_id = $1 AND status = 'pending'`,
+          [booking.id]).catch((e: any) => console.error('bar cascade (cancel class):', e?.message));
+
         // Aviso push al usuario afectado (fire-and-forget; nunca rompe el flujo)
         if (booking.user_id) {
             void sendWebPushToUser(booking.user_id, { title: 'Clase cancelada', body: 'El estudio canceló una de tus clases. Revisa tus reservas.', url: '/app/classes', tag: 'class_cancelled' });

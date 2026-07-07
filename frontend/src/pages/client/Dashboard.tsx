@@ -31,9 +31,11 @@ import {
   Sparkles,
   Play,
   Leaf,
+  Coffee,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PendingReviewsList } from '@/components/reviews/PendingReviewsList';
+import { useBarConfig } from '@/lib/api/bar';
 
 interface WalletSummary {
   pointsBalance: number;
@@ -69,6 +71,7 @@ const QUICK_ACTIONS = [
 export default function ClientDashboard() {
   const { user } = useAuthStore();
   const reduce = useReducedMotion();
+  const { data: barCfg } = useBarConfig();
   const heroStagger = { hidden: {}, show: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } } };
   const heroItem = {
     hidden: reduce ? { opacity: 0 } : { opacity: 0, y: 14 },
@@ -222,7 +225,12 @@ export default function ClientDashboard() {
             variants={heroStagger} initial="hidden" animate="show"
             className="grid grid-cols-2 gap-3 sm:grid-cols-4"
           >
-            {QUICK_ACTIONS.map((a) => {
+            {[
+              ...QUICK_ACTIONS,
+              ...(barCfg?.enabled
+                ? [{ to: '/app/fuel-bar', label: 'Fuel Bar', sub: 'Pide y recoge', icon: Coffee, color: '#6C8424', primary: false }]
+                : []),
+            ].map((a) => {
               const Icon = a.icon;
               if (a.primary) {
                 return (

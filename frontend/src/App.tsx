@@ -48,6 +48,9 @@ import ClientOrderDetail from "./pages/client/OrderDetail";
 import VideoLibrary from "./pages/client/VideoLibrary";
 import VideoPlayer from "./pages/client/VideoPlayer";
 import ClientEvents from "./pages/client/Events";
+import FuelBar from "./pages/client/FuelBar";
+import FuelBarConfirm from "./pages/client/FuelBarConfirm";
+import FuelBarOrder from "./pages/client/FuelBarOrder";
 import Checkout from "./pages/Checkout";
 
 // Admin pages
@@ -84,6 +87,8 @@ import NotificationSettings from "./pages/admin/settings/NotificationSettings";
 import ClosedDays from "./pages/admin/settings/ClosedDays";
 import WhatsAppSettings from "./pages/admin/settings/WhatsAppSettings";
 import AdminOnboardingRules from "./pages/admin/settings/OnboardingRules";
+import BarSettings from "./pages/admin/settings/BarSettings";
+import BarQueue from "./pages/admin/bar/BarQueue";
 
 // Loyalty pages
 import LoyaltyConfig from "./pages/admin/loyalty/LoyaltyConfig";
@@ -253,6 +258,9 @@ const App = () => (
             <Route path="/app/videos" element={<VideoLibrary />} />
             <Route path="/app/videos/:videoId" element={<VideoPlayer />} />
             <Route path="/app/events" element={<ClientEvents />} />
+            <Route path="/app/fuel-bar" element={<FuelBar />} />
+            <Route path="/app/fuel-bar/confirm" element={<FuelBarConfirm />} />
+            <Route path="/app/fuel-bar/order/:id" element={<FuelBarOrder />} />
 
             {/* Admin Routes */}
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
@@ -315,6 +323,8 @@ const App = () => (
             <Route path="/admin/settings/closed-days" element={<ClosedDays />} />
             <Route path="/admin/settings/whatsapp" element={<WhatsAppSettings />} />
             <Route path="/admin/settings/onboarding" element={<AdminOnboardingRules />} />
+            <Route path="/admin/settings/bar" element={<BarSettings />} />
+            <Route path="/admin/bar/queue" element={<BarQueue />} />
             <Route path="/admin/settings" element={<Navigate to="/admin/settings/general" replace />} />
 
             <Route path="/admin/notifications/difusion" element={<PushBroadcast />} />

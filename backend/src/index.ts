@@ -36,6 +36,7 @@ import evolutionRoutes from './routes/evolution.js';
 import webhookEvolutionRoutes from './routes/webhook-evolution.js';
 import migrationRoutes from './routes/migrations.js';
 import productRoutes from './routes/products.js';
+import barRoutes from './routes/bar.js';
 import salesRoutes from './routes/sales.js';
 import commissionsRoutes from './routes/commissions.js';
 import coachPayrollRoutes from './routes/coach-payroll.js';
@@ -3088,6 +3089,84 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Migration 022: MercadoPago columns and payment_webhook_events table ready.');
     } catch (e) { console.error('Migration 022 error:', e); }
 
+    // Migration BAR-01: tablas de la Barra de Bebidas (Fuel Bar).
+    try {
+        await query(`CREATE TABLE IF NOT EXISTS bar_orders (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'pending'
+                CHECK (status IN ('pending','preparing','ready','delivered','cancelled')),
+            pickup_time TIMESTAMPTZ NOT NULL,
+            payment_method VARCHAR(20) NOT NULL CHECK (payment_method IN ('reception','card')),
+            payment_status VARCHAR(20) NOT NULL DEFAULT 'pending'
+                CHECK (payment_status IN ('pending','paid','refunded','failed')),
+            subtotal_mxn NUMERIC(10,2) NOT NULL DEFAULT 0,
+            total_mxn NUMERIC(10,2) NOT NULL DEFAULT 0,
+            customer_notes VARCHAR(140),
+            cancellation_reason TEXT,
+            cancelled_by VARCHAR(30),
+            mp_checkout_url TEXT,
+            mp_payment_id VARCHAR(255),
+            provider VARCHAR(30),
+            preparing_at TIMESTAMPTZ, ready_at TIMESTAMPTZ, delivered_at TIMESTAMPTZ, cancelled_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
+        )`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_bar_orders_queue ON bar_orders(status, pickup_time)
+                     WHERE status IN ('pending','preparing','ready')`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_bar_orders_user ON bar_orders(user_id)`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_bar_orders_booking ON bar_orders(booking_id)`);
+        await query(`CREATE TABLE IF NOT EXISTS bar_order_items (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            bar_order_id UUID NOT NULL REFERENCES bar_orders(id) ON DELETE CASCADE,
+            product_id UUID REFERENCES products(id) ON DELETE SET NULL,
+            product_name VARCHAR(200) NOT NULL,
+            quantity INTEGER NOT NULL CHECK (quantity > 0),
+            unit_price_mxn NUMERIC(10,2) NOT NULL,
+            line_total_mxn NUMERIC(10,2) NOT NULL
+        )`);
+        console.log('Migration BAR-01: bar_orders + bar_order_items listas.');
+    } catch (e) { console.error('Migration BAR-01 error:', e); }
+
+    // Seed BAR-menu: categorías + productos reales del menú Casa Shé (idempotente).
+    try {
+        await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities(id)`);
+        const fac = await queryOne<{ id: string }>(`SELECT id FROM facilities LIMIT 1`);
+        if (fac) {
+            const CATS = ['Calientes con café','Fríos sin café','Tisanas','Fríos con café','Smoothies','Proteínas'];
+            const catId: Record<string, string> = {};
+            for (const name of CATS) {
+                const existing = await queryOne<{ id: string }>(
+                    `SELECT id FROM product_categories WHERE name = $1`, [name]);
+                if (existing) {
+                    catId[name] = existing.id;
+                } else {
+                    const created = await queryOne<{ id: string }>(
+                        `INSERT INTO product_categories (name) VALUES ($1) RETURNING id`, [name]);
+                    catId[name] = created!.id;
+                }
+            }
+            const MENU: [string, string, number][] = [
+                ['Americano','Calientes con café',50], ['Latte','Calientes con café',70],
+                ['Cappuccino','Calientes con café',70], ['Capuchino Shot','Calientes con café',85],
+                ['Matcha tradicional','Fríos sin café',75], ['Coco Matcha Shé','Fríos sin café',85],
+                ['Latte frío','Fríos sin café',75], ['Latte Shot','Fríos sin café',85],
+                ['Te verde','Tisanas',55], ['Jardín de flores','Tisanas',55], ['Cítricos del Sol','Tisanas',55],
+                ['Terracota','Fríos con café',80], ['Especias','Fríos con café',80], ['Jade','Fríos con café',80],
+                ['Sol Verde','Smoothies',85], ['Banana Cacao','Smoothies',85], ['Rubí','Smoothies',85],
+                ['Proteína','Proteínas',85],
+            ];
+            for (const [name, cat, price] of MENU) {
+                await query(
+                    `INSERT INTO products (name, price, stock, category_id, facility_id, is_active)
+                     SELECT $1, $2, 0, $3, $4, true
+                     WHERE NOT EXISTS (SELECT 1 FROM products WHERE name = $1)`,
+                    [name, price, catId[cat], fac.id]);
+            }
+            console.log('Seed BAR-menu: menú Casa Shé sembrado.');
+        }
+    } catch (e) { console.error('Seed BAR-menu error:', e); }
+
     // Migration 089: reviews — columnas que el INSERT de POST /reviews referencia pero
     // que faltaban en prod (punctuality_rating, would_recommend, would_repeat). Sin ellas,
     // TODA reseña enviada desde la app reventaba con "column does not exist" → 500 →
@@ -3492,6 +3571,7 @@ app.use('/api/evolution', evolutionRoutes);
 app.use('/api/evolution/webhook', webhookEvolutionRoutes);
 app.use('/api/migrations', migrationRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/bar', barRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/cash-shifts', cashShiftRoutes);
 app.use('/api/egresos', egresosRoutes);
