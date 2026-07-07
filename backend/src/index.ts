@@ -3129,6 +3129,7 @@ async function runStartupMigrations(): Promise<void> {
 
     // Seed BAR-menu: categorías + productos reales del menú Casa Shé (idempotente).
     try {
+        await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities(id)`);
         const fac = await queryOne<{ id: string }>(`SELECT id FROM facilities LIMIT 1`);
         if (fac) {
             const CATS = ['Calientes con café','Fríos sin café','Tisanas','Fríos con café','Smoothies','Proteínas'];
