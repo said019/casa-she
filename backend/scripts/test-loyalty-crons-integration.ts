@@ -16,6 +16,7 @@ import { saveLoyaltyConfig } from '../src/lib/loyalty.js';
 import { birthdayBonus, anniversaryBonus, streakBonus } from '../src/services/cron-jobs.js';
 
 async function main() {
+  const testStartedAt = new Date();
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -248,6 +249,19 @@ async function main() {
     throw e;
   } finally {
     client.release();
+    // Limpiar filas de cron_job_logs que recordJobExecution escribió fuera de la
+    // transacción (usa query() global auto-commit). Sólo borramos las 3 filas del
+    // test en la ventana de tiempo de esta ejecución — no afecta datos reales.
+    try {
+      await pool.query(
+        `DELETE FROM cron_job_logs
+         WHERE job_name IN ('BIRTHDAY_BONUS', 'ANNIVERSARY_BONUS', 'STREAK_BONUS')
+           AND executed_at >= $1`,
+        [testStartedAt]
+      );
+    } catch {
+      // best-effort: no falla el test si la tabla aún no existe
+    }
     await pool.end();
   }
 }
