@@ -68,13 +68,13 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
   const surchargePct = paymentMethod === 'card' ? Number(cfg.card_surcharge_percent ?? 0) : 0;
   const totals = computeBarTotals(priced, { surchargePercent: surchargePct });
 
-  // Inserta la orden + items. Puntos se marcan como 'paid' al instante.
+  // Inserta la orden + items. Todos los métodos entran como 'pending'; puntos se flipan a 'paid' en la transacción de descontar.
   const order = await queryOne<{ id: string }>(
     `INSERT INTO bar_orders (user_id, booking_id, status, pickup_time, payment_method, payment_status,
                              subtotal_mxn, card_surcharge_mxn, total_mxn, customer_notes)
      VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
     [userId, bookingId ?? null, pickup.toISOString(), paymentMethod,
-     paymentMethod === 'points' ? 'paid' : 'pending',
+     'pending',
      totals.subtotal_mxn, totals.surcharge_mxn, totals.total_mxn, notes ?? null]);
   if (!order) return res.status(500).json({ error: 'ORDER_CREATION_FAILED' });
   const orderId = order.id;
@@ -101,10 +101,11 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
         await query(`DELETE FROM bar_orders WHERE id=$1`, [orderId]);
         return res.status(400).json({ error: 'INSUFFICIENT_POINTS', needed, balance });
       }
-      await client.query(`UPDATE bar_orders SET points_spent=$1 WHERE id=$2`, [needed, orderId]);
+      await client.query(`UPDATE bar_orders SET points_spent=$1, payment_status='paid' WHERE id=$2`, [needed, orderId]);
       await spendBarPoints(client, userId, needed, orderId);
       await client.query('COMMIT');
-    } catch (e) {
+    } catch (e: any) {
+      console.error('bar points charge failed:', e?.message);
       await client.query('ROLLBACK');
       await query(`DELETE FROM bar_orders WHERE id=$1`, [orderId]);
       return res.status(500).json({ error: 'POINTS_CHARGE_FAILED' });
