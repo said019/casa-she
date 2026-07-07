@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AuthGuard } from '@/components/layout/AuthGuard';
@@ -61,10 +61,23 @@ type PickupMode = 'asap' | 'after_class' | 'other';
 
 // ── component ─────────────────────────────────────────────────────────────────
 
+// ── Error code → Spanish message map ─────────────────────────────────────────
+const ERROR_MESSAGES: Record<string, string> = {
+  CARD_DISABLED: 'El pago con tarjeta no está disponible. Elige otra opción.',
+  POINTS_DISABLED: 'El pago con puntos no está disponible.',
+  INSUFFICIENT_POINTS: 'No tienes suficientes puntos para cubrir este pedido.',
+  INVALID_PICKUP_TIME: 'Elige una hora de recogida válida.',
+  BAR_DISABLED: 'La barra está cerrada por ahora.',
+  CARD_PAYMENT_FAILED: 'No se pudo iniciar el pago con tarjeta. Intenta de nuevo.',
+  POINTS_CHARGE_FAILED: 'No se pudo procesar el pago con puntos. Intenta de nuevo.',
+  PRODUCT_NOT_FOUND: 'Un producto ya no está disponible.',
+};
+
 export default function FuelBarConfirm() {
   const nav = useNavigate();
   const { state } = useLocation();
   const { toast } = useToast();
+  const qc = useQueryClient();
 
   const cart: Record<string, BarCartLine> = state?.cart ?? {};
   const lines = Object.values(cart).filter((l) => l.quantity > 0);
@@ -106,15 +119,33 @@ export default function FuelBarConfirm() {
   const canPayWithPoints =
     (config?.points_enabled ?? false) && rate > 0 && pointsBalance >= pointsNeeded;
 
-  // Reset payMethod if currently 'points' and it becomes unavailable
-  // (handled gracefully — option won't render, user can't select it)
+  // ── Auto-switch payMethod when config loads and current selection is unavailable ──
+  useEffect(() => {
+    if (!config) return;
+    const cardAvailable = config.card_enabled === true;
+    const pointsAvailable = canPayWithPoints;
+    const currentIsAvailable =
+      (payMethod === 'card' && cardAvailable) ||
+      (payMethod === 'points' && pointsAvailable) ||
+      payMethod === 'reception';
+    if (!currentIsAvailable) {
+      if (pointsAvailable) {
+        setPayMethod('points');
+      } else {
+        setPayMethod('reception');
+      }
+    }
+  }, [config, canPayWithPoints]);
+
+  // ── Prep time (configurable) ───────────────────────────────────────────────
+  const prep = config?.prep_time_minutes ?? 15;
 
   // ── Pickup time ────────────────────────────────────────────────────────────
   const afterClassIso = suggestions?.after_class?.pickup_iso ?? null;
 
   const pickupTime: string | null = (() => {
     if (pickupMode === 'asap') {
-      return new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      return new Date(Date.now() + prep * 60 * 1000).toISOString();
     }
     if (pickupMode === 'after_class' && afterClassIso) {
       return afterClassIso;
@@ -157,14 +188,15 @@ export default function FuelBarConfirm() {
       if (code === 'INSUFFICIENT_POINTS') {
         toast({
           title: 'Puntos insuficientes',
-          description: 'No tienes suficientes puntos para cubrir este pedido.',
+          description: ERROR_MESSAGES.INSUFFICIENT_POINTS,
           variant: 'destructive',
         });
-        setPayMethod('card');
+        setPayMethod(config?.card_enabled === true ? 'card' : 'reception');
+        qc.invalidateQueries({ queryKey: ['wallet-pass'] });
       } else {
         toast({
           title: 'Error al crear pedido',
-          description: err?.response?.data?.message ?? 'Intenta de nuevo.',
+          description: ERROR_MESSAGES[code] ?? 'Intenta de nuevo.',
           variant: 'destructive',
         });
       }
@@ -246,7 +278,7 @@ export default function FuelBarConfirm() {
                 selected={pickupMode === 'asap'}
                 onSelect={() => setPickupMode('asap')}
                 title="Lo antes posible"
-                sub="Listo ~15 min"
+                sub={`Listo ~${prep} min`}
                 flex
               />
               <PickupChip

@@ -23,6 +23,7 @@ export interface BarClientConfig {
   points_redemption_rate: number;
   card_surcharge_percent: number;
   cancellation_window_minutes: number;
+  prep_time_minutes: number;
 }
 
 export interface PickupAfterClass {
