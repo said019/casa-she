@@ -513,40 +513,15 @@ CREATE INDEX IF NOT EXISTS idx_loyalty_points_type    ON loyalty_points(type);
 CREATE INDEX IF NOT EXISTS idx_loyalty_points_created ON loyalty_points(created_at);
 
 -- --------------------------------------------------------
--- REWARDS
--- --------------------------------------------------------
-CREATE TABLE IF NOT EXISTS rewards (
-    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name        VARCHAR(255) NOT NULL,
-    description TEXT,
-    points_cost INTEGER NOT NULL,
-    category    reward_category NOT NULL,
-    image_url   TEXT,
-    stock       INTEGER,
-    is_active   BOOLEAN DEFAULT true,
-    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-ALTER TABLE loyalty_points
-    ADD CONSTRAINT IF NOT EXISTS fk_loyalty_related_reward
-    FOREIGN KEY (related_reward_id) REFERENCES rewards(id) ON DELETE SET NULL;
-
-CREATE INDEX IF NOT EXISTS idx_rewards_active   ON rewards(is_active);
-CREATE INDEX IF NOT EXISTS idx_rewards_category ON rewards(category);
-
-DROP TRIGGER IF EXISTS update_rewards_updated_at ON rewards;
-CREATE TRIGGER update_rewards_updated_at
-    BEFORE UPDATE ON rewards
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- --------------------------------------------------------
 -- REDEMPTIONS
+-- (Note: loyalty_rewards table is created via migration in index.ts)
+-- (FK from redemptions.reward_id to loyalty_rewards(id) is also established via migration)
 -- --------------------------------------------------------
 CREATE TABLE IF NOT EXISTS redemptions (
     id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    reward_id     UUID NOT NULL REFERENCES rewards(id) ON DELETE RESTRICT,
+    reward_id     UUID NOT NULL,
+    -- reward_id references loyalty_rewards.id (FK added by migration)
     points_spent  INTEGER NOT NULL,
     status        redemption_status NOT NULL DEFAULT 'pending',
     fulfilled_at  TIMESTAMP WITH TIME ZONE,
@@ -2143,7 +2118,7 @@ DO $$
 BEGIN
     RAISE NOTICE '✅ BMB Studio — Esquema completo cargado correctamente.';
     RAISE NOTICE '   Tablas: users, plans, memberships, class_types, facilities, instructors,';
-    RAISE NOTICE '           schedules, classes, bookings, loyalty_points, rewards, redemptions,';
+    RAISE NOTICE '           schedules, classes, bookings, loyalty_points, loyalty_rewards, redemptions,';
     RAISE NOTICE '           notifications, wallet_passes, payments, system_settings, admin_notes,';
     RAISE NOTICE '           videos, orders, payment_proofs, admin_actions, video_purchases,';
     RAISE NOTICE '           guest_bookings, apple_wallet_devices, apple_wallet_updates,';

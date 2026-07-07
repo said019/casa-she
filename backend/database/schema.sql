@@ -433,10 +433,6 @@ CREATE TRIGGER update_bookings_updated_at
     BEFORE UPDATE ON bookings
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_rewards_updated_at
-    BEFORE UPDATE ON rewards
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
 CREATE TRIGGER update_redemptions_updated_at
     BEFORE UPDATE ON redemptions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
