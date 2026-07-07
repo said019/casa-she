@@ -20,6 +20,7 @@ router.get('/config', authenticate, async (_req: Request, res: Response) => {
     points_redemption_rate: Number(c.points_redemption_rate ?? 10),
     card_surcharge_percent: Number(c.card_surcharge_percent ?? 0),
     cancellation_window_minutes: Number(c.cancellation_window_minutes ?? 60),
+    prep_time_minutes: Number(c.prep_time_minutes ?? 15),
   });
 });
 
@@ -102,7 +103,53 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
   const surchargePct = paymentMethod === 'card' ? Number(cfg.card_surcharge_percent ?? 0) : 0;
   const totals = computeBarTotals(priced, { surchargePercent: surchargePct });
 
-  // Inserta la orden + items. Todos los métodos entran como 'pending'; puntos se flipan a 'paid' en la transacción de descontar.
+  // Rama PUNTOS: la orden + items + descuento de puntos + flip a 'paid' se crean
+  // en UNA SOLA transacción atómica. Así un crash a mitad de camino no deja una
+  // orden 'pending' huérfana (bebida gratis): un ROLLBACK borra todo.
+  // Bloqueo por usuario (fila de users FOR UPDATE, igual que loyalty.ts) ANTES del
+  // SUM del saldo → los gastos concurrentes del mismo usuario se serializan.
+  if (paymentMethod === 'points') {
+    const rate = Number(cfg.points_redemption_rate ?? 10);
+    const needed = pointsForTotal(totals.total_mxn, rate);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Lock por usuario: serializa gastos concurrentes sin FOR UPDATE sobre el agregado.
+      await client.query(`SELECT id FROM users WHERE id=$1 FOR UPDATE`, [userId]);
+      const balRow = await client.query(
+        `SELECT COALESCE(SUM(points),0)::int AS bal FROM loyalty_points WHERE user_id=$1`,
+        [userId]);
+      const balance = Number(balRow.rows[0]?.bal ?? 0);
+      if (balance < needed) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'INSUFFICIENT_POINTS', needed, balance });
+      }
+      // Crea la orden ya como 'paid' con los puntos gastados, DENTRO de la transacción.
+      const ins = await client.query(
+        `INSERT INTO bar_orders (user_id, booking_id, status, pickup_time, payment_method, payment_status,
+                                 subtotal_mxn, card_surcharge_mxn, total_mxn, customer_notes, points_spent)
+         VALUES ($1, $2, 'pending', $3, 'points', 'paid', $4, $5, $6, $7, $8) RETURNING id`,
+        [userId, bookingId ?? null, pickup.toISOString(),
+         totals.subtotal_mxn, totals.surcharge_mxn, totals.total_mxn, notes ?? null, needed]);
+      const orderId = ins.rows[0]?.id as string;
+      if (!orderId) { await client.query('ROLLBACK'); return res.status(500).json({ error: 'ORDER_CREATION_FAILED' }); }
+      for (const it of priced) {
+        await client.query(
+          `INSERT INTO bar_order_items (bar_order_id, product_id, product_name, quantity, unit_price_mxn, line_total_mxn)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [orderId, it.productId, it.name, it.quantity, it.unit_price_mxn, it.unit_price_mxn * it.quantity]);
+      }
+      await spendBarPoints(client, userId, needed, orderId);
+      await client.query('COMMIT');
+      return res.status(201).json({ id: orderId });
+    } catch (e: any) {
+      console.error('bar points charge failed:', e?.message);
+      await client.query('ROLLBACK'); // borra la orden + items no comprometidos
+      return res.status(500).json({ error: 'POINTS_CHARGE_FAILED' });
+    } finally { client.release(); }
+  }
+
+  // Tarjeta y recepción: creación por auto-commit (no requieren atomicidad orden+gasto).
   const order = await queryOne<{ id: string }>(
     `INSERT INTO bar_orders (user_id, booking_id, status, pickup_time, payment_method, payment_status,
                              subtotal_mxn, card_surcharge_mxn, total_mxn, customer_notes)
@@ -119,34 +166,6 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
       [orderId, it.productId, it.name, it.quantity, it.unit_price_mxn, it.unit_price_mxn * it.quantity]);
   }
 
-  // Rama PUNTOS: transacción atómica con bloqueo de saldo para evitar carreras.
-  if (paymentMethod === 'points') {
-    const rate = Number(cfg.points_redemption_rate ?? 10);
-    const needed = pointsForTotal(totals.total_mxn, rate);
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const balRow = await client.query(
-        `SELECT COALESCE(SUM(points),0)::int AS bal FROM loyalty_points WHERE user_id=$1 FOR UPDATE`,
-        [userId]);
-      const balance = Number(balRow.rows[0]?.bal ?? 0);
-      if (balance < needed) {
-        await client.query('ROLLBACK');
-        await query(`DELETE FROM bar_orders WHERE id=$1`, [orderId]);
-        return res.status(400).json({ error: 'INSUFFICIENT_POINTS', needed, balance });
-      }
-      await client.query(`UPDATE bar_orders SET points_spent=$1, payment_status='paid' WHERE id=$2`, [needed, orderId]);
-      await spendBarPoints(client, userId, needed, orderId);
-      await client.query('COMMIT');
-    } catch (e: any) {
-      console.error('bar points charge failed:', e?.message);
-      await client.query('ROLLBACK');
-      await query(`DELETE FROM bar_orders WHERE id=$1`, [orderId]);
-      return res.status(500).json({ error: 'POINTS_CHARGE_FAILED' });
-    } finally { client.release(); }
-    return res.status(201).json({ id: orderId });
-  }
-
   if (paymentMethod === 'card') {
     if (!mpConfigured()) {
       await query(`DELETE FROM bar_orders WHERE id = $1`, [orderId]);
@@ -154,9 +173,15 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
     }
     const user = await queryOne<{ email: string }>(`SELECT email FROM users WHERE id = $1`, [userId]);
     try {
+      // MP debe cobrar subtotal + recargo. El recargo va como línea aparte para que
+      // transaction_amount == total_mxn (si no, el estudio pierde el recargo).
+      const mpItems = priced.map((p) => ({ title: p.name, quantity: p.quantity, unit_price: p.unit_price_mxn }));
+      if (totals.surcharge_mxn > 0) {
+        mpItems.push({ title: 'Uso de app', quantity: 1, unit_price: totals.surcharge_mxn });
+      }
       const pref = await createPreference({
         orderId: `bar:${orderId}`,           // ← prefijo que el webhook enruta a la barra
-        items: priced.map((p) => ({ title: p.name, quantity: p.quantity, unit_price: p.unit_price_mxn })),
+        items: mpItems,
         payerEmail: user?.email || undefined,
         backUrl: `${process.env.FRONTEND_URL}/app/fuel-bar/order/${orderId}`,
         notificationUrl: process.env.BACKEND_URL ? `${process.env.BACKEND_URL}/webhooks/mercadopago` : undefined,
@@ -211,11 +236,36 @@ router.patch('/orders/:id/status', authenticate, staffOnly, async (req: Request,
   if (to === 'cancelled' && !req.body?.cancellationReason) return res.status(400).json({ error: 'REASON_REQUIRED' });
   const cfg = await getSetting('bar_config');
   const stamp = to === 'preparing' ? 'preparing_at' : to === 'ready' ? 'ready_at' : to === 'delivered' ? 'delivered_at' : 'cancelled_at';
-  // Lock optimista: solo transiciona si el estado no cambió por otra terminal.
+
+  // Cancelación de staff: el flip de estado (con lock optimista) y el reembolso de
+  // puntos van en UNA transacción atómica. Un crash entre ambos ya no deja deuda de
+  // puntos silenciosa: el ROLLBACK revierte también el cambio de estado.
+  if (to === 'cancelled') {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const upd = await client.query(
+        `UPDATE bar_orders SET status='cancelled', cancelled_at=NOW(), cancellation_reason=$1, cancelled_by='staff', updated_at=NOW()
+         WHERE id=$2 AND status=$3 RETURNING id`,
+        [req.body.cancellationReason, req.params.id, o.status]);
+      if (upd.rowCount === 0) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'STATE_CHANGED' }); }
+      if (o.payment_method === 'points' && o.points_spent && o.points_spent > 0) {
+        await refundBarPoints(client, o.user_id, o.points_spent, req.params.id);
+      }
+      await client.query('COMMIT');
+    } catch (e: any) {
+      console.error('bar staff-cancel points refund failed:', e?.message);
+      await client.query('ROLLBACK');
+      return res.status(500).json({ error: 'CANCEL_FAILED' });
+    } finally { client.release(); }
+    return res.json({ ok: true, status: to });
+  }
+
+  // Otras transiciones (preparing/ready/delivered): auto-commit con lock optimista.
   const upd = await query(
-    `UPDATE bar_orders SET status=$1, ${stamp}=NOW(), cancellation_reason=$2, cancelled_by=$3, updated_at=NOW()
-     WHERE id=$4 AND status=$5 RETURNING id`,
-    [to, to === 'cancelled' ? req.body.cancellationReason : null, to === 'cancelled' ? 'staff' : null, req.params.id, o.status]);
+    `UPDATE bar_orders SET status=$1, ${stamp}=NOW(), updated_at=NOW()
+     WHERE id=$2 AND status=$3 RETURNING id`,
+    [to, req.params.id, o.status]);
   if (upd.length === 0) return res.status(409).json({ error: 'STATE_CHANGED' });
   if (to === 'ready') {
     void sendWebPushToUser(o.user_id, { title: '¡Tu bebida está lista!', body: 'Pásala a recoger en la barra.', url: `/app/fuel-bar/order/${req.params.id}`, tag: 'bar_ready' });
@@ -226,17 +276,6 @@ router.patch('/orders/:id/status', authenticate, staffOnly, async (req: Request,
       body: `Estará lista en ~${Number(cfg.prep_time_minutes ?? 15)} min.`,
       url: `/app/fuel-bar/order/${req.params.id}`, tag: 'bar_preparing',
     });
-  }
-  if (to === 'cancelled' && o.payment_method === 'points' && o.points_spent && o.points_spent > 0) {
-    const refundClient = await pool.connect();
-    try {
-      await refundClient.query('BEGIN');
-      await refundBarPoints(refundClient, o.user_id, o.points_spent, req.params.id);
-      await refundClient.query('COMMIT');
-    } catch (e: any) {
-      console.error('bar staff-cancel points refund failed:', e?.message);
-      await refundClient.query('ROLLBACK');
-    } finally { refundClient.release(); }
   }
   res.json({ ok: true, status: to });
 });
