@@ -118,15 +118,17 @@ export default function BarSettings() {
   }
 
   function setDayTime(day: number, field: 'open' | 'close', value: string) {
-    const current = form.operating_hours[day];
-    if (!current) return;
-    setForm(prev => ({
-      ...prev,
-      operating_hours: {
-        ...prev.operating_hours,
-        [day]: { ...current, [field]: value },
-      },
-    }));
+    setForm(prev => {
+      const current = prev.operating_hours[day];
+      if (!current) return prev;
+      return {
+        ...prev,
+        operating_hours: {
+          ...prev.operating_hours,
+          [day]: { ...current, [field]: value },
+        },
+      };
+    });
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
