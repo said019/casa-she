@@ -208,7 +208,7 @@ async function requestReviews(): Promise<void> {
                     await sendCustomNotification({
                         membershipId: booking.membership_id,
                         title: '⭐ ¿Cómo estuvo tu clase?',
-                        message: `Cuéntanos tu experiencia en ${booking.class_type} y gana 50 puntos`,
+                        message: `Cuéntanos tu experiencia en ${booking.class_type}`,
                     });
                 }
 
