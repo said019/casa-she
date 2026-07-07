@@ -23,6 +23,7 @@ router.get('/config', authenticate, async (_req: Request, res: Response) => {
   });
 });
 
+// GET /api/bar/pickup-suggestions
 router.get('/pickup-suggestions', authenticate, async (req: Request, res: Response) => {
   const c = await getSetting('bar_config');
   const offset = Number(c.pickup_offset_minutes ?? 0);
@@ -36,7 +37,7 @@ router.get('/pickup-suggestions', authenticate, async (req: Request, res: Respon
      WHERE b.user_id=$1 AND b.status='confirmed'
        AND (c.date + c.start_time) > (NOW() AT TIME ZONE 'America/Mexico_City')
      ORDER BY c.date ASC, c.start_time ASC LIMIT 1`, [req.user!.userId]);
-  let after_class = null as any;
+  let after_class: { pickup_iso: string; class_name: string; ends_iso: string } | null = null;
   if (nx) {
     const ends = new Date(`${String(nx.date).slice(0,10)}T${String(nx.end_time).slice(0,5)}:00-06:00`);
     const pickup = new Date(ends.getTime() + offset * 60_000);
