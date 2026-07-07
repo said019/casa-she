@@ -199,7 +199,8 @@ router.patch('/orders/:id/status', authenticate, staffOnly, async (req: Request,
       await refundClient.query('BEGIN');
       await refundBarPoints(refundClient, o.user_id, o.points_spent, req.params.id);
       await refundClient.query('COMMIT');
-    } catch (e) {
+    } catch (e: any) {
+      console.error('bar staff-cancel points refund failed:', e?.message);
       await refundClient.query('ROLLBACK');
     } finally { refundClient.release(); }
   }
