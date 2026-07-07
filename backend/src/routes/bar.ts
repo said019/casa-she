@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { query, queryOne, pool } from '../config/database.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { getSetting } from '../lib/settings.js';
-import { isBarOpenAt, BAR_CATEGORY_NAMES, computeBarTotals, pointsForTotal, canBarTransition, type BarStatus } from '../lib/bar.js';
-import { spendBarPoints } from '../lib/barPoints.js';
+import { isBarOpenAt, BAR_CATEGORY_NAMES, computeBarTotals, pointsForTotal, canBarTransition, canCustomerCancel, type BarStatus } from '../lib/bar.js';
+import { spendBarPoints, refundBarPoints } from '../lib/barPoints.js';
 import { sendWebPushToUser } from '../lib/web-push.js';
 import { createPreference, mpConfigured } from '../lib/mercadopago.js';
 
@@ -170,10 +170,12 @@ router.get('/orders/queue', authenticate, staffOnly, async (_req: Request, res: 
 router.patch('/orders/:id/status', authenticate, staffOnly, async (req: Request, res: Response) => {
   const to = req.body?.status as BarStatus;
   if (!to) return res.status(400).json({ error: 'MISSING_STATUS' });
-  const o = await queryOne<{ status: BarStatus; user_id: string }>(`SELECT status, user_id FROM bar_orders WHERE id = $1`, [req.params.id]);
+  const o = await queryOne<{ status: BarStatus; user_id: string; payment_method: string; points_spent: number | null }>(
+    `SELECT status, user_id, payment_method, points_spent FROM bar_orders WHERE id = $1`, [req.params.id]);
   if (!o) return res.status(404).json({ error: 'NOT_FOUND' });
   if (!canBarTransition(o.status, to, 'staff')) return res.status(400).json({ error: 'INVALID_TRANSITION' });
   if (to === 'cancelled' && !req.body?.cancellationReason) return res.status(400).json({ error: 'REASON_REQUIRED' });
+  const cfg = await getSetting('bar_config');
   const stamp = to === 'preparing' ? 'preparing_at' : to === 'ready' ? 'ready_at' : to === 'delivered' ? 'delivered_at' : 'cancelled_at';
   // Lock optimista: solo transiciona si el estado no cambió por otra terminal.
   const upd = await query(
@@ -183,6 +185,23 @@ router.patch('/orders/:id/status', authenticate, staffOnly, async (req: Request,
   if (upd.length === 0) return res.status(409).json({ error: 'STATE_CHANGED' });
   if (to === 'ready') {
     void sendWebPushToUser(o.user_id, { title: '¡Tu bebida está lista!', body: 'Pásala a recoger en la barra.', url: `/app/fuel-bar/order/${req.params.id}`, tag: 'bar_ready' });
+  }
+  if (to === 'preparing' && cfg.preparing_push) {
+    void sendWebPushToUser(o.user_id, {
+      title: 'Tu bebida se está preparando',
+      body: `Estará lista en ~${Number(cfg.prep_time_minutes ?? 15)} min.`,
+      url: `/app/fuel-bar/order/${req.params.id}`, tag: 'bar_preparing',
+    });
+  }
+  if (to === 'cancelled' && o.payment_method === 'points' && o.points_spent && o.points_spent > 0) {
+    const refundClient = await pool.connect();
+    try {
+      await refundClient.query('BEGIN');
+      await refundBarPoints(refundClient, o.user_id, o.points_spent, req.params.id);
+      await refundClient.query('COMMIT');
+    } catch (e) {
+      await refundClient.query('ROLLBACK');
+    } finally { refundClient.release(); }
   }
   res.json({ ok: true, status: to });
 });
@@ -201,11 +220,25 @@ router.delete('/orders/:id', authenticate, async (req: Request, res: Response) =
   if (!o) return res.status(404).json({ error: 'NOT_FOUND' });
   if (o.user_id !== req.user!.userId) return res.status(403).json({ error: 'FORBIDDEN' });
   if (!canBarTransition(o.status, 'cancelled', 'customer')) return res.status(400).json({ error: 'CANNOT_CANCEL' });
-  const upd = await query(
-    `UPDATE bar_orders SET status='cancelled', cancelled_by='customer', cancelled_at=NOW(), updated_at=NOW()
-     WHERE id=$1 AND status=$2 RETURNING id`,
-    [req.params.id, o.status]);
-  if (upd.length === 0) return res.status(409).json({ error: 'STATE_CHANGED' });
+  const cfg = await getSetting('bar_config');
+  const full = await queryOne<{ pickup_time: string; payment_method: string; points_spent: number | null }>(
+    `SELECT pickup_time, payment_method, points_spent FROM bar_orders WHERE id=$1`, [req.params.id]);
+  if (full && !canCustomerCancel(new Date(full.pickup_time), new Date(), Number(cfg.cancellation_window_minutes ?? 60))) {
+    return res.status(400).json({ error: 'CANCEL_WINDOW_CLOSED' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const upd = await client.query(
+      `UPDATE bar_orders SET status='cancelled', cancelled_by='customer', cancelled_at=NOW(), updated_at=NOW()
+       WHERE id=$1 AND status=$2 RETURNING id`, [req.params.id, o.status]);
+    if (upd.rowCount === 0) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'STATE_CHANGED' }); }
+    if (full && full.payment_method === 'points' && full.points_spent && full.points_spent > 0) {
+      await refundBarPoints(client, o.user_id, full.points_spent, req.params.id);
+    }
+    await client.query('COMMIT');
+  } catch (e) { await client.query('ROLLBACK'); return res.status(500).json({ error: 'CANCEL_FAILED' }); }
+  finally { client.release(); }
   res.json({ ok: true });
 });
 
