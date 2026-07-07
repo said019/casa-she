@@ -10,6 +10,7 @@
  */
 
 import { query, queryOne } from '../config/database.js';
+import type { BarConfig } from './bar.js';
 
 // ============================================
 // TYPE DEFINITIONS
@@ -91,6 +92,7 @@ export interface SettingsMap {
     bank_info: BankInfo;
     general_settings: GeneralSettings;
     whatsapp_templates: WhatsAppTemplates;
+    bar_config: BarConfig;
 }
 
 export type SettingKey = keyof SettingsMap;
@@ -155,6 +157,20 @@ const DEFAULTS: SettingsMap = {
         send_class_reminder: '🔔 *Recordatorio de Clase*\n\nHola {nombre}!\n\nTu clase *{clase}* es en {hora}.\n\n¡No faltes! 🧘',
         send_membership_expiring: '⏰ *Membresía por vencer*\n\nHola {nombre},\n\nTu plan *{plan}* vence pronto.\n\nRenueva para seguir disfrutando.',
         send_points_earned: '⭐ *Puntos ganados*\n\nHola {nombre}!\n\nGanaste {puntos} puntos.\n\nSaldo: {saldo} puntos.',
+    },
+    bar_config: {
+        enabled: false, // APAGADA por default (Global Constraint)
+        operating_hours: {
+            0: null,
+            1: { open: '07:00', close: '20:00' },
+            2: { open: '07:00', close: '20:00' },
+            3: { open: '07:00', close: '20:00' },
+            4: { open: '07:00', close: '20:00' },
+            5: { open: '07:00', close: '20:00' },
+            6: { open: '08:00', close: '14:00' },
+        },
+        lead_time_max_hours: 4,
+        pickup_offset_minutes: -2,
     },
 };
 
