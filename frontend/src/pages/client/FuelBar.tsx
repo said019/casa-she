@@ -87,8 +87,11 @@ export default function FuelBar() {
       <AuthGuard>
         <ClientLayout>
           <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-8 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#2A4E36]/10 text-3xl">
-              ☕
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#2A4E36]/10">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2A4E36" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 8h11v4a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V8z" />
+                <path d="M16 9h2a2 2 0 0 1 0 4h-2" />
+              </svg>
             </div>
             <h2 className="font-heading text-2xl text-[#2A4E36]">La barra está cerrada por ahora</h2>
             <p className="text-sm italic text-[#2A4E36]/60">
