@@ -88,6 +88,7 @@ import ClosedDays from "./pages/admin/settings/ClosedDays";
 import WhatsAppSettings from "./pages/admin/settings/WhatsAppSettings";
 import AdminOnboardingRules from "./pages/admin/settings/OnboardingRules";
 import BarSettings from "./pages/admin/settings/BarSettings";
+import BarQueue from "./pages/admin/bar/BarQueue";
 
 // Loyalty pages
 import LoyaltyConfig from "./pages/admin/loyalty/LoyaltyConfig";
@@ -323,6 +324,7 @@ const App = () => (
             <Route path="/admin/settings/whatsapp" element={<WhatsAppSettings />} />
             <Route path="/admin/settings/onboarding" element={<AdminOnboardingRules />} />
             <Route path="/admin/settings/bar" element={<BarSettings />} />
+            <Route path="/admin/bar/queue" element={<BarQueue />} />
             <Route path="/admin/settings" element={<Navigate to="/admin/settings/general" replace />} />
 
             <Route path="/admin/notifications/difusion" element={<PushBroadcast />} />

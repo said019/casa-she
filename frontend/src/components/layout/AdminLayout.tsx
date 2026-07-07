@@ -40,6 +40,7 @@ import {
     Command,
     PanelLeftClose,
     ArrowLeftRight,
+    Coffee,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import CasaSheLogo from '@/components/CasaSheLogo';
@@ -128,6 +129,7 @@ const sidebarItems: SidebarItem[] = [
             { href: '/admin/pos', label: 'Punto de venta' },
             { href: '/admin/cash-shifts', label: 'Cortes de caja' },
             { href: '/admin/products', label: 'Productos' },
+            { href: '/admin/bar/queue', label: 'Barra' },
         ],
     },
     { href: '/admin/payments', label: 'Pagos', icon: CreditCard },
