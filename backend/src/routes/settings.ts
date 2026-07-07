@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { query, queryOne } from '../config/database.js';
 import { authenticate, requireRole, optionalAuth } from '../middleware/auth.js';
 import { requireElevated } from '../middleware/elevation.js';
-import { invalidateCache } from '../lib/settings.js';
+import { invalidateCache, getSetting, setSetting } from '../lib/settings.js';
 
 const router = Router();
 
@@ -118,6 +118,27 @@ router.put(
         }
     }
 );
+
+// ============================================
+// GET /api/settings/bar-config — autenticados (admin edita; el cliente usa /api/bar/config)
+// PUT /api/settings/bar-config — solo admin
+// IMPORTANT: must be before /:key to avoid being caught by the param route
+// ============================================
+router.get('/bar-config', authenticate, async (_req: Request, res: Response) => {
+  res.json(await getSetting('bar_config'));
+});
+
+router.put('/bar-config', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
+  const b = req.body ?? {};
+  const value = {
+    enabled: b.enabled === true,
+    operating_hours: b.operating_hours ?? {},
+    lead_time_max_hours: Number(b.lead_time_max_hours ?? 4),
+    pickup_offset_minutes: Number(b.pickup_offset_minutes ?? -2),
+  };
+  await setSetting('bar_config', value as any, req.user?.userId);
+  res.json({ message: 'Configuración de barra guardada', bar_config: value });
+});
 
 // ============================================
 // GET /api/settings/bank-info - Get bank info for transfers (public for authenticated users)
