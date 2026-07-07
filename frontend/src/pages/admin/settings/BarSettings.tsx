@@ -71,10 +71,15 @@ export default function BarSettings() {
 
   const [form, setForm] = useState<BarConfig>({ ...DEFAULT_CONFIG });
 
+  // Raw string state for numeric inputs — lets user type decimals and clear fields
+  // without coercing mid-entry to 0. Synced to form on blur.
+  const [rawNums, setRawNums] = useState<Partial<Record<keyof BarConfig, string>>>({});
+
   // Seed form once data arrives — spread full config for round-trip safety
   useEffect(() => {
     if (data) {
       setForm({ ...DEFAULT_CONFIG, ...data });
+      setRawNums({});
     }
   }, [data]);
 
@@ -100,9 +105,24 @@ export default function BarSettings() {
     setForm(prev => ({ ...prev, [key]: value }));
   }
 
-  function setNumericField(key: keyof BarConfig, raw: string) {
-    const n = Number(raw);
-    if (!isNaN(n)) setForm(prev => ({ ...prev, [key]: n }));
+  // Track raw string while user types (allows "3.", "3.5", "")
+  function onNumericChange(key: keyof BarConfig, raw: string) {
+    setRawNums(prev => ({ ...prev, [key]: raw }));
+  }
+
+  // Coerce to number on blur; fall back to field's current form value (or min)
+  function onNumericBlur(key: keyof BarConfig, min?: number) {
+    const raw = rawNums[key];
+    if (raw === undefined) return; // untouched — nothing to do
+    const n = raw === '' ? NaN : Number(raw);
+    const resolved = isNaN(n) ? (min ?? (form[key] as number)) : n;
+    setForm(prev => ({ ...prev, [key]: resolved }));
+    setRawNums(prev => { const next = { ...prev }; delete next[key]; return next; });
+  }
+
+  // Value to show in the input: raw string while editing, else the committed number
+  function numericValue(key: keyof BarConfig): string | number {
+    return rawNums[key] !== undefined ? (rawNums[key] as string) : (form[key] as number);
   }
 
   function setDayOpen(day: number, open: boolean) {
@@ -203,8 +223,9 @@ export default function BarSettings() {
                   min={0}
                   max={100}
                   step={0.1}
-                  value={form.card_surcharge_percent}
-                  onChange={e => setNumericField('card_surcharge_percent', e.target.value)}
+                  value={numericValue('card_surcharge_percent')}
+                  onChange={e => onNumericChange('card_surcharge_percent', e.target.value)}
+                  onBlur={() => onNumericBlur('card_surcharge_percent', 0)}
                   disabled={isLoading}
                   className="max-w-xs"
                 />
@@ -234,8 +255,9 @@ export default function BarSettings() {
                   type="number"
                   min={1}
                   step={1}
-                  value={form.points_redemption_rate}
-                  onChange={e => setNumericField('points_redemption_rate', e.target.value)}
+                  value={numericValue('points_redemption_rate')}
+                  onChange={e => onNumericChange('points_redemption_rate', e.target.value)}
+                  onBlur={() => onNumericBlur('points_redemption_rate', 1)}
                   disabled={isLoading}
                   className="max-w-xs"
                 />
@@ -266,8 +288,9 @@ export default function BarSettings() {
                   min={1}
                   max={48}
                   step={1}
-                  value={form.lead_time_max_hours}
-                  onChange={e => setNumericField('lead_time_max_hours', e.target.value)}
+                  value={numericValue('lead_time_max_hours')}
+                  onChange={e => onNumericChange('lead_time_max_hours', e.target.value)}
+                  onBlur={() => onNumericBlur('lead_time_max_hours', 1)}
                   disabled={isLoading}
                   className="max-w-xs"
                 />
@@ -283,8 +306,9 @@ export default function BarSettings() {
                   id="pickup_offset_minutes"
                   type="number"
                   step={1}
-                  value={form.pickup_offset_minutes}
-                  onChange={e => setNumericField('pickup_offset_minutes', e.target.value)}
+                  value={numericValue('pickup_offset_minutes')}
+                  onChange={e => onNumericChange('pickup_offset_minutes', e.target.value)}
+                  onBlur={() => onNumericBlur('pickup_offset_minutes')}
                   disabled={isLoading}
                   className="max-w-xs"
                 />
@@ -302,8 +326,9 @@ export default function BarSettings() {
                   min={0}
                   max={1440}
                   step={1}
-                  value={form.cancellation_window_minutes}
-                  onChange={e => setNumericField('cancellation_window_minutes', e.target.value)}
+                  value={numericValue('cancellation_window_minutes')}
+                  onChange={e => onNumericChange('cancellation_window_minutes', e.target.value)}
+                  onBlur={() => onNumericBlur('cancellation_window_minutes', 0)}
                   disabled={isLoading}
                   className="max-w-xs"
                 />
@@ -321,8 +346,9 @@ export default function BarSettings() {
                   min={1}
                   max={120}
                   step={1}
-                  value={form.prep_time_minutes}
-                  onChange={e => setNumericField('prep_time_minutes', e.target.value)}
+                  value={numericValue('prep_time_minutes')}
+                  onChange={e => onNumericChange('prep_time_minutes', e.target.value)}
+                  onBlur={() => onNumericBlur('prep_time_minutes', 1)}
                   disabled={isLoading}
                   className="max-w-xs"
                 />
