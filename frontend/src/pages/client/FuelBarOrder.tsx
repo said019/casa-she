@@ -68,15 +68,13 @@ function ReadyThumb({ src, name }: { src?: string | null; name: string }) {
   }
   return (
     <div
-      className="relative mb-[26px] flex h-[118px] w-[118px] items-center justify-center overflow-hidden rounded-full text-5xl"
+      className="relative mb-[26px] flex h-[118px] w-[118px] items-center justify-center overflow-hidden rounded-full"
       style={{
         background: 'radial-gradient(circle at 50% 32%, #FCF7EE, #E7DAC2)',
         boxShadow:
           '0 0 0 10px rgba(42,78,54,.08), 0 0 0 24px rgba(42,78,54,.04), 0 26px 44px -24px rgba(22,38,26,.55)',
       }}
-    >
-      ☕
-    </div>
+    />
   );
 }
 
@@ -203,30 +201,30 @@ export default function FuelBarOrder() {
                 ))}
               </div>
 
-              {/* Checkmark badge (shown when ready) */}
-              {isReady && (
-                <div
-                  className="absolute right-[calc(50%-74px)] top-[116px] z-10 flex h-10 w-10 items-center justify-center rounded-full bg-[#2A4E36] shadow-[0_12px_22px_-10px_rgba(42,78,54,.8)]"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-5 w-5 text-[#F6EFE1]"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+              {/* Product thumb + checkmark badge */}
+              <div className="relative">
+                <ReadyThumb
+                  src={firstItem?.image_url}
+                  name={firstItem?.product_name ?? 'Tu bebida'}
+                />
+                {isReady && (
+                  <div
+                    className="absolute right-0 bottom-[30px] z-10 flex h-10 w-10 items-center justify-center rounded-full bg-[#2A4E36] shadow-[0_12px_22px_-10px_rgba(42,78,54,.8)]"
                   >
-                    <path d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              )}
-
-              {/* Product thumb */}
-              <ReadyThumb
-                src={firstItem?.image_url}
-                name={firstItem?.product_name ?? 'Tu bebida'}
-              />
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-5 w-5 text-[#F6EFE1]"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </div>
 
               {/* Status text */}
               <h2 className="font-heading text-[38px] leading-[1.02] text-[#2A4E36]">

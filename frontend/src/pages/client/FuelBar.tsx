@@ -27,9 +27,7 @@ function ProductThumb({ src, name }: { src: string | null; name: string }) {
     <div
       className="flex h-[60px] w-[60px] flex-shrink-0 items-end justify-center overflow-hidden rounded-[18px] shadow-[inset_0_1px_2px_rgba(255,255,255,.7),0_12px_20px_-13px_rgba(22,38,26,.42)]"
       style={{ background: 'radial-gradient(circle at 50% 32%, #FCF7EE, #EADDC6)' }}
-    >
-      <span className="mb-1 text-2xl select-none">☕</span>
-    </div>
+    />
   );
 }
 

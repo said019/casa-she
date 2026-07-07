@@ -29,9 +29,7 @@ function OrderThumb({ src, name }: { src: string | null; name: string }) {
     <div
       className="flex h-[52px] w-[52px] flex-shrink-0 items-end justify-center overflow-hidden rounded-[15px] shadow-[inset_0_1px_2px_rgba(255,255,255,.7),0_10px_16px_-11px_rgba(22,38,26,.4)]"
       style={{ background: 'radial-gradient(circle at 50% 32%, #FCF7EE, #EADDC6)' }}
-    >
-      <span className="mb-1 text-xl select-none">☕</span>
-    </div>
+    />
   );
 }
 
@@ -70,6 +68,10 @@ export default function FuelBarConfirm() {
   const submit = async () => {
     if (lines.length === 0) {
       toast({ title: 'Carrito vacío', description: 'Agrega al menos un producto.', variant: 'destructive' });
+      return;
+    }
+    if (pickupMode === 'other' && !customTime) {
+      toast({ title: 'Selecciona una hora', description: 'Elige a qué hora recoges tu pedido.', variant: 'destructive' });
       return;
     }
     setLoading(true);
