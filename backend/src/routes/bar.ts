@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { query, queryOne } from '../config/database.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { getSetting } from '../lib/settings.js';
-import { isBarOpenAt, BAR_CATEGORY_NAMES, computeBarTotals } from '../lib/bar.js';
+import { isBarOpenAt, BAR_CATEGORY_NAMES, computeBarTotals, canBarTransition, type BarStatus } from '../lib/bar.js';
+import { sendWebPushToUser } from '../lib/web-push.js';
 import { createPreference, mpConfigured } from '../lib/mercadopago.js';
 
 const router = Router();
@@ -111,6 +112,56 @@ router.get('/orders/:id', authenticate, async (req: Request, res: Response) => {
   if (o.user_id !== req.user!.userId && !staff) return res.status(403).json({ error: 'FORBIDDEN' });
   const items = await query(`SELECT * FROM bar_order_items WHERE bar_order_id = $1`, [req.params.id]);
   res.json({ ...o, items });
+});
+
+const staffOnly = requireRole('admin', 'super_admin', 'reception');
+
+router.get('/orders/queue', authenticate, staffOnly, async (_req: Request, res: Response) => {
+  const rows = await query(
+    `SELECT o.*, u.display_name AS user_name,
+            COALESCE(json_agg(json_build_object('name', i.product_name, 'qty', i.quantity)) FILTER (WHERE i.id IS NOT NULL), '[]') AS items
+     FROM bar_orders o JOIN users u ON u.id = o.user_id
+     LEFT JOIN bar_order_items i ON i.bar_order_id = o.id
+     WHERE o.status IN ('pending','preparing','ready')
+     GROUP BY o.id, u.display_name ORDER BY o.pickup_time ASC`);
+  res.json(rows);
+});
+
+router.patch('/orders/:id/status', authenticate, staffOnly, async (req: Request, res: Response) => {
+  const to = req.body?.status as BarStatus;
+  const o = await queryOne<{ status: BarStatus; user_id: string }>(`SELECT status, user_id FROM bar_orders WHERE id = $1`, [req.params.id]);
+  if (!o) return res.status(404).json({ error: 'NOT_FOUND' });
+  if (!canBarTransition(o.status, to, 'staff')) return res.status(400).json({ error: 'INVALID_TRANSITION' });
+  if (to === 'cancelled' && !req.body?.cancellationReason) return res.status(400).json({ error: 'REASON_REQUIRED' });
+  const stamp = to === 'preparing' ? 'preparing_at' : to === 'ready' ? 'ready_at' : to === 'delivered' ? 'delivered_at' : 'cancelled_at';
+  // Lock optimista: solo transiciona si el estado no cambió por otra terminal.
+  const upd = await query(
+    `UPDATE bar_orders SET status=$1, ${stamp}=NOW(), cancellation_reason=$2, cancelled_by=$3, updated_at=NOW()
+     WHERE id=$4 AND status=$5 RETURNING id`,
+    [to, to === 'cancelled' ? req.body.cancellationReason : null, to === 'cancelled' ? 'staff' : null, req.params.id, o.status]);
+  if (upd.length === 0) return res.status(409).json({ error: 'STATE_CHANGED' });
+  if (to === 'ready') {
+    void sendWebPushToUser(o.user_id, { title: '¡Tu bebida está lista!', body: 'Pásala a recoger en la barra.', url: `/app/fuel-bar/order/${req.params.id}`, tag: 'bar_ready' });
+  }
+  res.json({ ok: true, status: to });
+});
+
+router.post('/orders/:id/charge', authenticate, staffOnly, async (req: Request, res: Response) => {
+  const o = await queryOne<{ payment_method: string; payment_status: string }>(`SELECT payment_method, payment_status FROM bar_orders WHERE id = $1`, [req.params.id]);
+  if (!o) return res.status(404).json({ error: 'NOT_FOUND' });
+  if (o.payment_method !== 'reception') return res.status(400).json({ error: 'NOT_RECEPTION_ORDER' });
+  if (o.payment_status === 'paid') return res.status(400).json({ error: 'ALREADY_PAID' });
+  await query(`UPDATE bar_orders SET payment_status='paid', updated_at=NOW() WHERE id=$1`, [req.params.id]);
+  res.json({ ok: true });
+});
+
+router.delete('/orders/:id', authenticate, async (req: Request, res: Response) => {
+  const o = await queryOne<{ status: BarStatus; user_id: string }>(`SELECT status, user_id FROM bar_orders WHERE id = $1`, [req.params.id]);
+  if (!o) return res.status(404).json({ error: 'NOT_FOUND' });
+  if (o.user_id !== req.user!.userId) return res.status(403).json({ error: 'FORBIDDEN' });
+  if (!canBarTransition(o.status, 'cancelled', 'customer')) return res.status(400).json({ error: 'CANNOT_CANCEL' });
+  await query(`UPDATE bar_orders SET status='cancelled', cancelled_by='customer', cancelled_at=NOW(), updated_at=NOW() WHERE id=$1 AND status='pending'`, [req.params.id]);
+  res.json({ ok: true });
 });
 
 export default router;
