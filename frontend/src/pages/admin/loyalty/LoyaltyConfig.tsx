@@ -20,6 +20,9 @@ interface LoyaltyConfig {
     anniversary_bonus: number;
     referral_bonus: number;
     streak_bonus: number;
+    birthday_enabled: boolean;
+    anniversary_enabled: boolean;
+    streak_enabled: boolean;
 }
 
 export default function LoyaltyConfig() {
@@ -37,6 +40,9 @@ export default function LoyaltyConfig() {
         anniversary_bonus: 40,
         referral_bonus: 40,
         streak_bonus: 10,
+        birthday_enabled: true,
+        anniversary_enabled: true,
+        streak_enabled: true,
     });
     const { toast } = useToast();
 
@@ -238,6 +244,14 @@ export default function LoyaltyConfig() {
                             </div>
 
                             <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="birthday_enabled">Otorgar bono de cumpleaños</Label>
+                                    <Switch
+                                        id="birthday_enabled"
+                                        checked={config.birthday_enabled}
+                                        onCheckedChange={(v) => setConfig({ ...config, birthday_enabled: v })}
+                                    />
+                                </div>
                                 <Label htmlFor="birthday_bonus">Bono de Cumpleaños</Label>
                                 <Input
                                     id="birthday_bonus"
@@ -255,6 +269,14 @@ export default function LoyaltyConfig() {
                             </div>
 
                             <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="anniversary_enabled">Otorgar bono de aniversario</Label>
+                                    <Switch
+                                        id="anniversary_enabled"
+                                        checked={config.anniversary_enabled}
+                                        onCheckedChange={(v) => setConfig({ ...config, anniversary_enabled: v })}
+                                    />
+                                </div>
                                 <Label htmlFor="anniversary_bonus">Bono de Aniversario</Label>
                                 <Input
                                     id="anniversary_bonus"
@@ -289,6 +311,14 @@ export default function LoyaltyConfig() {
                             </div>
 
                             <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="streak_enabled">Otorgar bono de racha</Label>
+                                    <Switch
+                                        id="streak_enabled"
+                                        checked={config.streak_enabled}
+                                        onCheckedChange={(v) => setConfig({ ...config, streak_enabled: v })}
+                                    />
+                                </div>
                                 <Label htmlFor="streak_bonus">Bono por Racha</Label>
                                 <Input
                                     id="streak_bonus"
