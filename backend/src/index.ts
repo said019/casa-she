@@ -3109,42 +3109,51 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Migration BAR-02: columnas Fase 2 + payment_method points listas.');
     } catch (e) { console.error('Migration BAR-02 error:', e); }
 
-    // Seed BAR-menu: categorías + productos reales del menú Casa Shé (idempotente).
+    // products.facility_id: siempre idempotente (columna que usan las queries de la barra).
     try {
         await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities(id)`);
-        const fac = await queryOne<{ id: string }>(`SELECT id FROM facilities LIMIT 1`);
-        if (fac) {
-            const CATS = ['Calientes con café','Fríos sin café','Tisanas','Fríos con café','Smoothies','Proteínas'];
-            const catId: Record<string, string> = {};
-            for (const name of CATS) {
-                const existing = await queryOne<{ id: string }>(
-                    `SELECT id FROM product_categories WHERE name = $1`, [name]);
-                if (existing) {
-                    catId[name] = existing.id;
-                } else {
-                    const created = await queryOne<{ id: string }>(
-                        `INSERT INTO product_categories (name) VALUES ($1) RETURNING id`, [name]);
-                    catId[name] = created!.id;
+    } catch (e) { console.error('products.facility_id error:', e); }
+
+    // Seed BAR-menu: UNA SOLA VEZ. Pobla el menú inicial y luego NO vuelve a sembrar,
+    // así el menú es 100% editable desde admin (borrar/renombrar bebidas es permanente).
+    try {
+        const barMenuSeeded = await queryOne<{ x: number }>(`SELECT 1 AS x FROM system_settings WHERE key='bar_menu_seeded'`);
+        if (!barMenuSeeded) {
+            const fac = await queryOne<{ id: string }>(`SELECT id FROM facilities LIMIT 1`);
+            if (fac) {
+                const CATS = ['Calientes con café','Fríos sin café','Tisanas','Fríos con café','Smoothies','Proteínas'];
+                const catId: Record<string, string> = {};
+                for (const name of CATS) {
+                    const existing = await queryOne<{ id: string }>(
+                        `SELECT id FROM product_categories WHERE name = $1`, [name]);
+                    if (existing) {
+                        catId[name] = existing.id;
+                    } else {
+                        const created = await queryOne<{ id: string }>(
+                            `INSERT INTO product_categories (name) VALUES ($1) RETURNING id`, [name]);
+                        catId[name] = created!.id;
+                    }
                 }
+                const MENU: [string, string, number][] = [
+                    ['Americano','Calientes con café',50], ['Latte','Calientes con café',70],
+                    ['Cappuccino','Calientes con café',70], ['Capuchino Shot','Calientes con café',85],
+                    ['Matcha tradicional','Fríos sin café',75], ['Coco Matcha Shé','Fríos sin café',85],
+                    ['Latte frío','Fríos sin café',75], ['Latte Shot','Fríos sin café',85],
+                    ['Te verde','Tisanas',55], ['Jardín de flores','Tisanas',55], ['Cítricos del Sol','Tisanas',55],
+                    ['Terracota','Fríos con café',80], ['Especias','Fríos con café',80], ['Jade','Fríos con café',80],
+                    ['Sol Verde','Smoothies',85], ['Banana Cacao','Smoothies',85], ['Rubí','Smoothies',85],
+                    ['Proteína','Proteínas',85],
+                ];
+                for (const [name, cat, price] of MENU) {
+                    await query(
+                        `INSERT INTO products (name, price, stock, category_id, facility_id, is_active)
+                         SELECT $1, $2, 0, $3, $4, true
+                         WHERE NOT EXISTS (SELECT 1 FROM products WHERE name = $1)`,
+                        [name, price, catId[cat], fac.id]);
+                }
+                await query(`INSERT INTO system_settings (key, value) VALUES ('bar_menu_seeded', 'true'::jsonb) ON CONFLICT (key) DO NOTHING`);
+                console.log('Seed BAR-menu: menú Casa Shé sembrado (una sola vez).');
             }
-            const MENU: [string, string, number][] = [
-                ['Americano','Calientes con café',50], ['Latte','Calientes con café',70],
-                ['Cappuccino','Calientes con café',70], ['Capuchino Shot','Calientes con café',85],
-                ['Matcha tradicional','Fríos sin café',75], ['Coco Matcha Shé','Fríos sin café',85],
-                ['Latte frío','Fríos sin café',75], ['Latte Shot','Fríos sin café',85],
-                ['Te verde','Tisanas',55], ['Jardín de flores','Tisanas',55], ['Cítricos del Sol','Tisanas',55],
-                ['Terracota','Fríos con café',80], ['Especias','Fríos con café',80], ['Jade','Fríos con café',80],
-                ['Sol Verde','Smoothies',85], ['Banana Cacao','Smoothies',85], ['Rubí','Smoothies',85],
-                ['Proteína','Proteínas',85],
-            ];
-            for (const [name, cat, price] of MENU) {
-                await query(
-                    `INSERT INTO products (name, price, stock, category_id, facility_id, is_active)
-                     SELECT $1, $2, 0, $3, $4, true
-                     WHERE NOT EXISTS (SELECT 1 FROM products WHERE name = $1)`,
-                    [name, price, catId[cat], fac.id]);
-            }
-            console.log('Seed BAR-menu: menú Casa Shé sembrado.');
         }
     } catch (e) { console.error('Seed BAR-menu error:', e); }
 
