@@ -122,7 +122,7 @@ function ExtrasSelector({
   return (
     /* Backdrop */
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
+      className="fixed inset-0 z-[70] flex items-end justify-center"
       style={{ background: 'rgba(22,38,26,.45)', backdropFilter: 'blur(3px)' }}
       onClick={onCancel}
     >
@@ -526,7 +526,7 @@ export default function FuelBar() {
 
         {/* ── Sticky bottom CTA ──────────────────────────────────────────────── */}
         {count > 0 && (
-          <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-6 pt-8"
+          <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[60] flex justify-center px-4 pb-6 pt-8"
             style={{ background: 'linear-gradient(to top, #F6F0E4 58%, rgba(246,240,228,0))' }}
           >
             <button
