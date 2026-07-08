@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { useBarConfig } from '@/lib/api/bar';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -59,6 +60,11 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     const location = useLocation();
     const navigate = useNavigate();
     const { user, logout } = useAuthStore();
+    const { data: barCfg } = useBarConfig();
+    // Fuel Bar como acceso rápido en el bottom-nav, solo cuando la barra está encendida.
+    const navItems = barCfg?.enabled
+        ? [...bottomNavItems.slice(0, 3), { href: '/app/fuel-bar', label: 'Fuel Bar', icon: 'local_cafe' }, bottomNavItems[3]]
+        : bottomNavItems;
 
     // Badge de notificaciones in-app: polling cada 60s mientras la pestaña está activa.
     const { data: unreadData } = useQuery<{ count: number }>({
@@ -250,8 +256,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                 className="fixed bottom-0 left-0 right-0 z-50 border-t border-balance-sand/45 bg-[hsl(var(--admin-panel))]/92 shadow-[0_-24px_60px_-42px_rgba(42,33,24,0.85)] backdrop-blur-xl lg:hidden"
                 style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
             >
-                <div className="grid grid-cols-4 gap-1 px-2 py-2">
-                    {bottomNavItems.map((item) => {
+                <div className={cn('grid gap-1 px-2 py-2', navItems.length >= 5 ? 'grid-cols-5' : 'grid-cols-4')}>
+                    {navItems.map((item) => {
                         const isActive = isActivePath(item.href);
                         return (
                             <Link
