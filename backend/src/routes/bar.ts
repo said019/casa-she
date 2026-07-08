@@ -7,6 +7,7 @@ import { isBarOpenAt, nextBarOpening, BAR_CATEGORY_NAMES, computeBarTotals, poin
 import { spendBarPoints, refundBarPoints } from '../lib/barPoints.js';
 import { sendWebPushToUser } from '../lib/web-push.js';
 import { createPreference, mpConfigured } from '../lib/mercadopago.js';
+import { priceSelectedExtras, type BarExtra } from '../lib/barExtras.js';
 
 const router = Router();
 
@@ -68,7 +69,11 @@ router.get('/menu', authenticate, async (_req: Request, res: Response) => {
 });
 
 const CreateBarOrder = z.object({
-  items: z.array(z.object({ productId: z.string().uuid(), quantity: z.number().int().positive() })).min(1),
+  items: z.array(z.object({
+    productId: z.string().uuid(),
+    quantity: z.number().int().positive(),
+    extras: z.array(z.string()).optional(),
+  })).min(1),
   pickupTime: z.string(),
   paymentMethod: z.enum(['reception', 'card', 'points']),
   notes: z.string().max(140).optional(),
@@ -93,12 +98,19 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
   if (paymentMethod === 'points' && !cfg.points_enabled) return res.status(400).json({ error: 'POINTS_DISABLED' });
 
   // Cotiza cada producto EN SERVIDOR (el cliente nunca manda precio).
-  const priced: { productId: string; name: string; quantity: number; unit_price_mxn: number }[] = [];
+  const priced: { productId: string; name: string; quantity: number; unit_price_mxn: number; selected_extras: { id: string; name: string; price: number }[] }[] = [];
+
+  // Carga el catálogo de extras activos UNA VEZ (server-side guard: solo ids activos valen).
+  const extrasRows = await query<{ id: string; name: string; group_label: string; is_single: boolean; price_mxn: string }>(
+    `SELECT id, name, group_label, is_single, price_mxn FROM bar_extras WHERE is_active = true`);
+  const extrasCatalog: BarExtra[] = extrasRows.map((r) => ({ ...r, price_mxn: Number(r.price_mxn) }));
+
   for (const it of items) {
     const p = await queryOne<{ id: string; name: string; price: string; is_active: boolean }>(
       `SELECT id, name, price, is_active FROM products WHERE id = $1`, [it.productId]);
     if (!p || !p.is_active) return res.status(400).json({ error: 'PRODUCT_NOT_FOUND', productId: it.productId });
-    priced.push({ productId: p.id, name: p.name, quantity: it.quantity, unit_price_mxn: Number(p.price) });
+    const pe = priceSelectedExtras(it.extras ?? [], extrasCatalog);
+    priced.push({ productId: p.id, name: p.name, quantity: it.quantity, unit_price_mxn: Number(p.price) + pe.total, selected_extras: pe.snapshot });
   }
 
   // Recargo SOLO para tarjeta.
@@ -137,9 +149,9 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
       if (!orderId) { await client.query('ROLLBACK'); return res.status(500).json({ error: 'ORDER_CREATION_FAILED' }); }
       for (const it of priced) {
         await client.query(
-          `INSERT INTO bar_order_items (bar_order_id, product_id, product_name, quantity, unit_price_mxn, line_total_mxn)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [orderId, it.productId, it.name, it.quantity, it.unit_price_mxn, it.unit_price_mxn * it.quantity]);
+          `INSERT INTO bar_order_items (bar_order_id, product_id, product_name, quantity, unit_price_mxn, line_total_mxn, selected_extras)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+          [orderId, it.productId, it.name, it.quantity, it.unit_price_mxn, it.unit_price_mxn * it.quantity, JSON.stringify(it.selected_extras)]);
       }
       await spendBarPoints(client, userId, needed, orderId);
       await client.query('COMMIT');
@@ -163,9 +175,9 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
   const orderId = order.id;
   for (const it of priced) {
     await query(
-      `INSERT INTO bar_order_items (bar_order_id, product_id, product_name, quantity, unit_price_mxn, line_total_mxn)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [orderId, it.productId, it.name, it.quantity, it.unit_price_mxn, it.unit_price_mxn * it.quantity]);
+      `INSERT INTO bar_order_items (bar_order_id, product_id, product_name, quantity, unit_price_mxn, line_total_mxn, selected_extras)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+      [orderId, it.productId, it.name, it.quantity, it.unit_price_mxn, it.unit_price_mxn * it.quantity, JSON.stringify(it.selected_extras)]);
   }
 
   if (paymentMethod === 'card') {
