@@ -8,8 +8,17 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus, Edit, Trash2, Gift } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Gift, HelpCircle } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import api from '@/lib/api';
 
 interface Reward {
@@ -89,13 +98,15 @@ export default function LoyaltyRewards() {
     };
 
     const handleEdit = (reward: Reward) => {
+        const rawValue = reward.reward_value;
+        const valueStr = typeof rawValue === 'string' ? rawValue : JSON.stringify(rawValue);
         setEditingReward(reward);
         setForm({
             name: reward.name,
             description: reward.description || '',
             points_cost: reward.points_cost,
             reward_type: reward.reward_type,
-            reward_value: reward.reward_value || '',
+            reward_value: valueStr || '',
             is_active: reward.is_active,
             stock: reward.stock?.toString() || '',
         });
@@ -140,8 +151,24 @@ export default function LoyaltyRewards() {
             free_class: 'Clase gratis',
             product: 'Producto',
             membership_extension: 'Extensión membresía',
+            bar_discount: 'Descuento barra',
+            free_drink: 'Bebida gratis',
+            product_discount: 'Descuento ropa',
+            discount_package: 'Descuento paquete',
         };
         return types[type] || type;
+    };
+
+    const getRewardValueHint = (type: string) => {
+        switch (type) {
+            case 'free_class': return '{"class_type":"Yoga Ashtanga"}';
+            case 'bar_discount':
+            case 'product_discount':
+            case 'discount_package':
+            case 'discount': return '{"discount_type":"percentage","amount":10}';
+            case 'free_drink': return '{"quantity":1}';
+            default: return '{}';
+        }
     };
 
     if (loading) {
@@ -227,6 +254,49 @@ export default function LoyaltyRewards() {
                                             placeholder="Ilimitado"
                                         />
                                     </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="reward_type">Tipo de recompensa</Label>
+                                    <Select
+                                        value={form.reward_type}
+                                        onValueChange={(v) => setForm({ ...form, reward_type: v, reward_value: getRewardValueHint(v) })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Selecciona tipo" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="free_class">Clase gratis</SelectItem>
+                                            <SelectItem value="bar_discount">Descuento en barra</SelectItem>
+                                            <SelectItem value="product_discount">Descuento en ropa</SelectItem>
+                                            <SelectItem value="free_drink">Bebida gratis</SelectItem>
+                                            <SelectItem value="discount_package">Descuento en paquete</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-1.5">
+                                        <Label htmlFor="reward_value">Valor (JSON)</Label>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                                            </TooltipTrigger>
+                                            <TooltipContent className="max-w-[280px]">
+                                                <p className="text-xs">
+                                                    <strong>free_class:</strong> {'{"class_type":"Yoga"}'}<br />
+                                                    <strong>bar_discount / product_discount:</strong> {'{"discount_type":"percentage","amount":10}'}<br />
+                                                    <strong>free_drink:</strong> {'{"quantity":1}'}
+                                                </p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                    <Textarea
+                                        id="reward_value"
+                                        value={form.reward_value}
+                                        onChange={(e) => setForm({ ...form, reward_value: e.target.value })}
+                                        rows={3}
+                                        className="font-mono text-xs"
+                                        placeholder={getRewardValueHint(form.reward_type)}
+                                    />
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <Label>Activa</Label>

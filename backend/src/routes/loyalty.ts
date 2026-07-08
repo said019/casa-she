@@ -256,9 +256,10 @@ router.post('/rewards', authenticate, requireRole('admin'), async (req: Request,
         const points = req.body.points_cost ?? req.body.points_required ?? 0;
         const rtype = reward_type || 'bar_discount';
 
-        // Validar que reward_type sea conocido y reward_value tenga la estructura correcta
+        // Validar y parsear reward_value
+        let parsedValue: BenefitValue;
         try {
-          validateRewardValue(rtype, reward_value);
+          parsedValue = validateRewardValue(rtype, reward_value);
         } catch (valErr: any) {
           return res.status(400).json({
             error: 'reward_value inválido para este tipo de recompensa',
@@ -268,9 +269,9 @@ router.post('/rewards', authenticate, requireRole('admin'), async (req: Request,
 
         const result = await queryOne(
             `INSERT INTO loyalty_rewards (name, description, points_required, points_cost, reward_type, reward_value, is_active, stock)
-             VALUES ($1, $2, $3, $3, $4, $5, $6, $7)
+             VALUES ($1, $2, $3, $3, $4, $5::jsonb, $6, $7)
              RETURNING *`,
-            [name, description, points, rtype, JSON.stringify(reward_value), is_active ?? true, stock ?? null]
+            [name, description, points, rtype, JSON.stringify(parsedValue), is_active ?? true, stock ?? null]
         );
 
         res.status(201).json(result);
@@ -288,7 +289,8 @@ router.put('/rewards/:id', authenticate, requireRole('admin'), async (req: Reque
         const { id } = req.params;
         const { name, description, points_cost, reward_type, reward_value, is_active, stock } = req.body;
 
-        // Validar reward_value si se está actualizando tipo o valor
+        // Validar y parsear reward_value si se está actualizando tipo o valor
+        let parsedRewardValue: string | undefined;
         if (reward_type || reward_value !== undefined) {
           const existing = await queryOne<{ reward_type: string }>(
             `SELECT reward_type FROM loyalty_rewards WHERE id = $1`, [id]
@@ -298,7 +300,8 @@ router.put('/rewards/:id', authenticate, requireRole('admin'), async (req: Reque
           }
           const rtype = reward_type || existing.reward_type;
           try {
-            validateRewardValue(rtype, reward_value ?? {});
+            const validated = validateRewardValue(rtype, reward_value ?? {});
+            parsedRewardValue = JSON.stringify(validated);
           } catch (valErr: any) {
             return res.status(400).json({
               error: 'reward_value inválido para este tipo de recompensa',
@@ -306,8 +309,6 @@ router.put('/rewards/:id', authenticate, requireRole('admin'), async (req: Reque
             });
           }
         }
-
-        const sv = reward_value !== undefined ? JSON.stringify(reward_value) : undefined;
 
         const result = await queryOne(
             `UPDATE loyalty_rewards
@@ -321,7 +322,7 @@ router.put('/rewards/:id', authenticate, requireRole('admin'), async (req: Reque
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $8
              RETURNING *`,
-            [name, description, points_cost, reward_type, sv, is_active, stock, id]
+            [name, description, points_cost, reward_type, parsedRewardValue, is_active, stock, id]
         );
 
         if (!result) {
