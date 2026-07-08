@@ -318,4 +318,82 @@ router.delete('/orders/:id', authenticate, async (req: Request, res: Response) =
   res.json({ ok: true });
 });
 
+// ─── bar_extras CRUD ───────────────────────────────────────────────────────
+
+const CreateBarExtra = z.object({
+  name:        z.string().min(1).max(120),
+  group_label: z.string().min(1).max(80),
+  is_single:   z.boolean(),
+  price_mxn:   z.number().min(0),
+  sort_order:  z.number().int().optional().default(0),
+  is_active:   z.boolean().optional().default(true),
+});
+
+const UpdateBarExtra = CreateBarExtra.partial();
+
+// GET /api/bar/extras
+// Authenticated clients get only is_active=true rows.
+// Admins/super_admins may pass ?all=1 to receive all rows (including inactive).
+router.get('/extras', authenticate, async (req: Request, res: Response) => {
+  const isAdmin = ['admin', 'super_admin'].includes(req.user!.role);
+  const wantAll = req.query.all === '1' && isAdmin;
+  const rows = await query<{
+    id: string; name: string; group_label: string; is_single: boolean;
+    price_mxn: string; sort_order: number; is_active: boolean; created_at: string;
+  }>(
+    `SELECT id, name, group_label, is_single, price_mxn, sort_order, is_active, created_at
+     FROM bar_extras
+     ${wantAll ? '' : 'WHERE is_active = true'}
+     ORDER BY group_label, sort_order, name`
+  );
+  res.json(rows.map(r => ({ ...r, price_mxn: Number(r.price_mxn) })));
+});
+
+// POST /api/bar/extras (admin)
+router.post('/extras', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
+  const parsed = CreateBarExtra.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Datos invalidos', details: parsed.error.flatten().fieldErrors });
+  const { name, group_label, is_single, price_mxn, sort_order, is_active } = parsed.data;
+  const row = await queryOne<{
+    id: string; name: string; group_label: string; is_single: boolean;
+    price_mxn: string; sort_order: number; is_active: boolean; created_at: string;
+  }>(
+    `INSERT INTO bar_extras (name, group_label, is_single, price_mxn, sort_order, is_active)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, group_label, is_single, price_mxn, sort_order, is_active, created_at`,
+    [name, group_label, is_single, price_mxn, sort_order, is_active]
+  );
+  if (!row) return res.status(500).json({ error: 'INSERT_FAILED' });
+  res.status(201).json({ ...row, price_mxn: Number(row.price_mxn) });
+});
+
+// PUT /api/bar/extras/:id (admin)
+router.put('/extras/:id', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
+  const parsed = UpdateBarExtra.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Datos invalidos', details: parsed.error.flatten().fieldErrors });
+  const fields = parsed.data as Record<string, unknown>;
+  const keys = Object.keys(fields).filter(k => fields[k] !== undefined);
+  if (keys.length === 0) return res.status(400).json({ error: 'NO_FIELDS' });
+  const setClauses = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
+  const values = keys.map(k => fields[k]);
+  const row = await queryOne<{
+    id: string; name: string; group_label: string; is_single: boolean;
+    price_mxn: string; sort_order: number; is_active: boolean; created_at: string;
+  }>(
+    `UPDATE bar_extras SET ${setClauses}, updated_at = NOW() WHERE id = $1
+     RETURNING id, name, group_label, is_single, price_mxn, sort_order, is_active, created_at`,
+    [req.params.id, ...values]
+  );
+  if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
+  res.json({ ...row, price_mxn: Number(row.price_mxn) });
+});
+
+// DELETE /api/bar/extras/:id (admin)
+router.delete('/extras/:id', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
+  const row = await queryOne<{ id: string }>(
+    `DELETE FROM bar_extras WHERE id = $1 RETURNING id`, [req.params.id]
+  );
+  if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
+  res.json({ ok: true });
+});
+
 export default router;
