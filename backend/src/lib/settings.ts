@@ -153,6 +153,13 @@ const DEFAULTS: SettingsMap = {
         },
         lead_time_max_hours: 4,
         pickup_offset_minutes: -2,
+        cancellation_window_minutes: 60,
+        card_surcharge_percent: 0,
+        card_enabled: true,
+        points_enabled: false,
+        points_redemption_rate: 10,
+        preparing_push: true,
+        prep_time_minutes: 15,
     },
 };
 

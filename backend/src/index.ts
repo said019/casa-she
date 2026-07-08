@@ -3097,6 +3097,18 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Migration BAR-01: bar_orders + bar_order_items listas.');
     } catch (e) { console.error('Migration BAR-01 error:', e); }
 
+    // Migration BAR-02: columnas Fase 2 + permitir payment_method 'points'.
+    try {
+        await query(`ALTER TABLE bar_orders
+            ADD COLUMN IF NOT EXISTS points_spent INTEGER,
+            ADD COLUMN IF NOT EXISTS card_surcharge_mxn NUMERIC(10,2) NOT NULL DEFAULT 0`);
+        // Ampliar el CHECK de payment_method para incluir 'points' (drop + add, idempotente).
+        await query(`ALTER TABLE bar_orders DROP CONSTRAINT IF EXISTS bar_orders_payment_method_check`);
+        await query(`ALTER TABLE bar_orders ADD CONSTRAINT bar_orders_payment_method_check
+            CHECK (payment_method IN ('reception','card','points'))`);
+        console.log('Migration BAR-02: columnas Fase 2 + payment_method points listas.');
+    } catch (e) { console.error('Migration BAR-02 error:', e); }
+
     // Seed BAR-menu: categorías + productos reales del menú Casa Shé (idempotente).
     try {
         await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities(id)`);

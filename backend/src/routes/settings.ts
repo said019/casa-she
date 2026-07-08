@@ -135,6 +135,13 @@ router.put('/bar-config', authenticate, requireRole('admin', 'super_admin'), asy
     operating_hours: b.operating_hours ?? {},
     lead_time_max_hours: Number(b.lead_time_max_hours ?? 4),
     pickup_offset_minutes: Number(b.pickup_offset_minutes ?? -2),
+    cancellation_window_minutes: Number(b.cancellation_window_minutes ?? 60),
+    card_surcharge_percent: Number(b.card_surcharge_percent ?? 0),
+    card_enabled: b.card_enabled !== false,
+    points_enabled: b.points_enabled === true,
+    points_redemption_rate: Number(b.points_redemption_rate ?? 10),
+    preparing_push: b.preparing_push !== false,
+    prep_time_minutes: Number(b.prep_time_minutes ?? 15),
   };
   await setSetting('bar_config', value as any, req.user?.userId);
   res.json({ message: 'Configuración de barra guardada', bar_config: value });

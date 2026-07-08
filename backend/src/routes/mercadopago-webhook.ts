@@ -62,7 +62,7 @@ router.post('/', async (req: Request, res: Response) => {
             `UPDATE bar_orders SET mp_payment_id=$1, provider='mercadopago', updated_at=NOW() WHERE id=$2`,
             [String(payment.id), barOrderId]);
           if (payment.status === 'approved') {
-            await finalizeBarOrder(barOrderId, { provider: 'mercadopago', paymentRef: String(payment.id) });
+            await finalizeBarOrder(barOrderId, { provider: 'mercadopago', paymentRef: String(payment.id), paidAmount: payment.transaction_amount });
           } else if (payment.status === 'rejected' || payment.status === 'cancelled') {
             await query(`UPDATE bar_orders SET payment_status='failed', updated_at=NOW() WHERE id=$1 AND payment_status='pending'`, [barOrderId]);
           }

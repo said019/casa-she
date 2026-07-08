@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { isBarOpenAt, computeBarTotals, canBarTransition, type BarConfig } from '../src/lib/bar.js';
+import { isBarOpenAt, computeBarTotals, canBarTransition, pointsForTotal, canCustomerCancel, type BarConfig } from '../src/lib/bar.js';
 
 const cfg: BarConfig = {
   enabled: true,
@@ -7,6 +7,13 @@ const cfg: BarConfig = {
   operating_hours: { 0: null, 1: { open: '07:00', close: '20:00' }, 2: { open: '07:00', close: '20:00' } },
   lead_time_max_hours: 4,
   pickup_offset_minutes: -2,
+  cancellation_window_minutes: 60,
+  card_surcharge_percent: 0,
+  card_enabled: true,
+  points_enabled: false,
+  points_redemption_rate: 10,
+  preparing_push: true,
+  prep_time_minutes: 15,
 };
 
 // isBarOpenAt: dentro del horario del lunes
@@ -31,5 +38,26 @@ assert.equal(canBarTransition('pending', 'cancelled', 'customer'), true, 'client
 assert.equal(canBarTransition('preparing', 'cancelled', 'customer'), false, 'cliente NO cancela preparing');
 assert.equal(canBarTransition('delivered', 'preparing', 'staff'), false, 'terminal no transiciona');
 assert.equal(canBarTransition('pending', 'ready', 'staff'), false, 'no salta de pending a ready');
+
+// computeBarTotals con recargo por tarjeta
+const withFee = computeBarTotals([{ unit_price_mxn: 100, quantity: 1 }], { surchargePercent: 4 });
+assert.equal(withFee.subtotal_mxn, 100);
+assert.equal(withFee.surcharge_mxn, 4);
+assert.equal(withFee.total_mxn, 104);
+// sin recargo (default 0) — retrocompatible
+const noFee = computeBarTotals([{ unit_price_mxn: 85, quantity: 2 }]);
+assert.equal(noFee.subtotal_mxn, 170);
+assert.equal(noFee.surcharge_mxn, 0);
+assert.equal(noFee.total_mxn, 170);
+
+// pointsForTotal: $120 a tasa 10 = 12 puntos; redondea hacia arriba
+assert.equal(pointsForTotal(120, 10), 12);
+assert.equal(pointsForTotal(125, 10), 13);
+assert.equal(pointsForTotal(100, 0), Infinity); // tasa inválida
+
+// canCustomerCancel: recogida a >window minutos → true
+const now = new Date('2026-07-07T10:00:00-06:00');
+assert.equal(canCustomerCancel(new Date('2026-07-07T12:00:00-06:00'), now, 60), true);  // 120min > 60
+assert.equal(canCustomerCancel(new Date('2026-07-07T10:30:00-06:00'), now, 60), false); // 30min < 60
 
 console.log('test-bar OK');

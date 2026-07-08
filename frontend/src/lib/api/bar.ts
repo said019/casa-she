@@ -16,11 +16,40 @@ export interface BarMenu {
   products: BarProduct[];
 }
 
+export interface BarClientConfig {
+  enabled: boolean;
+  card_enabled: boolean;
+  points_enabled: boolean;
+  points_redemption_rate: number;
+  card_surcharge_percent: number;
+  cancellation_window_minutes: number;
+  prep_time_minutes: number;
+}
+
+export interface PickupAfterClass {
+  pickup_iso: string;
+  class_name: string;
+  ends_iso: string;
+}
+
+export interface PickupSuggestions {
+  after_class: PickupAfterClass | null;
+  manual_window: { earliest_iso: string; latest_iso: string };
+}
+
 export function useBarConfig() {
   return useQuery({
     queryKey: ['bar-config-client'],
-    queryFn: async () => (await api.get('/bar/config')).data as { enabled: boolean },
+    queryFn: async () => (await api.get('/bar/config')).data as BarClientConfig,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function usePickupSuggestions() {
+  return useQuery({
+    queryKey: ['bar-pickup-suggestions'],
+    queryFn: async () => (await api.get('/bar/pickup-suggestions')).data as PickupSuggestions,
+    staleTime: 60 * 1000,
   });
 }
 
