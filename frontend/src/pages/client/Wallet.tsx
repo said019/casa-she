@@ -237,7 +237,11 @@ export default function WalletClub() {
       free_class: CalendarPlus,
       product: Package,
       membership_extension: Award,
-    } as const;
+      bar_discount: BadgePercent,
+      product_discount: BadgePercent,
+      free_drink: Package,
+      discount_package: BadgePercent,
+    };
     return icons[type as keyof typeof icons] || Sparkles;
   };
 

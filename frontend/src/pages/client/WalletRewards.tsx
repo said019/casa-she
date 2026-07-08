@@ -44,6 +44,10 @@ const rewardTypeLabels: Record<string, string> = {
   free_class: 'Clase gratis',
   product: 'Producto',
   membership_extension: 'Membresía',
+  bar_discount: 'Descuento barra',
+  product_discount: 'Descuento ropa',
+  free_drink: 'Bebida gratis',
+  discount_package: 'Descuento paquete',
 };
 
 const rewardTypeIcons = {
@@ -51,7 +55,32 @@ const rewardTypeIcons = {
   free_class: CalendarPlus,
   product: Package,
   membership_extension: Award,
+  bar_discount: BadgePercent,
+  product_discount: BadgePercent,
+  free_drink: Package,
+  discount_package: BadgePercent,
 } as const;
+
+function formatRewardValue(reward: LoyaltyReward): string {
+  const raw = reward.reward_value;
+  if (!raw) return '';
+  let v: any = raw;
+  if (typeof raw === 'string') {
+    try { v = JSON.parse(raw); } catch { return raw; }
+  }
+  switch (reward.reward_type) {
+    case 'free_class':
+      return `Tipo: ${v.class_type || 'cualquiera'}`;
+    case 'bar_discount':
+    case 'product_discount':
+    case 'discount_package':
+      return `${v.discount_type === 'fixed' ? `$${v.amount}` : `${v.amount}%`} de descuento`;
+    case 'free_drink':
+      return `${v.quantity || 1} bebida(s) gratis`;
+    default:
+      return '';
+  }
+}
 
 export default function WalletRewards() {
   const [selectedReward, setSelectedReward] = useState<LoyaltyReward | null>(null);
@@ -215,6 +244,11 @@ export default function WalletRewards() {
                       <p className="min-h-10 text-sm text-muted-foreground">
                         {reward.description || 'Beneficio disponible para miembros del programa de lealtad.'}
                       </p>
+                      {formatRewardValue(reward) && (
+                        <p className="text-sm font-medium text-balance-olive">
+                          {formatRewardValue(reward)}
+                        </p>
+                      )}
                       <div className="flex items-center justify-between rounded-xl border bg-background/70 p-3">
                         <span className="text-sm text-muted-foreground">Costo</span>
                         <span className="font-semibold text-balance-olive">{reward.points_cost} pts</span>
