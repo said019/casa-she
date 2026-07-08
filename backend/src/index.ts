@@ -108,10 +108,23 @@ const authLimiter = rateLimit({
 });
 
 // Middleware
+const allowedOrigins = [
+    'https://frontend-production-435d.up.railway.app',
+    'https://casashe.mx',
+    'https://www.casashe.mx',
+    'http://localhost:5173',
+    'http://localhost:3000',
+];
+if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(process.env.FRONTEND_URL);
+}
 const corsOptions: cors.CorsOptions = {
     origin: (origin, callback) => {
-        // Allow all origins (including null for mobile/desktop apps)
-        callback(null, origin || '*');
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error(`CORS bloqueado: ${origin}`));
+        }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
