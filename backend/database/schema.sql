@@ -36,7 +36,7 @@ CREATE TYPE class_status AS ENUM ('scheduled', 'in_progress', 'completed', 'canc
 CREATE TYPE booking_status AS ENUM ('confirmed', 'waitlist', 'checked_in', 'no_show', 'cancelled');
 
 -- Loyalty points type
-CREATE TYPE loyalty_points_type AS ENUM ('class_attended', 'referral', 'bonus', 'redemption');
+CREATE TYPE loyalty_points_type AS ENUM ('class_attended', 'referral', 'bonus', 'redemption', 'welcome', 'package_purchase', 'birthday', 'anniversary', 'streak', 'adjustment');
 
 -- Reward categories
 CREATE TYPE reward_category AS ENUM ('merchandise', 'class', 'discount', 'experience');
@@ -268,7 +268,7 @@ CREATE TABLE loyalty_points (
     type loyalty_points_type NOT NULL,
     description TEXT,
     related_booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
-    related_reward_id UUID, -- Will be FK to rewards
+    related_reward_id UUID, -- Reserved for future use
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -278,37 +278,15 @@ CREATE INDEX idx_loyalty_points_type ON loyalty_points(type);
 CREATE INDEX idx_loyalty_points_created ON loyalty_points(created_at);
 
 -- ----------------------------------------
--- REWARDS TABLE
--- ----------------------------------------
-CREATE TABLE rewards (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    points_cost INTEGER NOT NULL,
-    category reward_category NOT NULL,
-    image_url TEXT,
-    stock INTEGER, -- NULL = unlimited
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Add FK to loyalty_points after rewards table exists
-ALTER TABLE loyalty_points 
-ADD CONSTRAINT fk_loyalty_related_reward 
-FOREIGN KEY (related_reward_id) REFERENCES rewards(id) ON DELETE SET NULL;
-
--- Index for rewards
-CREATE INDEX idx_rewards_active ON rewards(is_active);
-CREATE INDEX idx_rewards_category ON rewards(category);
-
--- ----------------------------------------
 -- REDEMPTIONS TABLE
 -- ----------------------------------------
+-- Note: loyalty_rewards table is created via migration (index.ts:2179)
+-- FK from redemptions.reward_id to loyalty_rewards(id) is also established via migration (index.ts:1129)
 CREATE TABLE redemptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    reward_id UUID NOT NULL REFERENCES rewards(id) ON DELETE RESTRICT,
+    reward_id UUID NOT NULL,
+    -- reward_id references loyalty_rewards.id (FK added by migration)
     points_spent INTEGER NOT NULL,
     status redemption_status NOT NULL DEFAULT 'pending',
     fulfilled_at TIMESTAMP WITH TIME ZONE,
@@ -453,10 +431,6 @@ CREATE TRIGGER update_classes_updated_at
 
 CREATE TRIGGER update_bookings_updated_at
     BEFORE UPDATE ON bookings
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_rewards_updated_at
-    BEFORE UPDATE ON rewards
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_redemptions_updated_at

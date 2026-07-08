@@ -8,3 +8,7 @@ build/
 coverage/
 playwright-report/
 test-results/
+
+# Skills locales de Claude (instaladas con npx skills add) — no son código del proyecto
+.agents/
+skills-lock.json

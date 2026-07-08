@@ -50,15 +50,6 @@ export interface NotificationSettings {
     send_points_earned: boolean;
 }
 
-export interface LoyaltyConfig {
-    points_per_class: number;
-    points_per_peso: number;
-    enabled: boolean;
-    welcome_bonus: number;
-    birthday_bonus: number;
-    referral_bonus: number;
-}
-
 export interface BankInfo {
     bank_name: string;
     account_holder: string;
@@ -88,7 +79,6 @@ export interface SettingsMap {
     studio_info: StudioInfo;
     booking_policies: BookingPolicies;
     notification_settings: NotificationSettings;
-    loyalty_config: LoyaltyConfig;
     bank_info: BankInfo;
     general_settings: GeneralSettings;
     whatsapp_templates: WhatsAppTemplates;
@@ -128,14 +118,6 @@ const DEFAULTS: SettingsMap = {
         send_class_reminder: true,
         send_membership_expiring: true,
         send_points_earned: true,
-    },
-    loyalty_config: {
-        points_per_class: 10,
-        points_per_peso: 1,
-        enabled: true,
-        welcome_bonus: 50,
-        birthday_bonus: 100,
-        referral_bonus: 200,
     },
     bank_info: {
         bank_name: 'Mercado Pago',

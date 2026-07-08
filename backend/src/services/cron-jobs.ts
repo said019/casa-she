@@ -21,7 +21,7 @@ import {
     sendWhatsAppMessage,
 } from '../lib/whatsapp.js';
 import { writeInAppNotification } from '../lib/in-app-notifications.js';
-import { awardCheckinPoints, getLoyaltyConfig } from '../lib/loyalty.js';
+import { awardCheckinPoints, getLoyaltyConfig, type DbClient } from '../lib/loyalty.js';
 
 // ============================================
 // TIPOS
@@ -208,7 +208,7 @@ async function requestReviews(): Promise<void> {
                     await sendCustomNotification({
                         membershipId: booking.membership_id,
                         title: '⭐ ¿Cómo estuvo tu clase?',
-                        message: `Cuéntanos tu experiencia en ${booking.class_type} y gana 50 puntos`,
+                        message: `Cuéntanos tu experiencia en ${booking.class_type}`,
                     });
                 }
 
@@ -535,17 +535,24 @@ async function expireReviewRequests(): Promise<void> {
 // JOB 10: BIRTHDAY BONUS — +100 pts (with active membership)
 // ============================================
 
-async function birthdayBonus(): Promise<void> {
+export async function birthdayBonus(client?: DbClient): Promise<void> {
     const jobName = 'BIRTHDAY_BONUS';
+    const q = client
+        ? (text: string, params?: unknown[]) => client.query(text, params).then(r => r.rows)
+        : (text: string, params?: unknown[]) => query(text, params as any[]);
+    const q1 = client
+        ? (text: string, params?: unknown[]) => client.query(text, params).then(r => r.rows[0] ?? null)
+        : (text: string, params?: unknown[]) => queryOne(text, params as any[]);
     logJob(jobName, 'Birthday bonus check…');
     try {
-        const config = await getLoyaltyConfig();
+        const config = await getLoyaltyConfig(client ?? null);
         if (!config.enabled) { await recordJobExecution(jobName, true, 'loyalty disabled'); return; }
+        if (!config.birthday_enabled) { await recordJobExecution(jobName, true, 'birthday disabled (toggle)'); return; }
         const points = config.birthday_bonus;
         if (points <= 0) { await recordJobExecution(jobName, true, 'birthday_bonus = 0'); return; }
 
         // Users whose date_of_birth matches today (MM-DD) and have an active membership
-        const targets = await query(`
+        const targets = await q(`
             SELECT u.id, u.display_name, u.email, u.phone
             FROM users u
             WHERE u.date_of_birth IS NOT NULL
@@ -561,16 +568,16 @@ async function birthdayBonus(): Promise<void> {
         let granted = 0;
         for (const u of targets) {
             const desc = `Cumpleaños ${today}`;
-            const exists = await queryOne(
+            const exists = await q1(
                 `SELECT id FROM loyalty_points WHERE user_id = $1 AND description = $2 LIMIT 1`,
                 [u.id, desc]
             );
             if (exists) continue;
-            await query(
+            await q(
                 `INSERT INTO loyalty_points (user_id, points, type, description) VALUES ($1, $2, 'birthday', $3)`,
                 [u.id, points, desc]
             );
-            await query(
+            await q(
                 `UPDATE users SET loyalty_points = COALESCE(loyalty_points, 0) + $1 WHERE id = $2`,
                 [points, u.id]
             );
@@ -588,17 +595,24 @@ async function birthdayBonus(): Promise<void> {
 // JOB 11: ANNIVERSARY BONUS — +40 pts (1 year, with active membership)
 // ============================================
 
-async function anniversaryBonus(): Promise<void> {
+export async function anniversaryBonus(client?: DbClient): Promise<void> {
     const jobName = 'ANNIVERSARY_BONUS';
+    const q = client
+        ? (text: string, params?: unknown[]) => client.query(text, params).then(r => r.rows)
+        : (text: string, params?: unknown[]) => query(text, params as any[]);
+    const q1 = client
+        ? (text: string, params?: unknown[]) => client.query(text, params).then(r => r.rows[0] ?? null)
+        : (text: string, params?: unknown[]) => queryOne(text, params as any[]);
     logJob(jobName, 'Anniversary bonus check…');
     try {
-        const config = await getLoyaltyConfig();
+        const config = await getLoyaltyConfig(client ?? null);
         if (!config.enabled) { await recordJobExecution(jobName, true, 'loyalty disabled'); return; }
+        if (!config.anniversary_enabled) { await recordJobExecution(jobName, true, 'anniversary disabled (toggle)'); return; }
         const points = config.anniversary_bonus;
         if (points <= 0) { await recordJobExecution(jobName, true, 'anniversary_bonus = 0'); return; }
 
         // Users registered on this MM-DD, more than 1 year ago, with active membership
-        const targets = await query(`
+        const targets = await q(`
             SELECT u.id,
                    EXTRACT(YEAR FROM AGE(CURRENT_DATE, u.created_at))::int AS years
             FROM users u
@@ -615,16 +629,16 @@ async function anniversaryBonus(): Promise<void> {
         let granted = 0;
         for (const u of targets) {
             const desc = `Aniversario ${year}`;
-            const exists = await queryOne(
+            const exists = await q1(
                 `SELECT id FROM loyalty_points WHERE user_id = $1 AND description = $2 LIMIT 1`,
                 [u.id, desc]
             );
             if (exists) continue;
-            await query(
+            await q(
                 `INSERT INTO loyalty_points (user_id, points, type, description) VALUES ($1, $2, 'anniversary', $3)`,
                 [u.id, points, desc]
             );
-            await query(
+            await q(
                 `UPDATE users SET loyalty_points = COALESCE(loyalty_points, 0) + $1 WHERE id = $2`,
                 [points, u.id]
             );
@@ -642,19 +656,26 @@ async function anniversaryBonus(): Promise<void> {
 // JOB 12: STREAK BONUS — +10 pts every 2 consecutive ISO weeks attended
 // ============================================
 
-async function streakBonus(): Promise<void> {
+export async function streakBonus(client?: DbClient): Promise<void> {
     const jobName = 'STREAK_BONUS';
+    const q = client
+        ? (text: string, params?: unknown[]) => client.query(text, params).then(r => r.rows)
+        : (text: string, params?: unknown[]) => query(text, params as any[]);
+    const q1 = client
+        ? (text: string, params?: unknown[]) => client.query(text, params).then(r => r.rows[0] ?? null)
+        : (text: string, params?: unknown[]) => queryOne(text, params as any[]);
     logJob(jobName, 'Streak bonus check…');
     try {
-        const config = await getLoyaltyConfig();
+        const config = await getLoyaltyConfig(client ?? null);
         if (!config.enabled) { await recordJobExecution(jobName, true, 'loyalty disabled'); return; }
+        if (!config.streak_enabled) { await recordJobExecution(jobName, true, 'streak disabled (toggle)'); return; }
         const points = config.streak_bonus;
         if (points <= 0) { await recordJobExecution(jobName, true, 'streak_bonus = 0'); return; }
 
         // For each user whose checked-in attendance covers BOTH the previous ISO week
         // and the current ISO week, grant +10 pts (one bonus per pair of weeks).
         // Idempotency: description embeds the LATER week (e.g. "Racha 2026-W18 + W19").
-        const rows = await query(`
+        const rows = await q(`
             WITH recent AS (
                 SELECT b.user_id,
                        DATE_TRUNC('week', c.date)::date AS week_start
@@ -678,16 +699,16 @@ async function streakBonus(): Promise<void> {
             const prevTag = `${r.prev_week.toISOString().slice(0, 10)}`;
             const currTag = `${r.curr_week.toISOString().slice(0, 10)}`;
             const desc = `Racha ${prevTag} + ${currTag}`;
-            const exists = await queryOne(
+            const exists = await q1(
                 `SELECT id FROM loyalty_points WHERE user_id = $1 AND description = $2 LIMIT 1`,
                 [r.user_id, desc]
             );
             if (exists) continue;
-            await query(
+            await q(
                 `INSERT INTO loyalty_points (user_id, points, type, description) VALUES ($1, $2, 'streak', $3)`,
                 [r.user_id, points, desc]
             );
-            await query(
+            await q(
                 `UPDATE users SET loyalty_points = COALESCE(loyalty_points, 0) + $1 WHERE id = $2`,
                 [points, r.user_id]
             );
@@ -865,15 +886,15 @@ export function initializeCronJobs(): void {
     console.log('  ✅ EXPIRE_REVIEWS - Diario 2:00 AM');
 
     // 9:00 AM - Birthday bonuses
-    cron.schedule('0 9 * * *', birthdayBonus, { timezone: 'America/Mexico_City' });
+    cron.schedule('0 9 * * *', () => { void birthdayBonus(); }, { timezone: 'America/Mexico_City' });
     console.log('  ✅ BIRTHDAY_BONUS - Diario 9:00 AM');
 
     // 9:05 AM - Anniversary bonuses
-    cron.schedule('5 9 * * *', anniversaryBonus, { timezone: 'America/Mexico_City' });
+    cron.schedule('5 9 * * *', () => { void anniversaryBonus(); }, { timezone: 'America/Mexico_City' });
     console.log('  ✅ ANNIVERSARY_BONUS - Diario 9:05 AM');
 
     // Daily at 1:00 AM - Streak detection
-    cron.schedule('0 1 * * *', streakBonus, { timezone: 'America/Mexico_City' });
+    cron.schedule('0 1 * * *', () => { void streakBonus(); }, { timezone: 'America/Mexico_City' });
     console.log('  ✅ STREAK_BONUS - Diario 1:00 AM');
 
     // Recordatorios de clase DESACTIVADOS (24h y 2h). Mientras las clientas sigan

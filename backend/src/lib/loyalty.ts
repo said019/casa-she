@@ -12,9 +12,12 @@ export interface LoyaltyConfig {
   enabled: boolean;
   welcome_bonus: number;          // on registration
   birthday_bonus: number;         // requires active membership
+  birthday_enabled: boolean;      // toggle admin: otorgar bono de cumpleaños
   anniversary_bonus: number;      // 1 year since registration, requires active membership
+  anniversary_enabled: boolean;   // toggle admin: otorgar bono de aniversario
   referral_bonus: number;         // to referrer when their code is used on a paid order
   streak_bonus: number;           // every 2 consecutive weeks attending
+  streak_enabled: boolean;        // toggle admin: otorgar bono de racha
 }
 
 export const DEFAULT_LOYALTY_CONFIG: LoyaltyConfig = {
@@ -25,9 +28,12 @@ export const DEFAULT_LOYALTY_CONFIG: LoyaltyConfig = {
   enabled: true,
   welcome_bonus: 10,
   birthday_bonus: 100,
+  birthday_enabled: true,
   anniversary_bonus: 40,
+  anniversary_enabled: true,
   referral_bonus: 40,
   streak_bonus: 10,
+  streak_enabled: true,
 };
 
 /**
@@ -54,12 +60,19 @@ const toNonNegativeInt = (value: unknown, fallback: number): number => {
   return Math.max(0, Math.floor(parsed));
 };
 
-const normalizeConfig = (value: unknown): LoyaltyConfig => {
+export const normalizeConfig = (value: unknown): LoyaltyConfig => {
   if (!value || typeof value !== 'object') {
     return { ...DEFAULT_LOYALTY_CONFIG };
   }
 
   const raw = value as Record<string, unknown>;
+
+  const coerceBooleanToggle = (val: unknown, defaultVal: boolean): boolean => {
+    if (val === undefined) {
+      return defaultVal;
+    }
+    return Boolean(val);
+  };
 
   return {
     points_per_class: toNonNegativeInt(raw.points_per_class, DEFAULT_LOYALTY_CONFIG.points_per_class),
@@ -75,9 +88,12 @@ const normalizeConfig = (value: unknown): LoyaltyConfig => {
           : Boolean(raw.enabled),
     welcome_bonus: toNonNegativeInt(raw.welcome_bonus, DEFAULT_LOYALTY_CONFIG.welcome_bonus),
     birthday_bonus: toNonNegativeInt(raw.birthday_bonus, DEFAULT_LOYALTY_CONFIG.birthday_bonus),
+    birthday_enabled: coerceBooleanToggle(raw.birthday_enabled, DEFAULT_LOYALTY_CONFIG.birthday_enabled),
     anniversary_bonus: toNonNegativeInt(raw.anniversary_bonus, DEFAULT_LOYALTY_CONFIG.anniversary_bonus),
+    anniversary_enabled: coerceBooleanToggle(raw.anniversary_enabled, DEFAULT_LOYALTY_CONFIG.anniversary_enabled),
     referral_bonus: toNonNegativeInt(raw.referral_bonus, DEFAULT_LOYALTY_CONFIG.referral_bonus),
     streak_bonus: toNonNegativeInt(raw.streak_bonus, DEFAULT_LOYALTY_CONFIG.streak_bonus),
+    streak_enabled: coerceBooleanToggle(raw.streak_enabled, DEFAULT_LOYALTY_CONFIG.streak_enabled),
   };
 };
 
