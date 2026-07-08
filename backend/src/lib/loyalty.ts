@@ -18,6 +18,7 @@ export interface LoyaltyConfig {
   referral_bonus: number;         // to referrer when their code is used on a paid order
   streak_bonus: number;           // every 2 consecutive weeks attending
   streak_enabled: boolean;        // toggle admin: otorgar bono de racha
+  benefit_expiration_days: number; // cuántos días de vigencia tiene un beneficio canjeado
 }
 
 export const DEFAULT_LOYALTY_CONFIG: LoyaltyConfig = {
@@ -34,6 +35,7 @@ export const DEFAULT_LOYALTY_CONFIG: LoyaltyConfig = {
   referral_bonus: 40,
   streak_bonus: 10,
   streak_enabled: true,
+  benefit_expiration_days: 30,   // 30 días de vigencia para beneficios
 };
 
 /**
@@ -94,6 +96,7 @@ export const normalizeConfig = (value: unknown): LoyaltyConfig => {
     referral_bonus: toNonNegativeInt(raw.referral_bonus, DEFAULT_LOYALTY_CONFIG.referral_bonus),
     streak_bonus: toNonNegativeInt(raw.streak_bonus, DEFAULT_LOYALTY_CONFIG.streak_bonus),
     streak_enabled: coerceBooleanToggle(raw.streak_enabled, DEFAULT_LOYALTY_CONFIG.streak_enabled),
+    benefit_expiration_days: Math.max(1, toNonNegativeInt(raw.benefit_expiration_days, DEFAULT_LOYALTY_CONFIG.benefit_expiration_days)),
   };
 };
 

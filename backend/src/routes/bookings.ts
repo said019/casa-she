@@ -594,7 +594,26 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
         }
 
         // === FREE CLASS PATH: skip membership check entirely ===
-        const isFreeClass = !!classDetails.is_free;
+        let isFreeClass = !!classDetails.is_free;
+
+        // === LOYALTY FREE CLASS BENEFIT: consume user_benefits ===
+        let freeClassBenefitId: string | null = null;
+        if (!isFreeClass) {
+            const freeBenefit = await queryOne<{ id: string }>(
+                `SELECT ub.id FROM user_benefits ub
+                 WHERE ub.user_id = $1
+                   AND ub.benefit_type = 'free_class'
+                   AND ub.status = 'active'
+                   AND ub.expires_at > NOW()
+                   AND (ub.class_type_id = $2 OR ub.class_type_id IS NULL)
+                 LIMIT 1`,
+                [userId, classDetails.class_type_id]
+            );
+            if (freeBenefit) {
+                freeClassBenefitId = freeBenefit.id;
+                isFreeClass = true;
+            }
+        }
 
         // ---- Transactional critical region ----
         // The duplicate-booking check, membership selection (FOR UPDATE lock),
@@ -742,6 +761,14 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                 [classId, userId, membershipId, isFreeClass, consumedCategory, userId]
             );
             newBooking = insertRes.rows[0];
+
+            // Consume free class benefit if used (only if still active — prevents double consumption)
+            if (freeClassBenefitId) {
+                await client.query(
+                    `UPDATE user_benefits SET status = 'used', used_at = NOW(), used_on_booking_id = $1 WHERE id = $2 AND status = 'active'`,
+                    [newBooking.id, freeClassBenefitId]
+                );
+            }
 
             await client.query('COMMIT');
         } catch (txErr) {

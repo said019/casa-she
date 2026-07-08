@@ -722,6 +722,19 @@ export async function streakBonus(client?: DbClient): Promise<void> {
     }
 }
 
+export async function expireBenefits(): Promise<void> {
+    const jobName = 'EXPIRE_BENEFITS';
+    try {
+        const result = await query(
+            `UPDATE user_benefits SET status = 'expired'
+             WHERE status = 'active' AND expires_at < NOW()`
+        );
+        logJob(jobName, `expired ${result} benefits`);
+    } catch (e: any) {
+        logJob(jobName, `error: ${e.message}`);
+    }
+}
+
 // ============================================
 // INICIALIZACIÓN
 // ============================================
@@ -897,6 +910,10 @@ export function initializeCronJobs(): void {
     cron.schedule('0 1 * * *', () => { void streakBonus(); }, { timezone: 'America/Mexico_City' });
     console.log('  ✅ STREAK_BONUS - Diario 1:00 AM');
 
+    // Daily at 1:30 AM - Expire loyalty benefits
+    cron.schedule('30 1 * * *', expireBenefits, { timezone: 'America/Mexico_City' });
+    console.log('  ✅ EXPIRE_BENEFITS - Diario 1:30 AM');
+
     // Recordatorios de clase DESACTIVADOS (24h y 2h). Mientras las clientas sigan
     // reservando/cancelando en Fitune, las cancelaciones llegan tarde a BMB y se mandaba
     // "no olvides tu clase" para clases ya canceladas; además Fitune ya manda sus propios
@@ -924,6 +941,7 @@ export const cronJobs = {
     birthdayBonus,
     anniversaryBonus,
     streakBonus,
+    expireBenefits,
     remind24h: () => sendClassReminders(24, '24h'),
     remind2h: () => sendClassReminders(2, '2h'),
 };

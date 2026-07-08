@@ -23,6 +23,7 @@ interface LoyaltyConfig {
     birthday_enabled: boolean;
     anniversary_enabled: boolean;
     streak_enabled: boolean;
+    benefit_expiration_days: number;
 }
 
 export default function LoyaltyConfig() {
@@ -43,6 +44,7 @@ export default function LoyaltyConfig() {
         birthday_enabled: true,
         anniversary_enabled: true,
         streak_enabled: true,
+        benefit_expiration_days: 30,
     });
     const { toast } = useToast();
 
@@ -332,6 +334,25 @@ export default function LoyaltyConfig() {
                                 />
                                 <p className="text-xs text-muted-foreground">
                                     Cada 2 semanas consecutivas asistiendo
+                                </p>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="benefit_expiration_days">Vigencia de beneficios (días)</Label>
+                                <Input
+                                    id="benefit_expiration_days"
+                                    type="number"
+                                    min={1}
+                                    max={365}
+                                    value={config.benefit_expiration_days}
+                                    onChange={(e) => setConfig({
+                                        ...config,
+                                        benefit_expiration_days: parseInt(e.target.value) || 30
+                                    })}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Días que dura un beneficio canjeado antes de expirar
                                 </p>
                             </div>
                         </div>

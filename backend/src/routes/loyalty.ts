@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { query, queryOne, pool } from '../config/database.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { getLoyaltyConfig, saveLoyaltyConfig, syncUserLoyaltyPointsSnapshot } from '../lib/loyalty.js';
+import { toBenefitType, validateRewardValue, BenefitValue, isFreeClassValue, isDiscountValue } from '../types/benefits.js';
 
 const router = Router();
 
@@ -38,6 +39,7 @@ router.get('/config-public', authenticate, async (_req: Request, res: Response) 
             anniversary_bonus: cfg.anniversary_bonus,
             referral_bonus: cfg.referral_bonus,
             streak_bonus: cfg.streak_bonus,
+            benefit_expiration_days: cfg.benefit_expiration_days,
         });
     } catch (error) {
         console.error('Get public loyalty config error:', error);
@@ -251,14 +253,24 @@ router.get('/rewards', authenticate, async (req: Request, res: Response) => {
 router.post('/rewards', authenticate, requireRole('admin'), async (req: Request, res: Response) => {
     try {
         const { name, description, reward_type, reward_value, is_active, stock } = req.body;
-        // Accept both points_cost (new) and points_required (legacy) — store in BOTH columns
         const points = req.body.points_cost ?? req.body.points_required ?? 0;
+        const rtype = reward_type || 'bar_discount';
+
+        // Validar que reward_type sea conocido y reward_value tenga la estructura correcta
+        try {
+          validateRewardValue(rtype, reward_value);
+        } catch (valErr: any) {
+          return res.status(400).json({
+            error: 'reward_value inválido para este tipo de recompensa',
+            detail: valErr.errors ?? valErr.message,
+          });
+        }
 
         const result = await queryOne(
             `INSERT INTO loyalty_rewards (name, description, points_required, points_cost, reward_type, reward_value, is_active, stock)
              VALUES ($1, $2, $3, $3, $4, $5, $6, $7)
              RETURNING *`,
-            [name, description, points, reward_type || 'discount', reward_value, is_active ?? true, stock ?? null]
+            [name, description, points, rtype, JSON.stringify(reward_value), is_active ?? true, stock ?? null]
         );
 
         res.status(201).json(result);
@@ -275,26 +287,47 @@ router.put('/rewards/:id', authenticate, requireRole('admin'), async (req: Reque
     try {
         const { id } = req.params;
         const { name, description, points_cost, reward_type, reward_value, is_active, stock } = req.body;
-        
+
+        // Validar reward_value si se está actualizando tipo o valor
+        if (reward_type || reward_value !== undefined) {
+          const existing = await queryOne<{ reward_type: string }>(
+            `SELECT reward_type FROM loyalty_rewards WHERE id = $1`, [id]
+          );
+          if (!existing) {
+            return res.status(404).json({ error: 'Recompensa no encontrada' });
+          }
+          const rtype = reward_type || existing.reward_type;
+          try {
+            validateRewardValue(rtype, reward_value ?? {});
+          } catch (valErr: any) {
+            return res.status(400).json({
+              error: 'reward_value inválido para este tipo de recompensa',
+              detail: valErr.errors ?? valErr.message,
+            });
+          }
+        }
+
+        const sv = reward_value !== undefined ? JSON.stringify(reward_value) : undefined;
+
         const result = await queryOne(
             `UPDATE loyalty_rewards
              SET name = COALESCE($1, name),
                  description = COALESCE($2, description),
                  points_cost = COALESCE($3, points_cost),
                  reward_type = COALESCE($4, reward_type),
-                 reward_value = COALESCE($5, reward_value),
+                 reward_value = COALESCE($5::jsonb, reward_value),
                  is_active = COALESCE($6, is_active),
                  stock = COALESCE($7, stock),
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $8
              RETURNING *`,
-            [name, description, points_cost, reward_type, reward_value, is_active, stock, id]
+            [name, description, points_cost, reward_type, sv, is_active, stock, id]
         );
-        
+
         if (!result) {
             return res.status(404).json({ error: 'Recompensa no encontrada' });
         }
-        
+
         res.json(result);
     } catch (error) {
         console.error('Update reward error:', error);
@@ -350,6 +383,47 @@ router.get('/redemptions', authenticate, requireRole('admin'), async (req: Reque
 });
 
 // ============================================
+// GET /api/loyalty/my-benefits - Active benefits for authenticated user
+// ============================================
+router.get('/my-benefits', authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) return res.status(401).json({ error: 'No autorizado' });
+
+        // Marcar expirados antes de consultar
+        await query(
+            `UPDATE user_benefits SET status = 'expired' WHERE user_id = $1 AND status = 'active' AND expires_at < NOW()`,
+            [userId]
+        );
+
+        const benefits = await query(
+            `SELECT ub.id, ub.benefit_type, ub.benefit_value, ub.status, ub.expires_at,
+                    ub.class_type_id, ub.used_at, ub.created_at,
+                    ct.name as class_type_name
+             FROM user_benefits ub
+             LEFT JOIN class_types ct ON ub.class_type_id = ct.id
+             WHERE ub.user_id = $1 AND ub.status = 'active'
+             ORDER BY ub.expires_at ASC`,
+            [userId]
+        );
+
+        res.json(benefits.map((b) => ({
+            id: b.id,
+            type: b.benefit_type,
+            value: b.benefit_value,
+            status: b.status,
+            expiresAt: b.expires_at,
+            classTypeId: b.class_type_id,
+            classTypeName: b.class_type_name,
+            createdAt: b.created_at,
+        })));
+    } catch (error) {
+        console.error('Get my-benefits error:', error);
+        res.status(500).json({ error: 'Error al obtener beneficios' });
+    }
+});
+
+// ============================================
 // POST /api/loyalty/redeem - Redeem a reward
 // ============================================
 router.post('/redeem', authenticate, async (req: Request, res: Response) => {
@@ -393,10 +467,10 @@ router.post('/redeem', authenticate, async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Puntos insuficientes' });
         }
 
-        // Registrar el canje (tabla redemptions; status 'pending' — se cumple en el studio).
+        // Registrar el canje (tabla redemptions; se cumple automáticamente con user_benefits).
         const redemptionRes = await client.query(
             `INSERT INTO redemptions (user_id, reward_id, points_spent, status)
-             VALUES ($1, $2, $3, 'pending')
+             VALUES ($1, $2, $3, 'fulfilled')
              RETURNING *`,
             [userId, rewardId, reward.points_cost]
         );
@@ -410,6 +484,43 @@ router.post('/redeem', authenticate, async (req: Request, res: Response) => {
         );
         await syncUserLoyaltyPointsSnapshot(userId, txDb);
 
+        // AUTO-FULFILLMENT: crear beneficio usable según reward_type (configurable por admin)
+        const loyaltyConfig = await getLoyaltyConfig(txDb);
+        const benefitType = toBenefitType(reward.reward_type);
+
+        let benefitValue: BenefitValue;
+        try {
+          benefitValue = validateRewardValue(reward.reward_type, reward.reward_value);
+        } catch (valErr: any) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            error: 'La configuración de esta recompensa tiene datos inválidos',
+            detail: valErr.message,
+          });
+        }
+
+        const expirationDays = loyaltyConfig.benefit_expiration_days > 0
+          ? loyaltyConfig.benefit_expiration_days
+          : 30;
+        const expiresAt = new Date(Date.now() + expirationDays * 24 * 60 * 60 * 1000).toISOString();
+
+        let classTypeId: string | null = null;
+        if (benefitType === 'free_class' && isFreeClassValue(benefitValue)) {
+          const ct = await client.query(
+            `SELECT id FROM class_types WHERE LOWER(name) = LOWER($1) AND is_active = true LIMIT 1`,
+            [benefitValue.class_type]
+          );
+          classTypeId = ct.rows[0]?.id ?? null;
+        }
+
+        const benefitRes = await client.query(
+          `INSERT INTO user_benefits (user_id, benefit_type, benefit_value, status, redemption_id, class_type_id, expires_at)
+           VALUES ($1, $2, $3::jsonb, 'active', $4, $5, $6)
+           RETURNING id, benefit_type, benefit_value, status, expires_at`,
+          [userId, benefitType, JSON.stringify(benefitValue), redemption.id, classTypeId, expiresAt]
+        );
+        const benefit = benefitRes.rows[0];
+
         // Descontar stock si aplica
         if (reward.stock !== null) {
             await client.query(
@@ -422,11 +533,24 @@ router.post('/redeem', authenticate, async (req: Request, res: Response) => {
             `SELECT loyalty_points FROM users WHERE id = $1`,
             [userId]
         );
+
+        // Marcar redemption como fulfilled
+        await client.query(
+            `UPDATE redemptions SET status = 'fulfilled', fulfilled_at = NOW() WHERE id = $1`,
+            [redemption.id]
+        );
+
         await client.query('COMMIT');
 
         res.json({
             message: 'Recompensa canjeada exitosamente',
-            redemption,
+            redemption: { ...redemption, status: 'fulfilled' },
+            benefit: {
+                id: benefit.id,
+                type: benefit.benefit_type,
+                value: benefit.benefit_value,
+                expiresAt: benefit.expires_at,
+            },
             newBalance: balRes.rows[0]?.loyalty_points ?? (user.loyalty_points - reward.points_cost)
         });
     } catch (error) {

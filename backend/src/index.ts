@@ -3563,6 +3563,29 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Casa Shé v1: catálogo, sede única y estado activo asegurados en cada arranque.');
     } catch (e) { console.error('Casa Shé v1 seed error:', e); }
 
+    // Migration 104: user_benefits — tabla de beneficios canjeados (recompensas de lealtad)
+    try {
+        await query(`CREATE TABLE IF NOT EXISTS user_benefits (
+            id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            benefit_type        VARCHAR(30) NOT NULL,
+            benefit_value       JSONB NOT NULL DEFAULT '{}',
+            status              VARCHAR(20) NOT NULL DEFAULT 'active',
+            redemption_id       UUID REFERENCES redemptions(id) ON DELETE SET NULL,
+            class_type_id       UUID REFERENCES class_types(id) ON DELETE SET NULL,
+            expires_at          TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '30 days'),
+            used_at             TIMESTAMPTZ,
+            used_on_booking_id  UUID,
+            used_on_bar_order_id UUID,
+            used_on_sale_id     UUID,
+            created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_user_benefits_user     ON user_benefits(user_id)`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_user_benefits_status   ON user_benefits(status)`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_user_benefits_type     ON user_benefits(benefit_type)`);
+        console.log('Migration 104: user_benefits table + indexes ready.');
+    } catch (e) { console.error('Migration 104 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();

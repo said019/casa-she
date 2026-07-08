@@ -115,7 +115,51 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
 
   // Recargo SOLO para tarjeta.
   const surchargePct = paymentMethod === 'card' ? Number(cfg.card_surcharge_percent ?? 0) : 0;
-  const totals = computeBarTotals(priced, { surchargePercent: surchargePct });
+  let totals = computeBarTotals(priced, { surchargePercent: surchargePct });
+
+  // === BENEFITS: detectar descuentos y bebidas gratis del programa de lealtad ===
+  let barDiscountBenefitId: string | null = null;
+  let barDiscountAmount: number = 0;
+  let freeDrinkBenefitId: string | null = null;
+  let freeDrinkDiscount: number = 0;
+
+  if (paymentMethod !== 'points') {
+    const activeBenefits = await query(
+      `SELECT ub.id, ub.benefit_type, ub.benefit_value
+       FROM user_benefits ub
+       WHERE ub.user_id = $1 AND ub.status = 'active' AND ub.expires_at > NOW()
+         AND ub.benefit_type IN ('bar_discount', 'free_drink')
+       ORDER BY ub.created_at ASC
+       LIMIT 2`,
+      [userId]
+    );
+
+    for (const b of activeBenefits) {
+      if (b.benefit_type === 'bar_discount' && !barDiscountBenefitId) {
+        const val = typeof b.benefit_value === 'object' ? b.benefit_value : {};
+        const pct = Number(val.amount || 10);
+        barDiscountAmount = Math.round(totals.subtotal_mxn * (pct / 100) * 100) / 100;
+        barDiscountBenefitId = b.id;
+      }
+      if (b.benefit_type === 'free_drink' && !freeDrinkBenefitId) {
+        // Primer drink del pedido = gratis
+        const firstDrink = priced.find((it) => it.unit_price_mxn > 0);
+        if (firstDrink) {
+          freeDrinkDiscount = firstDrink.unit_price_mxn * firstDrink.quantity;
+          freeDrinkBenefitId = b.id;
+        }
+      }
+    }
+
+    // Recalcular total si hay beneficios
+    if (barDiscountAmount > 0 || freeDrinkDiscount > 0) {
+      const totalDiscount = Math.min(barDiscountAmount + freeDrinkDiscount, totals.total_mxn);
+      totals = {
+        ...totals,
+        total_mxn: Math.round((totals.total_mxn - totalDiscount) * 100) / 100,
+      };
+    }
+  }
 
   // Rama PUNTOS: la orden + items + descuento de puntos + flip a 'paid' se crean
   // en UNA SOLA transacción atómica. Así un crash a mitad de camino no deja una
@@ -163,21 +207,60 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
     } finally { client.release(); }
   }
 
-  // Tarjeta y recepción: creación por auto-commit (no requieren atomicidad orden+gasto).
-  const order = await queryOne<{ id: string }>(
-    `INSERT INTO bar_orders (user_id, booking_id, status, pickup_time, payment_method, payment_status,
-                             subtotal_mxn, card_surcharge_mxn, total_mxn, customer_notes)
-     VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-    [userId, bookingId ?? null, pickup.toISOString(), paymentMethod,
-     'pending',
-     totals.subtotal_mxn, totals.surcharge_mxn, totals.total_mxn, notes ?? null]);
-  if (!order) return res.status(500).json({ error: 'ORDER_CREATION_FAILED' });
-  const orderId = order.id;
-  for (const it of priced) {
-    await query(
-      `INSERT INTO bar_order_items (bar_order_id, product_id, product_name, quantity, unit_price_mxn, line_total_mxn, selected_extras)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
-      [orderId, it.productId, it.name, it.quantity, it.unit_price_mxn, it.unit_price_mxn * it.quantity, JSON.stringify(it.selected_extras)]);
+  // Tarjeta y recepción: transaccional para garantizar atomicidad con beneficios de lealtad.
+  const hasBenefits = barDiscountBenefitId !== null || freeDrinkBenefitId !== null;
+  let orderId: string;
+  const consumeFn = async (oid: string) => {
+    if (barDiscountBenefitId) {
+      await query(`UPDATE user_benefits SET status = 'used', used_at = NOW(), used_on_bar_order_id = $1 WHERE id = $2 AND status = 'active'`, [oid, barDiscountBenefitId]);
+    }
+    if (freeDrinkBenefitId) {
+      await query(`UPDATE user_benefits SET status = 'used', used_at = NOW(), used_on_bar_order_id = $1 WHERE id = $2 AND status = 'active'`, [oid, freeDrinkBenefitId]);
+    }
+  };
+
+  if (hasBenefits) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const ins = await client.query(
+        `INSERT INTO bar_orders (user_id, booking_id, status, pickup_time, payment_method, payment_status,
+                                 subtotal_mxn, card_surcharge_mxn, total_mxn, customer_notes)
+         VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+        [userId, bookingId ?? null, pickup.toISOString(), paymentMethod,
+         'pending',
+         totals.subtotal_mxn, totals.surcharge_mxn, totals.total_mxn, notes ?? null]);
+      orderId = ins.rows[0]?.id;
+      if (!orderId) { await client.query('ROLLBACK'); client.release(); return res.status(500).json({ error: 'ORDER_CREATION_FAILED' }); }
+      for (const it of priced) {
+        await client.query(
+          `INSERT INTO bar_order_items (bar_order_id, product_id, product_name, quantity, unit_price_mxn, line_total_mxn, selected_extras)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+          [orderId, it.productId, it.name, it.quantity, it.unit_price_mxn, it.unit_price_mxn * it.quantity, JSON.stringify(it.selected_extras)]);
+      }
+      await client.query('COMMIT');
+    } catch (e: any) {
+      await client.query('ROLLBACK').catch(() => {});
+      client.release();
+      return res.status(500).json({ error: 'ORDER_CREATION_FAILED' });
+    }
+    client.release();
+  } else {
+    const order = await queryOne<{ id: string }>(
+      `INSERT INTO bar_orders (user_id, booking_id, status, pickup_time, payment_method, payment_status,
+                               subtotal_mxn, card_surcharge_mxn, total_mxn, customer_notes)
+       VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      [userId, bookingId ?? null, pickup.toISOString(), paymentMethod,
+       'pending',
+       totals.subtotal_mxn, totals.surcharge_mxn, totals.total_mxn, notes ?? null]);
+    if (!order) return res.status(500).json({ error: 'ORDER_CREATION_FAILED' });
+    orderId = order.id;
+    for (const it of priced) {
+      await query(
+        `INSERT INTO bar_order_items (bar_order_id, product_id, product_name, quantity, unit_price_mxn, line_total_mxn, selected_extras)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+        [orderId, it.productId, it.name, it.quantity, it.unit_price_mxn, it.unit_price_mxn * it.quantity, JSON.stringify(it.selected_extras)]);
+    }
   }
 
   if (paymentMethod === 'card') {
@@ -201,6 +284,7 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
         notificationUrl: process.env.BACKEND_URL ? `${process.env.BACKEND_URL}/webhooks/mercadopago` : undefined,
       });
       await query(`UPDATE bar_orders SET provider='mercadopago', mp_checkout_url=$1, updated_at=NOW() WHERE id=$2`, [pref.checkoutUrl, orderId]);
+      await consumeFn(orderId);
       return res.status(201).json({ id: orderId, checkout_url: pref.checkoutUrl });
     } catch (e: any) {
       await query(`DELETE FROM bar_orders WHERE id = $1`, [orderId]);
@@ -208,6 +292,7 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
     }
   }
   // reception → entra a la cola sin pagar
+  await consumeFn(orderId);
   return res.status(201).json({ id: orderId });
 });
 
