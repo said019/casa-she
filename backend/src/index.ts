@@ -3586,6 +3586,23 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Migration 104: user_benefits table + indexes ready.');
     } catch (e) { console.error('Migration 104 error:', e); }
 
+    // Migration 105: seed del catálogo de recompensas Casa Shé
+    try {
+        await query(`
+            INSERT INTO loyalty_rewards (name, description, points_required, points_cost, reward_type, reward_value, is_active)
+            SELECT v.name, v.desc, v.pts, v.pts, v.rtype, v.rval::jsonb, true
+            FROM (VALUES
+                ('Clase de Yoga gratis',       '1 clase de Yoga sin costo',                       100, 'free_class',       '{"class_type":"Yoga Ashtanga"}'),
+                ('10% descuento en barra',      '10% de descuento en tu pedido de la Fuel Bar',     200, 'bar_discount',     '{"discount_type":"percentage","amount":10}'),
+                ('Clase de Flex gratis',        '1 clase de Flex sin costo',                       300, 'free_class',       '{"class_type":"Flex"}'),
+                ('10% descuento en ropa',       '10% de descuento en productos de la tienda',      400, 'product_discount', '{"discount_type":"percentage","amount":10}'),
+                ('1 bebida gratis',             '1 bebida sin costo en la Fuel Bar',               500, 'free_drink',       '{"quantity":1}')
+            ) AS v(name, desc, pts, rtype, rval)
+            WHERE NOT EXISTS (SELECT 1 FROM loyalty_rewards lr WHERE lr.name = v.name)
+        `);
+        console.log('Migration 105: catálogo de recompensas sembrado.');
+    } catch (e) { console.error('Migration 105 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();
