@@ -75,4 +75,26 @@ export function useBarOrder(id: string) {
   });
 }
 
-export type BarCartLine = { product: BarProduct; quantity: number };
+export interface BarExtra {
+  id: string;
+  name: string;
+  group_label: string;
+  is_single: boolean;
+  price_mxn: number;
+}
+
+export function useBarExtras() {
+  return useQuery({
+    queryKey: ['bar-extras'],
+    queryFn: async () => (await api.get('/bar/extras')).data as BarExtra[],
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export type BarCartExtraSnapshot = { id: string; name: string; price: number };
+
+export type BarCartLine = {
+  product: BarProduct;
+  quantity: number;
+  extras?: BarCartExtraSnapshot[];
+};

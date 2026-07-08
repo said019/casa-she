@@ -82,7 +82,10 @@ export default function FuelBarConfirm() {
   const cart: Record<string, BarCartLine> = state?.cart ?? {};
   const lines = Object.values(cart).filter((l) => l.quantity > 0);
 
-  const subtotal = lines.reduce((a, l) => a + l.product.price * l.quantity, 0);
+  const subtotal = lines.reduce((a, l) => {
+    const extrasSum = (l.extras ?? []).reduce((s, e) => s + e.price, 0);
+    return a + (l.product.price + extrasSum) * l.quantity;
+  }, 0);
 
   // Config & suggestions
   const { data: config } = useBarConfig();
@@ -172,7 +175,11 @@ export default function FuelBarConfirm() {
     setLoading(true);
     try {
       const body = {
-        items: lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })),
+        items: lines.map((l) => ({
+          productId: l.product.id,
+          quantity: l.quantity,
+          extras: (l.extras ?? []).map((e) => e.id),
+        })),
         pickupTime,
         paymentMethod: payMethod,
         notes: notes || undefined,
@@ -248,9 +255,22 @@ export default function FuelBarConfirm() {
                   <div className="mt-0.5 text-[12px] italic text-[#2A4E36] opacity-50">
                     {line.product.category_name} · {line.quantity}
                   </div>
+                  {(line.extras ?? []).length > 0 && (
+                    <div className="mt-[5px] space-y-[2px]">
+                      {(line.extras ?? []).map((e) => (
+                        <div key={e.id} className="flex items-center justify-between text-[11px] text-[#2A4E36] opacity-60">
+                          <span>{e.name}</span>
+                          {e.price > 0 && <span>+{formatPrice(e.price)}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="font-heading ml-auto flex-shrink-0 text-[19px] text-[#2A4E36]">
-                  {formatPrice(line.product.price * line.quantity)}
+                  {formatPrice(
+                    ((line.product.price + (line.extras ?? []).reduce((s, e) => s + e.price, 0)) *
+                      line.quantity),
+                  )}
                 </div>
               </div>
             ))}
