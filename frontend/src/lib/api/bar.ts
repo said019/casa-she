@@ -24,6 +24,8 @@ export interface BarClientConfig {
   card_surcharge_percent: number;
   cancellation_window_minutes: number;
   prep_time_minutes: number;
+  is_open_now: boolean;
+  opens_at_label: string | null;
 }
 
 export interface PickupAfterClass {

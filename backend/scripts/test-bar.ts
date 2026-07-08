@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { isBarOpenAt, computeBarTotals, canBarTransition, pointsForTotal, canCustomerCancel, type BarConfig } from '../src/lib/bar.js';
+import { isBarOpenAt, computeBarTotals, canBarTransition, pointsForTotal, canCustomerCancel, nextBarOpening, type BarConfig } from '../src/lib/bar.js';
 
 const cfg: BarConfig = {
   enabled: true,
@@ -59,5 +59,57 @@ assert.equal(pointsForTotal(100, 0), Infinity); // tasa inválida
 const now = new Date('2026-07-07T10:00:00-06:00');
 assert.equal(canCustomerCancel(new Date('2026-07-07T12:00:00-06:00'), now, 60), true);  // 120min > 60
 assert.equal(canCustomerCancel(new Date('2026-07-07T10:30:00-06:00'), now, 60), false); // 30min < 60
+
+// nextBarOpening tests
+const cfgHours: BarConfig = {
+  enabled: true,
+  operating_hours: {
+    0: null, // domingo cerrado
+    1: { open: '08:00', close: '20:00' },
+    2: { open: '08:00', close: '20:00' },
+    3: { open: '08:00', close: '20:00' },
+    4: { open: '08:00', close: '20:00' },
+    5: { open: '08:00', close: '20:00' },
+    6: null, // sábado cerrado
+  },
+  lead_time_max_hours: 4,
+  pickup_offset_minutes: -2,
+  cancellation_window_minutes: 60,
+  card_surcharge_percent: 0,
+  card_enabled: true,
+  points_enabled: false,
+  points_redemption_rate: 10,
+  preparing_push: true,
+  prep_time_minutes: 15,
+};
+
+// (a) From a Saturday → label mentions "el lunes a las 08:00"
+// July 11 2026 is a Saturday
+const fromSaturday = new Date(2026, 6, 11, 10, 0, 0); // local time
+assert.equal(fromSaturday.getDay(), 6, 'July 11 2026 is Saturday');
+const resultA = nextBarOpening(cfgHours, fromSaturday);
+assert.ok(resultA !== null, 'Saturday: should find next opening');
+assert.equal(resultA!.label, 'el lunes a las 08:00', `Saturday label: ${resultA!.label}`);
+
+// (b) From a weekday before 08:00 → "hoy a las 08:00"
+// July 6 2026 is a Monday
+const fromMonday0700 = new Date(2026, 6, 6, 7, 0, 0); // local time
+assert.equal(fromMonday0700.getDay(), 1, 'July 6 2026 is Monday');
+const resultB = nextBarOpening(cfgHours, fromMonday0700);
+assert.ok(resultB !== null, 'Monday 07:00: should find next opening');
+assert.equal(resultB!.label, 'hoy a las 08:00', `Monday 07:00 label: ${resultB!.label}`);
+
+// (c) From a Friday after 20:00 → "el lunes a las 08:00" (skips weekend)
+// July 10 2026 is a Friday
+const fromFriday2100 = new Date(2026, 6, 10, 21, 0, 0); // local time
+assert.equal(fromFriday2100.getDay(), 5, 'July 10 2026 is Friday');
+const resultC = nextBarOpening(cfgHours, fromFriday2100);
+assert.ok(resultC !== null, 'Friday 21:00: should find next opening');
+assert.equal(resultC!.label, 'el lunes a las 08:00', `Friday 21:00 label: ${resultC!.label}`);
+
+// (d) All-null hours → returns null
+const cfgAllNull: BarConfig = { ...cfgHours, operating_hours: { 0: null, 1: null, 2: null, 3: null, 4: null, 5: null, 6: null } };
+const resultD = nextBarOpening(cfgAllNull, fromSaturday);
+assert.equal(resultD, null, 'All-null hours should return null');
 
 console.log('test-bar OK');

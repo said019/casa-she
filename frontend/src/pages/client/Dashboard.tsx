@@ -228,7 +228,7 @@ export default function ClientDashboard() {
             {[
               ...QUICK_ACTIONS,
               ...(barCfg?.enabled
-                ? [{ to: '/app/fuel-bar', label: 'Fuel Bar', sub: 'Pide y recoge', icon: Coffee, color: '#6C8424', primary: false }]
+                ? [{ to: '/app/fuel-bar', label: 'Fuel Bar', sub: barCfg?.is_open_now === false ? 'Cerrada por ahora' : 'Pide y recoge', icon: Coffee, color: '#6C8424', primary: false }]
                 : []),
             ].map((a) => {
               const Icon = a.icon;

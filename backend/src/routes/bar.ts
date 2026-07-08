@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { query, queryOne, pool } from '../config/database.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { getSetting } from '../lib/settings.js';
-import { isBarOpenAt, BAR_CATEGORY_NAMES, computeBarTotals, pointsForTotal, canBarTransition, canCustomerCancel, type BarStatus } from '../lib/bar.js';
+import { isBarOpenAt, nextBarOpening, BAR_CATEGORY_NAMES, computeBarTotals, pointsForTotal, canBarTransition, canCustomerCancel, type BarStatus, type BarConfig } from '../lib/bar.js';
 import { spendBarPoints, refundBarPoints } from '../lib/barPoints.js';
 import { sendWebPushToUser } from '../lib/web-push.js';
 import { createPreference, mpConfigured } from '../lib/mercadopago.js';
@@ -21,6 +21,8 @@ router.get('/config', authenticate, async (_req: Request, res: Response) => {
     card_surcharge_percent: Number(c.card_surcharge_percent ?? 0),
     cancellation_window_minutes: Number(c.cancellation_window_minutes ?? 60),
     prep_time_minutes: Number(c.prep_time_minutes ?? 15),
+    is_open_now: isBarOpenAt(c as BarConfig, new Date()),
+    opens_at_label: (c.enabled === true) ? (nextBarOpening(c as BarConfig, new Date())?.label ?? null) : null,
   });
 });
 
