@@ -112,4 +112,20 @@ const cfgAllNull: BarConfig = { ...cfgHours, operating_hours: { 0: null, 1: null
 const resultD = nextBarOpening(cfgAllNull, fromSaturday);
 assert.equal(resultD, null, 'All-null hours should return null');
 
+// priceSelectedExtras: dedup + filtra catálogo + snapshot + total
+import { priceSelectedExtras, type BarExtra } from '../src/lib/barExtras.js';
+const CAT: BarExtra[] = [
+  { id: 'a', name: 'Leche de avena', group_label: 'Leche', is_single: true, price_mxn: 10 },
+  { id: 'b', name: 'Shot extra', group_label: 'Agregados', is_single: false, price_mxn: 15 },
+  { id: 'c', name: 'Sin azúcar', group_label: 'Agregados', is_single: false, price_mxn: 0 },
+];
+let r = priceSelectedExtras(['a','b'], CAT);
+assert.equal(r.total, 25, 'suma precios de extras');
+assert.equal(r.snapshot.length, 2, 'snapshot con 2');
+r = priceSelectedExtras(['a','a','zzz'], CAT); // dedup + ignora desconocido
+assert.equal(r.total, 10, 'dedup + ignora id inexistente');
+assert.equal(r.snapshot.length, 1, 'snapshot dedup');
+r = priceSelectedExtras([], CAT);
+assert.equal(r.total, 0, 'sin extras = 0');
+
 console.log('test-bar OK');
