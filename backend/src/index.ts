@@ -3487,7 +3487,7 @@ async function runStartupMigrations(): Promise<void> {
     // ===========================================================================
     try {
         const CS_PLANS = ['Clase de prueba', 'Drop-in', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Membresía 360', 'Membresía Black', 'Salsa · 1 clase', 'Salsa · 4 clases'];
-        const CS_TYPES = ['Pilates Mat', 'Barre', 'Sculpt', 'Yoga Ashtanga', 'Yoga Vinyasa', 'Salsa'];
+        const CS_TYPES = ['Pilates Mat', 'Barre', 'Sculpt', 'Yoga Ashtanga', 'Yoga Vinyasa', 'Flex', 'Salsa'];
 
         // Reglamento obligatorio: marca de aceptación por usuaria (NULL = no aceptado aún).
         await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reglamento_accepted_at TIMESTAMPTZ`);
@@ -3497,7 +3497,7 @@ async function runStartupMigrations(): Promise<void> {
         //     después la admin puede editarlas desde el panel y NO se sobreescriben.
         await query(`INSERT INTO class_types (name, category, level, duration_minutes, max_capacity, is_active)
             SELECT v.name, 'multi'::class_category, 'all'::class_level, v.dur, v.cap, true
-            FROM (VALUES ('Pilates Mat',50,7),('Barre',50,8),('Sculpt',50,8),('Yoga Ashtanga',60,7),('Yoga Vinyasa',60,7))
+            FROM (VALUES ('Pilates Mat',50,7),('Barre',50,8),('Sculpt',50,8),('Yoga Ashtanga',60,7),('Yoga Vinyasa',60,7),('Flex',50,12))
               AS v(name, dur, cap)
             WHERE NOT EXISTS (SELECT 1 FROM class_types ct WHERE ct.name = v.name)`);
         await query(`INSERT INTO class_types (name, category, level, duration_minutes, max_capacity, is_active)

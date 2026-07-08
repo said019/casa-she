@@ -37,7 +37,7 @@ export default function Hero() {
           </h1>
 
           <p className="mt-6 max-w-xl font-heading italic text-lg leading-relaxed text-bmb-cream/85 lg:text-xl">
-            Pilates Mat, Barre, Sculpt, Yoga y Salsa. Una casa para moverte, nutrirte y
+            Pilates Mat, Barre, Sculpt, Yoga, Flex y Salsa. Una casa para moverte, nutrirte y
             reconectar con tu cuerpo en comunidad. Aquí, la comunidad es la medicina.
           </p>
 

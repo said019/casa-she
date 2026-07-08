@@ -48,10 +48,10 @@ const CARDS: Card[] = [
 
 const PILLARS = [
   {
-    eyebrow: "Pilates Mat · Barre · Sculpt · Yoga · Salsa",
+    eyebrow: "Pilates Mat · Barre · Sculpt · Yoga · Flex · Salsa",
     title: "Movimiento",
     img: "/casashe/pilates.jpg",
-    text: "Desde la precisión del Pilates Mat hasta la definición del Sculpt y la postura del Barre, nuestras clases fortalecen cada parte de tu cuerpo. Complementamos con la serenidad del Yoga —Ashtanga y Vinyasa— y cerramos el círculo con la energía de la Salsa.",
+    text: "Desde la precisión del Pilates Mat hasta la definición del Sculpt y la postura del Barre, nuestras clases fortalecen cada parte de tu cuerpo. Complementamos con la serenidad del Yoga —Ashtanga y Vinyasa—, la movilidad profunda del Flex y cerramos el círculo con la energía de la Salsa.",
   },
   {
     eyebrow: "Diseña tu estilo de vida",
@@ -241,7 +241,7 @@ function Hero() {
           className="mx-auto w-[min(82vw,620px)]"
         />
         <p className={`${body} mx-auto mt-8 max-w-xl text-base tracking-[0.12em] sm:text-lg`}>
-          Pilates · Barre · Sculpt · Yoga · Salsa · Community
+          Pilates · Barre · Sculpt · Yoga · Flex · Salsa · Community
         </p>
         <p className={`${body} mt-2 text-sm tracking-[0.18em] opacity-80`}>
           Alfonso Reyes 131, Condesa · CDMX
@@ -360,7 +360,7 @@ function Servicios() {
             Una experiencia 360°
           </h2>
           <p className={`${body} mt-4 text-base tracking-[0.18em]`} style={{ color: GREEN, opacity: 0.7 }}>
-            Pilates Mat · Barre · Sculpt · Yoga · Salsa
+            Pilates Mat · Barre · Sculpt · Yoga · Flex · Salsa
           </p>
         </div>
 
