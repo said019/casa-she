@@ -256,7 +256,6 @@ export default function FuelBar() {
                         <button
                           aria-label={`Agregar ${product.name}`}
                           onClick={() => add(product)}
-                          disabled={product.stock === 0}
                           className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#2A4E36] text-[#F6EFE1] shadow-[0_10px_18px_-10px_rgba(42,78,54,.75)] transition-transform active:scale-95 disabled:opacity-40"
                         >
                           <svg
