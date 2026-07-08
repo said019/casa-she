@@ -80,9 +80,9 @@ export default function FuelBarConfirm() {
   const qc = useQueryClient();
 
   const cart: Record<string, BarCartLine> = state?.cart ?? {};
-  const lines = Object.values(cart).filter((l) => l.quantity > 0);
+  const lines = Object.entries(cart).filter(([, l]) => l.quantity > 0);
 
-  const subtotal = lines.reduce((a, l) => {
+  const subtotal = lines.reduce((a, [, l]) => {
     const extrasSum = (l.extras ?? []).reduce((s, e) => s + e.price, 0);
     return a + (l.product.price + extrasSum) * l.quantity;
   }, 0);
@@ -175,7 +175,7 @@ export default function FuelBarConfirm() {
     setLoading(true);
     try {
       const body = {
-        items: lines.map((l) => ({
+        items: lines.map(([, l]) => ({
           productId: l.product.id,
           quantity: l.quantity,
           extras: (l.extras ?? []).map((e) => e.id),
@@ -241,9 +241,9 @@ export default function FuelBarConfirm() {
           </h2>
 
           <div>
-            {lines.map((line, i) => (
+            {lines.map(([lineKey, line], i) => (
               <div
-                key={line.product.id}
+                key={lineKey}
                 className={[
                   'flex items-center gap-[14px] py-3',
                   i < lines.length - 1 ? 'border-b border-[rgba(22,38,26,.06)]' : '',

@@ -3119,8 +3119,10 @@ async function runStartupMigrations(): Promise<void> {
             price_mxn NUMERIC(10,2) NOT NULL DEFAULT 0,
             sort_order INTEGER NOT NULL DEFAULT 0,
             is_active BOOLEAN NOT NULL DEFAULT true,
-            created_at TIMESTAMPTZ DEFAULT now()
+            created_at TIMESTAMPTZ DEFAULT now(),
+            updated_at TIMESTAMPTZ DEFAULT now()
         )`);
+        await query(`ALTER TABLE bar_extras ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()`);
         await query(`ALTER TABLE bar_order_items ADD COLUMN IF NOT EXISTS selected_extras JSONB NOT NULL DEFAULT '[]'::jsonb`);
         console.log('Migration BAR-03: bar_extras + selected_extras listas.');
     } catch (e) { console.error('Migration BAR-03 error:', e); }

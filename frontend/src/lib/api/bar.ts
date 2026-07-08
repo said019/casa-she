@@ -87,7 +87,7 @@ export function useBarExtras() {
   return useQuery({
     queryKey: ['bar-extras'],
     queryFn: async () => (await api.get('/bar/extras')).data as BarExtra[],
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
   });
 }
 

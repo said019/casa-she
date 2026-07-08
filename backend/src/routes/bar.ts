@@ -363,49 +363,66 @@ router.get('/extras', authenticate, async (req: Request, res: Response) => {
 
 // POST /api/bar/extras (admin)
 router.post('/extras', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
-  const parsed = CreateBarExtra.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'Datos invalidos', details: parsed.error.flatten().fieldErrors });
-  const { name, group_label, is_single, price_mxn, sort_order, is_active } = parsed.data;
-  const row = await queryOne<{
-    id: string; name: string; group_label: string; is_single: boolean;
-    price_mxn: string; sort_order: number; is_active: boolean; created_at: string;
-  }>(
-    `INSERT INTO bar_extras (name, group_label, is_single, price_mxn, sort_order, is_active)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, group_label, is_single, price_mxn, sort_order, is_active, created_at`,
-    [name, group_label, is_single, price_mxn, sort_order, is_active]
-  );
-  if (!row) return res.status(500).json({ error: 'INSERT_FAILED' });
-  res.status(201).json({ ...row, price_mxn: Number(row.price_mxn) });
+  try {
+    const parsed = CreateBarExtra.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Datos invalidos', details: parsed.error.flatten().fieldErrors });
+    const { name, group_label, is_single, price_mxn, sort_order, is_active } = parsed.data;
+    const row = await queryOne<{
+      id: string; name: string; group_label: string; is_single: boolean;
+      price_mxn: string; sort_order: number; is_active: boolean; created_at: string;
+    }>(
+      `INSERT INTO bar_extras (name, group_label, is_single, price_mxn, sort_order, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, group_label, is_single, price_mxn, sort_order, is_active, created_at`,
+      [name, group_label, is_single, price_mxn, sort_order, is_active]
+    );
+    if (!row) return res.status(500).json({ error: 'INSERT_FAILED' });
+    res.status(201).json({ ...row, price_mxn: Number(row.price_mxn) });
+  } catch (e: any) {
+    console.error('bar extras error:', e?.message);
+    res.status(500).json({ error: 'EXTRAS_ERROR' });
+  }
 });
 
 // PUT /api/bar/extras/:id (admin)
 router.put('/extras/:id', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
-  const parsed = UpdateBarExtra.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'Datos invalidos', details: parsed.error.flatten().fieldErrors });
-  const fields = parsed.data as Record<string, unknown>;
-  const keys = Object.keys(fields).filter(k => fields[k] !== undefined);
-  if (keys.length === 0) return res.status(400).json({ error: 'NO_FIELDS' });
-  const setClauses = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
-  const values = keys.map(k => fields[k]);
-  const row = await queryOne<{
-    id: string; name: string; group_label: string; is_single: boolean;
-    price_mxn: string; sort_order: number; is_active: boolean; created_at: string;
-  }>(
-    `UPDATE bar_extras SET ${setClauses}, updated_at = NOW() WHERE id = $1
-     RETURNING id, name, group_label, is_single, price_mxn, sort_order, is_active, created_at`,
-    [req.params.id, ...values]
-  );
-  if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
-  res.json({ ...row, price_mxn: Number(row.price_mxn) });
+  if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return res.status(404).json({ error: 'NOT_FOUND' });
+  try {
+    const parsed = UpdateBarExtra.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Datos invalidos', details: parsed.error.flatten().fieldErrors });
+    const fields = parsed.data as Record<string, unknown>;
+    const keys = Object.keys(fields).filter(k => fields[k] !== undefined);
+    if (keys.length === 0) return res.status(400).json({ error: 'NO_FIELDS' });
+    const setClauses = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
+    const values = keys.map(k => fields[k]);
+    const row = await queryOne<{
+      id: string; name: string; group_label: string; is_single: boolean;
+      price_mxn: string; sort_order: number; is_active: boolean; created_at: string;
+    }>(
+      `UPDATE bar_extras SET ${setClauses}, updated_at = NOW() WHERE id = $1
+       RETURNING id, name, group_label, is_single, price_mxn, sort_order, is_active, created_at`,
+      [req.params.id, ...values]
+    );
+    if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
+    res.json({ ...row, price_mxn: Number(row.price_mxn) });
+  } catch (e: any) {
+    console.error('bar extras error:', e?.message);
+    res.status(500).json({ error: 'EXTRAS_ERROR' });
+  }
 });
 
 // DELETE /api/bar/extras/:id (admin)
 router.delete('/extras/:id', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
-  const row = await queryOne<{ id: string }>(
-    `DELETE FROM bar_extras WHERE id = $1 RETURNING id`, [req.params.id]
-  );
-  if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
-  res.json({ ok: true });
+  if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return res.status(404).json({ error: 'NOT_FOUND' });
+  try {
+    const row = await queryOne<{ id: string }>(
+      `DELETE FROM bar_extras WHERE id = $1 RETURNING id`, [req.params.id]
+    );
+    if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
+    res.json({ ok: true });
+  } catch (e: any) {
+    console.error('bar extras error:', e?.message);
+    res.status(500).json({ error: 'EXTRAS_ERROR' });
+  }
 });
 
 export default router;

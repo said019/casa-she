@@ -13,7 +13,7 @@ import api from '@/lib/api';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface BarExtra {
-  id: number;
+  id: string;
   name: string;
   group_label: string;
   is_single: boolean;
@@ -66,7 +66,7 @@ export default function BarExtras() {
   const [rawPrice, setRawPrice] = useState<string>('0');
 
   // ── Edit state ────────────────────────────────────────────────────────────
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<UpdateExtraPayload & { name: string; group_label: string; price_mxn: number }>({
     name: '',
     group_label: '',
@@ -98,7 +98,7 @@ export default function BarExtras() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, payload }: { id: number; payload: UpdateExtraPayload }) =>
+    mutationFn: async ({ id, payload }: { id: string; payload: UpdateExtraPayload }) =>
       (await api.put(`/bar/extras/${id}`, payload)).data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bar-extras-admin'] });
@@ -115,7 +115,7 @@ export default function BarExtras() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) =>
+    mutationFn: async (id: string) =>
       (await api.delete(`/bar/extras/${id}`)).data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bar-extras-admin'] });
@@ -170,7 +170,7 @@ export default function BarExtras() {
     setEditRawPrice(String(extra.price_mxn));
   }
 
-  function handleUpdate(id: number) {
+  function handleUpdate(id: string) {
     const price = parseFloat(editRawPrice);
     updateMutation.mutate({
       id,
@@ -181,7 +181,7 @@ export default function BarExtras() {
     });
   }
 
-  function handleDelete(id: number) {
+  function handleDelete(id: string) {
     if (!window.confirm('¿Eliminar este extra del catálogo? Esta acción no se puede deshacer.')) return;
     deleteMutation.mutate(id);
   }

@@ -51,14 +51,18 @@ function catColor(i: number) {
 type ExtraGroup = { label: string; is_single: boolean; items: BarExtra[] };
 
 function groupExtras(extras: BarExtra[]): ExtraGroup[] {
-  const map = new Map<string, ExtraGroup>();
+  const map = new Map<string, { label: string; items: BarExtra[] }>();
   for (const e of extras) {
     if (!map.has(e.group_label)) {
-      map.set(e.group_label, { label: e.group_label, is_single: e.is_single, items: [] });
+      map.set(e.group_label, { label: e.group_label, items: [] });
     }
     map.get(e.group_label)!.items.push(e);
   }
-  return Array.from(map.values());
+  return Array.from(map.values()).map((g) => ({
+    label: g.label,
+    is_single: g.items.every((i) => i.is_single),
+    items: g.items,
+  }));
 }
 
 function ExtrasSelector({
