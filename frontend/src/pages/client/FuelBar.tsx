@@ -136,7 +136,7 @@ function ExtrasSelector({
 
         {/* product name */}
         <h3 className="font-heading mb-[2px] text-[22px] text-[#2A4E36]">{product.name}</h3>
-        <p className="mb-4 text-[12px] italic text-[#2A4E36] opacity-55">
+        <p className="mb-4 text-xs italic text-[#2A4E36] opacity-55">
           Personaliza tu bebida
         </p>
 
@@ -145,11 +145,11 @@ function ExtrasSelector({
           {groups.map((g) => (
             <div key={g.label}>
               <div className="mb-[10px] flex items-center gap-2">
-                <span className="text-[11px] uppercase tracking-[.22em] text-[#2A4E36] opacity-60">
+                <span className="text-xs uppercase tracking-[.22em] text-[#2A4E36] opacity-60">
                   {g.label}
                 </span>
                 {g.is_single && (
-                  <span className="rounded-full bg-[rgba(42,78,54,.08)] px-2 py-[1px] text-[10px] text-[#2A4E36] opacity-70">
+                  <span className="rounded-full bg-[rgba(42,78,54,.08)] px-2 py-[1px] text-xs text-[#2A4E36] opacity-70">
                     elige uno
                   </span>
                 )}
@@ -378,7 +378,7 @@ export default function FuelBar() {
             />
             {/* text content */}
             <div className="absolute bottom-[18px] left-5 right-5 z-10 text-[#F6EFE1]">
-              <span className="inline-block rounded-full border border-[rgba(246,239,225,.5)] px-[11px] py-1 text-[9px] uppercase tracking-[.3em] text-[#F6EFE1] opacity-92">
+              <span className="inline-block rounded-full border border-[rgba(246,239,225,.5)] px-[11px] py-1 text-xs uppercase tracking-[.3em] text-[#F6EFE1] opacity-92">
                 Recarga consciente
               </span>
               <h2 className="font-heading mt-[9px] text-[42px] leading-[.95] text-[#F6EFE1]">
@@ -494,7 +494,7 @@ export default function FuelBar() {
                         <button
                           aria-label={`Agregar ${product.name}`}
                           onClick={() => handleAdd(product)}
-                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#2A4E36] text-[#F6EFE1] shadow-[0_10px_18px_-10px_rgba(42,78,54,.75)] transition-transform active:scale-95 disabled:opacity-40"
+                          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#2A4E36] text-[#F6EFE1] shadow-[0_10px_18px_-10px_rgba(42,78,54,.75)] transition-transform active:scale-95 disabled:opacity-40"
                         >
                           <svg
                             viewBox="0 0 24 24"
@@ -526,7 +526,7 @@ export default function FuelBar() {
 
         {/* ── Sticky bottom CTA ──────────────────────────────────────────────── */}
         {count > 0 && (
-          <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[60] flex justify-center px-4 pb-6 pt-8"
+          <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[60] flex justify-center px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] pt-8"
             style={{ background: 'linear-gradient(to top, #F6F0E4 58%, rgba(246,240,228,0))' }}
           >
             <button

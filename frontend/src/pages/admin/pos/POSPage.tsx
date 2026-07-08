@@ -293,7 +293,7 @@ export default function POSPage() {
                                 <UserIcon className="h-4 w-4 text-balance-olive" />
                                 <span className="text-sm font-medium">{selectedUser.display_name}</span>
                             </div>
-                            <Button variant="ghost" size="icon" onClick={() => setSelectedUser(null)} className="h-6 w-6">
+                            <Button variant="ghost" size="icon" onClick={() => setSelectedUser(null)} className="h-9 w-9">
                                 <X className="h-3 w-3" />
                             </Button>
                         </div>
@@ -323,11 +323,11 @@ export default function POSPage() {
                                         <p className="text-sm text-muted-foreground">${Number(item.price).toFixed(2)}</p>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.id, -1)}>
+                                        <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => updateQuantity(item.id, -1)}>
                                             <Minus className="h-3 w-3" />
                                         </Button>
                                         <span className="w-6 text-center text-sm">{item.quantity}</span>
-                                        <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.id, 1)}>
+                                        <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => updateQuantity(item.id, 1)}>
                                             <Plus className="h-3 w-3" />
                                         </Button>
                                     </div>

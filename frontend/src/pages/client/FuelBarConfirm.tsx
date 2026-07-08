@@ -381,7 +381,7 @@ export default function FuelBarConfirm() {
             {/* Subtotal line — only show when there's a surcharge to break out */}
             {payMethod === 'card' && surcharge > 0 && (
               <div className="flex items-baseline justify-between mb-[6px]">
-                <span className="text-[11px] uppercase tracking-[.22em] text-[#2A4E36] opacity-55">
+                <span className="text-xs uppercase tracking-[.22em] text-[#2A4E36] opacity-55">
                   Subtotal
                 </span>
                 <span className="text-[15px] text-[#2A4E36] opacity-70">{formatPrice(subtotal)}</span>
@@ -390,7 +390,7 @@ export default function FuelBarConfirm() {
             {/* Surcharge line */}
             {payMethod === 'card' && surcharge > 0 && (
               <div className="flex items-baseline justify-between mb-[6px]">
-                <span className="text-[11px] uppercase tracking-[.22em] text-[#2A4E36] opacity-55">
+                <span className="text-xs uppercase tracking-[.22em] text-[#2A4E36] opacity-55">
                   Uso de app ({surchargePercent}%)
                 </span>
                 <span className="text-[15px] text-[#2A4E36] opacity-70">{formatPrice(surcharge)}</span>
@@ -399,7 +399,7 @@ export default function FuelBarConfirm() {
             {/* Points line */}
             {payMethod === 'points' && (
               <div className="flex items-baseline justify-between mb-[6px]">
-                <span className="text-[11px] uppercase tracking-[.22em] text-[#2A4E36] opacity-55">
+                <span className="text-xs uppercase tracking-[.22em] text-[#2A4E36] opacity-55">
                   Puntos a usar
                 </span>
                 <span className="text-[15px] text-[#2A4E36] opacity-70">{pointsNeeded} pts</span>
@@ -407,7 +407,7 @@ export default function FuelBarConfirm() {
             )}
             {/* Total */}
             <div className="flex items-baseline justify-between">
-              <span className="text-[11px] uppercase tracking-[.22em] text-[#2A4E36] opacity-55">
+              <span className="text-xs uppercase tracking-[.22em] text-[#2A4E36] opacity-55">
                 Total
               </span>
               <span className="font-heading text-[34px] text-[#2A4E36]">
@@ -419,7 +419,7 @@ export default function FuelBarConfirm() {
 
         {/* ── Sticky CTA ──────────────────────────────────────────────────────── */}
         <div
-          className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-6 pt-8"
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] pt-8"
           style={{ background: 'linear-gradient(to top, #F6F0E4 58%, rgba(246,240,228,0))' }}
         >
           <button
@@ -538,7 +538,7 @@ function PickupChip({
         ].join(' ')}
       >
         <span className="font-heading block text-[17px] text-[#2A4E36]">{title}</span>
-        <span className="mt-[3px] block text-[11px] italic text-[#2A4E36] opacity-55">
+        <span className="mt-[3px] block text-xs italic text-[#2A4E36] opacity-55">
           {sub}
         </span>
       </div>

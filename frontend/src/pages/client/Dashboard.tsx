@@ -186,7 +186,7 @@ export default function ClientDashboard() {
 
             <div className="relative grid gap-8 p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_16rem] lg:p-12">
               <div className="max-w-4xl">
-                <motion.div variants={heroItem} className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#F6F0E4]/20 bg-[#F6F0E4]/[0.06] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#D6D5C2]">
+                <motion.div variants={heroItem} className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#F6F0E4]/20 bg-[#F6F0E4]/[0.06] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.26em] text-[#D6D5C2]">
                   <Leaf className="h-3.5 w-3.5 text-[#B4A248]" />
                   Bienvenida de vuelta
                 </motion.div>
@@ -202,7 +202,7 @@ export default function ClientDashboard() {
               </div>
 
               <motion.aside variants={heroItem} className="flex flex-col justify-end rounded-[1.25rem] border border-[#F6F0E4]/14 bg-[#F6F0E4]/[0.06] p-5 text-right backdrop-blur-sm">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#D6D5C2]/60">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#D6D5C2]/60">
                   {monthLabel} · {today.getFullYear()}
                 </p>
                 <div className="mt-4 flex items-end justify-end gap-3">
@@ -297,7 +297,7 @@ export default function ClientDashboard() {
                 <div className="relative space-y-8">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#D6D5C2]/80 bg-[#F6F0E4]/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#6B554D]">
+                      <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#D6D5C2]/80 bg-[#F6F0E4]/60 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#6B554D]">
                         <span className="h-2 w-2 rounded-full bg-[#AE4836]" />
                         Membresía
                       </div>

@@ -519,7 +519,7 @@ export default function VideoPlayer() {
                                                                     <span className="text-muted-foreground">Titular</span>
                                                                     <div className="flex items-center gap-2">
                                                                         <span className="font-medium text-right">{bankInfo.account_holder}</span>
-                                                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyToClipboard(bankInfo.account_holder)}>
+                                                                        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => copyToClipboard(bankInfo.account_holder)}>
                                                                             <Copy className="h-3.5 w-3.5" />
                                                                         </Button>
                                                                     </div>
@@ -528,7 +528,7 @@ export default function VideoPlayer() {
                                                                     <span className="text-muted-foreground">Cuenta</span>
                                                                     <div className="flex items-center gap-2">
                                                                         <span className="font-medium font-mono">{bankInfo.account_number}</span>
-                                                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyToClipboard(bankInfo.account_number)}>
+                                                                        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => copyToClipboard(bankInfo.account_number)}>
                                                                             <Copy className="h-3.5 w-3.5" />
                                                                         </Button>
                                                                     </div>
@@ -537,7 +537,7 @@ export default function VideoPlayer() {
                                                                     <span className="text-muted-foreground">CLABE</span>
                                                                     <div className="flex items-center gap-2">
                                                                         <span className="font-medium font-mono">{bankInfo.clabe}</span>
-                                                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyToClipboard(bankInfo.clabe)}>
+                                                                        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => copyToClipboard(bankInfo.clabe)}>
                                                                             <Copy className="h-3.5 w-3.5" />
                                                                         </Button>
                                                                     </div>
@@ -594,7 +594,7 @@ export default function VideoPlayer() {
                                                             </button>
                                                         ) : (
                                                             <div className="relative border rounded-[1rem] p-3">
-                                                                <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7" onClick={removeFile}>
+                                                                <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-9 w-9" onClick={removeFile}>
                                                                     <X className="h-4 w-4" />
                                                                 </Button>
                                                                 {filePreview ? (

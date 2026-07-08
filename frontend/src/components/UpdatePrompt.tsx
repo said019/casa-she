@@ -68,7 +68,7 @@ export default function UpdatePrompt() {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-[calc(9rem+env(safe-area-inset-bottom,0px))] left-3 right-3 z-40 animate-in fade-in slide-in-from-bottom-4 duration-300 lg:bottom-4 lg:left-auto lg:right-4 lg:max-w-sm"
+      className="fixed bottom-[calc(9rem+env(safe-area-inset-bottom,0px))] left-3 right-3 z-[55] animate-in fade-in slide-in-from-bottom-4 duration-300 lg:bottom-4 lg:left-auto lg:right-4 lg:max-w-sm"
     >
       <div className="flex items-start gap-3 rounded-2xl border border-bmb-gold/40 bg-bmb-cream px-4 py-3 text-bmb-dark shadow-lg shadow-bmb-gold/10">
         <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bmb-gold/15 text-bmb-deepgold">

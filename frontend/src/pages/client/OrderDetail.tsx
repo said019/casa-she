@@ -511,7 +511,7 @@ export default function OrderDetail() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="absolute top-2 right-2 h-6 w-6"
+                        className="absolute top-2 right-2 h-9 w-9"
                         onClick={removeFile}
                       >
                         <X className="h-4 w-4" />

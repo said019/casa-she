@@ -253,7 +253,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             </main>
 
             <nav
-                className="fixed bottom-0 left-0 right-0 z-50 border-t border-balance-sand/45 bg-[hsl(var(--admin-panel))]/92 shadow-[0_-24px_60px_-42px_rgba(42,33,24,0.85)] backdrop-blur-xl lg:hidden"
+                className="fixed bottom-0 left-0 right-0 z-[55] border-t border-balance-sand/45 bg-[hsl(var(--admin-panel))]/92 shadow-[0_-24px_60px_-42px_rgba(42,33,24,0.85)] backdrop-blur-xl lg:hidden"
                 style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
             >
                 <div className={cn('grid gap-1 px-2 py-2', navItems.length >= 5 ? 'grid-cols-5' : 'grid-cols-4')}>
@@ -281,7 +281,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                 <Link
                     to="/app/book"
                     aria-label="Reservar clase"
-                    className="fixed right-5 z-50 flex items-center gap-2 rounded-full bg-balance-olive px-5 py-3.5 font-semibold text-balance-cream shadow-[0_18px_40px_-16px_rgba(206,155,37,0.75)] transition-transform active:scale-[0.96] lg:hidden"
+                    className="fixed right-5 z-[60] flex items-center gap-2 rounded-full bg-balance-olive px-5 py-3.5 font-semibold text-balance-cream shadow-[0_18px_40px_-16px_rgba(206,155,37,0.75)] transition-transform active:scale-[0.96] lg:hidden"
                     style={{ bottom: 'calc(5.2rem + env(safe-area-inset-bottom, 0px))' }}
                 >
                     <MSym name="calendar_add_on" size={22} />

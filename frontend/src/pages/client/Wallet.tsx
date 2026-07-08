@@ -70,7 +70,7 @@ function ReferralCodePanel() {
 
       <div className="relative space-y-5">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-balance-cream/70">
+          <p className="text-xs font-semibold uppercase tracking-[0.26em] text-balance-cream/70">
             Refiere a tus amigas
           </p>
           <h2 className="mt-1.5 text-2xl font-semibold tracking-[-0.01em]">Tu código personal</h2>
@@ -93,7 +93,7 @@ function ReferralCodePanel() {
             <span className="font-mono text-2xl font-bold tracking-[0.16em] sm:text-3xl">
               {data?.code ?? '—'}
             </span>
-            <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-balance-cream/70 transition-colors group-hover:text-white">
+            <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-balance-cream/70 transition-colors group-hover:text-white">
               <Copy className="h-4 w-4" />
               Copiar
             </span>
@@ -128,18 +128,18 @@ function ReferralCodePanel() {
           <div className="rounded-[1.1rem] border border-white/15 bg-white/10 p-3.5 text-center backdrop-blur-sm">
             <Users className="mx-auto mb-1.5 h-4 w-4 text-balance-cream/75" />
             <p className="text-2xl font-bold tabular-nums leading-none">{data?.totalReferrals ?? 0}</p>
-            <p className="mt-1 text-[11px] uppercase tracking-wider text-balance-cream/65">Referidas</p>
+            <p className="mt-1 text-xs uppercase tracking-wider text-balance-cream/65">Referidas</p>
           </div>
           <div className="rounded-[1.1rem] border border-white/15 bg-white/10 p-3.5 text-center backdrop-blur-sm">
             <Star className="mx-auto mb-1.5 h-4 w-4 text-balance-cream/75" />
             <p className="text-2xl font-bold tabular-nums leading-none">{data?.totalPointsEarned ?? 0}</p>
-            <p className="mt-1 text-[11px] uppercase tracking-wider text-balance-cream/65">Puntos ganados</p>
+            <p className="mt-1 text-xs uppercase tracking-wider text-balance-cream/65">Puntos ganados</p>
           </div>
         </div>
 
         {(data?.recentReferrals?.length ?? 0) > 0 && (
           <div className="space-y-1.5 rounded-[1.1rem] border border-white/12 bg-white/[0.07] p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-balance-cream/65">Amigas recientes</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-balance-cream/65">Amigas recientes</p>
             {data!.recentReferrals.slice(0, 3).map((r, i) => (
               <div key={i} className="flex items-center justify-between text-sm">
                 <span className="text-balance-cream/85">{r.friend_name}</span>
@@ -264,7 +264,7 @@ export default function WalletClub() {
               </div>
               <div className="flex flex-col gap-2 sm:items-end">
                 <div className="rounded-[1.25rem] border border-balance-olive/16 bg-balance-cream/60 px-5 py-4 sm:min-w-[180px]">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-balance-dark/46">Puntos</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-balance-dark/46">Puntos</p>
                   <p className="mt-1 text-3xl font-semibold tabular-nums text-balance-olive">{pointsBalance}</p>
                 </div>
                 {streak && (
