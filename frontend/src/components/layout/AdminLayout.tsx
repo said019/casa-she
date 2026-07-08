@@ -173,6 +173,7 @@ const sidebarItems: SidebarItem[] = [
             { href: '/admin/settings/studio', label: 'Studio' },
             { href: '/admin/settings/policies', label: 'Políticas' },
             { href: '/admin/settings/cancellations', label: 'Cancelaciones' },
+            { href: '/admin/settings/bar', label: 'Barra' },
             { href: '/admin/settings/notifications', label: 'Notificaciones' },
             { href: '/admin/notifications/difusion', label: 'Difusión push' },
             { href: '/admin/settings/whatsapp', label: 'WhatsApp' },
