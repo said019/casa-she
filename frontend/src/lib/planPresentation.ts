@@ -64,7 +64,7 @@ export const packagePresentations: Record<PackageType, PackagePresentation> = {
     shortTitle: 'Paquete',
     eyebrow: 'a tu ritmo',
     promise: 'Créditos para tus clases',
-    detail: 'Créditos flexibles para reservar Pilates Mat, Barre, Sculpt, Yoga y Salsa, en el orden que tú quieras.',
+    detail: 'Créditos flexibles para reservar Pilates Mat, Barre, Sculpt, Yoga, Flex y Salsa, en el orden que tú quieras.',
     bestFor: 'Ideal para mantener constancia sin comprometerte a todo el mes.',
     rule: 'Vigencia un mes desde la compra.',
     accentLabel: 'flexible',
