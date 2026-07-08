@@ -69,3 +69,36 @@ export function pointsForTotal(totalMxn: number, redemptionRate: number): number
 export function canCustomerCancel(pickupTime: Date, now: Date, windowMinutes: number): boolean {
   return pickupTime.getTime() - now.getTime() > windowMinutes * 60_000;
 }
+
+// Devuelve la próxima apertura de la barra (hasta 7 días adelante) o null si no hay horario configurado.
+export function nextBarOpening(cfg: BarConfig, from: Date): { iso: string; label: string } | null {
+  // Search up to 7 days ahead (offsets 0..6)
+  for (let i = 0; i <= 6; i++) {
+    const dow = (from.getDay() + i) % 7;
+    const hours = cfg.operating_hours?.[dow];
+    if (!hours) continue;
+    const openMins = hhmmToMinutes(hours.open);
+    if (i === 0) {
+      // today: only count it if bar hasn't opened yet (current time < open time)
+      const nowMins = from.getHours() * 60 + from.getMinutes();
+      if (nowMins >= openMins) continue; // already opened or currently open — skip
+    }
+    // Build the opening Date: start of `from`'s day + i days + openMins
+    const opening = new Date(from);
+    opening.setHours(0, 0, 0, 0);
+    opening.setDate(opening.getDate() + i);
+    opening.setHours(Math.floor(openMins / 60), openMins % 60, 0, 0);
+
+    let label: string;
+    if (i === 0) {
+      label = `hoy a las ${hours.open}`;
+    } else if (i === 1) {
+      label = `mañana a las ${hours.open}`;
+    } else {
+      const dayName = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][dow];
+      label = `el ${dayName} a las ${hours.open}`;
+    }
+    return { iso: opening.toISOString(), label };
+  }
+  return null;
+}

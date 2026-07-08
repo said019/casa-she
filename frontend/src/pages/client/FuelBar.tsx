@@ -81,8 +81,9 @@ export default function FuelBar() {
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // ── bar OFF state ─────────────────────────────────────────────────────────
-  if (!cfgLoading && cfg && !cfg.enabled) {
+  // ── bar OFF or closed-by-hours state ──────────────────────────────────────
+  if (!cfgLoading && cfg && (!cfg.enabled || !cfg.is_open_now)) {
+    const barDisabled = !cfg.enabled;
     return (
       <AuthGuard>
         <ClientLayout>
@@ -93,10 +94,23 @@ export default function FuelBar() {
                 <path d="M16 9h2a2 2 0 0 1 0 4h-2" />
               </svg>
             </div>
-            <h2 className="font-heading text-2xl text-[#2A4E36]">La barra está cerrada por ahora</h2>
-            <p className="text-sm italic text-[#2A4E36]/60">
-              Vuelve pronto para recargar tu energía
-            </p>
+            {barDisabled ? (
+              <>
+                <h2 className="font-heading text-2xl text-[#2A4E36]">La barra está cerrada por ahora</h2>
+                <p className="text-sm italic text-[#2A4E36]/60">
+                  Vuelve pronto para recargar tu energía
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="font-heading text-2xl text-[#2A4E36]">Cerrada por ahora</h2>
+                {cfg.opens_at_label && (
+                  <p className="text-sm italic text-[#2A4E36]/60">
+                    Abre {cfg.opens_at_label}
+                  </p>
+                )}
+              </>
+            )}
           </div>
         </ClientLayout>
       </AuthGuard>
