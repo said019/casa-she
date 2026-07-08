@@ -7,6 +7,7 @@ import { isBarOpenAt, nextBarOpening, BAR_CATEGORY_NAMES, computeBarTotals, poin
 import { spendBarPoints, refundBarPoints } from '../lib/barPoints.js';
 import { sendWebPushToUser } from '../lib/web-push.js';
 import { createPreference, mpConfigured } from '../lib/mercadopago.js';
+import { priceSelectedExtras, type BarExtra } from '../lib/barExtras.js';
 
 const router = Router();
 
@@ -68,7 +69,11 @@ router.get('/menu', authenticate, async (_req: Request, res: Response) => {
 });
 
 const CreateBarOrder = z.object({
-  items: z.array(z.object({ productId: z.string().uuid(), quantity: z.number().int().positive() })).min(1),
+  items: z.array(z.object({
+    productId: z.string().uuid(),
+    quantity: z.number().int().positive(),
+    extras: z.array(z.string()).optional(),
+  })).min(1),
   pickupTime: z.string(),
   paymentMethod: z.enum(['reception', 'card', 'points']),
   notes: z.string().max(140).optional(),
@@ -93,12 +98,19 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
   if (paymentMethod === 'points' && !cfg.points_enabled) return res.status(400).json({ error: 'POINTS_DISABLED' });
 
   // Cotiza cada producto EN SERVIDOR (el cliente nunca manda precio).
-  const priced: { productId: string; name: string; quantity: number; unit_price_mxn: number }[] = [];
+  const priced: { productId: string; name: string; quantity: number; unit_price_mxn: number; selected_extras: { id: string; name: string; price: number }[] }[] = [];
+
+  // Carga el catálogo de extras activos UNA VEZ (server-side guard: solo ids activos valen).
+  const extrasRows = await query<{ id: string; name: string; group_label: string; is_single: boolean; price_mxn: string }>(
+    `SELECT id, name, group_label, is_single, price_mxn FROM bar_extras WHERE is_active = true`);
+  const extrasCatalog: BarExtra[] = extrasRows.map((r) => ({ ...r, price_mxn: Number(r.price_mxn) }));
+
   for (const it of items) {
     const p = await queryOne<{ id: string; name: string; price: string; is_active: boolean }>(
       `SELECT id, name, price, is_active FROM products WHERE id = $1`, [it.productId]);
     if (!p || !p.is_active) return res.status(400).json({ error: 'PRODUCT_NOT_FOUND', productId: it.productId });
-    priced.push({ productId: p.id, name: p.name, quantity: it.quantity, unit_price_mxn: Number(p.price) });
+    const pe = priceSelectedExtras(it.extras ?? [], extrasCatalog);
+    priced.push({ productId: p.id, name: p.name, quantity: it.quantity, unit_price_mxn: Number(p.price) + pe.total, selected_extras: pe.snapshot });
   }
 
   // Recargo SOLO para tarjeta.
@@ -137,9 +149,9 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
       if (!orderId) { await client.query('ROLLBACK'); return res.status(500).json({ error: 'ORDER_CREATION_FAILED' }); }
       for (const it of priced) {
         await client.query(
-          `INSERT INTO bar_order_items (bar_order_id, product_id, product_name, quantity, unit_price_mxn, line_total_mxn)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [orderId, it.productId, it.name, it.quantity, it.unit_price_mxn, it.unit_price_mxn * it.quantity]);
+          `INSERT INTO bar_order_items (bar_order_id, product_id, product_name, quantity, unit_price_mxn, line_total_mxn, selected_extras)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+          [orderId, it.productId, it.name, it.quantity, it.unit_price_mxn, it.unit_price_mxn * it.quantity, JSON.stringify(it.selected_extras)]);
       }
       await spendBarPoints(client, userId, needed, orderId);
       await client.query('COMMIT');
@@ -163,9 +175,9 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
   const orderId = order.id;
   for (const it of priced) {
     await query(
-      `INSERT INTO bar_order_items (bar_order_id, product_id, product_name, quantity, unit_price_mxn, line_total_mxn)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [orderId, it.productId, it.name, it.quantity, it.unit_price_mxn, it.unit_price_mxn * it.quantity]);
+      `INSERT INTO bar_order_items (bar_order_id, product_id, product_name, quantity, unit_price_mxn, line_total_mxn, selected_extras)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+      [orderId, it.productId, it.name, it.quantity, it.unit_price_mxn, it.unit_price_mxn * it.quantity, JSON.stringify(it.selected_extras)]);
   }
 
   if (paymentMethod === 'card') {
@@ -316,6 +328,101 @@ router.delete('/orders/:id', authenticate, async (req: Request, res: Response) =
   } catch (e) { await client.query('ROLLBACK'); return res.status(500).json({ error: 'CANCEL_FAILED' }); }
   finally { client.release(); }
   res.json({ ok: true });
+});
+
+// ─── bar_extras CRUD ───────────────────────────────────────────────────────
+
+const CreateBarExtra = z.object({
+  name:        z.string().min(1).max(120),
+  group_label: z.string().min(1).max(80),
+  is_single:   z.boolean(),
+  price_mxn:   z.number().min(0),
+  sort_order:  z.number().int().optional().default(0),
+  is_active:   z.boolean().optional().default(true),
+});
+
+const UpdateBarExtra = CreateBarExtra.partial();
+
+// GET /api/bar/extras
+// Authenticated clients get only is_active=true rows.
+// Admins/super_admins may pass ?all=1 to receive all rows (including inactive).
+router.get('/extras', authenticate, async (req: Request, res: Response) => {
+  const isAdmin = ['admin', 'super_admin'].includes(req.user!.role);
+  const wantAll = req.query.all === '1' && isAdmin;
+  const rows = await query<{
+    id: string; name: string; group_label: string; is_single: boolean;
+    price_mxn: string; sort_order: number; is_active: boolean; created_at: string;
+  }>(
+    `SELECT id, name, group_label, is_single, price_mxn, sort_order, is_active, created_at
+     FROM bar_extras
+     ${wantAll ? '' : 'WHERE is_active = true'}
+     ORDER BY group_label, sort_order, name`
+  );
+  res.json(rows.map(r => ({ ...r, price_mxn: Number(r.price_mxn) })));
+});
+
+// POST /api/bar/extras (admin)
+router.post('/extras', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
+  try {
+    const parsed = CreateBarExtra.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Datos invalidos', details: parsed.error.flatten().fieldErrors });
+    const { name, group_label, is_single, price_mxn, sort_order, is_active } = parsed.data;
+    const row = await queryOne<{
+      id: string; name: string; group_label: string; is_single: boolean;
+      price_mxn: string; sort_order: number; is_active: boolean; created_at: string;
+    }>(
+      `INSERT INTO bar_extras (name, group_label, is_single, price_mxn, sort_order, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, group_label, is_single, price_mxn, sort_order, is_active, created_at`,
+      [name, group_label, is_single, price_mxn, sort_order, is_active]
+    );
+    if (!row) return res.status(500).json({ error: 'INSERT_FAILED' });
+    res.status(201).json({ ...row, price_mxn: Number(row.price_mxn) });
+  } catch (e: any) {
+    console.error('bar extras error:', e?.message);
+    res.status(500).json({ error: 'EXTRAS_ERROR' });
+  }
+});
+
+// PUT /api/bar/extras/:id (admin)
+router.put('/extras/:id', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
+  if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return res.status(404).json({ error: 'NOT_FOUND' });
+  try {
+    const parsed = UpdateBarExtra.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Datos invalidos', details: parsed.error.flatten().fieldErrors });
+    const fields = parsed.data as Record<string, unknown>;
+    const keys = Object.keys(fields).filter(k => fields[k] !== undefined);
+    if (keys.length === 0) return res.status(400).json({ error: 'NO_FIELDS' });
+    const setClauses = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
+    const values = keys.map(k => fields[k]);
+    const row = await queryOne<{
+      id: string; name: string; group_label: string; is_single: boolean;
+      price_mxn: string; sort_order: number; is_active: boolean; created_at: string;
+    }>(
+      `UPDATE bar_extras SET ${setClauses}, updated_at = NOW() WHERE id = $1
+       RETURNING id, name, group_label, is_single, price_mxn, sort_order, is_active, created_at`,
+      [req.params.id, ...values]
+    );
+    if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
+    res.json({ ...row, price_mxn: Number(row.price_mxn) });
+  } catch (e: any) {
+    console.error('bar extras error:', e?.message);
+    res.status(500).json({ error: 'EXTRAS_ERROR' });
+  }
+});
+
+// DELETE /api/bar/extras/:id (admin)
+router.delete('/extras/:id', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
+  if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return res.status(404).json({ error: 'NOT_FOUND' });
+  try {
+    const row = await queryOne<{ id: string }>(
+      `DELETE FROM bar_extras WHERE id = $1 RETURNING id`, [req.params.id]
+    );
+    if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
+    res.json({ ok: true });
+  } catch (e: any) {
+    console.error('bar extras error:', e?.message);
+    res.status(500).json({ error: 'EXTRAS_ERROR' });
+  }
 });
 
 export default router;

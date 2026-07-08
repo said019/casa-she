@@ -3109,6 +3109,48 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Migration BAR-02: columnas Fase 2 + payment_method points listas.');
     } catch (e) { console.error('Migration BAR-02 error:', e); }
 
+    // Migration BAR-03: extras/modificadores del Fuel Bar + snapshot en items.
+    try {
+        await query(`CREATE TABLE IF NOT EXISTS bar_extras (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name VARCHAR(120) NOT NULL,
+            group_label VARCHAR(80) NOT NULL,
+            is_single BOOLEAN NOT NULL DEFAULT false,
+            price_mxn NUMERIC(10,2) NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_active BOOLEAN NOT NULL DEFAULT true,
+            created_at TIMESTAMPTZ DEFAULT now(),
+            updated_at TIMESTAMPTZ DEFAULT now()
+        )`);
+        await query(`ALTER TABLE bar_extras ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()`);
+        await query(`ALTER TABLE bar_order_items ADD COLUMN IF NOT EXISTS selected_extras JSONB NOT NULL DEFAULT '[]'::jsonb`);
+        console.log('Migration BAR-03: bar_extras + selected_extras listas.');
+    } catch (e) { console.error('Migration BAR-03 error:', e); }
+
+    // Seed BAR-extras: ejemplos UNA sola vez (editables/borrables en admin).
+    try {
+        const seeded = await queryOne<{ x: number }>(`SELECT 1 AS x FROM system_settings WHERE key='bar_extras_seeded'`);
+        if (!seeded) {
+            const EXTRAS: [string, string, boolean, number, number][] = [
+                ['Leche entera','Leche',true,0,1],
+                ['Leche de almendra','Leche',true,10,2],
+                ['Leche de avena','Leche',true,10,3],
+                ['Deslactosada','Leche',true,10,4],
+                ['Shot extra de espresso','Agregados',false,15,1],
+                ['Crema batida','Agregados',false,10,2],
+                ['Sin azúcar','Agregados',false,0,3],
+            ];
+            for (const [name, grp, single, price, ord] of EXTRAS) {
+                await query(
+                    `INSERT INTO bar_extras (name, group_label, is_single, price_mxn, sort_order)
+                     SELECT $1,$2,$3,$4,$5 WHERE NOT EXISTS (SELECT 1 FROM bar_extras WHERE name=$1 AND group_label=$2)`,
+                    [name, grp, single, price, ord]);
+            }
+            await query(`INSERT INTO system_settings (key, value) VALUES ('bar_extras_seeded','true'::jsonb) ON CONFLICT (key) DO NOTHING`);
+            console.log('Seed BAR-extras: ejemplos sembrados (una sola vez).');
+        }
+    } catch (e) { console.error('Seed BAR-extras error:', e); }
+
     // products.facility_id: siempre idempotente (columna que usan las queries de la barra).
     try {
         await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS facility_id UUID REFERENCES facilities(id)`);

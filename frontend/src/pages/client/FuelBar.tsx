@@ -2,7 +2,15 @@ import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { ClientLayout } from '@/components/layout/ClientLayout';
-import { useBarMenu, useBarConfig, type BarProduct, type BarCartLine } from '@/lib/api/bar';
+import {
+  useBarMenu,
+  useBarConfig,
+  useBarExtras,
+  type BarProduct,
+  type BarCartLine,
+  type BarExtra,
+  type BarCartExtraSnapshot,
+} from '@/lib/api/bar';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -38,19 +46,221 @@ function catColor(i: number) {
   return CAT_COLORS[i % CAT_COLORS.length];
 }
 
+// ── ExtrasSelector modal ──────────────────────────────────────────────────────
+
+type ExtraGroup = { label: string; is_single: boolean; items: BarExtra[] };
+
+function groupExtras(extras: BarExtra[]): ExtraGroup[] {
+  const map = new Map<string, { label: string; items: BarExtra[] }>();
+  for (const e of extras) {
+    if (!map.has(e.group_label)) {
+      map.set(e.group_label, { label: e.group_label, items: [] });
+    }
+    map.get(e.group_label)!.items.push(e);
+  }
+  return Array.from(map.values()).map((g) => ({
+    label: g.label,
+    is_single: g.items.every((i) => i.is_single),
+    items: g.items,
+  }));
+}
+
+function ExtrasSelector({
+  product,
+  extras,
+  onConfirm,
+  onCancel,
+}: {
+  product: BarProduct;
+  extras: BarExtra[];
+  onConfirm: (chosen: BarCartExtraSnapshot[]) => void;
+  onCancel: () => void;
+}) {
+  const groups = useMemo(() => groupExtras(extras), [extras]);
+
+  // radio: group_label → extra id (or null)
+  const [radios, setRadios] = useState<Record<string, string | null>>(() => {
+    const init: Record<string, string | null> = {};
+    groups.forEach((g) => {
+      if (g.is_single) init[g.label] = null;
+    });
+    return init;
+  });
+
+  // checkboxes: Set of extra ids
+  const [checks, setChecks] = useState<Set<string>>(new Set());
+
+  const toggleCheck = (id: string) => {
+    setChecks((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const chosen: BarCartExtraSnapshot[] = useMemo(() => {
+    const result: BarCartExtraSnapshot[] = [];
+    groups.forEach((g) => {
+      if (g.is_single) {
+        const id = radios[g.label];
+        if (id) {
+          const e = g.items.find((i) => i.id === id);
+          if (e) result.push({ id: e.id, name: e.name, price: e.price_mxn });
+        }
+      } else {
+        g.items.forEach((e) => {
+          if (checks.has(e.id)) result.push({ id: e.id, name: e.name, price: e.price_mxn });
+        });
+      }
+    });
+    return result;
+  }, [radios, checks, groups]);
+
+  const extrasTotal = chosen.reduce((a, e) => a + e.price, 0);
+
+  return (
+    /* Backdrop */
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center"
+      style={{ background: 'rgba(22,38,26,.45)', backdropFilter: 'blur(3px)' }}
+      onClick={onCancel}
+    >
+      {/* Sheet */}
+      <div
+        className="relative w-full max-w-md rounded-t-[28px] bg-[#F6F0E4] px-5 pb-8 pt-5 shadow-[0_-24px_60px_-20px_rgba(22,38,26,.35)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* drag pill */}
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[rgba(22,38,26,.12)]" />
+
+        {/* product name */}
+        <h3 className="font-heading mb-[2px] text-[22px] text-[#2A4E36]">{product.name}</h3>
+        <p className="mb-4 text-[12px] italic text-[#2A4E36] opacity-55">
+          Personaliza tu bebida
+        </p>
+
+        {/* groups */}
+        <div className="space-y-5">
+          {groups.map((g) => (
+            <div key={g.label}>
+              <div className="mb-[10px] flex items-center gap-2">
+                <span className="text-[11px] uppercase tracking-[.22em] text-[#2A4E36] opacity-60">
+                  {g.label}
+                </span>
+                {g.is_single && (
+                  <span className="rounded-full bg-[rgba(42,78,54,.08)] px-2 py-[1px] text-[10px] text-[#2A4E36] opacity-70">
+                    elige uno
+                  </span>
+                )}
+              </div>
+              <div className="space-y-[8px]">
+                {g.items.map((e) => {
+                  const selected = g.is_single
+                    ? radios[g.label] === e.id
+                    : checks.has(e.id);
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() => {
+                        if (g.is_single) {
+                          setRadios((prev) => ({
+                            ...prev,
+                            [g.label]: prev[g.label] === e.id ? null : e.id,
+                          }));
+                        } else {
+                          toggleCheck(e.id);
+                        }
+                      }}
+                      className={[
+                        'flex w-full items-center justify-between rounded-[16px] border px-[15px] py-[12px] text-left transition-all',
+                        selected
+                          ? 'border-[rgba(42,78,54,.24)] bg-[#FBF5EA] shadow-[0_10px_22px_-18px_rgba(42,78,54,.4),inset_0_1px_0_rgba(255,255,255,.5)]'
+                          : 'border-[rgba(22,38,26,.10)] bg-[rgba(255,255,255,.42)]',
+                      ].join(' ')}
+                    >
+                      <span className="text-[14px] text-[#2A4E36]">{e.name}</span>
+                      <div className="flex items-center gap-3">
+                        {e.price_mxn > 0 && (
+                          <span className="text-[12.5px] italic text-[#2A4E36] opacity-60">
+                            +{formatPrice(e.price_mxn)}
+                          </span>
+                        )}
+                        {/* indicator */}
+                        {g.is_single ? (
+                          <div
+                            className={[
+                              'h-[18px] w-[18px] flex-shrink-0 rounded-full border-[1.5px] transition-all',
+                              selected ? 'border-[#2A4E36]' : 'border-[rgba(22,38,26,.18)]',
+                            ].join(' ')}
+                            style={
+                              selected
+                                ? { background: 'radial-gradient(circle, #2A4E36 40%, transparent 44%)' }
+                                : undefined
+                            }
+                          />
+                        ) : (
+                          <div
+                            className={[
+                              'flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-[5px] border-[1.5px] transition-all',
+                              selected
+                                ? 'border-[#2A4E36] bg-[#2A4E36]'
+                                : 'border-[rgba(22,38,26,.18)] bg-transparent',
+                            ].join(' ')}
+                          >
+                            {selected && (
+                              <svg viewBox="0 0 12 12" className="h-3 w-3" stroke="#F6EFE1" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M2 6l3 3 5-5" />
+                              </svg>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Confirm button */}
+        <button
+          onClick={() => onConfirm(chosen)}
+          className="mt-6 flex w-full items-center justify-between rounded-full bg-[#2A4E36] px-[26px] text-[#F6EFE1] shadow-[0_18px_34px_-18px_rgba(42,78,54,.8),inset_0_1px_0_rgba(255,255,255,.12)] transition-transform active:scale-[.98]"
+          style={{ height: '54px' }}
+        >
+          <span className="text-[13px] uppercase tracking-[.16em]">Agregar</span>
+          <span className="font-heading text-[19px]">
+            {formatPrice(product.price + extrasTotal)}
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── component ─────────────────────────────────────────────────────────────────
 
 export default function FuelBar() {
   const nav = useNavigate();
   const { data: cfg, isLoading: cfgLoading } = useBarConfig();
   const { data: menu, isLoading: menuLoading } = useBarMenu(cfg?.enabled === true);
+  const { data: extrasData } = useBarExtras();
+
+  const extras = extrasData ?? [];
 
   const [cart, setCart] = useState<Record<string, BarCartLine>>({});
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [selectorProduct, setSelectorProduct] = useState<BarProduct | null>(null);
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const total = useMemo(
-    () => Object.values(cart).reduce((a, l) => a + l.product.price * l.quantity, 0),
+    () =>
+      Object.values(cart).reduce((a, l) => {
+        const extrasSum = (l.extras ?? []).reduce((s, e) => s + e.price, 0);
+        return a + (l.product.price + extrasSum) * l.quantity;
+      }, 0),
     [cart],
   );
   const count = useMemo(
@@ -68,11 +278,39 @@ export default function FuelBar() {
 
   const categories = Object.keys(grouped);
 
-  const add = (p: BarProduct) => {
-    setCart((c) => ({
-      ...c,
-      [p.id]: { product: p, quantity: (c[p.id]?.quantity ?? 0) + 1 },
-    }));
+  // When "+" tapped: open selector if extras exist, else add directly
+  const handleAdd = (p: BarProduct) => {
+    if (extras.length > 0) {
+      setSelectorProduct(p);
+    } else {
+      addToCart(p, []);
+    }
+  };
+
+  const addToCart = (p: BarProduct, chosen: BarCartExtraSnapshot[]) => {
+    // Each addition is a separate line keyed by product+extras combo
+    // Simple approach: if no extras, use product id; if extras, append new line
+    if (chosen.length === 0) {
+      setCart((c) => ({
+        ...c,
+        [p.id]: { product: p, quantity: (c[p.id]?.quantity ?? 0) + 1, extras: [] },
+      }));
+    } else {
+      // Key: productId + sorted extra ids to allow same combo to stack
+      const extraKey = chosen
+        .map((e) => e.id)
+        .sort()
+        .join(',');
+      const lineKey = `${p.id}__${extraKey}`;
+      setCart((c) => ({
+        ...c,
+        [lineKey]: {
+          product: p,
+          quantity: (c[lineKey]?.quantity ?? 0) + 1,
+          extras: chosen,
+        },
+      }));
+    }
   };
 
   const scrollToCategory = (cat: string) => {
@@ -255,7 +493,7 @@ export default function FuelBar() {
 
                         <button
                           aria-label={`Agregar ${product.name}`}
-                          onClick={() => add(product)}
+                          onClick={() => handleAdd(product)}
                           className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#2A4E36] text-[#F6EFE1] shadow-[0_10px_18px_-10px_rgba(42,78,54,.75)] transition-transform active:scale-95 disabled:opacity-40"
                         >
                           <svg
@@ -321,6 +559,19 @@ export default function FuelBar() {
               </span>
             </button>
           </div>
+        )}
+
+        {/* ── Extras selector sheet ──────────────────────────────────────────── */}
+        {selectorProduct && (
+          <ExtrasSelector
+            product={selectorProduct}
+            extras={extras}
+            onConfirm={(chosen) => {
+              addToCart(selectorProduct, chosen);
+              setSelectorProduct(null);
+            }}
+            onCancel={() => setSelectorProduct(null)}
+          />
         )}
       </ClientLayout>
     </AuthGuard>
