@@ -765,8 +765,8 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
             // Consume free class benefit if used (only if still active — prevents double consumption)
             if (freeClassBenefitId) {
                 await client.query(
-                    `UPDATE user_benefits SET status = 'used', used_at = NOW(), used_on_booking_id = $1 WHERE id = $2 AND status = 'active'`,
-                    [newBooking.id, freeClassBenefitId]
+                    `UPDATE user_benefits SET status = 'used', used_at = NOW(), used_by = $3, used_on_booking_id = $1 WHERE id = $2 AND status = 'active'`,
+                    [newBooking.id, freeClassBenefitId, req.user?.userId ?? null]
                 );
             }
 
