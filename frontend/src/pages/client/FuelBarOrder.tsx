@@ -268,14 +268,22 @@ export default function FuelBarOrder() {
               )}
 
               {/* Cancel button (pending only) */}
-              {isPending && (
+              <div className="mt-8 flex flex-col items-center gap-3">
                 <button
-                  onClick={cancel}
-                  className="mt-8 rounded-full border border-[rgba(174,72,54,.35)] px-6 py-3 text-sm text-[#AE4836] transition-colors hover:bg-[#AE4836]/10"
+                  onClick={() => nav('/app/fuel-bar')}
+                  className="rounded-full bg-[#2A4E36] px-6 py-3 text-sm text-[#F6EFE1]"
                 >
-                  Cancelar pedido
+                  Pedir otra cosa
                 </button>
-              )}
+                {isPending && (
+                  <button
+                    onClick={cancel}
+                    className="rounded-full border border-[rgba(174,72,54,.35)] px-6 py-3 text-sm text-[#AE4836] transition-colors hover:bg-[#AE4836]/10"
+                  >
+                    Cancelar pedido
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

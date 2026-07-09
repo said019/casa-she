@@ -397,6 +397,16 @@ export default function FuelBar() {
             </div>
           </div>
 
+          {/* ── Order history link ─────────────────────────────────────────── */}
+          <div className="flex justify-end px-4 pt-3">
+            <button
+              onClick={() => nav('/app/fuel-bar/orders')}
+              className="text-[12.5px] text-[#2A4E36] opacity-60 hover:opacity-100 transition-opacity"
+            >
+              Mis pedidos →
+            </button>
+          </div>
+
           {/* ── Category chips ─────────────────────────────────────────────── */}
           {!isLoading && categories.length > 0 && (
             <div className="flex gap-[9px] overflow-x-auto px-4 py-[18px] scrollbar-hide">

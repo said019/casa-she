@@ -51,6 +51,7 @@ import ClientEvents from "./pages/client/Events";
 import FuelBar from "./pages/client/FuelBar";
 import FuelBarConfirm from "./pages/client/FuelBarConfirm";
 import FuelBarOrder from "./pages/client/FuelBarOrder";
+import FuelBarOrders from "./pages/client/FuelBarOrders";
 import Checkout from "./pages/Checkout";
 
 // Admin pages
@@ -261,6 +262,7 @@ const App = () => (
             <Route path="/app/events" element={<ClientEvents />} />
             <Route path="/app/fuel-bar" element={<FuelBar />} />
             <Route path="/app/fuel-bar/confirm" element={<FuelBarConfirm />} />
+            <Route path="/app/fuel-bar/orders" element={<FuelBarOrders />} />
             <Route path="/app/fuel-bar/order/:id" element={<FuelBarOrder />} />
 
             {/* Admin Routes */}
