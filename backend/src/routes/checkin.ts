@@ -10,6 +10,7 @@ import { sendWhatsAppMessage } from '../lib/whatsapp.js';
 import { awardCheckinPoints } from '../lib/loyalty.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { logAction } from '../lib/audit.js';
+import { verifyQrPayload } from '../lib/qr.js';
 
 const router = Router();
 
@@ -56,14 +57,6 @@ const ManualCheckinSchema = z.object({
   notes: z.string().optional(),
 });
 
-const QrPayloadSchema = z.object({
-  t: z.literal('checkin'),
-  m: z.string().uuid(),
-  ms: z.string().uuid().nullable().optional(),
-  e: z.number(),
-  h: z.string().min(32),
-});
-
 // ============================================
 // FUNCIONES DE UTILIDAD
 // ============================================
@@ -71,12 +64,6 @@ const QrPayloadSchema = z.object({
 const decodePayload = (payload: string) => {
   const decoded = Buffer.from(payload, 'base64url').toString('utf-8');
   return JSON.parse(decoded) as unknown;
-};
-
-const computeHash = (userId: string, membershipId: string | null | undefined, expiresAt: number) => {
-  const secret = process.env.CHECKIN_SECRET || 'walletclub-dev';
-  const base = `${userId}:${membershipId || 'none'}:${expiresAt}:${secret}`;
-  return createHash('sha256').update(base).digest('hex');
 };
 
 // Calcular distancia entre dos puntos usando Haversine
@@ -231,32 +218,21 @@ router.post('/qr', authenticate, requirePermission('checkin', ['instructor']), a
       });
     }
 
-    let decodedPayload: unknown;
-    try {
-      decodedPayload = decodePayload(validation.data.qrPayload);
-    } catch {
-      return res.status(400).json({ error: 'QR inválido' });
-    }
-
-    const payloadValidation = QrPayloadSchema.safeParse(decodedPayload);
-    if (!payloadValidation.success) {
-      // Check if it's an event QR scanned in the wrong mode
-      if (decodedPayload && typeof decodedPayload === 'object' && (decodedPayload as any).t === 'event_checkin') {
-        return res.status(400).json({ error: 'Este QR es para un evento. Usa el check-in de eventos.' });
+    const verified = verifyQrPayload(validation.data.qrPayload);
+    if (!verified) {
+      // Detect an event QR scanned in the wrong mode to give a helpful hint
+      try {
+        const decoded = JSON.parse(Buffer.from(validation.data.qrPayload, 'base64url').toString('utf-8'));
+        if (decoded && typeof decoded === 'object' && (decoded as any).t === 'event_checkin') {
+          return res.status(400).json({ error: 'Este QR es para un evento. Usa el check-in de eventos.' });
+        }
+      } catch {
+        /* not a base64url JSON payload — generic error below */
       }
-      return res.status(400).json({ error: 'QR inválido' });
+      return res.status(400).json({ error: 'QR inválido o expirado' });
     }
-
-    const { m: userId, ms: membershipId, e: expiresAt, h: hash } = payloadValidation.data;
-    const nowSeconds = Math.floor(Date.now() / 1000);
-    if (nowSeconds > expiresAt) {
-      return res.status(400).json({ error: 'QR expirado' });
-    }
-
-    const expectedHash = computeHash(userId, membershipId, expiresAt);
-    if (expectedHash !== hash) {
-      return res.status(400).json({ error: 'QR inválido' });
-    }
+    const userId = verified.userId;
+    const membershipId = verified.membershipId;
 
     const booking = await queryOne<{
       booking_id: string;
@@ -1196,19 +1172,11 @@ router.post('/event-qr', authenticate, requirePermission('checkin', ['instructor
       userId = u;
     }
 
-    // Try membership/class QR format (t:'checkin')
+    // Try membership/class QR format (t:'checkin') via shared verifier
     if (!userId) {
-      const classPayload = QrPayloadSchema.safeParse(decodedPayload);
-      if (classPayload.success) {
-        const { m, ms, e: expiresAt, h: hash } = classPayload.data;
-        if (Math.floor(Date.now() / 1000) > expiresAt) {
-          return res.status(400).json({ error: 'QR expirado' });
-        }
-        const expectedHash = computeHash(m, ms, expiresAt);
-        if (expectedHash !== hash) {
-          return res.status(400).json({ error: 'QR inválido' });
-        }
-        userId = m;
+      const verified = verifyQrPayload(qrPayload);
+      if (verified) {
+        userId = verified.userId;
       }
     }
 
