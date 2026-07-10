@@ -2,9 +2,15 @@
   "name": "BMB Coach",
   "short_name": "BMB Coach",
   "description": "Portal de coaches de BMB Studio — agenda, perfil y clases.",
+  "id": "/coach",
   "start_url": "/coach",
   "scope": "/coach",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
   "background_color": "#ECE1CE",
   "theme_color": "#CE9B25",
   "orientation": "portrait",

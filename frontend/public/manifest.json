@@ -2,11 +2,18 @@
   "name": "Casa Shé",
   "short_name": "Casa Shé",
   "description": "Pilates Mat, Yoga, Aeroyoga, Telas y comunidad en la Condesa, CDMX",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#FBF3DD",
   "theme_color": "#2E4A35",
   "orientation": "portrait",
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
   "icons": [
     {
       "src": "/icon-192.png",

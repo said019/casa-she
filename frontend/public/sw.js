@@ -13,7 +13,7 @@
 // strategy or precached files change. The activate handler removes any caches
 // that don't match the current version.
 
-const VERSION = 'br-v5';
+const VERSION = 'br-v6';
 const STATIC_CACHE = `${VERSION}-static`;
 
 self.addEventListener('install', (event) => {
@@ -126,17 +126,30 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Click en la notificación — enfocar una pestaña abierta o abrir la app en la pantalla correcta
+// Click en la notificación — reutilizar una ventana de la PWA existente (nunca abrir browser).
+// Orden: (1) ventana ya en la URL correcta → focus; (2) cualquier ventana de la app → navigate;
+// (3) no hay ninguna → openWindow (abre la PWA instalada en Android; Safari en iOS, limitación del SO).
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const targetUrl = (event.notification.data && event.notification.data.url) || '/app';
   event.waitUntil(
     (async () => {
       const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      for (const client of all) {
-        if ('focus' in client) { client.focus(); client.navigate(targetUrl); return; }
+
+      // Prioridad 1: ventana que ya está en la URL destino
+      const exact = all.find((c) => c.url === new URL(targetUrl, self.location.origin).href);
+      if (exact) { await exact.focus(); return; }
+
+      // Prioridad 2: cualquier ventana de esta app
+      const any = all.find((c) => c.url.startsWith(self.location.origin));
+      if (any) {
+        await any.focus();
+        if ('navigate' in any) await any.navigate(targetUrl);
+        return;
       }
-      if (self.clients.openWindow) await self.clients.openWindow(targetUrl);
+
+      // Sin ventana abierta: abrir (PWA en Android, Safari en iOS — limitación del SO)
+      await self.clients.openWindow(targetUrl);
     })()
   );
 });
