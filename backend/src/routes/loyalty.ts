@@ -3,6 +3,7 @@ import { query, queryOne, pool } from '../config/database.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { getLoyaltyConfig, saveLoyaltyConfig, syncUserLoyaltyPointsSnapshot } from '../lib/loyalty.js';
 import { toBenefitType, validateRewardValue, BenefitValue, isFreeClassValue, isDiscountValue } from '../types/benefits.js';
+import { POS_MARKABLE_TYPES } from '../lib/qr.js';
 
 const router = Router();
 
@@ -421,6 +422,57 @@ router.get('/my-benefits', authenticate, async (req: Request, res: Response) => 
     } catch (error) {
         console.error('Get my-benefits error:', error);
         res.status(500).json({ error: 'Error al obtener beneficios' });
+    }
+});
+
+// ============================================
+// GET /api/loyalty/users/:userId/benefits - Active benefits for a client (staff)
+// ============================================
+router.get('/users/:userId/benefits', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
+    try {
+        const targetUserId = req.params.userId;
+
+        await query(
+            `UPDATE user_benefits SET status = 'expired' WHERE user_id = $1 AND status = 'active' AND expires_at < NOW()`,
+            [targetUserId]
+        );
+
+        const benefits = await query<{
+            id: string; benefit_type: string; benefit_value: any; status: string;
+            expires_at: string; class_type_id: string | null; used_at: string | null;
+            created_at: string; class_type_name: string | null; used_by: string | null;
+        }>(
+            `SELECT ub.id, ub.benefit_type, ub.benefit_value, ub.status, ub.expires_at,
+                    ub.class_type_id, ub.used_at, ub.created_at, ub.used_by,
+                    ct.name as class_type_name
+             FROM user_benefits ub
+             LEFT JOIN class_types ct ON ub.class_type_id = ct.id
+             WHERE ub.user_id = $1 AND ub.status = 'active'
+             ORDER BY ub.expires_at ASC`,
+            [targetUserId]
+        );
+
+        const now = Date.now();
+        res.json(benefits.map((b) => {
+            const usableNow = b.status === 'active' && new Date(b.expires_at).getTime() > now;
+            return {
+                id: b.id,
+                type: b.benefit_type,
+                value: b.benefit_value,
+                status: b.status,
+                expiresAt: b.expires_at,
+                classTypeId: b.class_type_id,
+                classTypeName: b.class_type_name,
+                createdAt: b.created_at,
+                usedBy: b.used_by,
+                usableNow,
+                markableNow: usableNow && POS_MARKABLE_TYPES.has(b.benefit_type),
+                expiresSoon: usableNow && new Date(b.expires_at).getTime() < now + 3 * 24 * 3600 * 1000,
+            };
+        }));
+    } catch (error) {
+        console.error('Get user benefits error:', error);
+        res.status(500).json({ error: 'Error al obtener beneficios del cliente' });
     }
 });
 
