@@ -29,7 +29,9 @@ export default function ProfileMembership() {
   });
 
   const classLimit = membership?.class_limit ?? null;
-  const classesRemaining = membership?.classes_remaining ?? null;
+  const classesRemaining = membership?.has_multiple_memberships
+    ? (membership.total_classes_available ?? membership?.classes_remaining ?? null)
+    : (membership?.classes_remaining ?? null);
   const classesProgress = classLimit && classesRemaining !== null
     ? (classesRemaining / classLimit) * 100
     : null;

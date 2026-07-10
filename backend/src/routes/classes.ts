@@ -557,7 +557,7 @@ router.post('/generate', authenticate, requireElevated, async (req: Request, res
         const { startDate, endDate, facilityId } = validation.data;
 
         // 1. Get active recurring schedules (opcionalmente filtradas por sucursal)
-        const schedules = facilityId
+        const allSchedules = facilityId
             ? await query(
                 `SELECT * FROM schedules
                  WHERE is_active = true AND is_recurring = true AND facility_id = $1`,
@@ -568,9 +568,20 @@ router.post('/generate', authenticate, requireElevated, async (req: Request, res
       WHERE is_active = true AND is_recurring = true
     `);
 
-        if (schedules.length === 0) {
+        if (allSchedules.length === 0) {
             return res.json({ message: 'No hay horarios recurrentes activos para generar clases', count: 0 });
         }
+
+        // Filtrar horarios incompletos (sin instructor o sin tipo de clase asignado).
+        // Estos provocarían FK violations que abortarían la generación completa.
+        const warnings: string[] = [];
+        const schedules = allSchedules.filter((s: any) => {
+            if (!s.class_type_id || !s.instructor_id) {
+                warnings.push(`Horario del ${['dom','lun','mar','mié','jue','vie','sáb'][s.day_of_week] ?? s.day_of_week} ${s.start_time} omitido (${!s.class_type_id ? 'sin tipo de clase' : 'sin instructor'})`);
+                return false;
+            }
+            return true;
+        });
 
         // 2. Get closed days in the range to skip them
         const closedRows = await query(
@@ -581,20 +592,20 @@ router.post('/generate', authenticate, requireElevated, async (req: Request, res
             closedRows.map((r: any) => (r.date instanceof Date ? r.date.toISOString().split('T')[0] : String(r.date).split('T')[0]))
         );
 
-        // 3. Iterate through dates range
-        let current = new Date(startDate);
-        const end = new Date(endDate);
+        // 3. Iterate through dates range using UTC methods to avoid server-timezone drift
+        const current = new Date(`${startDate}T00:00:00Z`);
+        const end = new Date(`${endDate}T00:00:00Z`);
         let classesCreated = 0;
+        let classesSkipped = 0;
 
         while (current <= end) {
             // getUTCDay() para que el día coincida con la fecha en toISOString() (UTC).
-            // Con getDay() (hora local del servidor) las clases se generaban 1 día corridas.
             const dayOfWeek = current.getUTCDay();
             const dateStr = current.toISOString().split('T')[0];
 
             // Skip closed days
             if (closedDates.has(dateStr)) {
-                current.setDate(current.getDate() + 1);
+                current.setUTCDate(current.getUTCDate() + 1);
                 continue;
             }
 
@@ -602,45 +613,50 @@ router.post('/generate', authenticate, requireElevated, async (req: Request, res
             const daySchedules = schedules.filter((s: any) => s.day_of_week === dayOfWeek);
 
             for (const sched of daySchedules) {
-                // Check if class already exists for this schedule on this date to avoid dupes
-                // We use schedule_id to track origin
-                const existing = await queryOne(
-                    `SELECT id FROM classes WHERE schedule_id = $1 AND date = $2`,
-                    [sched.id, dateStr]
-                );
-
-                if (!existing) {
-                    // ON CONFLICT DO NOTHING: si ese slot ya está ocupado por una clase
-                    // idéntica (índice único classes_slot_unique por fecha/hora/coach/
-                    // disciplina/sucursal — p. ej. una clase creada a mano o desde otro
-                    // horario), se SALTA en vez de tronar. Antes esto lanzaba un 500
-                    // ("Error al generar clases") y abortaba toda la generación.
-                    const inserted = await query(
-                        `INSERT INTO classes (
-                        schedule_id, class_type_id, instructor_id, facility_id, date,
-                        start_time, end_time, max_capacity
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                    ON CONFLICT DO NOTHING RETURNING id`,
-                        [
-                            sched.id,
-                            sched.class_type_id,
-                            sched.instructor_id,
-                            sched.facility_id,
-                            dateStr,
-                            sched.start_time,
-                            sched.end_time,
-                            sched.max_capacity,
-                        ]
+                try {
+                    // Check if class already exists for this schedule on this date to avoid dupes
+                    const existing = await queryOne(
+                        `SELECT id FROM classes WHERE schedule_id = $1 AND date = $2`,
+                        [sched.id, dateStr]
                     );
-                    if (inserted.length > 0) classesCreated++;
+
+                    if (!existing) {
+                        // ON CONFLICT DO NOTHING: si ese slot está ocupado por otra clase
+                        // (creada a mano o desde otro horario), se salta sin tronar.
+                        const inserted = await query(
+                            `INSERT INTO classes (
+                            schedule_id, class_type_id, instructor_id, facility_id, date,
+                            start_time, end_time, max_capacity
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                        ON CONFLICT DO NOTHING RETURNING id`,
+                            [
+                                sched.id,
+                                sched.class_type_id,
+                                sched.instructor_id,
+                                sched.facility_id,
+                                dateStr,
+                                sched.start_time,
+                                sched.end_time,
+                                sched.max_capacity,
+                            ]
+                        );
+                        if (inserted.length > 0) classesCreated++;
+                        else classesSkipped++;
+                    }
+                } catch (schedErr: any) {
+                    warnings.push(`Error ${dateStr} horario ${sched.start_time}: ${schedErr.message}`);
                 }
             }
 
-            // Next day directly
-            current.setDate(current.getDate() + 1);
+            current.setUTCDate(current.getUTCDate() + 1);
         }
 
-        res.json({ message: 'Clases generadas exitosamente', count: classesCreated });
+        res.json({
+            message: 'Generación completada',
+            count: classesCreated,
+            skipped: classesSkipped,
+            warnings: warnings.length > 0 ? warnings : undefined,
+        });
 
     } catch (error) {
         console.error('Generate classes error:', error);

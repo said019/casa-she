@@ -17,6 +17,11 @@ export interface ClientMembership {
   multi_credits?: number | null;
   payment_method?: 'cash' | 'transfer' | 'card' | 'online' | null;
   payment_reference?: string | null;
+  // Totales agregados de TODAS las membresías activas vigentes hoy (devueltos por /me).
+  total_reformer_available?: number | null;
+  total_multi_available?: number | null;
+  total_classes_available?: number | null;
+  has_multiple_memberships?: boolean;
 }
 
 export interface CategoryCredit {
@@ -42,31 +47,41 @@ export function categoryCredits(m?: ClientMembership | null): CategoryCredit[] {
     && (m.multi_credits === null || m.multi_credits === undefined)
     && m.class_limit != null;
   if (sharedPool) {
+    // Cuando hay múltiples membresías activas, usar el total agregado.
+    const remaining = m.has_multiple_memberships && m.total_classes_available !== undefined
+      ? m.total_classes_available
+      : (m.classes_remaining ?? null);
     return [{
       key: 'shared',
       label: 'Clases (cualquier tipo)',
-      remaining: m.classes_remaining ?? null,
+      remaining,
       total: m.class_limit ?? null,
-      unlimited: m.classes_remaining === null || m.classes_remaining === undefined,
+      unlimited: remaining === null,
     }];
   }
   const out: CategoryCredit[] = [];
   const includesReformer = m.reformer_credits === null || (m.reformer_credits ?? 0) > 0;
   const includesMulti = m.multi_credits === null || (m.multi_credits ?? 0) > 0;
   if (includesReformer) {
+    const remaining = m.has_multiple_memberships && m.total_reformer_available !== undefined
+      ? m.total_reformer_available
+      : (m.reformer_remaining ?? null);
     out.push({
       key: 'reformer', label: 'Salsa',
-      remaining: m.reformer_remaining ?? null,
+      remaining,
       total: m.reformer_credits ?? null,
-      unlimited: m.reformer_remaining === null || m.reformer_remaining === undefined,
+      unlimited: remaining === null,
     });
   }
   if (includesMulti) {
+    const remaining = m.has_multiple_memberships && m.total_multi_available !== undefined
+      ? m.total_multi_available
+      : (m.multi_remaining ?? null);
     out.push({
       key: 'multi', label: 'Clases',
-      remaining: m.multi_remaining ?? null,
+      remaining,
       total: m.multi_credits ?? null,
-      unlimited: m.multi_remaining === null || m.multi_remaining === undefined,
+      unlimited: remaining === null,
     });
   }
   return out;

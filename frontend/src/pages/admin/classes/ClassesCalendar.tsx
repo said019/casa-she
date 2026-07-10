@@ -279,7 +279,15 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         },
         onSuccess: (data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['classes'] });
-            toast({ title: 'Generacion completada', description: `${data.data.count} clases creadas.` });
+            const { count, skipped, warnings } = data.data;
+            const parts: string[] = [`${count} clases creadas.`];
+            if (skipped > 0) parts.push(`${skipped} ya existían.`);
+            if (warnings?.length) parts.push(warnings.join(' · '));
+            toast({
+                title: 'Generación completada',
+                description: parts.join(' '),
+                variant: warnings?.length ? 'destructive' : 'default',
+            });
             setIsGenerateOpen(false);
             setCurrentDate(variables.startDate);
         },
@@ -1823,75 +1831,77 @@ function CalendarStat({ label, value }: { label: string; value: number }) {
     );
 }
 
-const programColor = (cat?: string) => (cat === 'reformer' ? '#2563eb' : '#7c3aed');
-
 function ClassEventCard({ item, onClick }: { item: Class; onClick: () => void }) {
     const baseColor = item.class_type_color || '#7E8579';
     const isFree = !!item.is_free;
-    const color = isFree ? '#16a34a' : baseColor;
+    const color = isFree ? '#059669' : baseColor;
     const bookings = Number(item.current_bookings || 0);
     const capacity = Number(item.max_capacity || 0);
-    const ratio = capacity > 0 ? Math.min((bookings / capacity) * 100, 100) : 0;
     const isCancelled = item.status === 'cancelled';
+
+    const dotCount = Math.min(capacity, 10);
+    const filledDots = Math.min(bookings, dotCount);
+    const nearly = capacity > 0 && bookings / capacity >= 0.75;
+    const full = capacity > 0 && bookings >= capacity;
 
     return (
         <button
             type="button"
             onClick={onClick}
             className={cn(
-                'group w-full rounded-[1.1rem] border p-3 text-left shadow-[0_14px_42px_-34px_rgba(51,42,34,0.7)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_52px_-36px_rgba(51,42,34,0.82)]',
-                isCancelled && 'opacity-55'
+                'group w-full overflow-hidden rounded-2xl border text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_-12px_rgba(51,42,34,0.22)]',
+                isCancelled && 'opacity-50 saturate-0'
             )}
             style={{
-                borderColor: isFree ? '#86efac' : `${color}66`,
+                borderColor: `${color}32`,
                 background: isFree
-                    ? 'linear-gradient(180deg, #dcfce7 0%, #f0fdf4cc 100%)'
-                    : `linear-gradient(180deg, ${color}1F 0%, rgba(243,238,226,0.68) 100%)`,
-                borderLeft: `4px solid ${programColor(item.category)}`,
+                    ? 'linear-gradient(160deg, #d1fae5 0%, rgba(243,238,226,0.6) 100%)'
+                    : `linear-gradient(160deg, ${color}14 0%, rgba(243,238,226,0.52) 100%)`,
             }}
         >
-            <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                    <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-                    <span className="truncate text-sm font-semibold text-balance-dark">{formatClassTime(item.start_time)}</span>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
+            <div className="h-[3px] w-full" style={{ backgroundColor: color }} />
+
+            <div className="p-3">
+                <div className="flex items-start justify-between gap-2">
+                    <p className="font-heading text-[13px] font-semibold italic leading-tight text-balance-dark">
+                        {item.class_type_name}
+                    </p>
                     {isFree && (
-                        <span className="rounded-full bg-green-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                            Gratis
+                        <span className="shrink-0 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white">
+                            gratis
                         </span>
                     )}
-                    {isCancelled ? (
-                        <Badge variant="destructive" className="rounded-full text-[10px]">Cancelada</Badge>
-                    ) : (
-                        <span className="rounded-full bg-balance-cream/75 px-2 py-0.5 text-[10px] font-semibold text-balance-dark/55">
-                            {bookings}/{capacity}
-                        </span>
+                    {isCancelled && (
+                        <Badge variant="destructive" className="shrink-0 rounded-full text-[9px]">Cancelada</Badge>
                     )}
                 </div>
-            </div>
 
-            <p className="mt-2 truncate text-sm font-semibold leading-5 text-balance-dark">{item.class_type_name}</p>
-            <div className="mt-2 space-y-1.5 text-[11px] text-balance-dark/56">
-                <p className="flex min-w-0 items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{item.instructor_name || 'Coach por asignar'}</span>
+                <p className="mt-1 text-[11px] font-medium tabular-nums text-balance-dark/50">
+                    {formatClassTime(item.start_time)}–{formatClassTime(item.end_time)}
                 </p>
-                <p className="flex min-w-0 items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{item.facility_name || 'Studio'}</span>
-                </p>
-                <p className="flex min-w-0 items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 shrink-0" />
-                    <span>{formatClassTime(item.start_time)} a {formatClassTime(item.end_time)}</span>
-                </p>
-            </div>
 
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-balance-dark/10">
-                <div
-                    className="h-full rounded-full transition-[width] duration-300"
-                    style={{ width: `${ratio}%`, backgroundColor: color }}
-                />
+                <p className="mt-1.5 truncate text-[11px] text-balance-dark/45">
+                    {item.instructor_name || 'Coach por asignar'}
+                </p>
+
+                {dotCount > 0 && (
+                    <div className="mt-2.5 flex flex-wrap items-center gap-1">
+                        {Array.from({ length: dotCount }, (_, i) => (
+                            <span
+                                key={i}
+                                className="h-[5px] w-[5px] rounded-full"
+                                style={{
+                                    backgroundColor: i < filledDots
+                                        ? (full ? '#dc2626' : nearly ? '#b45309' : color)
+                                        : `${color}20`,
+                                }}
+                            />
+                        ))}
+                        {capacity > 10 && (
+                            <span className="ml-0.5 text-[10px] text-balance-dark/35">+{capacity - 10}</span>
+                        )}
+                    </div>
+                )}
             </div>
         </button>
     );

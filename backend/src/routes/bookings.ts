@@ -484,19 +484,24 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
 
         const timeStr = classDetails.start_time.substring(0, 5); // HH:MM
 
-        // Create class datetime in Mexico timezone (UTC-6)
-        // The class time is stored in local Mexico time, so we need to compare properly
-        // We construct an ISO string with the offset to ensure precise comparison
-        const classDateTime = new Date(`${dateStr}T${timeStr}:00-06:00`);
-
-        // Debug log
-        console.log('Booking time check:', {
-            now: now.toISOString(),
-            classDate: dateStr,
-            classTime: timeStr,
-            classDateTime: classDateTime.toISOString(),
-            isPast: classDateTime < now
-        });
+        // Convert class local time (America/Mexico_City) to UTC — DST-aware.
+        // CDMX is UTC-6 in winter and UTC-5 in summer; the old hardcoded -06:00
+        // was wrong from April–October and allowed bookings after class had started.
+        // We use Intl.DateTimeFormat.formatToParts to compute the actual UTC offset
+        // for the class date, then apply it to get the true UTC moment.
+        const probe = new Date(`${dateStr}T${timeStr}:00Z`);
+        const tzParts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Mexico_City',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false,
+        }).formatToParts(probe);
+        const getPart = (type: string) => Number(tzParts.find(p => p.type === type)?.value ?? 0);
+        const probeAsMxUtcMs = Date.UTC(
+            getPart('year'), getPart('month') - 1, getPart('day'),
+            getPart('hour') % 24, getPart('minute'), getPart('second'),
+        );
+        const classDateTime = new Date(probe.getTime() + (probe.getTime() - probeAsMxUtcMs));
 
         if (isNaN(classDateTime.getTime())) {
             console.error('Invalid class date generated', { dateStr, timeStr });

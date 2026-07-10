@@ -84,7 +84,10 @@ export default function ClientDashboard() {
   });
 
   const isExpiredOrCancelled = membership?.status === 'expired' || membership?.status === 'cancelled';
-  const isOutOfCredits = membership?.status === 'active' && membership?.class_limit && (membership?.classes_remaining ?? 0) <= 0;
+  const totalAvailable = membership?.has_multiple_memberships
+    ? membership.total_classes_available ?? membership.total_reformer_available ?? membership.total_multi_available
+    : membership?.classes_remaining;
+  const isOutOfCredits = membership?.status === 'active' && membership?.class_limit && (totalAvailable ?? 0) <= 0;
 
   const { data: bookings, isLoading: bookingsLoading } = useQuery<BookingClient[]>({
     queryKey: ['my-bookings'],
@@ -134,7 +137,9 @@ export default function ClientDashboard() {
     ? Math.max(differenceInCalendarDays(membershipEndDate, new Date()), 0)
     : null;
   const classLimit = membership?.class_limit ?? null;
-  const classesRemaining = membership?.classes_remaining ?? null;
+  const classesRemaining = membership?.has_multiple_memberships
+    ? (membership.total_classes_available ?? membership?.classes_remaining ?? null)
+    : (membership?.classes_remaining ?? null);
   const classesProgress = classLimit && classesRemaining !== null
     ? (classesRemaining / classLimit) * 100
     : null;

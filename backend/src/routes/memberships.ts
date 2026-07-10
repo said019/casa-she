@@ -85,13 +85,45 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'No tienes membresía activa' });
         }
 
+        // Suma de créditos disponibles en TODAS las membresías activas vigentes hoy.
+        // Cuando una usuaria tiene 2 membresías simultáneas o renovó antes de agotar
+        // la anterior, este total refleja lo que realmente puede reservar.
+        const today = new Date().toISOString().split('T')[0];
+        const allActive = await query(
+            `SELECT reformer_remaining, multi_remaining, classes_remaining
+               FROM memberships
+              WHERE user_id = $1
+                AND status = 'active'
+                AND (start_date IS NULL OR start_date <= $2::date)
+                AND (end_date IS NULL OR end_date >= $2::date)`,
+            [userId, today]
+        );
+
+        // Si alguna membresía es ilimitada (NULL credits), el total es NULL (ilimitado).
+        let totalReformer: number | null = 0;
+        let totalMulti: number | null = 0;
+        for (const m of allActive as any[]) {
+            if (totalReformer !== null) {
+                totalReformer = m.reformer_remaining === null ? null : totalReformer + Number(m.reformer_remaining ?? 0);
+            }
+            if (totalMulti !== null) {
+                totalMulti = m.multi_remaining === null ? null : totalMulti + Number(m.multi_remaining ?? 0);
+            }
+        }
+
+        const primaryCredits = (membership.reformer_remaining === null && membership.multi_remaining === null && typeof membership.classes_remaining === 'number')
+            ? membership.classes_remaining
+            : legacyRemaining(membership.reformer_remaining, membership.multi_remaining);
+
         res.json({
             ...membership,
-            // Bolsa COMPARTIDA (plataforma): reformer/multi en NULL pero classes_remaining real → NO
-            // pisar con legacyRemaining (que daría NULL/∞). Para planes normales sí se usa el legacy.
-            classes_remaining: (membership.reformer_remaining === null && membership.multi_remaining === null && typeof membership.classes_remaining === 'number')
-                ? membership.classes_remaining
-                : legacyRemaining(membership.reformer_remaining, membership.multi_remaining),
+            classes_remaining: primaryCredits,
+            // Total de créditos disponibles sumando todas las membresías activas vigentes.
+            // Usar este campo en el display para que la clienta vea su capacidad real.
+            total_reformer_available: totalReformer,
+            total_multi_available: totalMulti,
+            total_classes_available: legacyRemaining(totalReformer, totalMulti),
+            has_multiple_memberships: allActive.length > 1,
         });
     } catch (error) {
         console.error('Get membership error:', error);
