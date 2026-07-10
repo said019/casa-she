@@ -15,9 +15,8 @@ interface WalletPassResponse {
  */
 export function WalletQr() {
   const { data, isLoading, error, refetch } = useQuery<WalletPassResponse>({
-    queryKey: ['wallet-pass-qr'],
+    queryKey: ['wallet-pass'],
     queryFn: async () => (await api.get('/wallet/pass')).data,
-    staleTime: 1000 * 60 * 60, // 1h; el QR vence a 24h
   });
 
   if (isLoading) {

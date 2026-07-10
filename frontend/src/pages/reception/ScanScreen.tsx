@@ -374,7 +374,10 @@ export default function ScanScreen() {
                     variant="outline"
                     className="gap-1 h-7 text-xs"
                     disabled={useBenefit.isPending}
-                    onClick={() => useBenefit.mutate(b.id)}
+                    onClick={() => {
+                      if (!window.confirm('¿Marcar este beneficio como usado? Esta acción no se puede deshacer.')) return;
+                      useBenefit.mutate(b.id);
+                    }}
                   >
                     {useBenefit.isPending && useBenefit.variables === b.id ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
@@ -412,7 +415,10 @@ export default function ScanScreen() {
                   size="sm"
                   className="gap-1 h-7 text-xs"
                   disabled={redeem.isPending}
-                  onClick={() => redeem.mutate(r.id)}
+                  onClick={() => {
+                    if (!window.confirm(`Canjear "${r.name}" por ${r.points_cost} puntos para este cliente?`)) return;
+                    redeem.mutate(r.id);
+                  }}
                 >
                   {redeem.isPending && redeem.variables === r.id ? (
                     <Loader2 className="h-3 w-3 animate-spin" />

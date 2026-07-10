@@ -649,12 +649,12 @@ router.post('/users/:userId/redeem', authenticate, requireRole('admin', 'super_a
         );
         const reward = rewardRes.rows[0];
         if (!reward) {
-            await client.query('ROLLBACK');
+            try { await client.query('ROLLBACK'); } catch { /* ignore */ }
             return res.status(404).json({ error: 'Recompensa no encontrada o no disponible' });
         }
         if (reward.stock !== null && reward.stock <= 0) {
-            await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Recompensa agotada' });
+            try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+            return res.status(409).json({ error: 'Recompensa sin stock' });
         }
 
         const userRes = await client.query(
@@ -663,11 +663,11 @@ router.post('/users/:userId/redeem', authenticate, requireRole('admin', 'super_a
         );
         const user = userRes.rows[0];
         if (!user) {
-            await client.query('ROLLBACK');
+            try { await client.query('ROLLBACK'); } catch { /* ignore */ }
             return res.status(404).json({ error: 'Cliente no encontrado' });
         }
         if (user.loyalty_points < reward.points_cost) {
-            await client.query('ROLLBACK');
+            try { await client.query('ROLLBACK'); } catch { /* ignore */ }
             return res.status(402).json({ error: 'Puntos insuficientes' });
         }
 
@@ -696,7 +696,7 @@ router.post('/users/:userId/redeem', authenticate, requireRole('admin', 'super_a
         try {
             benefitValue = validateRewardValue(reward.reward_type, reward.reward_value);
         } catch (valErr: any) {
-            await client.query('ROLLBACK');
+            try { await client.query('ROLLBACK'); } catch { /* ignore */ }
             return res.status(400).json({
                 error: 'La configuración de esta recompensa tiene datos inválidos',
                 detail: valErr.message,
@@ -709,12 +709,14 @@ router.post('/users/:userId/redeem', authenticate, requireRole('admin', 'super_a
         const expiresAt = new Date(Date.now() + expirationDays * 24 * 60 * 60 * 1000).toISOString();
 
         let classTypeId: string | null = null;
+        let classTypeName: string | null = null;
         if (benefitType === 'free_class' && isFreeClassValue(benefitValue)) {
-            const ct = await client.query(
-                `SELECT id FROM class_types WHERE LOWER(name) = LOWER($1) AND is_active = true LIMIT 1`,
+            const ct = await client.query<{ id: string; name: string }>(
+                `SELECT id, name FROM class_types WHERE LOWER(name) = LOWER($1) AND is_active = true LIMIT 1`,
                 [benefitValue.class_type],
             );
             classTypeId = ct.rows[0]?.id ?? null;
+            classTypeName = ct.rows[0]?.name ?? null;
         }
 
         const benefitRes = await client.query(
@@ -744,7 +746,7 @@ router.post('/users/:userId/redeem', authenticate, requireRole('admin', 'super_a
             status: benefit.status,
             expiresAt: benefit.expires_at,
             classTypeId: benefit.class_type_id ?? null,
-            classTypeName: null,
+            classTypeName,
             createdAt: benefit.created_at,
             usedBy: benefit.used_by ?? null,
             usableNow,
@@ -771,13 +773,13 @@ router.post('/benefits/:id/use', authenticate, requireRole('admin', 'super_admin
         await client.query('BEGIN');
         const res_q = await client.query(`SELECT * FROM user_benefits WHERE id = $1 FOR UPDATE`, [req.params.id]);
         const b = res_q.rows[0];
-        if (!b) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Beneficio no encontrado' }); }
+        if (!b) { try { await client.query('ROLLBACK'); } catch { /* ignore */ } return res.status(404).json({ error: 'Beneficio no encontrado' }); }
         if (b.status !== 'active' || new Date(b.expires_at).getTime() <= Date.now()) {
-            await client.query('ROLLBACK');
+            try { await client.query('ROLLBACK'); } catch { /* ignore */ }
             return res.status(409).json({ error: 'El beneficio ya no está vigente' });
         }
         if (!POS_MARKABLE_TYPES.has(b.benefit_type)) {
-            await client.query('ROLLBACK');
+            try { await client.query('ROLLBACK'); } catch { /* ignore */ }
             return res.status(409).json({ error: 'Aplica este beneficio al reservar la clase; no se puede marcar usado suelto.' });
         }
         await client.query(

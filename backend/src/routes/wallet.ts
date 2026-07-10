@@ -250,6 +250,15 @@ router.post('/lookup', authenticate, requireRole('admin', 'super_admin', 'recept
     try {
         const { qrPayload, membershipId, userId } = req.body ?? {};
 
+        // Validar formatos UUID antes de consultar (evita 500 por invalid uuid syntax).
+        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (userId !== undefined && userId !== null && !UUID_RE.test(String(userId))) {
+            return res.status(400).json({ error: 'userId inválido' });
+        }
+        if (membershipId !== undefined && membershipId !== null && !UUID_RE.test(String(membershipId))) {
+            return res.status(400).json({ error: 'membershipId inválido' });
+        }
+
         let resolvedUserId: string | null = null;
         if (userId) {
             resolvedUserId = userId;
@@ -267,7 +276,7 @@ router.post('/lookup', authenticate, requireRole('admin', 'super_admin', 'recept
 
         const u = await queryOne<{ id: string; name: string; email: string; phone: string | null; photo_url: string | null; loyalty_points: number }>(
             `SELECT u.id, u.display_name AS name, u.email, u.phone, u.photo_url, u.loyalty_points
-             FROM users u WHERE u.id = $1`,
+             FROM users u WHERE u.id = $1 AND u.role = 'client'`,
             [resolvedUserId]
         );
         if (!u) return res.status(404).json({ error: 'Cliente no encontrado.' });
