@@ -615,4 +615,149 @@ router.post('/redeem', authenticate, async (req: Request, res: Response) => {
     }
 });
 
+// ============================================
+// POST /api/loyalty/users/:userId/redeem - Staff canjea a nombre de un cliente
+// Replica la transacción de POST /redeem pero con destinatario :userId y
+// fulfilled_by = req.user.userId (staff). Devuelve el user_benefits creado
+// en el mismo formato que GET /users/:userId/benefits (con flags).
+// ============================================
+router.post('/users/:userId/redeem', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
+    const targetUserId = req.params.userId;
+    const staffId = req.user?.userId ?? null;
+    const { rewardId } = req.body as { rewardId?: string };
+
+    // Validar rewardId ANTES de abrir la transacción (no hay tx abierta => no ROLLBACK).
+    if (!rewardId) {
+        return res.status(400).json({ error: 'Falta rewardId' });
+    }
+
+    const client = await pool.connect();
+    // Adaptador para que syncUserLoyaltyPointsSnapshot y getLoyaltyConfig vean la tx abierta.
+    const txDb = {
+        query: async (text: string, params?: unknown[]) => {
+            const r = await client.query(text, params as any[]);
+            return { rows: r.rows, rowCount: r.rowCount ?? 0 };
+        },
+    };
+    try {
+        await client.query('BEGIN');
+
+        // FOR UPDATE en recompensa y usuario: serializa canjes concurrentes.
+        const rewardRes = await client.query(
+            `SELECT * FROM loyalty_rewards WHERE id = $1 AND is_active = true FOR UPDATE`,
+            [rewardId],
+        );
+        const reward = rewardRes.rows[0];
+        if (!reward) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Recompensa no encontrada o no disponible' });
+        }
+        if (reward.stock !== null && reward.stock <= 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Recompensa agotada' });
+        }
+
+        const userRes = await client.query(
+            `SELECT loyalty_points FROM users WHERE id = $1 FOR UPDATE`,
+            [targetUserId],
+        );
+        const user = userRes.rows[0];
+        if (!user) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Cliente no encontrado' });
+        }
+        if (user.loyalty_points < reward.points_cost) {
+            await client.query('ROLLBACK');
+            return res.status(402).json({ error: 'Puntos insuficientes' });
+        }
+
+        // Registrar el canje a nombre del cliente; lo cumple el staff => fulfilled_by + fulfilled_at ya.
+        const redemptionRes = await client.query(
+            `INSERT INTO redemptions (user_id, reward_id, points_spent, status, fulfilled_by, fulfilled_at)
+             VALUES ($1, $2, $3, 'fulfilled', $4, NOW())
+             RETURNING *`,
+            [targetUserId, rewardId, reward.points_cost, staffId],
+        );
+        const redemption = redemptionRes.rows[0];
+
+        // Asentar el gasto de puntos en el ledger + recalcular el saldo (snapshot dentro de la tx).
+        await client.query(
+            `INSERT INTO loyalty_points (user_id, points, type, description, related_reward_id)
+             VALUES ($1, $2, 'redemption', $3, $4)`,
+            [targetUserId, -Math.abs(reward.points_cost), `Canje staff: ${reward.name}`, rewardId],
+        );
+        await syncUserLoyaltyPointsSnapshot(targetUserId, txDb);
+
+        // AUTO-FULFILLMENT: crear beneficio usable según reward_type (configurable por admin).
+        const loyaltyConfig = await getLoyaltyConfig(txDb);
+        const benefitType = toBenefitType(reward.reward_type);
+
+        let benefitValue: BenefitValue;
+        try {
+            benefitValue = validateRewardValue(reward.reward_type, reward.reward_value);
+        } catch (valErr: any) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                error: 'La configuración de esta recompensa tiene datos inválidos',
+                detail: valErr.message,
+            });
+        }
+
+        const expirationDays = loyaltyConfig.benefit_expiration_days > 0
+            ? loyaltyConfig.benefit_expiration_days
+            : 30;
+        const expiresAt = new Date(Date.now() + expirationDays * 24 * 60 * 60 * 1000).toISOString();
+
+        let classTypeId: string | null = null;
+        if (benefitType === 'free_class' && isFreeClassValue(benefitValue)) {
+            const ct = await client.query(
+                `SELECT id FROM class_types WHERE LOWER(name) = LOWER($1) AND is_active = true LIMIT 1`,
+                [benefitValue.class_type],
+            );
+            classTypeId = ct.rows[0]?.id ?? null;
+        }
+
+        const benefitRes = await client.query(
+            `INSERT INTO user_benefits (user_id, benefit_type, benefit_value, status, redemption_id, class_type_id, expires_at)
+             VALUES ($1, $2, $3::jsonb, 'active', $4, $5, $6)
+             RETURNING id, benefit_type, benefit_value, status, expires_at, class_type_id, created_at, used_by`,
+            [targetUserId, benefitType, JSON.stringify(benefitValue), redemption.id, classTypeId, expiresAt],
+        );
+        const benefit = benefitRes.rows[0];
+
+        // Descontar stock si aplica.
+        if (reward.stock !== null) {
+            await client.query(
+                `UPDATE loyalty_rewards SET stock = stock - 1 WHERE id = $1`,
+                [rewardId],
+            );
+        }
+
+        await client.query('COMMIT');
+
+        const usableNow = true;
+        const now = Date.now();
+        return res.json({
+            id: benefit.id,
+            type: benefit.benefit_type,
+            value: benefit.benefit_value,
+            status: benefit.status,
+            expiresAt: benefit.expires_at,
+            classTypeId: benefit.class_type_id ?? null,
+            classTypeName: null,
+            createdAt: benefit.created_at,
+            usedBy: benefit.used_by ?? null,
+            usableNow,
+            markableNow: usableNow && POS_MARKABLE_TYPES.has(benefit.benefit_type),
+            expiresSoon: usableNow && new Date(benefit.expires_at).getTime() < now + 3 * 24 * 3600 * 1000,
+        });
+    } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        console.error('Staff redeem error:', error);
+        return res.status(500).json({ error: 'Error al canjear para el cliente' });
+    } finally {
+        client.release();
+    }
+});
+
 export default router;
