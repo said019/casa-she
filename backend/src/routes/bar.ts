@@ -212,10 +212,10 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
   let orderId: string;
   const consumeFn = async (oid: string) => {
     if (barDiscountBenefitId) {
-      await query(`UPDATE user_benefits SET status = 'used', used_at = NOW(), used_on_bar_order_id = $1 WHERE id = $2 AND status = 'active'`, [oid, barDiscountBenefitId]);
+      await query(`UPDATE user_benefits SET status = 'used', used_at = NOW(), used_by = $3, used_on_bar_order_id = $1 WHERE id = $2 AND status = 'active'`, [oid, barDiscountBenefitId, req.user?.userId ?? null]);
     }
     if (freeDrinkBenefitId) {
-      await query(`UPDATE user_benefits SET status = 'used', used_at = NOW(), used_on_bar_order_id = $1 WHERE id = $2 AND status = 'active'`, [oid, freeDrinkBenefitId]);
+      await query(`UPDATE user_benefits SET status = 'used', used_at = NOW(), used_by = $3, used_on_bar_order_id = $1 WHERE id = $2 AND status = 'active'`, [oid, freeDrinkBenefitId, req.user?.userId ?? null]);
     }
   };
 

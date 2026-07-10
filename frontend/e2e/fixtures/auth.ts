@@ -49,7 +49,9 @@ export async function loginAs(page: Page, role: UserRole): Promise<void> {
   await page.goto(loginPath);
 
   await page.getByLabel(/correo|email/i).fill(email);
-  await page.getByLabel(/contraseña|password/i).fill(password);
+  // getByLabel(/contraseña|password/i) coincide con el input Y el botón
+  // "Mostrar contraseña" → violación strict-mode. Se acota a textbox.
+  await page.getByRole("textbox", { name: /contraseña|password/i }).fill(password);
   await page.getByRole("button", { name: /iniciar|entrar|login|sign in/i }).click();
 
   // Wait for redirect away from the login page

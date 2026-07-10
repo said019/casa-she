@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { query, queryOne } from '../config/database.js';
 import { createHash } from 'crypto';
+import { verifyQrPayload } from '../lib/qr.js';
 
 // Import wallet libraries
 import { 
@@ -233,6 +234,73 @@ router.get('/pass', authenticate, requireRole('client'), async (req: Request, re
     } catch (error) {
         console.error('Wallet pass error:', error);
         res.status(500).json({ error: 'Error al obtener el pase' });
+    }
+});
+
+// ============================================
+// Reception / Admin Lookup
+// ============================================
+
+/**
+ * POST /api/wallet/lookup
+ * Resolve a QR (signed qrPayload), a raw membershipId (UUID), or a direct userId
+ * to the client's ficha. Used by reception/admin scan flow.
+ */
+router.post('/lookup', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
+    try {
+        const { qrPayload, membershipId, userId } = req.body ?? {};
+
+        // Validar formatos UUID antes de consultar (evita 500 por invalid uuid syntax).
+        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (userId !== undefined && userId !== null && !UUID_RE.test(String(userId))) {
+            return res.status(400).json({ error: 'userId inválido' });
+        }
+        if (membershipId !== undefined && membershipId !== null && !UUID_RE.test(String(membershipId))) {
+            return res.status(400).json({ error: 'membershipId inválido' });
+        }
+
+        let resolvedUserId: string | null = null;
+        if (userId) {
+            resolvedUserId = userId;
+        } else if (qrPayload) {
+            const v = verifyQrPayload(qrPayload);
+            if (!v) return res.status(400).json({ error: 'QR inválido o expirado; pide al cliente que regenere su QR.' });
+            resolvedUserId = v.userId;
+        } else if (membershipId) {
+            const m = await queryOne<{ user_id: string }>(`SELECT user_id FROM memberships WHERE id = $1`, [membershipId]);
+            if (!m) return res.status(404).json({ error: 'Membresía no encontrada; usa búsqueda manual.' });
+            resolvedUserId = m.user_id;
+        } else {
+            return res.status(400).json({ error: 'Envía qrPayload, membershipId o userId.' });
+        }
+
+        const u = await queryOne<{ id: string; name: string; email: string; phone: string | null; photo_url: string | null; loyalty_points: number }>(
+            `SELECT u.id, u.display_name AS name, u.email, u.phone, u.photo_url, u.loyalty_points
+             FROM users u WHERE u.id = $1 AND u.role = 'client'`,
+            [resolvedUserId]
+        );
+        if (!u) return res.status(404).json({ error: 'Cliente no encontrado.' });
+
+        const mem = await queryOne<{ status: string; plan_name: string | null }>(
+            `SELECT m.status, p.name as plan_name
+             FROM memberships m LEFT JOIN plans p ON m.plan_id = p.id
+             WHERE m.user_id = $1 ORDER BY m.created_at DESC LIMIT 1`,
+            [resolvedUserId]
+        );
+
+        return res.json({
+            userId: u.id,
+            name: u.name,
+            email: u.email,
+            phone: u.phone,
+            photoUrl: u.photo_url,
+            membership: { status: mem?.status ?? null, planName: mem?.plan_name ?? null },
+            pointsBalance: u.loyalty_points ?? 0,
+            streak: null,
+        });
+    } catch (error) {
+        console.error('wallet/lookup error:', error);
+        return res.status(500).json({ error: 'Error al buscar el cliente' });
     }
 });
 

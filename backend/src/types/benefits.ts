@@ -58,6 +58,7 @@ export interface UserBenefit {
   used_on_booking_id: string | null;
   used_on_bar_order_id: string | null;
   used_on_sale_id: string | null;
+  used_by: string | null;
   created_at: string;
 }
 

@@ -3599,6 +3599,12 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Migration 104: user_benefits table + indexes ready.');
     } catch (e) { console.error('Migration 104 error:', e); }
 
+    // Migration 106: auditoría de quién consume un beneficio
+    try {
+        await query(`ALTER TABLE user_benefits ADD COLUMN IF NOT EXISTS used_by UUID REFERENCES users(id) ON DELETE SET NULL`);
+        console.log('Migration 106: user_benefits.used_by column ready.');
+    } catch (e) { console.error('Migration 106 error:', e); }
+
     // Migration 105: seed del catálogo de recompensas Casa Shé
     try {
         await query(`

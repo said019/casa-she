@@ -11,6 +11,7 @@ import {
     ShoppingCart,
     Package,
     UserCheck,
+    ScanLine,
     Users,
     CalendarDays,
     CalendarPlus,
@@ -40,6 +41,7 @@ type NavItem = { href: string; label: string; icon: ElementType; exact?: boolean
 const allNav: NavItem[] = [
     { href: '/reception', label: 'Dashboard', icon: LayoutDashboard, exact: true },
     { href: '/reception/checkin', label: 'Check-in', icon: UserCheck, perm: 'checkin' },
+    { href: '/reception/scan', label: 'Escanear cliente', icon: ScanLine },
     { href: '/reception/clientes', label: 'Usuarios', icon: Users, perm: 'clientes' },
     { href: '/reception/reservas', label: 'Reservas', icon: CalendarDays, perm: 'reservas' },
     { href: '/reception/historial', label: 'Historial de reservas', icon: History, perm: 'reservas' },

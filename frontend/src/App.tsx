@@ -151,6 +151,7 @@ import ReceptionTeamScreen from "./pages/reception/TeamScreen";
 import ReceptionApprovalsScreen from "./pages/reception/ApprovalsScreen";
 import ReceptionWhatsAppScreen from "./pages/reception/WhatsAppScreen";
 import ReceptionGenerateWeekScreen from "./pages/reception/GenerateWeekScreen";
+import ScanScreen from "./pages/reception/ScanScreen";
 
 // Coach pages
 import CoachLogin from "./pages/auth/CoachLogin";
@@ -372,6 +373,7 @@ const App = () => (
                     <Route path="/reception/vender" element={<PosScreen />} />
                     <Route path="/reception/inventario" element={<ReceptionInventoryScreen />} />
                     <Route path="/reception/checkin" element={<CheckinScreen />} />
+                    <Route path="/reception/scan" element={<ScanScreen />} />
                     <Route path="/reception/clientes" element={<ReceptionClientsScreen />} />
                     <Route path="/reception/reservas" element={<ReceptionBookingsScreen />} />
                     <Route path="/reception/historial" element={<ReceptionBookingHistoryScreen />} />

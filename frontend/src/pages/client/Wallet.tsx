@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { ClientLayout } from '@/components/layout/ClientLayout';
+import { WalletQr } from '@/components/wallet/WalletQr';
 import { CasaSheMark } from '@/components/CasaSheLogo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -249,6 +250,9 @@ export default function WalletClub() {
     <AuthGuard requiredRoles={['client']}>
       <ClientLayout>
         <div className="space-y-7">
+          {/* QR de recepción del cliente — lo escanea el staff en /app/reception/scan */}
+          <WalletQr />
+
           {/* Header */}
           <section className="rounded-[2rem] border border-balance-olive/25 bg-balance-olive/10 p-5 shadow-[0_22px_72px_-58px_rgba(51,42,34,0.75)] sm:p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
