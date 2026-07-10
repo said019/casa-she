@@ -124,6 +124,7 @@ export default function InstructorsList() {
         },
         onSuccess: (response) => {
             queryClient.invalidateQueries({ queryKey: ['instructors'] });
+            queryClient.invalidateQueries({ queryKey: ['public-instructors'] });
             const creds = response.data?.credentials;
             if (creds) {
                 // New user was created — show credentials
@@ -150,6 +151,7 @@ export default function InstructorsList() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['instructors'] });
+            queryClient.invalidateQueries({ queryKey: ['public-instructors'] });
             toast({ title: 'Instructor actualizado', description: 'Los datos han sido actualizados.' });
             setIsDialogOpen(false);
             setEditingInstructor(null);
@@ -167,6 +169,7 @@ export default function InstructorsList() {
         },
         onSuccess: (res) => {
             queryClient.invalidateQueries({ queryKey: ['instructors'] });
+            queryClient.invalidateQueries({ queryKey: ['public-instructors'] });
             toast({
                 title: res?.deleted ? 'Instructor eliminado' : 'Instructor desactivado',
                 description: res?.message ?? 'Listo.',
@@ -188,6 +191,7 @@ export default function InstructorsList() {
         },
         onSuccess: (res) => {
             queryClient.invalidateQueries({ queryKey: ['instructors'] });
+            queryClient.invalidateQueries({ queryKey: ['public-instructors'] });
             toast({ title: 'Coaches fusionados', description: res?.message ?? 'Listo.' });
             setMergingInstructor(null);
             setMergeTargetId('');
@@ -357,9 +361,8 @@ export default function InstructorsList() {
             return await api.post(`/instructors/${id}/photo`, formData);
         },
         onSuccess: (response, variables) => {
-            // Invalidate to refetch the list
             queryClient.invalidateQueries({ queryKey: ['instructors'] });
-            
+            queryClient.invalidateQueries({ queryKey: ['public-instructors'] });
             // **FIX DEL BUG**: Actualizar el instructor en edición con la nueva foto
             if (editingInstructor) {
                 setEditingInstructor({
