@@ -41,6 +41,20 @@ async function main() {
     // vía userId
     assert.equal(await resolveLookup({ userId: cliId }), cliId, 'userId directo');
 
+    // Ejercicio de la query de ficha que usa POST /api/wallet/lookup.
+    // El route hace SELECT u.id, u.display_name AS name, u.email, u.phone, u.photo_url, u.loyalty_points
+    // — este assert verifica que esa query no revienta (columna existente) y trae los valores insertados.
+    const u = await queryOne<{ id: string; name: string; email: string; phone: string | null; photo_url: string | null; loyalty_points: number }>(
+      `SELECT u.id, u.display_name AS name, u.email, u.phone, u.photo_url, u.loyalty_points
+       FROM users u WHERE u.id = $1`,
+      [cliId]
+    );
+    assert.ok(u, 'lookup: query de ficha debe devolver una fila');
+    assert.equal(u!.name, 'cli', 'lookup: name (alias de display_name) coincide');
+    assert.equal(u!.email, 'cli-lk@test', 'lookup: email coincide');
+    assert.equal(u!.phone, '5550000001', 'lookup: phone coincide');
+    assert.equal(u!.loyalty_points, 250, 'lookup: loyalty_points coincide');
+
     // vía qrPayload válido
     const future = Math.floor(Date.now() / 1000) + 3600;
     assert.equal(await resolveLookup({ qrPayload: await buildRaw(cliId, null, future) }), cliId, 'qrPayload válido');

@@ -266,7 +266,7 @@ router.post('/lookup', authenticate, requireRole('admin', 'super_admin', 'recept
         }
 
         const u = await queryOne<{ id: string; name: string; email: string; phone: string | null; photo_url: string | null; loyalty_points: number }>(
-            `SELECT u.id, u.name, u.email, u.phone, u.photo_url, u.loyalty_points
+            `SELECT u.id, u.display_name AS name, u.email, u.phone, u.photo_url, u.loyalty_points
              FROM users u WHERE u.id = $1`,
             [resolvedUserId]
         );
