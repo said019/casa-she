@@ -32,7 +32,9 @@ test.describe('Recepción — Pantalla de escaneo /reception/scan', () => {
             await firstResult.click();
             // Ficha del cliente
             await expect(page.locator('.ficha')).toBeVisible({ timeout: 8000 });
-            await expect(page.getByText(/puntos/i)).toBeVisible();
+            // Scoped to .ficha y con ':' para evitar ambigüedad con
+            // <CardTitle>Canjear puntos</CardTitle> (strict-mode: /puntos/i match BOTH).
+            await expect(page.locator('.ficha').getByText(/puntos:/i)).toBeVisible();
             // Botones de acción (Marcar usado / Canjear) cuando aplique
             await expect(
                 page.getByRole('button', { name: /marcar usado|canjear|escanear otro/i }).first()
