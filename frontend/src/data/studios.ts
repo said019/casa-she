@@ -78,12 +78,12 @@ const studioDirectory: Record<string, StudioInfo> = {
     whatsapp: '5543860391', // TODO: confirmar WhatsApp oficial
     email: 'casashecondesa@gmail.com',
     instagram: '@casashe.mx',
-    mapUrl: 'https://www.google.com/maps/search/Casa+Sh%C3%A9+Condesa+CDMX',
+    mapUrl: 'https://maps.app.goo.gl/PUQqpiDKyzuHGkCL9',
     branches: [
       {
         name: 'Casa Shé — Condesa',
         addressLines: ['Alfonso Reyes 131, Condesa', '06140 Ciudad de México, CDMX'],
-        mapUrl: 'https://www.google.com/maps?q=Alfonso+Reyes+131,+Condesa,+06140+Ciudad+de+M%C3%A9xico,+CDMX',
+        mapUrl: 'https://maps.app.goo.gl/PUQqpiDKyzuHGkCL9',
         mapEmbed:
           'https://www.google.com/maps?q=Alfonso+Reyes+131,+Condesa,+06140+Ciudad+de+M%C3%A9xico,+CDMX&output=embed',
       },

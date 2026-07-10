@@ -4,7 +4,7 @@ const BRANCHES = [
     name: "Condesa",
     address: "Alfonso Reyes 131, Condesa, 06140 Ciudad de México, CDMX",
     hours: ["Lun–Vie · 06:30–21:00", "Sáb–Dom · 08:00–14:00"],
-    mapsUrl: "https://www.google.com/maps/search/Casa+Sh%C3%A9+Condesa+CDMX",
+    mapsUrl: "https://maps.app.goo.gl/PUQqpiDKyzuHGkCL9",
   },
 ];
 
