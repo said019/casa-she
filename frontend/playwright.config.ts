@@ -23,7 +23,9 @@ export default defineConfig({
     ["junit", { outputFile: "e2e/reports/results.xml" }],
   ],
   use: {
-    baseURL: process.env.BASE_URL ?? "http://localhost:8080",
+    // Alineado con el webServer (npm run preview = vite preview :4173).
+    // Antes apuntaba a :8080 → ERR_CONNECTION_REFUSED.
+    baseURL: process.env.BASE_URL ?? "http://localhost:4173",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
