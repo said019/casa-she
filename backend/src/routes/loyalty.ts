@@ -760,4 +760,39 @@ router.post('/users/:userId/redeem', authenticate, requireRole('admin', 'super_a
     }
 });
 
+// ============================================
+// POST /api/loyalty/benefits/:id/use - Staff marca un beneficio POS como usado
+// Atomically: FOR UPDATE, rechaza free_class y no-POS con 409, marca status='used'
+// con used_by = staff + used_at = NOW(). Es la acción "marcar usado ahora" del spec.
+// ============================================
+router.post('/benefits/:id/use', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const res_q = await client.query(`SELECT * FROM user_benefits WHERE id = $1 FOR UPDATE`, [req.params.id]);
+        const b = res_q.rows[0];
+        if (!b) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Beneficio no encontrado' }); }
+        if (b.status !== 'active' || new Date(b.expires_at).getTime() <= Date.now()) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: 'El beneficio ya no está vigente' });
+        }
+        if (!POS_MARKABLE_TYPES.has(b.benefit_type)) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: 'Aplica este beneficio al reservar la clase; no se puede marcar usado suelto.' });
+        }
+        await client.query(
+            `UPDATE user_benefits SET status = 'used', used_at = NOW(), used_by = $2 WHERE id = $1`,
+            [b.id, req.user?.userId ?? null]
+        );
+        await client.query('COMMIT');
+        return res.json({ id: b.id, status: 'used', usedBy: req.user?.userId ?? null });
+    } catch (error) {
+        try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+        console.error('benefit use error:', error);
+        return res.status(500).json({ error: 'Error al marcar el beneficio' });
+    } finally {
+        client.release();
+    }
+});
+
 export default router;
