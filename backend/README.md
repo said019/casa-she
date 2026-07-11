@@ -17,11 +17,13 @@ Configure these four variables in the Railway backend service:
 All four must contain non-empty values before the real image-migration command
 will start.
 
-The upload flow makes each uploaded file public with the Google Drive permission
-`type=anyone` and `role=reader`, so the application can display the stored image
-or open a payment proof without requiring the viewer to sign in to Google. Check
-that your Google Workspace sharing policy allows this public-reader permission
-before enabling it in production.
+Regular rendered images are uploaded with the Google Drive public-reader
+permission (`type=anyone`, `role=reader`) so the application can render them.
+Payment proofs explicitly remain private: their bytes are served only through
+the authenticated, same-origin payment-proof endpoint after the backend checks
+that the requester owns the order or is an authorized reviewer. Check that your
+Google Workspace sharing policy allows the public-reader permission before
+enabling regular image uploads in production.
 
 ### Migrating existing base64 images
 

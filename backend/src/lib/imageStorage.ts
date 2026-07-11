@@ -1,5 +1,6 @@
 import {
     driveImageUrl,
+    type GoogleDriveUploadOptions,
     isGoogleDriveConfigured,
     uploadBufferToGoogleDrive,
 } from './googleDrive.js';
@@ -24,9 +25,16 @@ export interface ImageStorageOptions {
     thumbnailWidth?: number;
 }
 
+export type ImageStorageUploadOptions = GoogleDriveUploadOptions;
+
 export interface ImageStorageDependencies {
     configured: () => boolean;
-    upload: (buffer: Buffer, originalName: string, mimeType: string) => Promise<{ fileId: string }>;
+    upload: (
+        buffer: Buffer,
+        originalName: string,
+        mimeType: string,
+        options?: ImageStorageUploadOptions,
+    ) => Promise<{ fileId: string }>;
     imageUrl: (fileId: string, width?: number) => string;
     warn?: (message: string, error: unknown) => void;
 }
@@ -109,13 +117,19 @@ export function createImageStorage(dependencies: ImageStorageDependencies): Imag
         nombreBase: string,
         opts: ImageStorageOptions | undefined,
         allowPdf: boolean,
+        makePublic: boolean,
     ): Promise<string> {
         const mimeType = normalizedMimeType(suppliedMimeType);
         assertAllowedMimeType(mimeType, allowPdf);
 
         if (dependencies.configured()) {
             try {
-                const uploaded = await dependencies.upload(buffer, originalName(nombreBase, mimeType), mimeType);
+                const uploaded = await dependencies.upload(
+                    buffer,
+                    originalName(nombreBase, mimeType),
+                    mimeType,
+                    { makePublic },
+                );
                 if (mimeType === 'application/pdf') {
                     return drivePreviewUrl(uploaded.fileId);
                 }
@@ -129,14 +143,16 @@ export function createImageStorage(dependencies: ImageStorageDependencies): Imag
     }
 
     return {
-        subirImagen: (buffer, mimeType, nombreBase, opts) => store(buffer, mimeType, nombreBase, opts, false),
-        subirComprobante: (buffer, mimeType, nombreBase, opts) => store(buffer, mimeType, nombreBase, opts, true),
+        subirImagen: (buffer, mimeType, nombreBase, opts) => store(buffer, mimeType, nombreBase, opts, false, true),
+        subirComprobante: (buffer, mimeType, nombreBase, opts) => store(buffer, mimeType, nombreBase, opts, true, false),
     };
 }
 
 const productionStorage = createImageStorage({
     configured: () => isGoogleDriveConfigured,
-    upload: uploadBufferToGoogleDrive,
+    upload: (buffer, originalName, mimeType, options) => (
+        uploadBufferToGoogleDrive(buffer, originalName, mimeType, undefined, options)
+    ),
     imageUrl: driveImageUrl,
 });
 

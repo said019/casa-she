@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
 import { pool } from '../src/config/database.js';
+import { uploadBufferToGoogleDrive } from '../src/lib/googleDrive.js';
 import { createImageStorage, ImageStorageError } from '../src/lib/imageStorage.js';
 import {
     decodePaymentProofDataUrl,
@@ -32,6 +33,63 @@ async function expectRejects(
         assert.equal(error.code, expectedCode);
         return true;
     });
+}
+
+async function googleDriveAclContract(): Promise<void> {
+    const originalFetch = globalThis.fetch;
+    const originalEnvironment = {
+        GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+        GOOGLE_REFRESH_TOKEN: process.env.GOOGLE_REFRESH_TOKEN,
+        GOOGLE_DRIVE_FOLDER_ID: process.env.GOOGLE_DRIVE_FOLDER_ID,
+    };
+    const permissionRequests: Array<{ url: string; body: string | undefined }> = [];
+    let uploadCount = 0;
+
+    try {
+        Object.assign(process.env, {
+            GOOGLE_CLIENT_ID: 'test-client-id',
+            GOOGLE_CLIENT_SECRET: 'test-client-secret',
+            GOOGLE_REFRESH_TOKEN: 'test-refresh-token',
+            GOOGLE_DRIVE_FOLDER_ID: 'test-folder-id',
+        });
+        globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+            const url = typeof input === 'string' ? input : input.toString();
+            if (url === 'https://oauth2.googleapis.com/token') {
+                return new Response(JSON.stringify({ access_token: 'test-access-token' }), { status: 200 });
+            }
+            if (url.startsWith('https://www.googleapis.com/upload/drive/v3/files')) {
+                uploadCount += 1;
+                return new Response(JSON.stringify({ id: `drive-file-${uploadCount}` }), { status: 200 });
+            }
+            if (url.includes('/permissions')) {
+                permissionRequests.push({ url, body: typeof init?.body === 'string' ? init.body : undefined });
+                return new Response(null, { status: 200 });
+            }
+            throw new Error(`Llamada Drive inesperada: ${url}`);
+        }) as typeof fetch;
+
+        await uploadBufferToGoogleDrive(image, 'imagen-publica.png', 'image/png');
+        await uploadBufferToGoogleDrive(image, 'comprobante-privado.png', 'image/png', undefined, { makePublic: false });
+
+        assert.deepEqual(
+            permissionRequests,
+            [{
+                url: 'https://www.googleapis.com/drive/v3/files/drive-file-1/permissions',
+                body: JSON.stringify({ role: 'reader', type: 'anyone' }),
+            }],
+            'la subida normal conserva ACL público y la privada no debe llamar al endpoint de permisos',
+        );
+    } finally {
+        globalThis.fetch = originalFetch;
+        for (const [key, value] of Object.entries(originalEnvironment)) {
+            if (value === undefined) {
+                delete process.env[key];
+            } else {
+                process.env[key] = value;
+            }
+        }
+    }
 }
 
 async function waitForHealth(timeoutMs = 90_000): Promise<void> {
@@ -261,13 +319,15 @@ async function main(): Promise<void> {
     let uploadedName = '';
     let uploadedMime = '';
     let uploadedBuffer: Buffer | undefined;
+    const uploadOptions: Array<{ makePublic?: boolean } | undefined> = [];
     let requestedWidth = 0;
     const driveStorage = createImageStorage({
         configured: () => true,
-        upload: async (buffer, originalName, mimeType) => {
+        upload: async (buffer, originalName, mimeType, options) => {
             uploadedBuffer = buffer;
             uploadedName = originalName;
             uploadedMime = mimeType;
+            uploadOptions.push(options);
             return { fileId: 'drive-image-123' };
         },
         imageUrl: (fileId, width) => {
@@ -282,6 +342,15 @@ async function main(): Promise<void> {
     assert.equal(uploadedName, 'perfil-ana.png');
     assert.equal(uploadedMime, 'image/png');
     assert.equal(requestedWidth, 1600);
+    assert.deepEqual(uploadOptions, [{ makePublic: true }], 'las imágenes normales deben conservar ACL público');
+
+    const privateProof = await driveStorage.subirComprobante(image, 'image/png', 'comprobante-julio');
+    assert.equal(privateProof, 'https://images.example/drive-image-123?width=1600');
+    assert.deepEqual(
+        uploadOptions,
+        [{ makePublic: true }, { makePublic: false }],
+        'los comprobantes deben pedir una subida privada sin ACL público',
+    );
 
     const noDriveStorage = createImageStorage({
         configured: () => false,
@@ -340,6 +409,8 @@ async function main(): Promise<void> {
         'comprobante-julio',
     );
     assert.equal(pdfPreview, 'https://drive.google.com/file/d/receipt-pdf-456/preview');
+
+    await googleDriveAclContract();
 
     await productImageContract();
 

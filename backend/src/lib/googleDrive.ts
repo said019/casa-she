@@ -82,11 +82,20 @@ export interface DriveUploadResult {
     durationSeconds: number;
 }
 
+/**
+ * Upload defaults to public-reader access so existing rendered media keeps
+ * working. Callers handling sensitive files must opt out explicitly.
+ */
+export interface GoogleDriveUploadOptions {
+    makePublic?: boolean;
+}
+
 export async function uploadBufferToGoogleDrive(
     buffer: Buffer,
     originalName: string,
     mimeType: string,
     folderId?: string | null,
+    options: GoogleDriveUploadOptions = {},
 ): Promise<DriveUploadResult> {
     const accessToken = await getGoogleDriveAccessToken();
     const ext = path.extname(originalName) || '';
@@ -131,7 +140,9 @@ export async function uploadBufferToGoogleDrive(
         throw new Error(`Google Drive upload error: ${uploadData.error?.message || uploadResponse.statusText}`);
     }
 
-    await makeGoogleDriveFilePublic(uploadData.id, accessToken);
+    if (options.makePublic !== false) {
+        await makeGoogleDriveFilePublic(uploadData.id, accessToken);
+    }
 
     const durationMillis = Number(uploadData.videoMediaMetadata?.durationMillis || 0);
 
