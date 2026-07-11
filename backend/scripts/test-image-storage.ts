@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { request as httpRequest } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
@@ -13,6 +14,8 @@ const PRODUCT_IMAGE_API = `http://localhost:${PRODUCT_IMAGE_PORT}/api`;
 const BACKEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const productImage = Buffer.from('product-image');
 const PRODUCT_IMAGE_MAX_TRANSPORT_BYTES = 10 * 1024 * 1024;
+const PRODUCT_IMAGE_MULTIPART_RESERVE_BYTES = 16 * 1024;
+const PRODUCT_IMAGE_MAX_FILE_BYTES = PRODUCT_IMAGE_MAX_TRANSPORT_BYTES - PRODUCT_IMAGE_MULTIPART_RESERVE_BYTES;
 
 async function expectRejects(
     action: () => Promise<unknown>,
@@ -46,6 +49,52 @@ async function apiJson(url: string, token: string, body: FormData): Promise<{ st
         body,
     });
     return { status: response.status, json: await response.json() };
+}
+
+// Sends a valid multipart file plus an RFC-permitted epilogue without a
+// Content-Length header. The file stays below Multer's per-file cap, while the
+// complete chunked request exceeds the aggregate 10 MiB budget.
+async function chunkedImageJson(url: string, token: string): Promise<{ status: number; json: any }> {
+    const boundary = `product-image-${randomUUID()}`;
+    const fileHeader = Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="chunked.png"\r\nContent-Type: image/png\r\n\r\n`,
+    );
+    const file = Buffer.alloc(PRODUCT_IMAGE_MAX_FILE_BYTES - 1);
+    const closingWithEpilogue = Buffer.concat([
+        Buffer.from(`\r\n--${boundary}--\r\n`),
+        Buffer.alloc(20 * 1024, 0x20),
+    ]);
+
+    return await new Promise((resolve, reject) => {
+        const request = httpRequest({
+            hostname: '127.0.0.1',
+            port: PRODUCT_IMAGE_PORT,
+            path: `/api${url}`,
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                'Transfer-Encoding': 'chunked',
+            },
+        }, (response) => {
+            const chunks: Buffer[] = [];
+            response.on('data', (chunk: Buffer) => chunks.push(chunk));
+            response.once('end', () => {
+                const raw = Buffer.concat(chunks).toString('utf8');
+                try {
+                    resolve({ status: response.statusCode || 0, json: JSON.parse(raw) });
+                } catch (error) {
+                    reject(new Error(`Respuesta chunked no JSON (${response.statusCode}): ${raw}`, { cause: error }));
+                }
+            });
+        });
+        request.once('error', reject);
+        request.write(fileHeader);
+        for (let offset = 0; offset < file.length; offset += 64 * 1024) {
+            request.write(file.subarray(offset, Math.min(offset + 64 * 1024, file.length)));
+        }
+        request.end(closingWithEpilogue);
+    });
 }
 
 async function productImageContract(): Promise<void> {
@@ -125,6 +174,10 @@ async function productImageContract(): Promise<void> {
         const aggregateLimit = await apiJson(`/products/${product.id}/image`, token, aggregateLimitBody);
         assert.equal(aggregateLimit.status, 413, `límite total multipart: ${JSON.stringify(aggregateLimit.json)}`);
         assert.match(aggregateLimit.json.error, /carga multipart.*10 MB/i);
+
+        const chunkedLimit = await chunkedImageJson(`/products/${product.id}/image`, token);
+        assert.equal(chunkedLimit.status, 413, `límite chunked multipart: ${JSON.stringify(chunkedLimit.json)}`);
+        assert.match(chunkedLimit.json.error, /carga multipart.*10 MB/i);
 
         const validBody = new FormData();
         validBody.append('image', new Blob([productImage], { type: 'image/png' }), 'producto.png');

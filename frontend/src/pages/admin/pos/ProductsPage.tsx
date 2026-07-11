@@ -35,6 +35,12 @@ import { Plus, Search, Edit, Trash2, Loader2, Package } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 
+const PRODUCT_IMAGE_MAX_TRANSPORT_BYTES = 10 * 1024 * 1024;
+// Keep this reserve aligned with the backend so a selected file always leaves
+// room for multipart boundaries and headers inside the 10 MiB request budget.
+const PRODUCT_IMAGE_MULTIPART_RESERVE_BYTES = 16 * 1024;
+const PRODUCT_IMAGE_MAX_FILE_BYTES = PRODUCT_IMAGE_MAX_TRANSPORT_BYTES - PRODUCT_IMAGE_MULTIPART_RESERVE_BYTES;
+
 type PendingImageUpload = { id: string; name?: string | null };
 
 class ProductSavedWithoutImageError extends Error {
@@ -330,8 +336,17 @@ function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, pendingI
     }, [imageFile]);
 
     useEffect(() => {
-        if (open) setImageFile(null);
+        setImageFile(null);
+        if (fileRef.current) fileRef.current.value = '';
     }, [open, initialData?.id]);
+
+    const handleDialogOpenChange = (nextOpen: boolean) => {
+        if (!nextOpen) {
+            setImageFile(null);
+            if (fileRef.current) fileRef.current.value = '';
+        }
+        onOpenChange(nextOpen);
+    };
 
     const handleImageFile = (file: File | null) => {
         if (!file) return;
@@ -339,8 +354,12 @@ function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, pendingI
             toast({ variant: 'destructive', title: 'Archivo no válido', description: 'Sube una imagen (JPG o PNG).' });
             return;
         }
-        if (file.size > 10 * 1024 * 1024) {
-            toast({ variant: 'destructive', title: 'Imagen muy grande', description: 'La imagen no debe pesar más de 10 MB.' });
+        if (file.size > PRODUCT_IMAGE_MAX_FILE_BYTES) {
+            toast({
+                variant: 'destructive',
+                title: 'Imagen muy grande',
+                description: 'La foto debe pesar máximo 9.98 MiB; reservamos 16 KiB para el envío multipart dentro del límite total de 10 MiB.',
+            });
             return;
         }
         setImageFile(file);
@@ -370,7 +389,7 @@ function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, pendingI
     const displayedImageUrl = imagePreviewUrl ?? initialData?.image_url ?? '';
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={handleDialogOpenChange}>
             <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
                     <DialogTitle>{pendingImageUpload ? 'Reintentar foto del producto' : initialData ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
@@ -459,11 +478,11 @@ function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, pendingI
                         </div>
                         <input ref={fileRef} type="file" accept="image/*" className="hidden"
                             onChange={(e) => { handleImageFile(e.target.files?.[0] ?? null); e.target.value = ''; }} />
-                        <p className="text-xs text-muted-foreground">Hasta 10 MB con Google Drive. Sin Drive, el respaldo local admite hasta 1 MB.</p>
+                        <p className="text-xs text-muted-foreground">Máximo 9.98 MiB por foto (16 KiB se reservan para el envío multipart). La solicitud admite hasta 10 MiB con Google Drive; sin Drive, el respaldo local admite hasta 1 MiB.</p>
                     </div>
 
                     <DialogFooter className="mt-4">
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                        <Button type="button" variant="outline" onClick={() => handleDialogOpenChange(false)}>Cancelar</Button>
                         <Button type="submit" disabled={isSubmitting}>
                             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {pendingImageUpload ? 'Reintentar foto' : 'Guardar'}

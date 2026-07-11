@@ -15,6 +15,13 @@ const PRODUCT_IMAGE_MAX_TRANSPORT_BYTES = 10 * 1024 * 1024;
 // headers multipart. Solo se admite una parte de archivo y cero campos de texto.
 const PRODUCT_IMAGE_MAX_FILE_BYTES = PRODUCT_IMAGE_MAX_TRANSPORT_BYTES - 16 * 1024;
 
+class ProductImageTransportLimitError extends Error {
+    constructor() {
+        super('La carga multipart no debe superar 10 MB en total');
+        this.name = 'ProductImageTransportLimitError';
+    }
+}
+
 const productImageUpload = multer({
     storage: multer.memoryStorage(),
     limits: {
@@ -34,10 +41,9 @@ function productImagePayloadTooLarge(res: Response, error = 'La carga multipart 
     res.status(413).json({ error });
 }
 
-// Multer limita cada archivo, no el request completo. El header incluye el
-// archivo, boundaries y cualquier parte adicional, así que se valida antes de
-// que Multer reserve memoria. El límite de archivo conservador protege también
-// requests chunked que no incluyen Content-Length.
+// Multer limita cada archivo, no el request completo. Primero se descarta por
+// Content-Length; para transferencias chunked contamos el body real y emitimos
+// un solo error que Multer ya sabe abortar (unpipe, drain y limpiar memoria).
 function enforceProductImageTransportLimit(req: Request, res: Response, next: NextFunction): void {
     const rawContentLength = req.headers['content-length'];
     const contentLength = typeof rawContentLength === 'string' ? Number(rawContentLength) : NaN;
@@ -45,12 +51,38 @@ function enforceProductImageTransportLimit(req: Request, res: Response, next: Ne
         productImagePayloadTooLarge(res);
         return;
     }
+
+    let receivedBytes = 0;
+    let exceeded = false;
+    const stopCounting = () => {
+        req.off('data', countReceivedBytes);
+        res.off('finish', stopCounting);
+        res.off('close', stopCounting);
+    };
+    const countReceivedBytes = (chunk: Buffer) => {
+        if (exceeded) return;
+        receivedBytes += chunk.length;
+        if (receivedBytes <= PRODUCT_IMAGE_MAX_TRANSPORT_BYTES) return;
+
+        exceeded = true;
+        stopCounting();
+        // `uploadProductImage` owns the response. Multer's req error handler
+        // stops its parser and the route handler is never reached.
+        req.emit('error', new ProductImageTransportLimitError());
+    };
+    req.on('data', countReceivedBytes);
+    res.once('finish', stopCounting);
+    res.once('close', stopCounting);
     next();
 }
 
 function uploadProductImage(req: Request, res: Response, next: NextFunction): void {
     productImageUpload.single('image')(req, res, (error: unknown) => {
         if (res.headersSent) return;
+        if (error instanceof ProductImageTransportLimitError) {
+            productImagePayloadTooLarge(res);
+            return;
+        }
         if (error instanceof multer.MulterError) {
             const payloadLimitCodes = new Set([
                 'LIMIT_PART_COUNT',
