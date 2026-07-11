@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import express from 'express';
 import { query } from '../config/database.js';
 import { verifyWebhookSignature } from '../lib/stripe.js';
-import { finalizePaidOrder } from '../lib/orderFulfillment.js';
+import { finalizePaidOrder, reversePaymentByReference } from '../lib/orderFulfillment.js';
 import type { Event as StripeEvent } from 'stripe/cjs/resources/Events.js';
 
 const router = Router();
@@ -63,14 +63,31 @@ async function dispatchEvent(event: StripeEvent): Promise<void> {
         case 'charge.refunded': {
             const c = event.data.object as any;
             if (c.amount_refunded === c.amount && c.payment_intent) {
+                const pi = typeof c.payment_intent === 'string' ? c.payment_intent : c.payment_intent.id;
                 await query(`UPDATE orders SET stripe_payment_status='refunded', updated_at=NOW()
-                             WHERE stripe_payment_intent_id=$1`, [typeof c.payment_intent === 'string' ? c.payment_intent : c.payment_intent.id]);
-                console.warn('Stripe charge.refunded (total) — revisar membresía manualmente:', c.payment_intent);
+                             WHERE stripe_payment_intent_id=$1`, [pi]);
+                // Reembolso TOTAL confirmado por Stripe: revierte acceso y valor otorgado
+                // (membresía, puntos, bono de referido) dentro de una transacción real — ver
+                // reversePaymentByReference en lib/orderFulfillment.ts.
+                await reversePaymentByReference(pi, 'Reembolso total confirmado por Stripe');
             }
             break;
         }
         case 'charge.dispute.created': {
+            // Solo se ABRE el contracargo — Stripe aún puede fallar a favor del estudio. No se
+            // revierte nada aquí (sería prematuro); la reversión real ocurre en
+            // charge.dispute.closed cuando el resultado es 'lost' (fondos ya retirados de verdad).
             console.warn('Stripe dispute creada:', (event.data.object as any).id);
+            break;
+        }
+        case 'charge.dispute.closed': {
+            const d = event.data.object as any;
+            if (d.status === 'lost' && d.payment_intent) {
+                const pi = typeof d.payment_intent === 'string' ? d.payment_intent : d.payment_intent.id;
+                await query(`UPDATE orders SET stripe_payment_status='charged_back', updated_at=NOW()
+                             WHERE stripe_payment_intent_id=$1`, [pi]);
+                await reversePaymentByReference(pi, 'Contracargo perdido (dispute) confirmado por Stripe');
+            }
             break;
         }
         default: break;

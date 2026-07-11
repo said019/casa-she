@@ -1,5 +1,27 @@
 export const MAX_REFORMER_CAPACITY = 8;
 
+/**
+ * Convierte una fecha+hora de PARED en America/Mexico_City (CDMX) al instante UTC real,
+ * respetando horario de verano (DST: UTC-5 abr-oct, UTC-6 nov-mar). Un offset fijo (-06:00)
+ * queda mal la mitad del año — permitía reservar/hacer check-in hasta 1h después de que la
+ * clase ya había iniciado. Usa Intl.DateTimeFormat.formatToParts para el offset real del día.
+ */
+export function cdmxWallClockToUtc(dateStr: string, timeStr: string): Date {
+  const probe = new Date(`${dateStr}T${timeStr}:00Z`);
+  const tzParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Mexico_City',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(probe);
+  const getPart = (type: string) => Number(tzParts.find((p) => p.type === type)?.value ?? 0);
+  const probeAsMxUtcMs = Date.UTC(
+    getPart('year'), getPart('month') - 1, getPart('day'),
+    getPart('hour') % 24, getPart('minute'), getPart('second'),
+  );
+  return new Date(probe.getTime() + (probe.getTime() - probeAsMxUtcMs));
+}
+
 /** Suma minutos a una hora 'HH:MM' (envuelve a 24h). */
 export function addMinutesToTime(hhmm: string, minutes: number): string {
   const [h, m] = hhmm.split(':').map(Number);

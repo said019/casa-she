@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../config/database.js';
 import { verifyWebhookSignature, syncPayment } from '../lib/mercadopago.js';
-import { finalizePaidOrder } from '../lib/orderFulfillment.js';
+import { finalizePaidOrder, reversePaymentByReference } from '../lib/orderFulfillment.js';
 import { finalizeBarOrder } from '../lib/barFulfillment.js';
 
 const router = Router();
@@ -85,6 +85,17 @@ router.post('/', async (req: Request, res: Response) => {
                     `UPDATE orders SET rejected_at=NOW(), updated_at=NOW()
                      WHERE id=$1 AND status='pending_payment'`,
                     [orderId]
+                );
+            } else if (payment.status === 'refunded' || payment.status === 'charged_back') {
+                // Reembolso total o contracargo confirmado por MercadoPago sobre una orden YA
+                // aprobada: revierte acceso y valor otorgado (membresía, puntos, bono de
+                // referido) — simétrico al mismo caso de Stripe. Antes esta rama no existía:
+                // la clienta recuperaba su dinero pero conservaba membresía + créditos + puntos.
+                await reversePaymentByReference(
+                    String(payment.id),
+                    payment.status === 'refunded'
+                        ? 'Reembolso total confirmado por MercadoPago'
+                        : 'Contracargo confirmado por MercadoPago'
                 );
             }
         } else {

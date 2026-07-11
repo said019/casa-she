@@ -68,6 +68,19 @@ export async function cancelClassWithRefunds(
             );
             refundedCredits++;
         }
+
+        // Reactiva el beneficio de lealtad (clase gratis pagada con puntos) si esta reserva
+        // lo consumió. Sin esto, cancelar la CLASE completa (admin, solape de evento, día
+        // inhábil) hacía perder el beneficio para siempre — no había camino de vuelta a
+        // 'active'. No reactiva si ya venció (se perdió por vigencia, no por esta cancelación).
+        if (booking.is_free_booking) {
+            await query(
+                `UPDATE user_benefits
+                    SET status = 'active', used_at = NULL, used_by = NULL, used_on_booking_id = NULL
+                  WHERE used_on_booking_id = $1 AND status = 'used' AND expires_at > NOW()`,
+                [booking.id]
+            ).catch((e: any) => console.error('reactivar free_class benefit (cancel class):', e?.message));
+        }
     }
 
     return { class: result, cancelledBookings, refundedCredits };

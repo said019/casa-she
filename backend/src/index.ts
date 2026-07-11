@@ -1948,6 +1948,20 @@ async function runStartupMigrations(): Promise<void> {
                     WHERE id = v_booking.membership_id;
                 END IF;
 
+                -- Reactiva el beneficio de lealtad (clase gratis pagada con puntos) si esta
+                -- reserva se hizo consumiendo uno. Antes NO existía ningún camino que regresara
+                -- un user_benefit a 'active' tras cancelar: la clienta perdía el beneficio que
+                -- pagó con puntos aunque cancelara a tiempo o el estudio cancelara la clase. El
+                -- WHERE used_on_booking_id = p_booking_id hace que sea inofensivo para reservas
+                -- gratis por classDetails.is_free (esas no tienen un user_benefit ligado). No
+                -- reactiva si el beneficio ya venció (expires_at <= NOW(): se perdió por
+                -- vigencia, no por esta cancelación).
+                UPDATE user_benefits
+                   SET status = 'active', used_at = NULL, used_by = NULL, used_on_booking_id = NULL
+                 WHERE used_on_booking_id = p_booking_id
+                   AND status = 'used'
+                   AND expires_at > NOW();
+
                 -- Cancel the booking
                 UPDATE bookings SET
                     status = 'cancelled',

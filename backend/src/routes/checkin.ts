@@ -11,6 +11,7 @@ import { awardCheckinPoints } from '../lib/loyalty.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { logAction } from '../lib/audit.js';
 import { verifyQrPayload } from '../lib/qr.js';
+import { cdmxWallClockToUtc } from '../lib/schedule.js';
 
 const router = Router();
 
@@ -372,7 +373,12 @@ router.post('/qr', authenticate, requirePermission('checkin', ['instructor']), a
       ipAddress: req.ip || req.socket.remoteAddress || 'unknown',
       userAgent: req.get('user-agent') || 'unknown',
       qrCode: validation.data.qrPayload,
-      classStartTime: `${booking.class_date}T${booking.class_start_time}`,
+      // ISO-UTC real (no naive): createCheckinLog usa new Date(classStartTime) para
+      // is_late/minutes_early_late en checkin_logs — pasar el string crudo sin offset se
+      // interpretaba en la TZ del proceso (UTC en Railway) contra una hora de PARED CDMX,
+      // el mismo bug de 6h que el gate de /self (ya corregido), pero aquí solo afectaba el
+      // reporte de puntualidad, no si se permitía el check-in.
+      classStartTime: cdmxWallClockToUtc(booking.class_date, String(booking.class_start_time).substring(0, 5)).toISOString(),
       isFirstClass: firstClass,
     });
 
@@ -515,8 +521,12 @@ router.post('/self', authenticate, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'No puedes hacer check-in con este estado de reserva' });
     }
 
-    // Verificar que la clase sea dentro de los próximos 30 minutos o hace menos de 10 minutos
-    const classStart = new Date(`${booking.class_date}T${booking.class_start_time}`);
+    // Verificar que la clase sea dentro de los próximos 30 minutos o hace menos de 10 minutos.
+    // booking.class_date/class_start_time son hora de PARED en CDMX; parsear con `new Date()`
+    // sin offset los interpreta en la TZ del proceso Node (UTC en Railway) → desfase de 6h que
+    // hacía fallar el self check-in siempre ("el tiempo para check-in ha pasado"), mismo bug
+    // que el check-in por QR (checkin.ts ~línea 283).
+    const classStart = cdmxWallClockToUtc(booking.class_date, String(booking.class_start_time).substring(0, 5));
     const now = new Date();
     const diffMinutes = (classStart.getTime() - now.getTime()) / 60000;
 
@@ -552,7 +562,12 @@ router.post('/self', authenticate, async (req: Request, res: Response) => {
       location: validation.data.location,
       ipAddress: req.ip || req.socket.remoteAddress || 'unknown',
       userAgent: req.get('user-agent') || 'unknown',
-      classStartTime: `${booking.class_date}T${booking.class_start_time}`,
+      // ISO-UTC real (no naive): createCheckinLog usa new Date(classStartTime) para
+      // is_late/minutes_early_late en checkin_logs — pasar el string crudo sin offset se
+      // interpretaba en la TZ del proceso (UTC en Railway) contra una hora de PARED CDMX,
+      // el mismo bug de 6h que el gate de /self (ya corregido), pero aquí solo afectaba el
+      // reporte de puntualidad, no si se permitía el check-in.
+      classStartTime: cdmxWallClockToUtc(booking.class_date, String(booking.class_start_time).substring(0, 5)).toISOString(),
       isFirstClass: firstClass,
     });
 
@@ -685,7 +700,12 @@ router.post('/manual', authenticate, requirePermission('checkin', ['instructor']
       checkedInBy: req.user?.userId || null,
       ipAddress: req.ip || req.socket.remoteAddress || 'unknown',
       userAgent: req.get('user-agent') || 'unknown',
-      classStartTime: `${booking.class_date}T${booking.class_start_time}`,
+      // ISO-UTC real (no naive): createCheckinLog usa new Date(classStartTime) para
+      // is_late/minutes_early_late en checkin_logs — pasar el string crudo sin offset se
+      // interpretaba en la TZ del proceso (UTC en Railway) contra una hora de PARED CDMX,
+      // el mismo bug de 6h que el gate de /self (ya corregido), pero aquí solo afectaba el
+      // reporte de puntualidad, no si se permitía el check-in.
+      classStartTime: cdmxWallClockToUtc(booking.class_date, String(booking.class_start_time).substring(0, 5)).toISOString(),
       isFirstClass: firstClass,
     });
 

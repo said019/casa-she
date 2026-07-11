@@ -1,7 +1,7 @@
 import { query, queryOne, pool } from '../config/database.js';
 import { sendMembershipActivatedEmail } from '../services/email.js';
 import { sendMembershipActivatedNotice } from '../lib/whatsapp.js';
-import { awardPaymentLoyaltyPoints, awardReferralBonus } from '../lib/loyalty.js';
+import { awardPaymentLoyaltyPoints, awardReferralBonus, reversePaymentLoyaltyPoints, reverseReferralBonus } from '../lib/loyalty.js';
 import { notifyMembershipRenewed, notifyPointsEarnedExternal } from '../lib/notifications.js';
 
 export interface FinalizeOpts { provider: string; paymentRef: string | null; }
@@ -111,6 +111,113 @@ export async function finalizePaidOrder(orderId: string, opts: FinalizeOpts): Pr
     } catch (err: any) {
         await client.query('ROLLBACK');
         console.error('finalizePaidOrder transaction error:', err.message);
+        throw err;
+    } finally {
+        client.release();
+    }
+}
+
+/**
+ * Reversa un pago ya completado (reembolso total o contracargo perdido confirmado por el
+ * proveedor): marca el pago 'refunded', cancela la membresía activa asociada, y revierte los
+ * puntos de lealtad y el bono de referido otorgados por ese pago/orden. Provider-agnóstico:
+ * Stripe y MercadoPago guardan su referencia de pago en payments.reference_id (ver
+ * finalizePaidOrder arriba — opts.paymentRef se inserta ahí para ambos). Contraparte
+ * simétrica de finalizePaidOrder — misma transacción real (BEGIN/COMMIT/ROLLBACK) para que
+ * un fallo a mitad de camino no deje el pago marcado 'refunded' sin revertir membresía/puntos.
+ * Devuelve false si no hay un pago 'completed' con esa referencia (ya revertido, o no existe)
+ * — llamar es un no-op seguro/idempotente.
+ */
+export async function reversePaymentByReference(reference: string, reasonLabel: string): Promise<boolean> {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Localiza el membership_id SIN lock, solo para saber qué fila de memberships bloquear
+        // PRIMERO. orders.ts (/:id/reject) y memberships.ts (/:id/cancel) bloquean memberships
+        // ANTES que payments; bloquear en el orden inverso aquí (como en un intento anterior de
+        // este fix) causaba un deadlock AB-BA real si un reembolso de webhook llegaba justo
+        // cuando un admin rechazaba la orden o cancelaba la membresía manualmente en el panel.
+        const peek = await client.query<{ membership_id: string | null }>(
+            `SELECT membership_id FROM payments WHERE reference_id = $1 AND status = 'completed'`,
+            [reference]
+        );
+        const peekedMembershipId = peek.rows[0]?.membership_id ?? null;
+        if (peekedMembershipId) {
+            await client.query(`SELECT id FROM memberships WHERE id = $1 FOR UPDATE`, [peekedMembershipId]);
+        }
+
+        const paymentRes = await client.query<{ id: string; user_id: string; membership_id: string | null }>(
+            `SELECT id, user_id, membership_id FROM payments WHERE reference_id = $1 AND status = 'completed' FOR UPDATE`,
+            [reference]
+        );
+        const payment = paymentRes.rows[0];
+        if (!payment) {
+            await client.query('ROLLBACK');
+            return false;
+        }
+
+        // Invariante de la que depende el orden de locks de arriba: payments.membership_id se
+        // fija UNA sola vez en el INSERT de finalizePaidOrder y ninguna ruta lo actualiza después
+        // (solo su status transiciona completed→refunded). Por eso peekedMembershipId (leído sin
+        // lock) siempre coincide con payment.membership_id (leído con FOR UPDATE) — bloquear
+        // memberships antes que payments arriba es seguro. Si en el futuro algún flujo llegara a
+        // reasignar membership_id en un payment ya existente, este assert lo haría explícito en
+        // vez de fallar en silencio con un orden de locks incorrecto.
+        if (payment.membership_id !== peekedMembershipId) {
+            throw new Error(
+                `reversePaymentByReference: membership_id cambió entre peek y lock (${peekedMembershipId} → ${payment.membership_id}) — invariante rota, revisar orden de locks`
+            );
+        }
+
+        await client.query(`UPDATE payments SET status = 'refunded' WHERE id = $1`, [payment.id]);
+
+        // El bono de referido se busca vía memberships.order_id con una lectura simple, SIN
+        // depender de que el UPDATE de cancelación de abajo afecte una fila: si la membresía ya
+        // expiró o fue cancelada por otra vía antes de que llegue este reembolso/contracargo
+        // (plausible — una disputa bancaria puede tardar semanas en resolverse), el bono del
+        // referidor de todos modos debe revertirse.
+        let orderRow: { id: string; discount_code_id: string | null; user_id: string } | null = null;
+        if (payment.membership_id) {
+            const memRow = await client.query<{ order_id: string | null }>(
+                `SELECT order_id FROM memberships WHERE id = $1`,
+                [payment.membership_id]
+            );
+            const orderId = memRow.rows[0]?.order_id;
+            if (orderId) {
+                const oRes = await client.query<{ id: string; discount_code_id: string | null; user_id: string }>(
+                    `SELECT id, discount_code_id, user_id FROM orders WHERE id = $1`,
+                    [orderId]
+                );
+                orderRow = oRes.rows[0] ?? null;
+            }
+            await client.query(
+                `UPDATE memberships SET status = 'cancelled', cancelled_at = NOW(),
+                    cancellation_reason = $2, updated_at = NOW()
+                 WHERE id = $1 AND status = 'active'`,
+                [payment.membership_id, reasonLabel]
+            );
+        }
+
+        await reversePaymentLoyaltyPoints({ db: client, userId: payment.user_id, paymentId: payment.id });
+
+        if (orderRow?.discount_code_id) {
+            const refRow = await client.query<{ referral_owner_id: string }>(
+                `SELECT referral_owner_id FROM discount_codes WHERE id = $1 AND is_referral = true
+                   AND referral_owner_id IS NOT NULL AND referral_owner_id <> $2`,
+                [orderRow.discount_code_id, orderRow.user_id]
+            );
+            const ownerId = refRow.rows[0]?.referral_owner_id;
+            if (ownerId) {
+                await reverseReferralBonus({ db: client, referrerUserId: ownerId, orderId: orderRow.id });
+            }
+        }
+
+        await client.query('COMMIT');
+        return true;
+    } catch (err: any) {
+        await client.query('ROLLBACK').catch(() => {});
+        console.error(`reversePaymentByReference(${reference}) transaction error:`, err.message);
         throw err;
     } finally {
         client.release();

@@ -14,6 +14,7 @@ import { studioBookingError } from '../lib/membershipStudio.js';
 import { selectMembershipForBooking, toDbClient, pickBestMembership } from '../lib/membershipSelection.js';
 import { awardCheckinPoints } from '../lib/loyalty.js';
 import { joinWaitlist, waitlistOffer, compactWaitlist, promoteNextFromWaitlist } from '../lib/waitlist.js';
+import { cdmxWallClockToUtc } from '../lib/schedule.js';
 
 const router = Router();
 
@@ -485,23 +486,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
         const timeStr = classDetails.start_time.substring(0, 5); // HH:MM
 
         // Convert class local time (America/Mexico_City) to UTC — DST-aware.
-        // CDMX is UTC-6 in winter and UTC-5 in summer; the old hardcoded -06:00
-        // was wrong from April–October and allowed bookings after class had started.
-        // We use Intl.DateTimeFormat.formatToParts to compute the actual UTC offset
-        // for the class date, then apply it to get the true UTC moment.
-        const probe = new Date(`${dateStr}T${timeStr}:00Z`);
-        const tzParts = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Mexico_City',
-            year: 'numeric', month: '2-digit', day: '2-digit',
-            hour: '2-digit', minute: '2-digit', second: '2-digit',
-            hour12: false,
-        }).formatToParts(probe);
-        const getPart = (type: string) => Number(tzParts.find(p => p.type === type)?.value ?? 0);
-        const probeAsMxUtcMs = Date.UTC(
-            getPart('year'), getPart('month') - 1, getPart('day'),
-            getPart('hour') % 24, getPart('minute'), getPart('second'),
-        );
-        const classDateTime = new Date(probe.getTime() + (probe.getTime() - probeAsMxUtcMs));
+        const classDateTime = cdmxWallClockToUtc(dateStr, timeStr);
 
         if (isNaN(classDateTime.getTime())) {
             console.error('Invalid class date generated', { dateStr, timeStr });
@@ -675,6 +660,29 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                 return res.status(400).json({ error: 'Clase llena', ...offer });
             }
 
+            // Consume el beneficio personal DENTRO de la tx, ANTES de decidir si la reserva
+            // es gratis. Antes se consumía DESPUÉS de insertar la reserva y sin revisar
+            // rowCount: el beneficio se leyó sin lock (línea ~607, fuera de la tx), así que dos
+            // reservas concurrentes en clases DISTINTAS veían el mismo beneficio 'active' y
+            // AMBAS comiteaban gratis (el índice único de bookings solo protege la MISMA clase,
+            // no evita usar un beneficio dos veces en clases distintas). Con este UPDATE
+            // auto-guardado, si otra tx ya lo gastó, rowCount=0 y esta reserva cae a la vía de
+            // pago normal (créditos) en vez de quedar gratis sin que el beneficio se haya
+            // consumido de verdad.
+            if (freeClassBenefitId) {
+                const consume = await client.query(
+                    `UPDATE user_benefits SET status = 'used', used_at = NOW(), used_by = $2
+                     WHERE id = $1 AND status = 'active' AND expires_at > NOW()`,
+                    [freeClassBenefitId, req.user?.userId ?? null]
+                );
+                if ((consume.rowCount ?? 0) === 0) {
+                    // Perdió la carrera: el beneficio ya se gastó en otra reserva concurrente.
+                    // Solo sigue gratis si la CLASE en sí es gratuita (classDetails.is_free).
+                    isFreeClass = !!classDetails.is_free;
+                    freeClassBenefitId = null;
+                }
+            }
+
             if (!isFreeClass) {
                 if (membershipId) {
                     // Explicit membership: validate ownership, status, credits, studio.
@@ -792,11 +800,12 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
             );
             newBooking = insertRes.rows[0];
 
-            // Consume free class benefit if used (only if still active — prevents double consumption)
+            // El beneficio ya se marcó 'used' arriba (dentro de la tx, con rowCount verificado);
+            // aquí solo se adjunta a qué reserva quedó ligado, para la reactivación al cancelar.
             if (freeClassBenefitId) {
                 await client.query(
-                    `UPDATE user_benefits SET status = 'used', used_at = NOW(), used_by = $3, used_on_booking_id = $1 WHERE id = $2 AND status = 'active'`,
-                    [newBooking.id, freeClassBenefitId, req.user?.userId ?? null]
+                    `UPDATE user_benefits SET used_on_booking_id = $1 WHERE id = $2`,
+                    [newBooking.id, freeClassBenefitId]
                 );
             }
 

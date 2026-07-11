@@ -675,7 +675,12 @@ const ClassUpdateSchema = z.object({
     startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Formato HH:MM requerido').optional(),
     endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Formato HH:MM requerido').optional(),
     maxCapacity: z.number().int().positive().optional(),
-    status: z.enum(['scheduled', 'in_progress', 'completed', 'cancelled']).optional(),
+    // 'cancelled' NO está permitido aquí a propósito: este PUT hace un UPDATE directo de
+    // columna sin pasar por cancelClassWithRefunds, así que cancelar por esta vía no
+    // reembolsaba créditos, no cancelaba las reservas, no fijaba cancelled_at/by/reason ni
+    // notificaba — dejaba current_bookings inflado y créditos pagados sin devolver. Usar
+    // DELETE /:id (más abajo) para cancelar, que sí hace todo eso correctamente.
+    status: z.enum(['scheduled', 'in_progress', 'completed']).optional(),
 });
 
 router.put('/:id', authenticate, requireElevated, async (req: Request, res: Response) => {

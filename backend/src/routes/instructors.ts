@@ -731,6 +731,29 @@ router.delete('/:id', authenticate, requireRole('admin'), async (req: Request, r
 
         // Sin historial → borrado DURO. La cascada limpia disponibilidad/playlists/favoritos del coach.
         await query('DELETE FROM instructors WHERE id = $1', [id]);
+
+        // Desactiva también la cuenta de usuario. Sin esto, un coach despedido ANTES de dar su
+        // primera clase (0 historial → esta rama) se borraba de `instructors` pero users.is_active
+        // seguía en true: el chequeo de authenticate (middleware/auth.ts) hace LEFT JOIN contra
+        // instructors, y sin ninguna fila que unir, COALESCE trata la ausencia como "activo" —
+        // indistinguible de alguien que nunca fue instructor. El coach eliminado conservaba
+        // acceso completo con su JWT (hasta 7 días) o incluso re-logueándose.
+        //
+        // PERO: instructors.user_id no es UNIQUE — el auto-vínculo por email (getOwnInstructor)
+        // puede dejar dos filas de instructor apuntando al mismo user_id (duplicado sin cuenta +
+        // el registro real). Si la fila que se borra es el duplicado vacío pero OTRA fila activa
+        // sigue ligada al mismo user_id, desactivar la cuenta bloquearía por error al coach que
+        // SÍ sigue de alta. Solo se desactiva si NINGUNA otra fila de instructor activa comparte
+        // ese user_id.
+        if (inst.user_id) {
+            const stillLinked = await queryOne<{ id: string }>(
+                'SELECT id FROM instructors WHERE user_id = $1 AND is_active = true LIMIT 1',
+                [inst.user_id]
+            );
+            if (!stillLinked) {
+                await query('UPDATE users SET is_active = false WHERE id = $1', [inst.user_id]);
+            }
+        }
         return res.json({ message: 'Instructor eliminado.', deleted: true });
     } catch (error) {
         console.error('Delete instructor error:', error);

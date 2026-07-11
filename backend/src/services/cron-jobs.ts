@@ -21,7 +21,7 @@ import {
     sendWhatsAppMessage,
 } from '../lib/whatsapp.js';
 import { writeInAppNotification } from '../lib/in-app-notifications.js';
-import { awardCheckinPoints, getLoyaltyConfig, type DbClient } from '../lib/loyalty.js';
+import { getLoyaltyConfig, type DbClient } from '../lib/loyalty.js';
 
 // ============================================
 // TIPOS
@@ -469,6 +469,18 @@ async function markNoShows(): Promise<void> {
 async function autoCheckIn(): Promise<void> {
     const jobName = 'AUTO_CHECK_IN';
     try {
+        // Pre-prod audit 2026-07-10 (P1-6): esta ventana ANTES anclaba en start_time + 30min,
+        // que para casi toda clase (60-90min) cae ANTES de que la clase termine — o sea, antes
+        // de que markNoShows (que ancla en end_time + 30min y corre 5 min antes en el cron,
+        // :05/:35 vs :10/:40) pudiera evaluar esa reserva. autoCheckIn le ganaba la carrera:
+        // marcaba 'checked_in' —y otorgaba PUNTOS CANJEABLES— a cualquiera que simplemente no
+        // hubiera cancelado, sin verificar asistencia real, dejando a markNoShows sin nada que
+        // marcar. Ahora ancla en el MISMO umbral que markNoShows (end_time + 30min): como
+        // markNoShows corre primero y ya flippeó a 'no_show' todo lo que sigue 'confirmed' en
+        // ese umbral, este UPDATE no encuentra filas en el flujo normal — queda como respaldo
+        // inerte solo si markNoShows llegara a fallar/estar deshabilitado, y YA NO otorga
+        // puntos de lealtad (la asistencia real solo la acredita el check-in de verdad:
+        // QR/self/manual, que sí verifica presencia).
         const result = await query<{ id: string; user_id: string }>(`
             UPDATE bookings
             SET status = 'checked_in',
@@ -477,7 +489,7 @@ async function autoCheckIn(): Promise<void> {
             WHERE status = 'confirmed'
             AND class_id IN (
                 SELECT id FROM classes
-                WHERE (date::text || ' ' || start_time::text)::timestamp AT TIME ZONE 'America/Mexico_City'
+                WHERE (date::text || ' ' || end_time::text)::timestamp AT TIME ZONE 'America/Mexico_City'
                       + INTERVAL '30 minutes' <= NOW()
                   AND (date::text || ' ' || end_time::text)::timestamp AT TIME ZONE 'America/Mexico_City'
                       > NOW() - INTERVAL '3 hours'
@@ -486,12 +498,8 @@ async function autoCheckIn(): Promise<void> {
             RETURNING id, user_id
         `);
         const count = result.length;
-        // Award attendance points for each auto-checked-in booking (idempotent)
-        for (const row of result) {
-            void awardCheckinPoints(row.user_id, row.id);
-        }
         if (count > 0) {
-            logJob(jobName, `${count} asistencias marcadas automáticamente`);
+            logJob(jobName, `${count} asistencias marcadas automáticamente (respaldo, sin puntos — markNoShows no las alcanzó)`);
         }
         await recordJobExecution(jobName, true, `Auto check-in: ${count}`);
     } catch (error) {
@@ -881,16 +889,23 @@ export function initializeCronJobs(): void {
     });
     console.log('  ✅ CLEANUP_ORDERS - Cada 6 horas');
 
-    // Cada 30 min - Marcar no-shows y completar clases
-    cron.schedule('5,35 * * * *', markNoShows, {
+    // Cada 30 min - Marcar no-shows y completar clases, LUEGO auto-check-in de respaldo.
+    // Antes corrían en cron.schedule separados (:05/:35 vs :10/:40): con ambos anclados en
+    // end_time+30min (fix P1-6), el orden entre ticks independientes solo quedaba garantizado
+    // si el minuto de end_time no caía en la "zona de peligro" {10,40} — hoy ningún horario de
+    // producción cae ahí, pero un horario futuro sí podría. Correrlos secuenciales en el MISMO
+    // tick garantiza el orden SIEMPRE, sin depender de en qué minuto termine una clase.
+    cron.schedule('5,35 * * * *', async () => {
+        // markNoShows/autoCheckIn ya envuelven su cuerpo en try/catch y no relanzan (ver sus
+        // definiciones), pero esa garantía vive en el callee, no aquí. .catch() explícito por
+        // llamada asegura que un cambio futuro que rompa ese try/catch interno no le impida a
+        // autoCheckIn ejecutar en el tick solo porque markNoShows lanzó.
+        await markNoShows().catch((e) => logError('MARK_NO_SHOWS_WRAPPER', e));
+        await autoCheckIn().catch((e) => logError('AUTO_CHECK_IN_WRAPPER', e));
+    }, {
         timezone: 'America/Mexico_City',
     });
-    console.log('  ✅ MARK_NO_SHOWS - Cada 30 min');
-
-    cron.schedule('10,40 * * * *', autoCheckIn, {
-        timezone: 'America/Mexico_City',
-    });
-    console.log('  ✅ AUTO_CHECK_IN - Cada 30 min');
+    console.log('  ✅ MARK_NO_SHOWS + AUTO_CHECK_IN (secuencial) - Cada 30 min');
 
     // 2:00 AM - Expirar solicitudes de reseña
     cron.schedule('0 2 * * *', expireReviewRequests, {

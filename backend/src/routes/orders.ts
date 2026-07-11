@@ -6,7 +6,7 @@ import { requirePermission } from '../middleware/requirePermission.js';
 import { applyDiscountToOrder, resolveDiscountForOrder } from './discount-codes.js';
 import { sendMembershipActivatedEmail, sendOrderRejectedEmail } from '../services/email.js';
 import { sendMembershipActivatedNotice, sendWhatsAppMessage } from '../lib/whatsapp.js';
-import { awardPaymentLoyaltyPoints, awardReferralBonus, consumeSampleClassDiscount, canBuySamplePlan } from '../lib/loyalty.js';
+import { awardPaymentLoyaltyPoints, awardReferralBonus, reversePaymentLoyaltyPoints, reverseReferralBonus, consumeSampleClassDiscount, canBuySamplePlan } from '../lib/loyalty.js';
 import { toDbClient } from '../lib/membershipSelection.js';
 import { notifyMembershipRenewed, notifyPointsEarnedExternal } from '../lib/notifications.js';
 import { mpConfigured, createPreference, syncPayment } from '../lib/mercadopago.js';
@@ -966,6 +966,15 @@ router.post('/:id/reject', authenticate, requireRole('admin', 'super_admin'), as
                     WHERE order_id = $1 AND status = 'active'
                 `, [id, `Orden rechazada: ${notes || 'sin motivo'}`]);
 
+                // Lock antes de revertir para consistencia frente a lecturas concurrentes
+                // (mismo patrón que PUT /memberships/:id/cancel).
+                const refundedPayments = await client.query<{ id: string }>(`
+                    SELECT id FROM payments
+                    WHERE membership_id IN (SELECT id FROM memberships WHERE order_id = $1)
+                      AND status = 'completed'
+                    FOR UPDATE
+                `, [id]);
+
                 await client.query(`
                     UPDATE payments SET
                         status = 'refunded'
@@ -973,6 +982,26 @@ router.post('/:id/reject', authenticate, requireRole('admin', 'super_admin'), as
                         SELECT id FROM memberships WHERE order_id = $1
                     ) AND status = 'completed'
                 `, [id]);
+
+                // Revierte los puntos de lealtad otorgados por esos pagos y el bono de
+                // referido de esta orden. Antes rechazar una orden ya aprobada cancelaba la
+                // membresía y marcaba el pago 'refunded', pero la clienta conservaba los
+                // puntos canjeables y el referidor su bono — dinero real que el estudio ya no
+                // había cobrado de verdad.
+                for (const row of refundedPayments.rows) {
+                    await reversePaymentLoyaltyPoints({ db: client, userId: order.user_id, paymentId: row.id });
+                }
+                if (order.discount_code_id) {
+                    const refRow = await client.query(
+                        `SELECT referral_owner_id FROM discount_codes WHERE id = $1 AND is_referral = true
+                           AND referral_owner_id IS NOT NULL AND referral_owner_id <> $2`,
+                        [order.discount_code_id, order.user_id]
+                    );
+                    const ownerId = refRow.rows[0]?.referral_owner_id;
+                    if (ownerId) {
+                        await reverseReferralBonus({ db: client, referrerUserId: ownerId, orderId: order.id });
+                    }
+                }
             }
 
             // Founder discount rollback on reject (same as cancel)

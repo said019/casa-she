@@ -122,6 +122,10 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
   let barDiscountAmount: number = 0;
   let freeDrinkBenefitId: string | null = null;
   let freeDrinkDiscount: number = 0;
+  // Monto de descuento realmente aplicado a totals.total_mxn (capado por el total). El pago
+  // con tarjeta debe reflejar este mismo monto en MercadoPago; sin esto, MP cobraba el precio
+  // COMPLETO ignorando el descuento/bebida gratis, pero el beneficio igual se marcaba usado.
+  let appliedLoyaltyDiscount: number = 0;
 
   if (paymentMethod !== 'points') {
     const activeBenefits = await query(
@@ -154,6 +158,7 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
     // Recalcular total si hay beneficios
     if (barDiscountAmount > 0 || freeDrinkDiscount > 0) {
       const totalDiscount = Math.min(barDiscountAmount + freeDrinkDiscount, totals.total_mxn);
+      appliedLoyaltyDiscount = totalDiscount;
       totals = {
         ...totals,
         total_mxn: Math.round((totals.total_mxn - totalDiscount) * 100) / 100,
@@ -264,17 +269,45 @@ router.post('/orders', authenticate, async (req: Request, res: Response) => {
   }
 
   if (paymentMethod === 'card') {
+    // Descuento de lealtad cubre el total: nada que cobrar por MP. Consume el beneficio y
+    // marca la orden pagada directamente (mismo criterio que la rama de puntos: no hay
+    // adeudo). Evita mandar un preference con items vacíos (MP lo rechaza).
+    if (totals.total_mxn <= 0) {
+      await consumeFn(orderId);
+      await query(`UPDATE bar_orders SET payment_status='paid', updated_at=NOW() WHERE id=$1`, [orderId]);
+      return res.status(201).json({ id: orderId });
+    }
     if (!mpConfigured()) {
       await query(`DELETE FROM bar_orders WHERE id = $1`, [orderId]);
       return res.status(503).json({ error: 'Pago con tarjeta no disponible' });
     }
     const user = await queryOne<{ email: string }>(`SELECT email FROM users WHERE id = $1`, [userId]);
     try {
-      // MP debe cobrar subtotal + recargo. El recargo va como línea aparte para que
-      // transaction_amount == total_mxn (si no, el estudio pierde el recargo).
-      const mpItems = priced.map((p) => ({ title: p.name, quantity: p.quantity, unit_price: p.unit_price_mxn }));
+      // MP debe cobrar EXACTAMENTE totals.total_mxn (subtotal + recargo - descuento de
+      // lealtad). Antes se armaba con el precio COMPLETO de `priced` ignorando el descuento
+      // ya aplicado a totals.total_mxn: la clienta pagaba de más por tarjeta Y perdía el
+      // beneficio (consumeFn lo marcaba usado igual). MP rechaza unit_price <= 0
+      // (buildPreferenceBody), así que el descuento se distribuye reduciendo cada línea en
+      // vez de una línea negativa; una línea que queda en $0 (p.ej. bebida gratis) se omite.
+      let remainingDiscount = appliedLoyaltyDiscount;
+      const mpItems: { title: string; quantity: number; unit_price: number }[] = [];
+      for (const p of priced) {
+        const lineTotal = Math.round(p.unit_price_mxn * p.quantity * 100) / 100;
+        const applied = Math.min(remainingDiscount, lineTotal);
+        remainingDiscount = Math.round((remainingDiscount - applied) * 100) / 100;
+        const newLineTotal = Math.round((lineTotal - applied) * 100) / 100;
+        if (newLineTotal > 0) {
+          mpItems.push({ title: p.name, quantity: 1, unit_price: newLineTotal });
+        }
+      }
+      // Si el descuento excede el subtotal de productos (raro: bar_discount + free_drink
+      // combinados), el remanente se resta del recargo.
       if (totals.surcharge_mxn > 0) {
-        mpItems.push({ title: 'Uso de app', quantity: 1, unit_price: totals.surcharge_mxn });
+        const newSurcharge = Math.round((totals.surcharge_mxn - remainingDiscount) * 100) / 100;
+        remainingDiscount = Math.max(0, Math.round((remainingDiscount - totals.surcharge_mxn) * 100) / 100);
+        if (newSurcharge > 0) {
+          mpItems.push({ title: 'Uso de app', quantity: 1, unit_price: newSurcharge });
+        }
       }
       const pref = await createPreference({
         orderId: `bar:${orderId}`,           // ← prefijo que el webhook enruta a la barra

@@ -13,7 +13,7 @@ declare global {
 }
 
 // Verify JWT token middleware
-export function authenticate(req: Request, res: Response, next: NextFunction) {
+export async function authenticate(req: Request, res: Response, next: NextFunction) {
     try {
         const authHeader = req.headers.authorization;
 
@@ -33,6 +33,33 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
         }
 
         const decoded = jwt.verify(token, secret) as JwtPayload;
+
+        // Revalida is_active en BD en cada request. El JWT vive hasta 7 días (JWT_EXPIRES_IN)
+        // y, sin este chequeo, req.user se arma solo con lo que dice el token: un staff dado
+        // de baja (despedida, recepción desactivada) conservaba acceso completo —abrir caja,
+        // vender membresías, procesar reembolsos, ver PII— hasta que el token expirara por sí
+        // solo. Si la consulta falla, se cae al catch de abajo (fail-closed, nunca abierto).
+        //
+        // También revisa instructors.is_active: desactivar un coach (DELETE /instructors/:id
+        // o el toggle isActive) SOLO escribe esa columna, nunca users.is_active — son tablas
+        // independientes. Sin este JOIN, un coach dado de baja seguía pasando el chequeo de
+        // arriba con users.is_active intacto. bool_and sobre el LEFT JOIN cubre también el
+        // caso de un registro de instructor duplicado desactivado por /merge.
+        const fresh = await queryOne<{ user_active: boolean; instructor_active: boolean | null }>(
+            `SELECT u.is_active AS user_active, bool_and(COALESCE(i.is_active, true)) AS instructor_active
+               FROM users u
+               LEFT JOIN instructors i ON i.user_id = u.id
+              WHERE u.id = $1
+              GROUP BY u.id, u.is_active`,
+            [decoded.userId]
+        );
+        if (!fresh || fresh.user_active === false || fresh.instructor_active === false) {
+            return res.status(401).json({
+                error: 'Cuenta desactivada',
+                message: 'Tu cuenta ya no tiene acceso. Contacta al estudio.',
+            });
+        }
+
         req.user = {
             userId: decoded.userId,
             email: decoded.email,

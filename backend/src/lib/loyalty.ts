@@ -573,6 +573,45 @@ export async function awardReferralBonus(
 }
 
 /**
+ * Reverse the referral bonus awarded to the referrer for a specific order (refund/reject
+ * case). Sin esto, rechazar/reembolsar una orden que otorgó un bono de referido dejaba al
+ * referidor con puntos canjeables por una orden que nunca se pagó de verdad. Idempotente —
+ * busca el award original por related_order_id e inserta una entrada negativa equivalente.
+ * Devuelve los puntos revertidos (0 si no había bono que revertir o ya se revirtió).
+ */
+export async function reverseReferralBonus(params: {
+  db: DbClient;
+  referrerUserId: string;
+  orderId: string;
+}): Promise<number> {
+  const { db, referrerUserId, orderId } = params;
+  const reversalDesc = `Reversa referido — orden #${orderId}`;
+
+  const reversed = await db.query(
+    `SELECT id FROM loyalty_points WHERE user_id = $1 AND description = $2 LIMIT 1`,
+    [referrerUserId, reversalDesc]
+  );
+  if (reversed.rowCount > 0) return 0;
+
+  const original = await db.query(
+    `SELECT points FROM loyalty_points WHERE user_id = $1 AND related_order_id = $2 AND type = 'referral' LIMIT 1`,
+    [referrerUserId, orderId]
+  );
+  if (original.rowCount === 0) return 0;
+  const awardedPoints = Number(original.rows[0].points);
+  if (!Number.isFinite(awardedPoints) || awardedPoints <= 0) return 0;
+
+  await db.query(
+    `INSERT INTO loyalty_points (user_id, points, type, description, related_order_id)
+     VALUES ($1, $2, 'redemption', $3, $4)`,
+    [referrerUserId, -awardedPoints, reversalDesc, orderId]
+  );
+
+  await syncUserLoyaltyPointsSnapshot(referrerUserId, db);
+  return awardedPoints;
+}
+
+/**
  * Pure decision: a user may buy the Clase Muestra only if they have NO active
  * package membership (class_limit > 1). activePackageCount is produced by the
  * DB query in canBuySamplePlan.
