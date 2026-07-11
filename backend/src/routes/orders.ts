@@ -39,6 +39,8 @@ const UploadProofSchema = z.object({
 const DATA_URL_MIME_TYPE = /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i;
 const BASE64_DATA_URL = /^data:([a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+);base64,([A-Za-z0-9+/]+={0,2})$/i;
 const BASE64_CONTENT = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+const DEFAULT_PAYMENT_PROOF_FILE_NAME = 'comprobante';
+const MAX_PAYMENT_PROOF_FILE_NAME_LENGTH = 255;
 
 export class PaymentProofDataUrlError extends Error {
     constructor(message: string) {
@@ -50,6 +52,21 @@ export class PaymentProofDataUrlError extends Error {
 export interface DecodedPaymentProofData {
     buffer: Buffer;
     mimeType: string;
+}
+
+export function normalizePaymentProofFileName(fileName: unknown): string {
+    if (fileName === null || fileName === undefined) {
+        return DEFAULT_PAYMENT_PROOF_FILE_NAME;
+    }
+
+    if (typeof fileName !== 'string') {
+        throw new PaymentProofDataUrlError('El nombre del comprobante no es válido');
+    }
+
+    const normalizedFileName = fileName.trim();
+    return normalizedFileName
+        ? normalizedFileName.slice(0, MAX_PAYMENT_PROOF_FILE_NAME_LENGTH)
+        : DEFAULT_PAYMENT_PROOF_FILE_NAME;
 }
 
 function isAllowedProofMimeType(mimeType: string): boolean {
@@ -92,6 +109,9 @@ export function decodePaymentProofDataUrl(
     const buffer = Buffer.from(match[2], 'base64');
     if (!buffer.length) {
         throw new PaymentProofDataUrlError('El comprobante no puede estar vacío');
+    }
+    if (buffer.toString('base64') !== match[2]) {
+        throw new PaymentProofDataUrlError('El comprobante debe usar base64 canónico');
     }
 
     return { buffer, mimeType };
@@ -631,7 +651,6 @@ router.post('/:id/upload-proof', authenticate, async (req: Request, res: Respons
         const transfer_date = req.body.transfer_date || null;
         const notes = req.body.notes || '';
         const file_data = req.body.file_data || null;
-        const file_name = req.body.file_name || 'comprobante';
 
         // Verify order ownership
         const order = await queryOne(
@@ -648,10 +667,12 @@ router.post('/:id/upload-proof', authenticate, async (req: Request, res: Respons
         }
 
         let decodedProof: DecodedPaymentProofData;
+        let fileName: string;
         try {
             // Decode before opening a DB transaction so malformed payloads never
             // create partial order/proof state.
             decodedProof = decodePaymentProofDataUrl(file_data, req.body.file_type);
+            fileName = normalizePaymentProofFileName(req.body.file_name);
         } catch (error) {
             if (error instanceof PaymentProofDataUrlError) {
                 return res.status(400).json({ error: error.message });
@@ -661,7 +682,7 @@ router.post('/:id/upload-proof', authenticate, async (req: Request, res: Respons
 
         let fileUrl: string;
         try {
-            fileUrl = await subirComprobante(decodedProof.buffer, decodedProof.mimeType, file_name);
+            fileUrl = await subirComprobante(decodedProof.buffer, decodedProof.mimeType, fileName);
         } catch (error) {
             if (error instanceof ImageStorageError) {
                 if (error.code === 'INVALID_MIME_TYPE') {
@@ -688,7 +709,7 @@ router.post('/:id/upload-proof', authenticate, async (req: Request, res: Respons
             `, [
                 id,
                 fileUrl,
-                file_name,
+                fileName,
                 decodedProof.mimeType,
                 transfer_reference,
                 notes

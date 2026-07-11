@@ -7,7 +7,11 @@ import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
 import { pool } from '../src/config/database.js';
 import { createImageStorage, ImageStorageError } from '../src/lib/imageStorage.js';
-import { decodePaymentProofDataUrl, PaymentProofDataUrlError } from '../src/routes/orders.js';
+import {
+    decodePaymentProofDataUrl,
+    normalizePaymentProofFileName,
+    PaymentProofDataUrlError,
+} from '../src/routes/orders.js';
 
 const image = Buffer.from('small-image');
 const PRODUCT_IMAGE_PORT = 3204;
@@ -223,11 +227,22 @@ async function main(): Promise<void> {
         PaymentProofDataUrlError,
     );
     assert.throws(
+        () => decodePaymentProofDataUrl('data:image/png;base64,Zm9=', 'image/png'),
+        PaymentProofDataUrlError,
+    );
+    assert.throws(
         () => decodePaymentProofDataUrl(`data:image/png;base64,${receiptPng.toString('base64')}`, 'image/jpeg'),
         PaymentProofDataUrlError,
     );
     assert.throws(
         () => decodePaymentProofDataUrl('data:text/plain;base64,dGV4dA==', 'text/plain'),
+        PaymentProofDataUrlError,
+    );
+    assert.equal(normalizePaymentProofFileName(undefined), 'comprobante');
+    assert.equal(normalizePaymentProofFileName('  comprobante.png  '), 'comprobante.png');
+    assert.equal(normalizePaymentProofFileName('x'.repeat(300)).length, 255);
+    assert.throws(
+        () => normalizePaymentProofFileName({ name: 'comprobante.png' }),
         PaymentProofDataUrlError,
     );
 
