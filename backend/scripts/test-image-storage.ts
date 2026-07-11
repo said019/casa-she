@@ -50,6 +50,15 @@ async function main(): Promise<void> {
     const fallbackImage = await noDriveStorage.subirImagen(image, 'image/jpeg', 'perfil-ana');
     assert.equal(fallbackImage, `data:image/jpeg;base64,${image.toString('base64')}`);
 
+    const oneAndHalfMiBImage = Buffer.alloc(Math.floor(1.5 * 1024 * 1024), 0xab);
+    const routeFallbackImage = await noDriveStorage.subirImagen(
+        oneAndHalfMiBImage,
+        'image/jpeg',
+        'perfil-ana',
+        { maxBase64Bytes: 2 * 1024 * 1024 },
+    );
+    assert.equal(routeFallbackImage, `data:image/jpeg;base64,${oneAndHalfMiBImage.toString('base64')}`);
+
     const warnings: unknown[][] = [];
     const driveFailureStorage = createImageStorage({
         configured: () => true,
