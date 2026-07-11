@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
 import { pool } from '../src/config/database.js';
 import { createImageStorage, ImageStorageError } from '../src/lib/imageStorage.js';
+import { decodePaymentProofDataUrl, PaymentProofDataUrlError } from '../src/routes/orders.js';
 
 const image = Buffer.from('small-image');
 const PRODUCT_IMAGE_PORT = 3204;
@@ -201,6 +202,35 @@ async function productImageContract(): Promise<void> {
 }
 
 async function main(): Promise<void> {
+    const receiptPng = Buffer.from('receipt-png');
+    const decodedPng = decodePaymentProofDataUrl(
+        `data:image/png;base64,${receiptPng.toString('base64')}`,
+        'image/png',
+    );
+    assert.equal(decodedPng.mimeType, 'image/png');
+    assert.deepEqual(decodedPng.buffer, receiptPng);
+
+    const receiptPdf = Buffer.from('%PDF-1.7');
+    const decodedPdf = decodePaymentProofDataUrl(
+        `data:application/pdf;base64,${receiptPdf.toString('base64')}`,
+        'application/pdf',
+    );
+    assert.equal(decodedPdf.mimeType, 'application/pdf');
+    assert.deepEqual(decodedPdf.buffer, receiptPdf);
+
+    assert.throws(
+        () => decodePaymentProofDataUrl('data:image/png;base64,no-es-base64?', 'image/png'),
+        PaymentProofDataUrlError,
+    );
+    assert.throws(
+        () => decodePaymentProofDataUrl(`data:image/png;base64,${receiptPng.toString('base64')}`, 'image/jpeg'),
+        PaymentProofDataUrlError,
+    );
+    assert.throws(
+        () => decodePaymentProofDataUrl('data:text/plain;base64,dGV4dA==', 'text/plain'),
+        PaymentProofDataUrlError,
+    );
+
     let uploadedName = '';
     let uploadedMime = '';
     let uploadedBuffer: Buffer | undefined;

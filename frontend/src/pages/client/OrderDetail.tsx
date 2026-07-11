@@ -602,7 +602,9 @@ export default function OrderDetail() {
               <CardContent className="space-y-3">
                 {order.payment_proofs.map((proof, index) => {
                   const isBase64Image = proof.file_url?.startsWith('data:image/');
-                  const isImage = isBase64Image || proof.file_type?.startsWith('image/');
+                  const isPdf = proof.file_type?.toLowerCase() === 'application/pdf'
+                    || proof.file_url?.startsWith('data:application/pdf');
+                  const isImage = !isPdf && (isBase64Image || proof.file_type?.startsWith('image/'));
                   
                   return (
                     <div
@@ -637,6 +639,15 @@ export default function OrderDetail() {
                             Click para ampliar
                           </p>
                         </div>
+                      )}
+
+                      {isPdf && proof.file_url && (
+                        <Button asChild variant="outline" className="mt-3">
+                          <a href={proof.file_url} target="_blank" rel="noreferrer">
+                            <FileText className="h-4 w-4 mr-2" />
+                            Ver comprobante
+                          </a>
+                        </Button>
                       )}
                     </div>
                   );

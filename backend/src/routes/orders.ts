@@ -11,6 +11,7 @@ import { toDbClient } from '../lib/membershipSelection.js';
 import { notifyMembershipRenewed, notifyPointsEarnedExternal } from '../lib/notifications.js';
 import { mpConfigured, createPreference, syncPayment } from '../lib/mercadopago.js';
 import { finalizePaidOrder } from '../lib/orderFulfillment.js';
+import { ImageStorageError, subirComprobante } from '../lib/imageStorage.js';
 
 const router = Router();
 
@@ -34,6 +35,67 @@ const UploadProofSchema = z.object({
     transfer_date: z.string().optional(),
     notes: z.string().max(500).optional(),
 });
+
+const DATA_URL_MIME_TYPE = /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i;
+const BASE64_DATA_URL = /^data:([a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+);base64,([A-Za-z0-9+/]+={0,2})$/i;
+const BASE64_CONTENT = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+
+export class PaymentProofDataUrlError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'PaymentProofDataUrlError';
+    }
+}
+
+export interface DecodedPaymentProofData {
+    buffer: Buffer;
+    mimeType: string;
+}
+
+function isAllowedProofMimeType(mimeType: string): boolean {
+    return /^image\/[a-z0-9!#$&^_.+-]+$/i.test(mimeType) || mimeType === 'application/pdf';
+}
+
+/**
+ * Validates a browser data URL before it is decoded or sent to storage.
+ * The declared file_type remains optional for backwards compatibility, but if
+ * present it must describe exactly the same MIME type as the data URL.
+ */
+export function decodePaymentProofDataUrl(
+    fileData: unknown,
+    declaredFileType: unknown,
+): DecodedPaymentProofData {
+    if (typeof fileData !== 'string') {
+        throw new PaymentProofDataUrlError('Debes adjuntar un comprobante válido');
+    }
+
+    const match = BASE64_DATA_URL.exec(fileData);
+    if (!match || !BASE64_CONTENT.test(match[2])) {
+        throw new PaymentProofDataUrlError('El comprobante debe ser un data URL base64 válido');
+    }
+
+    const mimeType = match[1].toLowerCase();
+    if (!DATA_URL_MIME_TYPE.test(mimeType) || !isAllowedProofMimeType(mimeType)) {
+        throw new PaymentProofDataUrlError('El comprobante debe ser una imagen o PDF');
+    }
+
+    if (declaredFileType !== null && declaredFileType !== undefined) {
+        if (typeof declaredFileType !== 'string' || !declaredFileType.trim()) {
+            throw new PaymentProofDataUrlError('El tipo de archivo del comprobante no es válido');
+        }
+
+        if (declaredFileType.trim().toLowerCase() !== mimeType) {
+            throw new PaymentProofDataUrlError('El tipo de archivo no coincide con el comprobante');
+        }
+    }
+
+    const buffer = Buffer.from(match[2], 'base64');
+    if (!buffer.length) {
+        throw new PaymentProofDataUrlError('El comprobante no puede estar vacío');
+    }
+
+    return { buffer, mimeType };
+}
 
 const ApproveOrderSchema = z.object({
     admin_notes: z.string().max(500).optional(),
@@ -568,9 +630,8 @@ router.post('/:id/upload-proof', authenticate, async (req: Request, res: Respons
         const transfer_reference = req.body.transfer_reference || '';
         const transfer_date = req.body.transfer_date || null;
         const notes = req.body.notes || '';
-        const file_data = req.body.file_data || null; // Base64 encoded file
+        const file_data = req.body.file_data || null;
         const file_name = req.body.file_name || 'comprobante';
-        const file_type = req.body.file_type || 'image/jpeg';
 
         // Verify order ownership
         const order = await queryOne(
@@ -586,12 +647,31 @@ router.post('/:id/upload-proof', authenticate, async (req: Request, res: Respons
             return res.status(400).json({ error: 'Esta orden ya no acepta comprobantes' });
         }
 
-        // Store the file as base64 data URL or generate a proper file URL
-        // For now, store the base64 directly (in production you'd upload to S3/cloud storage)
-        let fileUrl = 'pending://upload';
-        if (file_data) {
-            // Store base64 data directly in DB (not ideal for production, but works)
-            fileUrl = file_data;
+        let decodedProof: DecodedPaymentProofData;
+        try {
+            // Decode before opening a DB transaction so malformed payloads never
+            // create partial order/proof state.
+            decodedProof = decodePaymentProofDataUrl(file_data, req.body.file_type);
+        } catch (error) {
+            if (error instanceof PaymentProofDataUrlError) {
+                return res.status(400).json({ error: error.message });
+            }
+            throw error;
+        }
+
+        let fileUrl: string;
+        try {
+            fileUrl = await subirComprobante(decodedProof.buffer, decodedProof.mimeType, file_name);
+        } catch (error) {
+            if (error instanceof ImageStorageError) {
+                if (error.code === 'INVALID_MIME_TYPE') {
+                    return res.status(400).json({ error: 'El comprobante debe ser una imagen o PDF' });
+                }
+                if (error.code === 'BASE64_TOO_LARGE') {
+                    return res.status(413).json({ error: 'Comprobante demasiado grande para almacenamiento local (máx 1MB sin Drive)' });
+                }
+            }
+            throw error;
         }
 
         const client = await pool.connect();
@@ -609,7 +689,7 @@ router.post('/:id/upload-proof', authenticate, async (req: Request, res: Respons
                 id,
                 fileUrl,
                 file_name,
-                file_type,
+                decodedProof.mimeType,
                 transfer_reference,
                 notes
             ]);
