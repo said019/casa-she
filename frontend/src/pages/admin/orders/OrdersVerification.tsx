@@ -133,6 +133,26 @@ function OrdersVerificationInner() {
     },
   });
   
+  // Cancel mutation — para quitar órdenes atoradas en "Esperando pago"
+  // (ej. tarjeta que el cliente abandonó en el checkout de Mercado Pago).
+  const cancelMutation = useMutation({
+    mutationFn: async (orderId: string) => (await api.post(`/orders/${orderId}/cancel`)).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders-pending'] });
+      toast({
+        title: 'Orden cancelada',
+        description: 'La orden se quitó de esperando pago.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'No se pudo cancelar la orden',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handleAction = () => {
     if (!selectedOrder || !actionType) return;
     
@@ -313,10 +333,27 @@ function OrdersVerificationInner() {
                         <TableCell className="text-right">
                           {order.payment_method === 'card' ? (
                             // Las órdenes con tarjeta se liquidan automáticamente por el
-                            // webhook de Stripe (checkout hospedado) — nunca se aprueban a mano.
-                            <Badge variant="outline" className="text-muted-foreground">
-                              Esperando pago en Stripe
-                            </Badge>
+                            // webhook de Mercado Pago (checkout hospedado) — nunca se aprueban a
+                            // mano. Si el cliente abandona el pago, el admin puede cancelarla.
+                            <div className="flex items-center gap-2 justify-end">
+                              <Badge variant="outline" className="text-muted-foreground">
+                                Esperando pago en Mercado Pago
+                              </Badge>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                disabled={cancelMutation.isPending}
+                                onClick={() => {
+                                  if (confirm(`¿Cancelar la orden ${order.order_number}? Se quitará de "Esperando pago".`)) {
+                                    cancelMutation.mutate(order.id);
+                                  }
+                                }}
+                              >
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Cancelar
+                              </Button>
+                            </div>
                           ) : (
                             <div className="flex gap-2 justify-end">
                               <Button

@@ -62,7 +62,10 @@ export default function ProfileMembership() {
                 <>
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-lg font-semibold">{membership.plan_name || 'Plan activo'}</p>
+                      <p className="flex items-center gap-2 truncate text-lg font-semibold">
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: membership.plan_color || '#AE4836' }} />
+                        {membership.plan_name || 'Plan activo'}
+                      </p>
                       <p className="truncate text-sm text-muted-foreground">
                         {membership.plan_price
                           ? `${membership.plan_price} ${membership.plan_currency || 'MXN'}`

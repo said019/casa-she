@@ -57,7 +57,7 @@ const flows: Flow[] = [
         steps: [
             { actor: 'admin', action: 'Abre Panel Admin → Usuarios → Nuevo Usuario', detail: 'Llena nombre, telefono y email (o solo telefono si no tiene email).' },
             { actor: 'admin', action: 'Asigna membresia o paquete de clases', detail: 'Selecciona el plan adecuado para el usuario.' },
-            { actor: 'admin', action: 'Registra forma de pago', detail: 'Marca como "Pago en efectivo", "Transferencia" o "Tarjeta (Stripe)". No necesita checkout online.', isDecision: true, branches: [{ label: 'Efectivo / Transfer', next: 'Marca pago manual' }, { label: 'Tarjeta', next: 'Checkout Stripe' }] },
+            { actor: 'admin', action: 'Registra forma de pago', detail: 'Marca como "Pago en efectivo", "Transferencia" o "Tarjeta (Mercado Pago)". No necesita checkout online.', isDecision: true, branches: [{ label: 'Efectivo / Transfer', next: 'Marca pago manual' }, { label: 'Tarjeta', next: 'Checkout Mercado Pago' }] },
             { actor: 'system', action: 'Crea la cuenta y activa membresia automaticamente', detail: 'El usuario no necesita crear cuenta, poner contrasena ni descargar nada.' },
             { actor: 'admin', action: '(Opcional) Genera Wallet Pass para el celular', detail: 'Si el usuario tiene iPhone o Android, el admin puede generar el pase y agregarlo al celular en el momento.' },
         ],
@@ -103,7 +103,7 @@ const flows: Flow[] = [
         steps: [
             { actor: 'admin', action: 'Abre Panel → Eventos → Selecciona evento', detail: 'Navega al evento especial que deseas.' },
             { actor: 'admin', action: 'Busca al usuario por nombre → Inscribir', detail: 'Selecciona y listo, queda inscrito.' },
-            { actor: 'admin', action: 'Registra pago manual (efectivo/transferencia)', detail: 'No necesita pasar por checkout online ni Stripe.' },
+            { actor: 'admin', action: 'Registra pago manual (efectivo/transferencia)', detail: 'No necesita pasar por checkout online ni Mercado Pago.' },
             { actor: 'system', action: 'Genera confirmacion automatica', detail: 'El sistema registra la inscripcion y si tiene Wallet Pass, genera uno del evento.' },
             { actor: 'system', action: 'Recordatorio WhatsApp antes del evento', detail: '"Recuerda que manana es el workshop de Barre a las 5pm."' },
         ],

@@ -757,8 +757,8 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                     <SelectTrigger className="w-[150px]"><SelectValue placeholder="Programa" /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">Todos los programas</SelectItem>
-                                        <SelectItem value="reformer">Reformer</SelectItem>
-                                        <SelectItem value="multi">Multiclases</SelectItem>
+                                        <SelectItem value="reformer">Salsa</SelectItem>
+                                        <SelectItem value="multi">Clases</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 {classTypes && classTypes.length > 0 && (

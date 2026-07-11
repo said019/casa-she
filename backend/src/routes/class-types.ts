@@ -14,6 +14,9 @@ const ClassTypeSchema = z.object({
     maxCapacity: z.number().int().positive('La capacidad debe ser positiva'),
     icon: z.string().optional(),
     color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Color inválido').optional(),
+    // Categoría de crédito (enum class_category): 'reformer' = Salsa, 'multi' = Clases.
+    // Determina de qué bucket de la membresía descuenta la reserva.
+    category: z.enum(['reformer', 'multi']).default('multi'),
     isActive: z.boolean().default(true),
 });
 
@@ -29,8 +32,8 @@ router.get('/', async (req: Request, res: Response) => {
 
         let queryStr = `
       SELECT 
-        id, name, description, level, duration_minutes, 
-        max_capacity, icon, color, is_active
+        id, name, description, level, duration_minutes,
+        max_capacity, icon, color, category, is_active
       FROM class_types
     `;
 
@@ -65,9 +68,9 @@ router.post('/', authenticate, requireRole('admin'), async (req: Request, res: R
 
         const newType = await queryOne(
             `INSERT INTO class_types (
-        name, description, level, duration_minutes, 
-        max_capacity, icon, color, is_active
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        name, description, level, duration_minutes,
+        max_capacity, icon, color, category, is_active
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *`,
             [
                 data.name,
@@ -77,6 +80,7 @@ router.post('/', authenticate, requireRole('admin'), async (req: Request, res: R
                 data.maxCapacity,
                 data.icon || 'dumbbell',
                 data.color || '#333333',
+                data.category,
                 data.isActive,
             ]
         );
@@ -141,6 +145,10 @@ router.put('/:id', authenticate, requireRole('admin'), async (req: Request, res:
         if (data.color !== undefined) {
             updates.push(`color = $${paramCount++}`);
             values.push(data.color);
+        }
+        if (data.category !== undefined) {
+            updates.push(`category = $${paramCount++}`);
+            values.push(data.category);
         }
         if (data.isActive !== undefined) {
             updates.push(`is_active = $${paramCount++}`);

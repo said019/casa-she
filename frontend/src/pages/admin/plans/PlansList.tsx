@@ -206,8 +206,9 @@ export default function PlansList() {
             features: featuresArray,
             isActive: data.isActive,
             isInternal: data.isInternal,
-            // El color solo aplica a planes internos (pastilla en reservas); si no, null.
-            color: data.isInternal ? (data.color || null) : null,
+            // Color del paquete: se usa en la tarjeta de membresía del cliente y,
+            // para planes internos, también como pastilla del alumno en el roster.
+            color: data.color || null,
             sortOrder: data.sortOrder ?? 0,
         };
 
@@ -435,17 +436,17 @@ export default function PlansList() {
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="reformerCredits">Créditos Reformer</Label>
+                                        <Label htmlFor="reformerCredits">Créditos Salsa</Label>
                                         <Input id="reformerCredits" type="number" min="0" {...register('reformerCredits')} placeholder="Ilimitado" />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="multiCredits">Créditos Multi</Label>
+                                        <Label htmlFor="multiCredits">Créditos Clases</Label>
                                         <Input id="multiCredits" type="number" min="0" {...register('multiCredits')} placeholder="Ilimitado" />
                                     </div>
                                 </div>
                                 <p className="-mt-2 text-xs text-muted-foreground">
-                                    El motor de reservas usa <strong>estos dos buckets</strong>. <strong>Vacío = ilimitado</strong>, <strong>0 = no incluye</strong> esa categoría.
-                                    Ej: Reformer → Reformer 8, Multi 0 · Mixto → Reformer 4, Multi 4 · Full → ambos vacíos.
+                                    El motor de reservas usa <strong>estas dos bolsas</strong>. <strong>Vacío = ilimitado</strong>, <strong>0 = no incluye</strong> esa categoría.
+                                    Ej: solo Clases → Salsa 0, Clases 8 · solo Salsa → Salsa 4, Clases 0 · Todo → ambas vacías.
                                 </p>
 
                                 <div className="space-y-2">
@@ -490,11 +491,11 @@ export default function PlansList() {
                                     />
                                 </div>
 
-                                {watch('isInternal') && (
+                                {(
                                     <div className="space-y-2 border p-3 rounded-md">
-                                        <Label htmlFor="color">Color en reservas</Label>
+                                        <Label htmlFor="color">Color del paquete</Label>
                                         <p className="text-xs text-muted-foreground">
-                                            Pastilla con la que se identifica al alumno de este plan en el roster de cada clase.
+                                            Se usa en la tarjeta de "Mi membresía" del cliente{watch('isInternal') ? ' y como pastilla del alumno en el roster de cada clase' : ''}.
                                         </p>
                                         <Controller
                                             control={control}

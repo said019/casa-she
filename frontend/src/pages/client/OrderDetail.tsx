@@ -348,7 +348,7 @@ export default function OrderDetail() {
             </CardContent>
           </Card>
           
-          {/* Stripe card payment */}
+          {/* Mercado Pago card payment */}
           {canPayWithCard && (
             <Card className="rounded-[1.75rem] border-balance-sand/65 bg-[hsl(var(--card))]/88">
               <CardHeader>
@@ -359,7 +359,7 @@ export default function OrderDetail() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Serás redirigido a Stripe para completar tu pago de forma segura.
+                  Serás redirigido a Mercado Pago para completar tu pago de forma segura.
                 </p>
                 <Button
                   className="w-full rounded-full bg-balance-olive text-balance-cream hover:bg-balance-olive/90"

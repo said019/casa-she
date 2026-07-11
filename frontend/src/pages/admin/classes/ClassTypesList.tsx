@@ -54,6 +54,8 @@ const classTypeSchema = z.object({
     durationMinutes: z.coerce.number().int().positive('Debe ser positivo'),
     maxCapacity: z.coerce.number().int().positive('Debe ser positivo'),
     color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Color hexadecimal requerido (ej. #FF0000)'), // Simple hex regex
+    // Bolsa de crédito de la que descuenta la reserva: 'multi' = Clases, 'reformer' = Salsa.
+    category: z.enum(['reformer', 'multi']).default('multi'),
     isActive: z.boolean().default(true),
 });
 
@@ -72,6 +74,7 @@ export default function ClassTypesList() {
             durationMinutes: 60,
             maxCapacity: 6,
             color: '#7E8579',
+            category: 'multi',
             isActive: true,
         },
     });
@@ -145,6 +148,7 @@ export default function ClassTypesList() {
         setValue('durationMinutes', item.duration_minutes);
         setValue('maxCapacity', item.max_capacity);
         setValue('color', item.color || '#7E8579');
+        setValue('category', ((item as any).category === 'reformer' ? 'reformer' : 'multi'));
         setValue('isActive', item.is_active);
         setIsDialogOpen(true);
     };
@@ -203,6 +207,9 @@ export default function ClassTypesList() {
                                         <TableRow key={item.id}>
                                             <TableCell className="font-medium">
                                                 {item.name}
+                                                <div className="text-xs text-muted-foreground">
+                                                    {(item as any).category === 'reformer' ? 'Salsa' : 'Clases'}
+                                                </div>
                                             </TableCell>
                                             <TableCell className="capitalize">{item.level}</TableCell>
                                             <TableCell>{item.duration_minutes} min</TableCell>
@@ -271,6 +278,28 @@ export default function ClassTypesList() {
                                 <div className="space-y-2">
                                     <Label htmlFor="description">Descripción</Label>
                                     <Textarea id="description" {...register('description')} rows={2} />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Categoría de créditos</Label>
+                                    <Controller
+                                        control={control}
+                                        name="category"
+                                        render={({ field }) => (
+                                            <Select value={field.value} onValueChange={field.onChange}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Seleccionar categoría" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="multi">Clases (Pilates Mat, Barre, Sculpt, Yoga, Flex)</SelectItem>
+                                                    <SelectItem value="reformer">Salsa</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        De qué bolsa de la membresía descuenta esta clase: <strong>Clases</strong> para las disciplinas regulares, <strong>Salsa</strong> para las de salsa.
+                                    </p>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">

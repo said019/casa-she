@@ -70,7 +70,7 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
         m.payment_method, m.payment_reference,
         p.name as plan_name, p.price as plan_price, p.currency as plan_currency,
         p.duration_days as plan_duration_days, p.class_limit,
-        p.reformer_credits, p.multi_credits
+        p.reformer_credits, p.multi_credits, p.color as plan_color
       FROM memberships m
       JOIN plans p ON m.plan_id = p.id
       WHERE m.user_id = $1
@@ -146,7 +146,7 @@ router.get('/my', authenticate, async (req: Request, res: Response) => {
         m.id, m.status, m.start_date, m.end_date, m.classes_remaining,
         m.reformer_remaining, m.multi_remaining,
         p.name as plan_name, p.price as plan_price, p.currency as plan_currency,
-        p.class_limit, p.reformer_credits, p.multi_credits
+        p.class_limit, p.reformer_credits, p.multi_credits, p.color as plan_color
       FROM memberships m
       JOIN plans p ON m.plan_id = p.id
       WHERE m.user_id = $1 AND m.status IN ('active', 'pending_payment')

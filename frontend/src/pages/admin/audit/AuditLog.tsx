@@ -71,8 +71,8 @@ const STATUS_ES: Record<string, string> = {
     confirmed: 'Confirmada', checked_in: 'Asistió', no_show: 'No asistió', waitlist: 'Lista de espera',
 };
 const BUCKET_ES: Record<string, string> = {
-    reformer_remaining: 'Reformer', multi_remaining: 'Multi', classes_remaining: 'Genérico',
-    reformer: 'Reformer', multi: 'Multi',
+    reformer_remaining: 'Salsa', multi_remaining: 'Clases', classes_remaining: 'Genérico',
+    reformer: 'Salsa', multi: 'Clases',
 };
 
 function isUuid(v: unknown): boolean {

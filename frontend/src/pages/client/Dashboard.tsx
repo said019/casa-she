@@ -303,7 +303,7 @@ export default function ClientDashboard() {
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#D6D5C2]/80 bg-[#F6F0E4]/60 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#6B554D]">
-                        <span className="h-2 w-2 rounded-full bg-[#AE4836]" />
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: membership?.plan_color || '#AE4836' }} />
                         Membresía
                       </div>
                       {membershipLoading ? (

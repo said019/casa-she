@@ -10,6 +10,8 @@ export interface ClientMembership {
   plan_name: string | null;
   plan_price: number | null;
   plan_currency: string | null;
+  // Color configurable del paquete; la tarjeta de membresía lo usa como acento.
+  plan_color?: string | null;
   plan_duration_days: number | null;
   class_limit: number | null;
   // Cupo del PLAN por categoría: >0 = N créditos, null = ilimitado, 0 = la categoría no aplica.
