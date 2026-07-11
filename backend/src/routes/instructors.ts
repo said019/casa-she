@@ -15,7 +15,7 @@ import {
     writeInAppNotification,
     writeInAppNotificationForInstructor,
 } from '../lib/in-app-notifications.js';
-import { uploadBufferToGoogleDrive, driveImageUrl, isGoogleDriveConfigured } from '../lib/googleDrive.js';
+import { ImageStorageError, subirImagen } from '../lib/imageStorage.js';
 import { awardCheckinPoints } from '../lib/loyalty.js';
 import { sendWhatsAppMessage } from '../lib/whatsapp.js';
 import { z } from 'zod';
@@ -488,21 +488,23 @@ router.post('/me/photo', authenticate, photoUpload.single('photo'), async (req: 
         if (!own) return res.status(403).json({ error: 'No tienes un perfil de instructor' });
         const file = req.file;
         if (!file) return res.status(400).json({ error: 'No se proporcionó imagen' });
+        if (!file.mimetype.startsWith('image/')) {
+            return res.status(400).json({ error: 'El archivo debe ser una imagen' });
+        }
 
         let photoUrl: string;
-        if (isGoogleDriveConfigured) {
-            try {
-                const uploaded = await uploadBufferToGoogleDrive(file.buffer, `instructor-${own.id}.jpg`, file.mimetype);
-                photoUrl = driveImageUrl(uploaded.fileId, 1600);
-            } catch (err) {
-                console.warn('[me/photo] Drive upload failed, fallback to base64:', err);
-                photoUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
-            }
-        } else {
-            if (file.buffer.length > 2 * 1024 * 1024) {
+        try {
+            photoUrl = await subirImagen(
+                file.buffer,
+                file.mimetype,
+                `instructor-${own.id}`,
+                { maxBase64Bytes: 2 * 1024 * 1024 },
+            );
+        } catch (error) {
+            if (error instanceof ImageStorageError && error.code === 'BASE64_TOO_LARGE') {
                 return res.status(400).json({ error: 'Imagen demasiado grande (máx 2MB sin Drive)' });
             }
-            photoUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+            throw error;
         }
         await query(`UPDATE instructors SET photo_url = $1, updated_at = NOW() WHERE id = $2`, [photoUrl, own.id]);
         res.json({ photo_url: photoUrl });
@@ -772,26 +774,23 @@ router.post('/:id/photo', authenticate, requirePermission('editar_coaches'), pho
         if (!file) {
             return res.status(400).json({ error: 'No se proporcionó imagen' });
         }
+        if (!file.mimetype.startsWith('image/')) {
+            return res.status(400).json({ error: 'El archivo debe ser una imagen' });
+        }
 
         let photoUrl: string;
-
-        if (isGoogleDriveConfigured) {
-            try {
-                const uploaded = await uploadBufferToGoogleDrive(
-                    file.buffer,
-                    `instructor-${id}.jpg`,
-                    file.mimetype,
-                );
-                photoUrl = driveImageUrl(uploaded.fileId, 1600);
-            } catch (err) {
-                console.warn('[instructor photo] Drive upload failed, falling back to base64:', err);
-                photoUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
-            }
-        } else {
-            if (file.buffer.length > 2 * 1024 * 1024) {
+        try {
+            photoUrl = await subirImagen(
+                file.buffer,
+                file.mimetype,
+                `instructor-${id}`,
+                { maxBase64Bytes: 2 * 1024 * 1024 },
+            );
+        } catch (error) {
+            if (error instanceof ImageStorageError && error.code === 'BASE64_TOO_LARGE') {
                 return res.status(413).json({ error: 'Imagen demasiado grande para almacenamiento local (máx 2MB sin Drive)' });
             }
-            photoUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+            throw error;
         }
 
         const result = await queryOne(

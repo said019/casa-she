@@ -1,4 +1,5 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 import { query, queryOne } from '../config/database.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/requirePermission.js';
@@ -6,8 +7,104 @@ import { requireElevated } from '../middleware/elevation.js';
 import { hasPermission } from '../lib/permissions.js';
 import { logAction } from '../lib/audit.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
+import { ImageStorageError, subirImagen } from '../lib/imageStorage.js';
 
 const router = Router();
+const PRODUCT_IMAGE_MAX_TRANSPORT_BYTES = 10 * 1024 * 1024;
+// Cuando el request no trae Content-Length, este margen cubre los boundaries y
+// headers multipart. Solo se admite una parte de archivo y cero campos de texto.
+const PRODUCT_IMAGE_MAX_FILE_BYTES = PRODUCT_IMAGE_MAX_TRANSPORT_BYTES - 16 * 1024;
+
+class ProductImageTransportLimitError extends Error {
+    constructor() {
+        super('La carga multipart no debe superar 10 MB en total');
+        this.name = 'ProductImageTransportLimitError';
+    }
+}
+
+const productImageUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: PRODUCT_IMAGE_MAX_FILE_BYTES,
+        fieldSize: 1024,
+        files: 1,
+        fields: 0,
+        // Busboy alcanza el límite antes de procesar el cierre; 2 admite una
+        // sola parte `image` y sigue rechazando cualquier parte adicional.
+        parts: 2,
+        fieldNameSize: 64,
+        headerPairs: 16,
+    },
+});
+
+function productImagePayloadTooLarge(res: Response, error = 'La carga multipart no debe superar 10 MB en total'): void {
+    res.status(413).json({ error });
+}
+
+// Multer limita cada archivo, no el request completo. Primero se descarta por
+// Content-Length; para transferencias chunked contamos el body real y emitimos
+// un solo error que Multer ya sabe abortar (unpipe, drain y limpiar memoria).
+function enforceProductImageTransportLimit(req: Request, res: Response, next: NextFunction): void {
+    const rawContentLength = req.headers['content-length'];
+    const contentLength = typeof rawContentLength === 'string' ? Number(rawContentLength) : NaN;
+    if (Number.isSafeInteger(contentLength) && contentLength > PRODUCT_IMAGE_MAX_TRANSPORT_BYTES) {
+        productImagePayloadTooLarge(res);
+        return;
+    }
+
+    let receivedBytes = 0;
+    let exceeded = false;
+    const stopCounting = () => {
+        req.off('data', countReceivedBytes);
+        res.off('finish', stopCounting);
+        res.off('close', stopCounting);
+    };
+    const countReceivedBytes = (chunk: Buffer) => {
+        if (exceeded) return;
+        receivedBytes += chunk.length;
+        if (receivedBytes <= PRODUCT_IMAGE_MAX_TRANSPORT_BYTES) return;
+
+        exceeded = true;
+        stopCounting();
+        // `uploadProductImage` owns the response. Multer's req error handler
+        // stops its parser and the route handler is never reached.
+        req.emit('error', new ProductImageTransportLimitError());
+    };
+    req.on('data', countReceivedBytes);
+    res.once('finish', stopCounting);
+    res.once('close', stopCounting);
+    next();
+}
+
+function uploadProductImage(req: Request, res: Response, next: NextFunction): void {
+    productImageUpload.single('image')(req, res, (error: unknown) => {
+        if (res.headersSent) return;
+        if (error instanceof ProductImageTransportLimitError) {
+            productImagePayloadTooLarge(res);
+            return;
+        }
+        if (error instanceof multer.MulterError) {
+            const payloadLimitCodes = new Set([
+                'LIMIT_PART_COUNT',
+                'LIMIT_FILE_SIZE',
+                'LIMIT_FILE_COUNT',
+                'LIMIT_FIELD_VALUE',
+                'LIMIT_FIELD_COUNT',
+            ]);
+            if (payloadLimitCodes.has(error.code)) {
+                productImagePayloadTooLarge(res, 'La imagen o sus partes superan el límite permitido de 10 MB');
+                return;
+            }
+            res.status(400).json({ error: 'No se pudo procesar la imagen' });
+            return;
+        }
+        if (error) {
+            res.status(400).json({ error: 'No se pudo procesar la imagen' });
+            return;
+        }
+        next();
+    });
+}
 
 // GET /api/products - List products
 router.get('/', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
@@ -233,6 +330,60 @@ router.put('/:id', authenticate, requirePermission('inventario'), async (req: Re
     } catch (error) {
         console.error('Update product error:', error);
         res.status(500).json({ error: 'Error al actualizar producto' });
+    }
+});
+
+// POST /api/products/:id/image - Upload product image (multipart field: image)
+router.post('/:id/image', authenticate, requirePermission('inventario'), enforceProductImageTransportLimit, uploadProductImage, async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const file = req.file;
+
+        if (!file) {
+            return res.status(400).json({ error: 'Debes adjuntar una imagen' });
+        }
+        if (!file.mimetype.startsWith('image/')) {
+            return res.status(400).json({ error: 'El archivo debe ser una imagen' });
+        }
+
+        const existing = await queryOne<{ id: string; facility_id: string | null }>(
+            'SELECT id, facility_id FROM products WHERE id = $1',
+            [id],
+        );
+        if (!existing) return res.status(404).json({ error: 'Producto no encontrado' });
+
+        // Recepción solo puede subir fotos a productos de su sucursal.
+        const scope = await resolveRequestFacility(req.user, existing.facility_id);
+        if (scope.kind === 'error') return res.status(scope.status).json({ error: scope.message });
+
+        let imageUrl: string;
+        try {
+            imageUrl = await subirImagen(file.buffer, file.mimetype, `product-${id}`);
+        } catch (error) {
+            if (error instanceof ImageStorageError) {
+                if (error.code === 'INVALID_MIME_TYPE') {
+                    return res.status(400).json({ error: 'El archivo debe ser una imagen' });
+                }
+                if (error.code === 'BASE64_TOO_LARGE') {
+                    return res.status(413).json({ error: 'Imagen demasiado grande para almacenamiento local (máx 1MB sin Drive)' });
+                }
+            }
+            throw error;
+        }
+
+        const product = await queryOne<Record<string, unknown>>(
+            `UPDATE products
+             SET image_url = $1, updated_at = NOW()
+             WHERE id = $2
+             RETURNING *`,
+            [imageUrl, id],
+        );
+        if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
+
+        res.json(product);
+    } catch (error) {
+        console.error('Upload product image error:', error);
+        res.status(500).json({ error: 'Error al subir imagen del producto' });
     }
 });
 

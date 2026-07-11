@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { PaymentProofImage, PaymentProofOpenButton } from '@/components/orders/PaymentProofContent';
 import type { OrderWithProofs, OrderStatus } from '@/types/order';
 import {
   CheckCircle2,
@@ -38,12 +39,10 @@ import {
   AlertCircle,
   Eye,
   FileImage,
-  ExternalLink,
   Receipt,
   User,
   Calendar,
   CreditCard,
-  Download,
 } from 'lucide-react';
 
 const statusConfig: Record<OrderStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -471,26 +470,9 @@ function OrdersVerificationInner() {
                     {selectedOrder.payment_proofs && selectedOrder.payment_proofs.length > 0 ? (
                       <div className="space-y-3">
                         {selectedOrder.payment_proofs.map((proof, index) => {
-                          // Check if file_url is base64 image
-                          const isBase64Image = proof.file_url?.startsWith('data:image/');
-                          const isBase64Pdf = proof.file_url?.startsWith('data:application/pdf');
-                          const isImage = isBase64Image || proof.file_type?.startsWith('image/');
-                          
-                          const downloadProof = () => {
-                            if (!proof.file_url) return;
-                            const a = document.createElement('a');
-                            a.href = proof.file_url;
-                            const ext = isBase64Image
-                              ? (proof.file_url.match(/data:image\/(\w+)/)?.[1] || 'png')
-                              : isBase64Pdf
-                              ? 'pdf'
-                              : '';
-                            const fallback = `comprobante-${selectedOrder.order_number}-${index + 1}${ext ? `.${ext}` : ''}`;
-                            a.download = proof.file_name || fallback;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                          };
+                          const mimeType = proof.file_type?.toLowerCase() || '';
+                          const isPdf = mimeType === 'application/pdf';
+                          const isImage = !isPdf && mimeType.startsWith('image/');
 
                           return (
                             <div key={proof.id || index} className="p-3 rounded-lg border">
@@ -503,28 +485,25 @@ function OrdersVerificationInner() {
                                     {proof.notes && <p>Notas: {proof.notes}</p>}
                                   </div>
                                 </div>
-                                {proof.file_url && (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
+                                {isPdf && proof.id && (
+                                  <PaymentProofOpenButton
+                                    orderId={selectedOrder.id}
+                                    proofId={proof.id}
                                     size="sm"
-                                    onClick={downloadProof}
                                     className="shrink-0"
-                                  >
-                                    <Download className="h-3.5 w-3.5 mr-1.5" />
-                                    Descargar
-                                  </Button>
+                                  />
                                 )}
                               </div>
                               
                               {/* Preview image */}
-                              {isImage && proof.file_url && (
+                              {isImage && proof.id && (
                                 <div className="mt-3">
-                                  <img 
-                                    src={proof.file_url} 
+                                  <PaymentProofImage
+                                    orderId={selectedOrder.id}
+                                    proofId={proof.id}
                                     alt="Comprobante de pago"
                                     className="max-h-96 w-full rounded-lg border object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                                    onClick={() => setImagePreview(proof.file_url)}
+                                    onPreview={setImagePreview}
                                   />
                                   <p className="text-xs text-center text-muted-foreground mt-1">
                                     Click para ampliar
@@ -533,7 +512,7 @@ function OrdersVerificationInner() {
                               )}
                               
                               {/* PDF notice */}
-                              {isBase64Pdf && (
+                              {isPdf && (
                                 <div className="mt-3 p-4 bg-muted rounded-lg text-center">
                                   <FileImage className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                                   <p className="text-sm text-muted-foreground">Archivo PDF adjunto</p>

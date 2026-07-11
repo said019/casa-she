@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { fileToImageDataUrl } from '@/lib/image';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { Button } from '@/components/ui/button';
@@ -36,12 +35,28 @@ import { Plus, Search, Edit, Trash2, Loader2, Package } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 
+const PRODUCT_IMAGE_MAX_TRANSPORT_BYTES = 10 * 1024 * 1024;
+// Keep this reserve aligned with the backend so a selected file always leaves
+// room for multipart boundaries and headers inside the 10 MiB request budget.
+const PRODUCT_IMAGE_MULTIPART_RESERVE_BYTES = 16 * 1024;
+const PRODUCT_IMAGE_MAX_FILE_BYTES = PRODUCT_IMAGE_MAX_TRANSPORT_BYTES - PRODUCT_IMAGE_MULTIPART_RESERVE_BYTES;
+
+type PendingImageUpload = { id: string; name?: string | null };
+
+class ProductSavedWithoutImageError extends Error {
+    constructor(public readonly product: PendingImageUpload, public readonly originalError: unknown) {
+        super('El producto se guardó, pero no se pudo subir la imagen');
+        this.name = 'ProductSavedWithoutImageError';
+    }
+}
+
 export function ProductsContent() {
     const [search, setSearch] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<string>('all');
     const [facilityFilter, setFacilityFilter] = useState<string>('all');
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<any>(null);
+    const [pendingImageUpload, setPendingImageUpload] = useState<PendingImageUpload | null>(null);
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
@@ -80,21 +95,59 @@ export function ProductsContent() {
 
     // Create/Update Product Mutation
     const saveProductMutation = useMutation({
-        mutationFn: async (productData: any) => {
-            if (editingProduct) {
-                return await api.put(`/products/${editingProduct.id}`, productData);
-            } else {
-                return await api.post('/products', productData);
+        mutationFn: async ({ productData, imageFile, savedProductId }: {
+            productData: any;
+            imageFile: File | null;
+            savedProductId: string | null;
+        }) => {
+            if (savedProductId) {
+                if (!imageFile) throw new Error('Selecciona una imagen para reintentar la carga.');
+                const retryImageData = new FormData();
+                retryImageData.append('image', imageFile);
+                return await api.post(`/products/${savedProductId}/image`, retryImageData);
+            }
+
+            const productResponse = editingProduct
+                ? await api.put(`/products/${editingProduct.id}`, productData)
+                : await api.post('/products', productData);
+
+            if (!imageFile) {
+                return productResponse;
+            }
+
+            const imageData = new FormData();
+            imageData.append('image', imageFile);
+            try {
+                return await api.post(`/products/${productResponse.data.id}/image`, imageData);
+            } catch (error) {
+                const product = { id: productResponse.data.id, name: productResponse.data.name };
+                setPendingImageUpload(product);
+                queryClient.invalidateQueries({ queryKey: ['products'] });
+                throw new ProductSavedWithoutImageError(product, error);
             }
         },
-        onSuccess: () => {
-            toast({ title: editingProduct ? 'Producto actualizado' : 'Producto creado' });
+        onSuccess: (_response, variables) => {
+            toast({ title: variables.savedProductId ? 'Foto del producto actualizada' : editingProduct ? 'Producto actualizado' : 'Producto creado' });
             setIsCreateOpen(false);
             setEditingProduct(null);
+            setPendingImageUpload(null);
             queryClient.invalidateQueries({ queryKey: ['products'] });
         },
         onError: (error) => {
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el producto.' });
+            if (error instanceof ProductSavedWithoutImageError) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Producto guardado; foto pendiente',
+                    description: 'Puedes reintentar solo la foto sin duplicar el producto. Las imágenes de hasta 10 MB requieren Google Drive; sin Drive, el límite local es 1 MB.',
+                });
+            } else {
+                const response = (error as any)?.response;
+                const apiMessage = response?.data?.error;
+                const description = response?.status === 413
+                    ? `${apiMessage || 'La imagen excede el límite permitido.'} Las imágenes de hasta 10 MB requieren Google Drive; sin Drive, el límite local es 1 MB.`
+                    : apiMessage || 'No se pudo guardar el producto.';
+                toast({ variant: 'destructive', title: 'Error', description });
+            }
             console.error(error);
         }
     });
@@ -111,8 +164,17 @@ export function ProductsContent() {
     });
 
     const handleEdit = (product: any) => {
+        setPendingImageUpload(null);
         setEditingProduct(product);
         setIsCreateOpen(true);
+    };
+
+    const handleProductDialogOpenChange = (open: boolean) => {
+        setIsCreateOpen(open);
+        if (!open) {
+            setEditingProduct(null);
+            setPendingImageUpload(null);
+        }
     };
 
     const handleDelete = (id: string) => {
@@ -128,7 +190,7 @@ export function ProductsContent() {
                     <h2 className="text-3xl font-heading font-bold">Inventario</h2>
                     <p className="text-muted-foreground">Gestiona los productos de venta</p>
                 </div>
-                <Button onClick={() => { setEditingProduct(null); setIsCreateOpen(true); }}>
+                <Button onClick={() => { setEditingProduct(null); setPendingImageUpload(null); setIsCreateOpen(true); }}>
                     <Plus className="mr-2 h-4 w-4" /> Nuevo Producto
                 </Button>
             </div>
@@ -232,9 +294,10 @@ export function ProductsContent() {
 
             <ProductFormDialog
                 open={isCreateOpen}
-                onOpenChange={setIsCreateOpen}
+                onOpenChange={handleProductDialogOpenChange}
                 onSubmit={(data) => saveProductMutation.mutate(data)}
                 initialData={editingProduct}
+                pendingImageUpload={pendingImageUpload}
                 categories={categories || []}
                 facilities={facilities || []}
                 defaultFacilityId={defaultFacilityId}
@@ -254,61 +317,93 @@ export default function ProductsPage() {
     );
 }
 
-function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, categories, facilities, defaultFacilityId, isSubmitting }: any) {
+function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, pendingImageUpload, categories, facilities, defaultFacilityId, isSubmitting }: any) {
     const { toast } = useToast();
     const fileRef = useRef<HTMLInputElement>(null);
-    const [imageUrl, setImageUrl] = useState<string>('');
-    const [readingImage, setReadingImage] = useState(false);
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+    const [removeExistingImage, setRemoveExistingImage] = useState(false);
 
-    // Pre-cargar la foto al abrir / cambiar de producto en edición.
+    // El preview local nunca se persiste: se libera al cambiar/quitar el archivo o cerrar el diálogo.
     useEffect(() => {
-        if (open) setImageUrl(initialData?.image_url ?? '');
-    }, [open, initialData]);
+        if (!imageFile) {
+            setImagePreviewUrl(null);
+            return;
+        }
 
-    const handleImageFile = async (file: File | null) => {
+        const objectUrl = URL.createObjectURL(imageFile);
+        setImagePreviewUrl(objectUrl);
+        return () => URL.revokeObjectURL(objectUrl);
+    }, [imageFile]);
+
+    useEffect(() => {
+        setImageFile(null);
+        setRemoveExistingImage(false);
+        if (fileRef.current) fileRef.current.value = '';
+    }, [open, initialData?.id]);
+
+    const handleDialogOpenChange = (nextOpen: boolean) => {
+        if (!nextOpen) {
+            setImageFile(null);
+            if (fileRef.current) fileRef.current.value = '';
+        }
+        onOpenChange(nextOpen);
+    };
+
+    const handleImageFile = (file: File | null) => {
         if (!file) return;
         if (!file.type.startsWith('image/')) {
             toast({ variant: 'destructive', title: 'Archivo no válido', description: 'Sube una imagen (JPG o PNG).' });
             return;
         }
-        if (file.size > 10 * 1024 * 1024) {
-            toast({ variant: 'destructive', title: 'Imagen muy grande', description: 'La imagen no debe pesar más de 10 MB.' });
+        if (file.size > PRODUCT_IMAGE_MAX_FILE_BYTES) {
+            toast({
+                variant: 'destructive',
+                title: 'Imagen muy grande',
+                description: 'La foto debe pesar máximo 9.98 MiB; reservamos 16 KiB para el envío multipart dentro del límite total de 10 MiB.',
+            });
             return;
         }
-        setReadingImage(true);
-        try {
-            setImageUrl(await fileToImageDataUrl(file));
-        } catch {
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo procesar la imagen.' });
-        } finally {
-            setReadingImage(false);
-        }
+        setImageFile(file);
+        setRemoveExistingImage(false);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (pendingImageUpload && !imageFile) {
+            toast({ variant: 'destructive', title: 'Falta la foto', description: 'Selecciona una imagen para reintentar la carga.' });
+            return;
+        }
         const formData = new FormData(e.target as HTMLFormElement);
-        const data = {
+        const productData = {
             name: formData.get('name'),
             description: formData.get('description'),
             price: Number(formData.get('price')),
             cost: Number(formData.get('cost')),
             stock: Number(formData.get('stock')),
             sku: formData.get('sku'),
-            categoryId: formData.get('categoryId') === 'none' ? null : formData.get('categoryId'),
+            category_id: formData.get('categoryId') === 'none' ? null : formData.get('categoryId'),
             facility_id: formData.get('facilityId') || null,
-            image_url: imageUrl || null,
-            isActive: true // Default to active
+            is_active: initialData?.is_active ?? true,
+            // `undefined` leaves an existing image unchanged; `null` asks the
+            // product API to remove it without requiring a replacement File.
+            image_url: removeExistingImage ? null : undefined,
         };
-        onSubmit(data);
+        onSubmit({ productData, imageFile, savedProductId: pendingImageUpload?.id ?? null });
     };
 
+    const displayedImageUrl = imagePreviewUrl ?? (removeExistingImage ? '' : initialData?.image_url ?? '');
+
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={handleDialogOpenChange}>
             <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
-                    <DialogTitle>{initialData ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
-                    <DialogDescription>Completa la información del producto.</DialogDescription>
+                    <DialogTitle>{pendingImageUpload ? 'Reintentar foto del producto' : initialData ? 'Editar Producto' : 'Nuevo Producto'}</DialogTitle>
+                    <DialogDescription>
+                        {pendingImageUpload
+                            ? 'El producto ya quedó guardado. Esta acción reintenta solo la foto y no vuelve a crear el producto.'
+                            : 'Completa la información del producto.'}
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="grid gap-4 py-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -368,35 +463,48 @@ function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, categori
                         <Label>Foto del producto (opcional)</Label>
                         <div className="flex items-center gap-3">
                             <div className="h-24 w-24 shrink-0 rounded-md bg-muted flex items-center justify-center overflow-hidden ring-1 ring-border">
-                                {imageUrl ? (
-                                    <img src={imageUrl} alt="Producto" className="h-full w-full object-cover" />
+                                {displayedImageUrl ? (
+                                    <img src={displayedImageUrl} alt="Producto" className="h-full w-full object-cover" />
                                 ) : (
                                     <Package className="h-7 w-7 text-muted-foreground" />
                                 )}
                             </div>
                             <div className="space-y-1">
-                                <Button type="button" variant="outline" size="sm" disabled={readingImage}
+                                <Button type="button" variant="outline" size="sm"
                                     onClick={() => fileRef.current?.click()}>
-                                    {readingImage && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                    Subir foto
+                                    {pendingImageUpload ? 'Elegir otra foto' : 'Subir foto'}
                                 </Button>
-                                {imageUrl && (
+                                {imageFile && (
                                     <button type="button" className="block text-xs text-muted-foreground underline"
-                                        onClick={() => setImageUrl('')}>
-                                        Quitar
+                                        onClick={() => setImageFile(null)}>
+                                        Descartar nueva foto
                                     </button>
+                                )}
+                                {initialData?.image_url && !imageFile && (
+                                    removeExistingImage ? (
+                                        <button type="button" className="block text-xs text-muted-foreground underline"
+                                            onClick={() => setRemoveExistingImage(false)}>
+                                            Conservar foto actual
+                                        </button>
+                                    ) : (
+                                        <button type="button" className="block text-xs text-destructive underline"
+                                            onClick={() => setRemoveExistingImage(true)}>
+                                            Quitar foto actual
+                                        </button>
+                                    )
                                 )}
                             </div>
                         </div>
                         <input ref={fileRef} type="file" accept="image/*" className="hidden"
                             onChange={(e) => { handleImageFile(e.target.files?.[0] ?? null); e.target.value = ''; }} />
+                        <p className="text-xs text-muted-foreground">Máximo 9.98 MiB por foto (16 KiB se reservan para el envío multipart). La solicitud admite hasta 10 MiB con Google Drive; sin Drive, el respaldo local admite hasta 1 MiB.</p>
                     </div>
 
                     <DialogFooter className="mt-4">
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                        <Button type="button" variant="outline" onClick={() => handleDialogOpenChange(false)}>Cancelar</Button>
                         <Button type="submit" disabled={isSubmitting}>
                             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Guardar
+                            {pendingImageUpload ? 'Reintentar foto' : 'Guardar'}
                         </Button>
                     </DialogFooter>
                 </form>
