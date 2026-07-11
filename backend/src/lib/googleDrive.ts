@@ -71,7 +71,33 @@ export async function makeGoogleDriveFilePublic(fileId: string, accessToken: str
 
     if (!response.ok) {
         const text = await response.text();
-        console.warn('Unable to make Google Drive file public:', text);
+        throw new Error(`Google Drive public permission error (${response.status}): ${text.slice(0, 300) || response.statusText}`);
+    }
+}
+
+/**
+ * Payment proofs are private files. A public parent folder would make the
+ * file accessible through inherited access even when the file itself never
+ * receives an `anyone` permission, so reject that storage target first.
+ */
+export async function requirePrivateGoogleDriveFolder(folderId: string, accessToken: string): Promise<void> {
+    const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(folderId)}?fields=permissions(type,role)`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    const rawText = await response.text();
+    let data: { permissions?: Array<{ type?: string; role?: string }> } = {};
+    try {
+        data = JSON.parse(rawText);
+    } catch {
+        /* response wasn't JSON */
+    }
+
+    if (!response.ok) {
+        throw new Error(`Google Drive folder privacy check error (${response.status}): ${rawText.slice(0, 300) || response.statusText}`);
+    }
+    if (data.permissions?.some((permission) => permission.type === 'anyone')) {
+        throw new Error('Google Drive folder for private uploads must not grant access to anyone');
     }
 }
 
@@ -105,6 +131,10 @@ export async function uploadBufferToGoogleDrive(
     const metadata: { name: string; parents?: string[] } = { name: fileName };
     const parentFolderId = folderId || process.env.GOOGLE_DRIVE_FOLDER_ID;
     if (parentFolderId) metadata.parents = [parentFolderId];
+
+    if (options.makePublic === false && parentFolderId) {
+        await requirePrivateGoogleDriveFolder(parentFolderId, accessToken);
+    }
 
     const boundary = `catarsis_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const metadataPart = Buffer.from(

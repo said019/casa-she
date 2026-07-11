@@ -322,6 +322,7 @@ function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, pendingI
     const fileRef = useRef<HTMLInputElement>(null);
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+    const [removeExistingImage, setRemoveExistingImage] = useState(false);
 
     // El preview local nunca se persiste: se libera al cambiar/quitar el archivo o cerrar el diálogo.
     useEffect(() => {
@@ -337,6 +338,7 @@ function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, pendingI
 
     useEffect(() => {
         setImageFile(null);
+        setRemoveExistingImage(false);
         if (fileRef.current) fileRef.current.value = '';
     }, [open, initialData?.id]);
 
@@ -363,6 +365,7 @@ function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, pendingI
             return;
         }
         setImageFile(file);
+        setRemoveExistingImage(false);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -382,11 +385,14 @@ function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, pendingI
             category_id: formData.get('categoryId') === 'none' ? null : formData.get('categoryId'),
             facility_id: formData.get('facilityId') || null,
             is_active: initialData?.is_active ?? true,
+            // `undefined` leaves an existing image unchanged; `null` asks the
+            // product API to remove it without requiring a replacement File.
+            image_url: removeExistingImage ? null : undefined,
         };
         onSubmit({ productData, imageFile, savedProductId: pendingImageUpload?.id ?? null });
     };
 
-    const displayedImageUrl = imagePreviewUrl ?? initialData?.image_url ?? '';
+    const displayedImageUrl = imagePreviewUrl ?? (removeExistingImage ? '' : initialData?.image_url ?? '');
 
     return (
         <Dialog open={open} onOpenChange={handleDialogOpenChange}>
@@ -473,6 +479,19 @@ function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, pendingI
                                         onClick={() => setImageFile(null)}>
                                         Descartar nueva foto
                                     </button>
+                                )}
+                                {initialData?.image_url && !imageFile && (
+                                    removeExistingImage ? (
+                                        <button type="button" className="block text-xs text-muted-foreground underline"
+                                            onClick={() => setRemoveExistingImage(false)}>
+                                            Conservar foto actual
+                                        </button>
+                                    ) : (
+                                        <button type="button" className="block text-xs text-destructive underline"
+                                            onClick={() => setRemoveExistingImage(true)}>
+                                            Quitar foto actual
+                                        </button>
+                                    )
                                 )}
                             </div>
                         </div>

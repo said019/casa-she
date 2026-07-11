@@ -44,7 +44,10 @@ async function googleDriveAclContract(): Promise<void> {
         GOOGLE_DRIVE_FOLDER_ID: process.env.GOOGLE_DRIVE_FOLDER_ID,
     };
     const permissionRequests: Array<{ url: string; body: string | undefined }> = [];
+    const folderPrivacyRequests: string[] = [];
     let uploadCount = 0;
+    let failPublicPermission = false;
+    let parentFolderIsPublic = false;
 
     try {
         Object.assign(process.env, {
@@ -62,8 +65,17 @@ async function googleDriveAclContract(): Promise<void> {
                 uploadCount += 1;
                 return new Response(JSON.stringify({ id: `drive-file-${uploadCount}` }), { status: 200 });
             }
+            if (url.startsWith('https://www.googleapis.com/drive/v3/files/test-folder-id?fields=permissions')) {
+                folderPrivacyRequests.push(url);
+                return new Response(JSON.stringify({
+                    permissions: parentFolderIsPublic ? [{ type: 'anyone', role: 'reader' }] : [],
+                }), { status: 200 });
+            }
             if (url.includes('/permissions')) {
                 permissionRequests.push({ url, body: typeof init?.body === 'string' ? init.body : undefined });
+                if (failPublicPermission) {
+                    return new Response('Public sharing is disabled', { status: 403, statusText: 'Forbidden' });
+                }
                 return new Response(null, { status: 200 });
             }
             throw new Error(`Llamada Drive inesperada: ${url}`);
@@ -80,6 +92,51 @@ async function googleDriveAclContract(): Promise<void> {
             }],
             'la subida normal conserva ACL público y la privada no debe llamar al endpoint de permisos',
         );
+        assert.equal(folderPrivacyRequests.length, 1, 'un comprobante debe verificar que su carpeta padre siga privada');
+
+        const publicAclWarnings: unknown[][] = [];
+        const publicAclFailureStorage = createImageStorage({
+            configured: () => true,
+            upload: (buffer, originalName, mimeType, options) => (
+                uploadBufferToGoogleDrive(buffer, originalName, mimeType, undefined, options)
+            ),
+            imageUrl: () => 'no-debe-usarse',
+            warn: (...args) => publicAclWarnings.push(args),
+        });
+        failPublicPermission = true;
+        const publicAclFallback = await publicAclFailureStorage.subirImagen(image, 'image/png', 'imagen-con-acl-fallida');
+        assert.equal(
+            publicAclFallback,
+            `data:image/png;base64,${image.toString('base64')}`,
+            'si Drive no puede conceder ACL público, la imagen debe usar fallback local',
+        );
+        assert.equal(publicAclWarnings.length, 1, 'la falla de ACL público debe propagarse hasta imageStorage');
+
+        failPublicPermission = false;
+        parentFolderIsPublic = true;
+        const privateFolderWarnings: unknown[][] = [];
+        const privateProofStorage = createImageStorage({
+            configured: () => true,
+            upload: (buffer, originalName, mimeType, options) => (
+                uploadBufferToGoogleDrive(buffer, originalName, mimeType, undefined, options)
+            ),
+            imageUrl: () => 'no-debe-usarse',
+            warn: (...args) => privateFolderWarnings.push(args),
+        });
+        const uploadsBeforeRejectedProof = uploadCount;
+        const publicFolderProofFallback = await privateProofStorage.subirComprobante(image, 'image/png', 'comprobante-carpeta-publica');
+        assert.equal(
+            publicFolderProofFallback,
+            `data:image/png;base64,${image.toString('base64')}`,
+            'un comprobante no debe subirse a una carpeta con permiso anyone',
+        );
+        assert.equal(uploadCount, uploadsBeforeRejectedProof, 'la carpeta pública debe bloquear el upload privado antes de crear el archivo');
+        assert.equal(privateFolderWarnings.length, 1, 'el bloqueo de carpeta pública debe activar el fallback seguro');
+
+        const uploadsBeforePublicImage = uploadCount;
+        const publicFolderImage = await uploadBufferToGoogleDrive(image, 'imagen-carpeta-publica.png', 'image/png');
+        assert.equal(publicFolderImage.fileId, `drive-file-${uploadsBeforePublicImage + 1}`);
+        assert.equal(uploadCount, uploadsBeforePublicImage + 1, 'una carpeta pública no debe bloquear las imágenes que se publican explícitamente por archivo');
     } finally {
         globalThis.fetch = originalFetch;
         for (const [key, value] of Object.entries(originalEnvironment)) {
@@ -111,6 +168,18 @@ async function apiJson(url: string, token: string, body: FormData): Promise<{ st
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body,
+    });
+    return { status: response.status, json: await response.json() };
+}
+
+async function apiJsonBody(method: 'PUT', url: string, token: string, body: Record<string, unknown>): Promise<{ status: number; json: any }> {
+    const response = await fetch(`${PRODUCT_IMAGE_API}${url}`, {
+        method,
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
     });
     return { status: response.status, json: await response.json() };
 }
@@ -253,6 +322,10 @@ async function productImageContract(): Promise<void> {
             'SELECT image_url FROM products WHERE id = $1', [product.id],
         )).rows[0];
         assert.equal(persisted.image_url, valid.json.image_url, 'la URL de la imagen debe persistirse');
+
+        const removed = await apiJsonBody('PUT', `/products/${product.id}`, token, { image_url: null });
+        assert.equal(removed.status, 200, `quitar imagen existente: ${JSON.stringify(removed.json)}`);
+        assert.equal(removed.json.image_url, null, 'la API debe aceptar image_url: null para quitar una imagen sin subir archivo nuevo');
     } finally {
         if (createdProductIds.length) {
             await pool.query('DELETE FROM products WHERE id = ANY($1)', [createdProductIds]);
