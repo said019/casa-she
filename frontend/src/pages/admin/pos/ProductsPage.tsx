@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { fileToImageDataUrl } from '@/lib/image';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { Button } from '@/components/ui/button';
@@ -80,12 +79,18 @@ export function ProductsContent() {
 
     // Create/Update Product Mutation
     const saveProductMutation = useMutation({
-        mutationFn: async (productData: any) => {
-            if (editingProduct) {
-                return await api.put(`/products/${editingProduct.id}`, productData);
-            } else {
-                return await api.post('/products', productData);
+        mutationFn: async ({ productData, imageFile }: { productData: any; imageFile: File | null }) => {
+            const productResponse = editingProduct
+                ? await api.put(`/products/${editingProduct.id}`, productData)
+                : await api.post('/products', productData);
+
+            if (!imageFile) {
+                return productResponse;
             }
+
+            const imageData = new FormData();
+            imageData.append('image', imageFile);
+            return await api.post(`/products/${productResponse.data.id}/image`, imageData);
         },
         onSuccess: () => {
             toast({ title: editingProduct ? 'Producto actualizado' : 'Producto creado' });
@@ -257,15 +262,26 @@ export default function ProductsPage() {
 function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, categories, facilities, defaultFacilityId, isSubmitting }: any) {
     const { toast } = useToast();
     const fileRef = useRef<HTMLInputElement>(null);
-    const [imageUrl, setImageUrl] = useState<string>('');
-    const [readingImage, setReadingImage] = useState(false);
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
-    // Pre-cargar la foto al abrir / cambiar de producto en edición.
+    // El preview local nunca se persiste: se libera al cambiar/quitar el archivo o cerrar el diálogo.
     useEffect(() => {
-        if (open) setImageUrl(initialData?.image_url ?? '');
-    }, [open, initialData]);
+        if (!imageFile) {
+            setImagePreviewUrl(null);
+            return;
+        }
 
-    const handleImageFile = async (file: File | null) => {
+        const objectUrl = URL.createObjectURL(imageFile);
+        setImagePreviewUrl(objectUrl);
+        return () => URL.revokeObjectURL(objectUrl);
+    }, [imageFile]);
+
+    useEffect(() => {
+        if (open) setImageFile(null);
+    }, [open, initialData?.id]);
+
+    const handleImageFile = (file: File | null) => {
         if (!file) return;
         if (!file.type.startsWith('image/')) {
             toast({ variant: 'destructive', title: 'Archivo no válido', description: 'Sube una imagen (JPG o PNG).' });
@@ -275,33 +291,27 @@ function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, categori
             toast({ variant: 'destructive', title: 'Imagen muy grande', description: 'La imagen no debe pesar más de 10 MB.' });
             return;
         }
-        setReadingImage(true);
-        try {
-            setImageUrl(await fileToImageDataUrl(file));
-        } catch {
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo procesar la imagen.' });
-        } finally {
-            setReadingImage(false);
-        }
+        setImageFile(file);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const formData = new FormData(e.target as HTMLFormElement);
-        const data = {
+        const productData = {
             name: formData.get('name'),
             description: formData.get('description'),
             price: Number(formData.get('price')),
             cost: Number(formData.get('cost')),
             stock: Number(formData.get('stock')),
             sku: formData.get('sku'),
-            categoryId: formData.get('categoryId') === 'none' ? null : formData.get('categoryId'),
+            category_id: formData.get('categoryId') === 'none' ? null : formData.get('categoryId'),
             facility_id: formData.get('facilityId') || null,
-            image_url: imageUrl || null,
-            isActive: true // Default to active
+            is_active: initialData?.is_active ?? true,
         };
-        onSubmit(data);
+        onSubmit({ productData, imageFile });
     };
+
+    const displayedImageUrl = imagePreviewUrl ?? initialData?.image_url ?? '';
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -368,22 +378,21 @@ function ProductFormDialog({ open, onOpenChange, onSubmit, initialData, categori
                         <Label>Foto del producto (opcional)</Label>
                         <div className="flex items-center gap-3">
                             <div className="h-24 w-24 shrink-0 rounded-md bg-muted flex items-center justify-center overflow-hidden ring-1 ring-border">
-                                {imageUrl ? (
-                                    <img src={imageUrl} alt="Producto" className="h-full w-full object-cover" />
+                                {displayedImageUrl ? (
+                                    <img src={displayedImageUrl} alt="Producto" className="h-full w-full object-cover" />
                                 ) : (
                                     <Package className="h-7 w-7 text-muted-foreground" />
                                 )}
                             </div>
                             <div className="space-y-1">
-                                <Button type="button" variant="outline" size="sm" disabled={readingImage}
+                                <Button type="button" variant="outline" size="sm"
                                     onClick={() => fileRef.current?.click()}>
-                                    {readingImage && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                                     Subir foto
                                 </Button>
-                                {imageUrl && (
+                                {imageFile && (
                                     <button type="button" className="block text-xs text-muted-foreground underline"
-                                        onClick={() => setImageUrl('')}>
-                                        Quitar
+                                        onClick={() => setImageFile(null)}>
+                                        Descartar nueva foto
                                     </button>
                                 )}
                             </div>
