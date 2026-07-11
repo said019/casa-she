@@ -48,6 +48,7 @@ async function googleDriveAclContract(): Promise<void> {
     let uploadCount = 0;
     let failPublicPermission = false;
     let parentFolderIsPublic = false;
+    let parentFolderPermissionsOmitted = false;
 
     try {
         Object.assign(process.env, {
@@ -68,7 +69,9 @@ async function googleDriveAclContract(): Promise<void> {
             if (url.startsWith('https://www.googleapis.com/drive/v3/files/test-folder-id?fields=permissions')) {
                 folderPrivacyRequests.push(url);
                 return new Response(JSON.stringify({
-                    permissions: parentFolderIsPublic ? [{ type: 'anyone', role: 'reader' }] : [],
+                    ...(parentFolderPermissionsOmitted ? {} : {
+                        permissions: parentFolderIsPublic ? [{ type: 'anyone', role: 'reader' }] : [],
+                    }),
                 }), { status: 200 });
             }
             if (url.includes('/permissions')) {
@@ -132,6 +135,27 @@ async function googleDriveAclContract(): Promise<void> {
         );
         assert.equal(uploadCount, uploadsBeforeRejectedProof, 'la carpeta pública debe bloquear el upload privado antes de crear el archivo');
         assert.equal(privateFolderWarnings.length, 1, 'el bloqueo de carpeta pública debe activar el fallback seguro');
+
+        parentFolderIsPublic = false;
+        parentFolderPermissionsOmitted = true;
+        const missingPermissionsWarnings: unknown[][] = [];
+        const missingPermissionsStorage = createImageStorage({
+            configured: () => true,
+            upload: (buffer, originalName, mimeType, options) => (
+                uploadBufferToGoogleDrive(buffer, originalName, mimeType, undefined, options)
+            ),
+            imageUrl: () => 'no-debe-usarse',
+            warn: (...args) => missingPermissionsWarnings.push(args),
+        });
+        const uploadsBeforeMissingPermissionsProof = uploadCount;
+        const missingPermissionsProofFallback = await missingPermissionsStorage.subirComprobante(image, 'image/png', 'comprobante-permisos-omitidos');
+        assert.equal(
+            missingPermissionsProofFallback,
+            `data:image/png;base64,${image.toString('base64')}`,
+            'un comprobante debe usar fallback si Drive no devuelve permissions de la carpeta',
+        );
+        assert.equal(uploadCount, uploadsBeforeMissingPermissionsProof, 'una respuesta de privacidad incompleta debe bloquear el upload privado');
+        assert.equal(missingPermissionsWarnings.length, 1, 'permissions omitidos deben activar el fallback seguro');
 
         const uploadsBeforePublicImage = uploadCount;
         const publicFolderImage = await uploadBufferToGoogleDrive(image, 'imagen-carpeta-publica.png', 'image/png');

@@ -96,6 +96,9 @@ export async function requirePrivateGoogleDriveFolder(folderId: string, accessTo
     if (!response.ok) {
         throw new Error(`Google Drive folder privacy check error (${response.status}): ${rawText.slice(0, 300) || response.statusText}`);
     }
+    if (!Array.isArray(data.permissions)) {
+        throw new Error('Google Drive folder privacy check error: response did not include permissions');
+    }
     if (data.permissions?.some((permission) => permission.type === 'anyone')) {
         throw new Error('Google Drive folder for private uploads must not grant access to anyone');
     }
