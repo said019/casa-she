@@ -14,6 +14,9 @@ Configure these four variables in the Railway backend service:
 - `GOOGLE_REFRESH_TOKEN` — refresh token for the Drive account.
 - `GOOGLE_DRIVE_FOLDER_ID` — destination folder ID.
 
+All four must contain non-empty values before the real image-migration command
+will start.
+
 The upload flow makes each uploaded file public with the Google Drive permission
 `type=anyone` and `role=reader`, so the application can display the stored image
 or open a payment proof without requiring the viewer to sign in to Google. Check

@@ -1,6 +1,5 @@
 import 'dotenv/config';
 
-import { isGoogleDriveConfigured } from '../src/lib/googleDrive.js';
 import { subirComprobante, subirImagen } from '../src/lib/imageStorage.js';
 
 type MigrationTarget = {
@@ -25,6 +24,12 @@ type Counters = {
 
 const IMAGE_BASE64_PREFIX = '^data:image/[a-z0-9!#$&^_.+-]+;base64,';
 const IMAGE_BASE64_DATA_URL = /^data:(image\/[a-z0-9!#$&^_.+-]+);base64,([a-z0-9+/]*={0,2})$/i;
+const REQUIRED_GOOGLE_DRIVE_VARIABLES = [
+    'GOOGLE_CLIENT_ID',
+    'GOOGLE_CLIENT_SECRET',
+    'GOOGLE_REFRESH_TOKEN',
+    'GOOGLE_DRIVE_FOLDER_ID',
+] as const;
 
 const targets: MigrationTarget[] = [
     {
@@ -100,16 +105,21 @@ function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
 
+function missingGoogleDriveVariables(): string[] {
+    return REQUIRED_GOOGLE_DRIVE_VARIABLES.filter((name) => !process.env[name]?.trim());
+}
+
 async function main(): Promise<void> {
     const { dryRun } = parseArgs();
     const counters: Counters = { scanned: 0, migrated: 0, skipped: 0, failed: 0 };
 
     // subirImagen/subirComprobante intentionally fall back to data URLs for
     // regular request handling. A migration must never do that: it is only safe
-    // to start a real run when Drive is configured.
-    if (!dryRun && !isGoogleDriveConfigured) {
+    // to start a real run when all Drive settings are non-empty.
+    const missingDriveVariables = missingGoogleDriveVariables();
+    if (!dryRun && missingDriveVariables.length > 0) {
         console.error('Google Drive is not configured. Refusing to start the real migration.');
-        console.error('Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_REFRESH_TOKEN, then retry.');
+        console.error(`Set non-empty values for: ${missingDriveVariables.join(', ')}, then retry.`);
         printSummary(counters, dryRun);
         process.exitCode = 1;
         return;
@@ -124,20 +134,27 @@ async function main(): Promise<void> {
             // This server-side filter deliberately excludes ordinary URLs and
             // non-image data URLs. The decoder remains a second guard against
             // malformed base64 values.
-            const result = await pool.query<Candidate>(
-                `SELECT id, ${target.column} AS "sourceUrl"
-                 FROM ${target.table}
-                 WHERE ${target.column} ~* $1`,
-                [IMAGE_BASE64_PREFIX],
-            );
+            let candidates: Candidate[];
+            try {
+                const result = await pool.query<Candidate>(
+                    `SELECT id, ${target.column} AS "sourceUrl"
+                     FROM ${target.table}
+                     WHERE ${target.column} ~* $1`,
+                    [IMAGE_BASE64_PREFIX],
+                );
+                candidates = result.rows;
+            } catch (error) {
+                counters.failed += 1;
+                console.error(`[failed] scanning ${target.table}.${target.column}: ${errorMessage(error)}`);
+                continue;
+            }
 
-            for (const candidate of result.rows) {
+            for (const candidate of candidates) {
                 counters.scanned += 1;
 
                 try {
-                    const { buffer, mimeType } = decodeImageDataUrl(candidate.sourceUrl);
-
                     if (dryRun) {
+                        const { buffer, mimeType } = decodeImageDataUrl(candidate.sourceUrl);
                         counters.skipped += 1;
                         console.log(
                             `[dry-run] Would migrate ${target.label} ${candidate.id} (${mimeType}, ${buffer.length} bytes)`,
@@ -145,31 +162,59 @@ async function main(): Promise<void> {
                         continue;
                     }
 
-                    const destinationUrl = await target.upload(buffer, mimeType, target.fileName(candidate.id));
-                    if (!isGoogleDriveUrl(destinationUrl)) {
-                        throw new Error('Drive upload did not return a Google Drive URL; database row was left unchanged');
-                    }
+                    const client = await pool.connect();
+                    try {
+                        await client.query('BEGIN');
 
-                    // Match both the primary key and original value. This avoids
-                    // replacing a row that another request changed while the
-                    // upload was in flight.
-                    const update = await pool.query(
-                        `UPDATE ${target.table}
-                         SET ${target.column} = $1, updated_at = NOW()
-                         WHERE id = $2 AND ${target.column} = $3`,
-                        [destinationUrl, candidate.id, candidate.sourceUrl],
-                    );
-
-                    if (update.rowCount !== 1) {
-                        counters.skipped += 1;
-                        console.warn(
-                            `[skipped] ${target.label} ${candidate.id} changed before it could be updated; its Drive upload was not linked`,
+                        // Lock and recheck before calling Drive. The lock stays
+                        // open through the upload and update, so a concurrent
+                        // request cannot make this upload orphaned by changing
+                        // the source URL in the meantime.
+                        const locked = await client.query<Candidate>(
+                            `SELECT ${target.column} AS "sourceUrl"
+                             FROM ${target.table}
+                             WHERE id = $1
+                             FOR UPDATE`,
+                            [candidate.id],
                         );
-                        continue;
-                    }
+                        const lockedSourceUrl = locked.rows[0]?.sourceUrl;
+                        if (lockedSourceUrl !== candidate.sourceUrl) {
+                            await client.query('COMMIT');
+                            counters.skipped += 1;
+                            console.warn(
+                                `[skipped] ${target.label} ${candidate.id} changed before it could be locked; no upload was attempted`,
+                            );
+                            continue;
+                        }
 
-                    counters.migrated += 1;
-                    console.log(`[migrated] ${target.label} ${candidate.id}`);
+                        const { buffer, mimeType } = decodeImageDataUrl(lockedSourceUrl);
+                        const destinationUrl = await target.upload(buffer, mimeType, target.fileName(candidate.id));
+                        if (!isGoogleDriveUrl(destinationUrl)) {
+                            throw new Error('Drive upload did not return a Google Drive URL; database row was left unchanged');
+                        }
+
+                        const update = await client.query(
+                            `UPDATE ${target.table}
+                             SET ${target.column} = $1, updated_at = NOW()
+                             WHERE id = $2 AND ${target.column} = $3`,
+                            [destinationUrl, candidate.id, candidate.sourceUrl],
+                        );
+
+                        if (update.rowCount !== 1) {
+                            throw new Error('The locked row could not be updated; database transaction was rolled back');
+                        }
+
+                        await client.query('COMMIT');
+                        counters.migrated += 1;
+                        console.log(`[migrated] ${target.label} ${candidate.id}`);
+                    } catch (error) {
+                        await client.query('ROLLBACK').catch((rollbackError: unknown) => {
+                            console.error(`[failed] rollback for ${target.label} ${candidate.id}: ${errorMessage(rollbackError)}`);
+                        });
+                        throw error;
+                    } finally {
+                        client.release();
+                    }
                 } catch (error) {
                     counters.failed += 1;
                     console.error(`[failed] ${target.label} ${candidate.id}: ${errorMessage(error)}`);
