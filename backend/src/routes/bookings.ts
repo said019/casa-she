@@ -650,6 +650,31 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                 return res.status(400).json({ error: 'Ya tienes una reserva para esta clase' });
             }
 
+            // Bloquea la fila de la clase y REVALIDA el cupo DENTRO de la tx. El chequeo de la
+            // línea 443 se hace con una lectura previa a la transacción y NO protege contra dos
+            // reservas concurrentes del último lugar (sobrecupo): ambas leen current_bookings < max
+            // y ambas confirman. joinWaitlist/promoteNextFromWaitlist ya bloquean la clase con
+            // FOR UPDATE; esta —la ruta principal de la clienta— era la que lo omitía. Bloquear
+            // aquí (antes que la membresía) fija el orden de locks clase→membresía en todo el flujo.
+            const capRes = await client.query(
+                `SELECT current_bookings, max_capacity FROM classes WHERE id = $1 FOR UPDATE`,
+                [classId]
+            );
+            const capRow = capRes.rows[0];
+            if (capRow && Number(capRow.current_bookings) >= Number(capRow.max_capacity)) {
+                await client.query('ROLLBACK');
+                releaseClient();
+                if (waitlist === true) {
+                    const joined = await joinWaitlist({ userId, classId });
+                    if (!joined.ok) {
+                        return res.status(joined.status).json({ error: joined.error, ...(joined.code ? { code: joined.code } : {}) });
+                    }
+                    return res.status(201).json(joined.booking);
+                }
+                const offer = await waitlistOffer(classId);
+                return res.status(400).json({ error: 'Clase llena', ...offer });
+            }
+
             if (!isFreeClass) {
                 if (membershipId) {
                     // Explicit membership: validate ownership, status, credits, studio.
@@ -931,6 +956,22 @@ router.post('/admin-book', authenticate, requireRole('admin', 'super_admin', 're
             if (existing.rows.length > 0) {
                 await client.query('ROLLBACK'); release();
                 return res.status(400).json({ error: 'Este usuario ya tiene una reserva para esta clase' });
+            }
+
+            // Bloquea la clase y revalida cupo DENTRO de la tx (misma corrección que POST /).
+            // Doble propósito: (1) cierra el sobrecupo por carrera también en esta ruta de staff;
+            // (2) UNIFICA el orden de locks clase→membresía con la ruta de la clienta — sin esto,
+            // admin-book bloqueaba membresía (selectMembershipForBooking) y luego clase (trigger),
+            // orden inverso que provocaba deadlock ABBA con una auto-reserva concurrente. El bypass
+            // `forcing` (solo admin/super_admin) permite sobrecupo deliberado.
+            const capRes = await client.query(
+                `SELECT current_bookings, max_capacity FROM classes WHERE id = $1 FOR UPDATE`,
+                [classId]
+            );
+            const capRow = capRes.rows[0];
+            if (capRow && Number(capRow.current_bookings) >= Number(capRow.max_capacity) && !forcing) {
+                await client.query('ROLLBACK'); release();
+                return res.status(400).json({ error: 'Clase llena' });
             }
 
             if (!freeBooking) {

@@ -23,6 +23,23 @@ export async function finalizePaidOrder(orderId: string, opts: FinalizeOpts): Pr
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+
+        // Idempotencia bajo lock: el guard `order.status === 'approved'` de arriba se lee FUERA
+        // de la tx y NO protege contra dos ejecuciones concurrentes (webhook de MP + POST
+        // /orders/:id/sync-mp manual, o reintentos de MP). Sin esto, ambas pasan el guard y crean
+        // 2 membresías, 2 payments y otorgan puntos dos veces = doble cargo real. Se re-lee el
+        // estado con FOR UPDATE dentro de la tx y se aborta si ya quedó aprobada.
+        const lockRes = await client.query(`SELECT status FROM orders WHERE id = $1 FOR UPDATE`, [orderId]);
+        if (!lockRes.rows[0]) {
+            await client.query('ROLLBACK');
+            console.warn('finalizePaidOrder: order desapareció bajo lock', orderId);
+            return;
+        }
+        if (lockRes.rows[0].status === 'approved') {
+            await client.query('ROLLBACK');
+            return;
+        }
+
         const start = new Date();
         const end = new Date(start);
         end.setDate(end.getDate() + order.duration_days);

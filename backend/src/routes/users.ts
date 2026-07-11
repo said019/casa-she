@@ -749,11 +749,12 @@ router.post('/guest', requireRole('admin', 'super_admin', 'reception'), async (r
 });
 
 // ============================================
-// POST /api/users/:id/resend-credentials - Generate new temp password and resend
-// (admin/super_admin y TODA recepción — la dueña pidió que recepción también pueda
-// resetear credenciales de usuarios, 2026-06-23). Resets the user's password to a
-// freshly generated one and sends it via email + WhatsApp. Returns the new password
-// so staff can copy it manually if delivery fails.
+// POST /api/users/:id/resend-credentials - Generate new temp password and resend.
+// Recepción SOLO puede resetear credenciales de CLIENTES (la dueña lo pidió para clientes,
+// 2026-06-23); admin/super_admin pueden resetear a cualquiera salvo que resetear a un
+// super_admin exige ser super_admin. Esto evita que una recepcionista resetee a un admin y
+// capture su contraseña temporal. Resets the user's password to a freshly generated one and
+// sends it via email + WhatsApp. Returns the new password so staff can copy it if delivery fails.
 // ============================================
 router.post('/:id/resend-credentials', requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
     try {
@@ -768,6 +769,18 @@ router.post('/:id/resend-credentials', requireRole('admin', 'super_admin', 'rece
 
         if (!target) {
             return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+
+        // Guarda de escalada de privilegios: recepción SOLO puede resetear credenciales de
+        // clientes (la dueña pidió que recepción reseteara CLIENTES, 2026-06-23). Sin esto, una
+        // recepcionista podía resetear a un admin, recibir su contraseña temporal en la respuesta
+        // y tomar la cuenta. Además, nadie por debajo de super_admin puede resetear a un super_admin.
+        const requesterElevated = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+        if (!requesterElevated && target.role !== 'client') {
+            return res.status(403).json({ error: 'Solo puedes reenviar credenciales a clientes.' });
+        }
+        if (target.role === 'super_admin' && req.user?.role !== 'super_admin') {
+            return res.status(403).json({ error: 'No autorizado para resetear a un super administrador.' });
         }
 
         if (!target.email && !target.phone) {

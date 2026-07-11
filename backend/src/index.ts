@@ -1885,7 +1885,12 @@ async function runStartupMigrations(): Promise<void> {
                 END IF;
 
                 -- Compose class start in Mexico City TZ (DB stores local times)
-                SELECT id, date, start_time INTO v_class FROM classes WHERE id = v_booking.class_id;
+                -- FOR UPDATE: bloquea la fila de la clase ANTES de la membresía, dejando la
+                -- cancelación en orden clase→membresía como el resto de rutas (self/admin/bulk/
+                -- waitlist). Sin esto, cancel bloqueaba membresía→clase (la clase se lockeaba
+                -- tarde, vía el trigger del UPDATE bookings) y podía interbloquear (ABBA) con
+                -- bulk-month tomando la misma clase. Unifica el orden en los 6 caminos de reserva.
+                SELECT id, date, start_time INTO v_class FROM classes WHERE id = v_booking.class_id FOR UPDATE;
                 IF v_class IS NULL THEN
                     RAISE EXCEPTION 'CLASS_NOT_FOUND';
                 END IF;
@@ -3621,6 +3626,24 @@ async function runStartupMigrations(): Promise<void> {
         `);
         console.log('Migration 105: catálogo de recompensas sembrado.');
     } catch (e) { console.error('Migration 105 error:', e); }
+
+    // Migration 107: constraints de respaldo para las carreras de sobrecupo y de doble
+    // fulfillment (pre-prod audit 2026-07-10). La defensa principal es en código (FOR UPDATE),
+    // estos son la red de seguridad a nivel BD por si algún camino la omite.
+    // 107a — CHECK NOT VALID: impide current_bookings > max_capacity en nuevas escrituras sin
+    // escanear filas viejas (NOT VALID = no falla el deploy si ya hay datos inconsistentes).
+    try {
+        await query(`ALTER TABLE classes DROP CONSTRAINT IF EXISTS classes_capacity_check`);
+        await query(`ALTER TABLE classes ADD CONSTRAINT classes_capacity_check CHECK (current_bookings <= max_capacity) NOT VALID`);
+        console.log('Migration 107a: classes_capacity_check (NOT VALID) ready.');
+    } catch (e) { console.error('Migration 107a error:', e); }
+    // 107b — UNIQUE parcial: una orden pagada solo puede generar UNA membresía. Si el índice no
+    // se puede crear por duplicados preexistentes del bug, se loguea y se continúa (el fix de
+    // FOR UPDATE en finalizePaidOrder ya evita nuevos duplicados; ops debe limpiar los viejos).
+    try {
+        await query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_memberships_order_id ON memberships(order_id) WHERE order_id IS NOT NULL`);
+        console.log('Migration 107b: ux_memberships_order_id ready.');
+    } catch (e) { console.error('Migration 107b error (¿duplicados preexistentes de order_id? limpiar manualmente):', e); }
 
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }

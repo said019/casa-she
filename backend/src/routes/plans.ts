@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { query, queryOne, pool } from '../config/database.js';
 import { authenticate, requireRole, optionalAuth } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/requirePermission.js';
+import { logAction } from '../lib/audit.js';
 import { z } from 'zod';
 
 const router = Router();
@@ -177,7 +178,9 @@ router.put('/:id', authenticate, requirePermission('editar_catalogo'), async (re
         const data = validation.data;
 
         // Check if plan exists
-        const existingPlan = await queryOne('SELECT id FROM plans WHERE id = $1', [id]);
+        const existingPlan = await queryOne<{ id: string; duration_days: number }>(
+            'SELECT id, duration_days FROM plans WHERE id = $1', [id]
+        );
         if (!existingPlan) {
             return res.status(404).json({ error: 'Plan no encontrado' });
         }
@@ -243,17 +246,37 @@ router.put('/:id', authenticate, requirePermission('editar_catalogo'), async (re
                 values
             );
 
-            // If duration_days changed, recompute end_date for existing memberships of this plan.
-            // Applies to active/paused/pending memberships — ignores expired/cancelled.
-            if (data.durationDays !== undefined) {
-                await query(
+            // Recomputar end_date de las membresías del plan SOLO si la duración REALMENTE cambió.
+            // Los formularios mandan durationDays SIEMPRE (aunque no se toque), así que compararlo
+            // con la duración previa evita el recálculo masivo innecesario. Además, solo se tocan
+            // las membresías cuya vigencia sigue siendo la CANÓNICA (end_date == start_date +
+            // duración vieja): así NO se pisan extensiones por pausa (/resume) ni overrides
+            // manuales de fecha (PATCH /:id/dates), que dejan end_date distinto de la fórmula.
+            // Antes esto reescribía la vigencia pagada de TODAS las clientas en silencio.
+            const oldDuration = Number(existingPlan.duration_days);
+            if (data.durationDays !== undefined && data.durationDays !== oldDuration) {
+                const recomputed = await query<{ id: string }>(
                     `UPDATE memberships
                      SET end_date = (start_date::date + ($1::int || ' days')::interval)::date
                      WHERE plan_id = $2
                        AND start_date IS NOT NULL
-                       AND status IN ('active', 'paused', 'pending_payment', 'pending_activation')`,
-                    [data.durationDays, id]
+                       AND status IN ('active', 'paused', 'pending_payment', 'pending_activation')
+                       AND end_date = (start_date::date + ($3::int || ' days')::interval)::date
+                     RETURNING id`,
+                    [data.durationDays, id, oldDuration]
                 );
+                if (req.user?.userId) {
+                    await logAction(query, {
+                        adminUserId: req.user.userId,
+                        actionType: 'plan_duration_changed',
+                        entityType: 'plan',
+                        entityId: id,
+                        description: `Duración del plan ${oldDuration}→${data.durationDays} días; se recomputó la vigencia de ${recomputed.length} membresía(s) con vigencia canónica (las extendidas/override no se tocaron).`,
+                        oldData: { duration_days: oldDuration },
+                        newData: { duration_days: data.durationDays, memberships_recomputed: recomputed.length },
+                        req,
+                    });
+                }
             }
 
             return res.json(result);

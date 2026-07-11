@@ -280,8 +280,8 @@ router.post('/qr', authenticate, requirePermission('checkin', ['instructor']), a
        JOIN instructors i ON c.instructor_id = i.id
        WHERE b.user_id = $1
          AND b.status IN ('confirmed', 'waitlist', 'checked_in')
-         AND (c.date + c.start_time) BETWEEN NOW() - INTERVAL '30 minutes' AND NOW() + INTERVAL '30 minutes'
-       ORDER BY ABS(EXTRACT(EPOCH FROM ((c.date + c.start_time) - NOW()))) ASC
+         AND (c.date + c.start_time) BETWEEN (NOW() AT TIME ZONE 'America/Mexico_City') - INTERVAL '30 minutes' AND (NOW() AT TIME ZONE 'America/Mexico_City') + INTERVAL '30 minutes'
+       ORDER BY ABS(EXTRACT(EPOCH FROM ((c.date + c.start_time) - (NOW() AT TIME ZONE 'America/Mexico_City')))) ASC
        LIMIT 1`,
       [userId]
     );
