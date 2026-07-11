@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { Readable } from 'node:stream';
 import { z } from 'zod';
 import { query, queryOne, pool } from '../config/database.js';
 import { authenticate, requireRole, optionalAuth } from '../middleware/auth.js';
@@ -12,6 +13,8 @@ import { notifyMembershipRenewed, notifyPointsEarnedExternal } from '../lib/noti
 import { mpConfigured, createPreference, syncPayment } from '../lib/mercadopago.js';
 import { finalizePaidOrder } from '../lib/orderFulfillment.js';
 import { ImageStorageError, subirComprobante } from '../lib/imageStorage.js';
+import { downloadGoogleDriveFile } from '../lib/googleDrive.js';
+import { hasPermission } from '../lib/permissions.js';
 
 const router = Router();
 
@@ -41,6 +44,17 @@ const BASE64_DATA_URL = /^data:([a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+);base64,(
 const BASE64_CONTENT = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 const DEFAULT_PAYMENT_PROOF_FILE_NAME = 'comprobante';
 const MAX_PAYMENT_PROOF_FILE_NAME_LENGTH = 255;
+const GOOGLE_DRIVE_FILE_ID = /^[A-Za-z0-9_-]{10,}$/;
+
+class PaymentProofRequestError extends Error {
+    constructor(
+        public readonly status: number,
+        message: string,
+    ) {
+        super(message);
+        this.name = 'PaymentProofRequestError';
+    }
+}
 
 export class PaymentProofDataUrlError extends Error {
     constructor(message: string) {
@@ -71,6 +85,64 @@ export function normalizePaymentProofFileName(fileName: unknown): string {
 
 function isAllowedProofMimeType(mimeType: string): boolean {
     return /^image\/[a-z0-9!#$&^_.+-]+$/i.test(mimeType) || mimeType === 'application/pdf';
+}
+
+/**
+ * Extracts only the Drive file IDs emitted by our storage layer (plus the
+ * equivalent Drive viewer URLs used by older records). It intentionally does
+ * not accept arbitrary HTTP URLs, so proof delivery never becomes an SSRF
+ * proxy.
+ */
+export function extractGoogleDriveFileId(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (GOOGLE_DRIVE_FILE_ID.test(trimmed)) return trimmed;
+
+    let url: URL;
+    try {
+        url = new URL(trimmed);
+    } catch {
+        return null;
+    }
+
+    if (url.protocol !== 'https:' || !['drive.google.com', 'www.drive.google.com'].includes(url.hostname.toLowerCase())) {
+        return null;
+    }
+
+    const filePathMatch = url.pathname.match(/^\/file\/d\/([A-Za-z0-9_-]{10,})(?:\/|$)/);
+    if (filePathMatch) return filePathMatch[1];
+
+    if (['/thumbnail', '/uc', '/open'].includes(url.pathname)) {
+        const id = url.searchParams.get('id') || '';
+        return GOOGLE_DRIVE_FILE_ID.test(id) ? id : null;
+    }
+
+    return null;
+}
+
+function normalizedProofMimeType(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const mimeType = value.trim().toLowerCase();
+    return isAllowedProofMimeType(mimeType) ? mimeType : null;
+}
+
+function setProofContentHeaders(res: Response, mimeType: string, fileName: unknown): void {
+    const safeFileName = normalizePaymentProofFileName(fileName).replace(/[\r\n"]/g, '_');
+    res.set({
+        'Content-Type': mimeType,
+        'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(safeFileName)}`,
+        'Cache-Control': 'private, no-store, max-age=0',
+        Pragma: 'no-cache',
+        'X-Content-Type-Options': 'nosniff',
+    });
+}
+
+async function isPaymentProofReviewer(userId: string): Promise<boolean> {
+    const user = await queryOne<{ role: string; permissions: unknown; is_reception_master: boolean }>(
+        `SELECT role, permissions, is_reception_master FROM users WHERE id = $1`,
+        [userId],
+    );
+    return hasPermission(user, 'caja');
 }
 
 /**
@@ -206,7 +278,7 @@ router.get('/pending', authenticate, requirePermission('caja'), async (req: Requ
             const proofs = await query(`
                 SELECT
                     id,
-                    file_url,
+                    NULL::text as file_url,
                     file_name,
                     mime_type as file_type,
                     bank_reference as transfer_reference,
@@ -251,7 +323,7 @@ router.get('/my-orders', authenticate, async (req: Request, res: Response) => {
                 p.name as plan_name,
                 p.class_limit as plan_classes,
                 p.duration_days as plan_duration,
-                pp.file_url as proof_url,
+                NULL::text as proof_url,
                 pp.status as proof_status,
                 pp.uploaded_at as proof_uploaded_at
             FROM orders o
@@ -270,6 +342,86 @@ router.get('/my-orders', authenticate, async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Get my orders error:', error);
         res.status(500).json({ error: 'Error al obtener tus órdenes' });
+    }
+});
+
+// ============================================
+// GET /api/orders/:id/proofs/:proofId/content - Authenticated proof bytes
+// ============================================
+router.get('/:id/proofs/:proofId/content', authenticate, async (req: Request, res: Response) => {
+    try {
+        const { id, proofId } = req.params;
+        const viewerId = req.user?.userId;
+        if (!viewerId) return res.status(401).json({ error: 'No autorizado' });
+
+        const proof = await queryOne<{
+            user_id: string;
+            file_url: string;
+            file_name: string | null;
+            mime_type: string | null;
+        }>(`
+            SELECT o.user_id, pp.file_url, pp.file_name, pp.mime_type
+              FROM payment_proofs pp
+              JOIN orders o ON o.id = pp.order_id
+             WHERE pp.id = $1 AND pp.order_id = $2
+        `, [proofId, id]);
+
+        if (!proof) return res.status(404).json({ error: 'Comprobante no encontrado' });
+
+        const isOwner = proof.user_id === viewerId;
+        if (!isOwner && !(await isPaymentProofReviewer(viewerId))) {
+            return res.status(403).json({ error: 'No autorizado para ver este comprobante' });
+        }
+
+        // Legacy records remain readable, but only the same canonical image/PDF
+        // data URLs accepted on upload are decoded and served.
+        if (proof.file_url?.trim().toLowerCase().startsWith('data:')) {
+            let decoded: DecodedPaymentProofData;
+            try {
+                decoded = decodePaymentProofDataUrl(proof.file_url, proof.mime_type || undefined);
+            } catch (error) {
+                console.warn('Invalid legacy payment proof data URL:', error);
+                return res.status(422).json({ error: 'El comprobante almacenado no es válido' });
+            }
+            setProofContentHeaders(res, decoded.mimeType, proof.file_name);
+            return res.status(200).send(decoded.buffer);
+        }
+
+        const driveFileId = extractGoogleDriveFileId(proof.file_url);
+        const mimeType = normalizedProofMimeType(proof.mime_type);
+        if (!driveFileId || !mimeType) {
+            // Never dereference unknown URLs from the database. This prevents
+            // public/external URLs from being proxied through authenticated API.
+            return res.status(422).json({ error: 'El comprobante almacenado no es compatible' });
+        }
+
+        let driveResponse: globalThis.Response;
+        try {
+            driveResponse = await downloadGoogleDriveFile(driveFileId);
+        } catch (error) {
+            console.error('Download payment proof from Google Drive error:', error);
+            return res.status(502).json({ error: 'No se pudo obtener el comprobante' });
+        }
+
+        if (driveResponse.status === 404) {
+            return res.status(404).json({ error: 'El archivo del comprobante ya no está disponible' });
+        }
+        if (!driveResponse.ok || !driveResponse.body) {
+            console.error('Google Drive proof download failed:', { status: driveResponse.status, proofId });
+            return res.status(502).json({ error: 'No se pudo obtener el comprobante' });
+        }
+
+        setProofContentHeaders(res, mimeType, proof.file_name);
+        const stream = Readable.fromWeb(driveResponse.body as never);
+        stream.on('error', (error) => {
+            console.error('Google Drive proof stream error:', error);
+            if (!res.headersSent) res.status(502).json({ error: 'No se pudo obtener el comprobante' });
+            else res.destroy(error);
+        });
+        stream.pipe(res);
+    } catch (error) {
+        console.error('Get payment proof content error:', error);
+        if (!res.headersSent) res.status(500).json({ error: 'Error al obtener comprobante' });
     }
 });
 
@@ -327,7 +479,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response) => {
         const proofs = await query(`
             SELECT
                 id,
-                file_url,
+                NULL::text as file_url,
                 file_name,
                 mime_type as file_type,
                 bank_reference as transfer_reference,
@@ -648,23 +800,8 @@ router.post('/:id/upload-proof', authenticate, async (req: Request, res: Respons
 
         // Get form data - can be JSON or FormData
         const transfer_reference = req.body.transfer_reference || '';
-        const transfer_date = req.body.transfer_date || null;
         const notes = req.body.notes || '';
         const file_data = req.body.file_data || null;
-
-        // Verify order ownership
-        const order = await queryOne(
-            `SELECT * FROM orders WHERE id = $1 AND user_id = $2`,
-            [id, userId]
-        );
-
-        if (!order) {
-            return res.status(404).json({ error: 'Orden no encontrada' });
-        }
-
-        if (order.status !== 'pending_payment' && order.status !== 'pending_verification') {
-            return res.status(400).json({ error: 'Esta orden ya no acepta comprobantes' });
-        }
 
         let decodedProof: DecodedPaymentProofData;
         let fileName: string;
@@ -680,24 +817,39 @@ router.post('/:id/upload-proof', authenticate, async (req: Request, res: Respons
             throw error;
         }
 
-        let fileUrl: string;
-        try {
-            fileUrl = await subirComprobante(decodedProof.buffer, decodedProof.mimeType, fileName);
-        } catch (error) {
-            if (error instanceof ImageStorageError) {
-                if (error.code === 'INVALID_MIME_TYPE') {
-                    return res.status(400).json({ error: 'El comprobante debe ser una imagen o PDF' });
-                }
-                if (error.code === 'BASE64_TOO_LARGE') {
-                    return res.status(413).json({ error: 'Comprobante demasiado grande para almacenamiento local (máx 1MB sin Drive)' });
-                }
-            }
-            throw error;
-        }
-
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
+
+            // Keep the order row locked from the status/ownership validation
+            // through the remote upload and the final write. Without this, a
+            // cancellation/rejection/approval completed while Drive uploads
+            // could be overwritten back to pending_verification.
+            const lockedOrder = await client.query<{ status: string }>(
+                `SELECT status FROM orders WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+                [id, userId],
+            );
+            if (lockedOrder.rowCount !== 1) {
+                throw new PaymentProofRequestError(404, 'Orden no encontrada');
+            }
+            if (!['pending_payment', 'pending_verification'].includes(lockedOrder.rows[0].status)) {
+                throw new PaymentProofRequestError(400, 'Esta orden ya no acepta comprobantes');
+            }
+
+            let fileUrl: string;
+            try {
+                fileUrl = await subirComprobante(decodedProof.buffer, decodedProof.mimeType, fileName);
+            } catch (error) {
+                if (error instanceof ImageStorageError) {
+                    if (error.code === 'INVALID_MIME_TYPE') {
+                        throw new PaymentProofRequestError(400, 'El comprobante debe ser una imagen o PDF');
+                    }
+                    if (error.code === 'BASE64_TOO_LARGE') {
+                        throw new PaymentProofRequestError(413, 'Comprobante demasiado grande para almacenamiento local (máx 1MB sin Drive)');
+                    }
+                }
+                throw error;
+            }
 
             // Create proof record
             const proof = await client.query(`
@@ -715,11 +867,17 @@ router.post('/:id/upload-proof', authenticate, async (req: Request, res: Respons
                 notes
             ]);
 
-            // Update order status
-            await client.query(`
+            // The lock above makes this conditional update normally exact. The
+            // predicate is a second defense against any future code path that
+            // changes the row before this statement.
+            const updatedOrder = await client.query(`
                 UPDATE orders SET status = 'pending_verification', updated_at = NOW()
-                WHERE id = $1
-            `, [id]);
+                WHERE id = $1 AND user_id = $2
+                  AND status IN ('pending_payment', 'pending_verification')
+            `, [id, userId]);
+            if (updatedOrder.rowCount !== 1) {
+                throw new PaymentProofRequestError(409, 'La orden cambió de estado; vuelve a intentarlo');
+            }
 
             await client.query('COMMIT');
 
@@ -729,7 +887,10 @@ router.post('/:id/upload-proof', authenticate, async (req: Request, res: Respons
                 newStatus: 'pending_verification'
             });
         } catch (err) {
-            await client.query('ROLLBACK');
+            await client.query('ROLLBACK').catch(() => undefined);
+            if (err instanceof PaymentProofRequestError) {
+                return res.status(err.status).json({ error: err.message });
+            }
             throw err;
         } finally {
             client.release();

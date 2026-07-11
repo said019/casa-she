@@ -9,6 +9,7 @@ import { pool } from '../src/config/database.js';
 import { createImageStorage, ImageStorageError } from '../src/lib/imageStorage.js';
 import {
     decodePaymentProofDataUrl,
+    extractGoogleDriveFileId,
     normalizePaymentProofFileName,
     PaymentProofDataUrlError,
 } from '../src/routes/orders.js';
@@ -245,6 +246,17 @@ async function main(): Promise<void> {
         () => normalizePaymentProofFileName({ name: 'comprobante.png' }),
         PaymentProofDataUrlError,
     );
+    assert.equal(extractGoogleDriveFileId('drive-file_123'), 'drive-file_123');
+    assert.equal(
+        extractGoogleDriveFileId('https://drive.google.com/thumbnail?id=drive-file_123&sz=w1600'),
+        'drive-file_123',
+    );
+    assert.equal(
+        extractGoogleDriveFileId('https://drive.google.com/file/d/drive-file_123/preview'),
+        'drive-file_123',
+    );
+    assert.equal(extractGoogleDriveFileId('https://example.com/drive-file_123'), null);
+    assert.equal(extractGoogleDriveFileId('http://drive.google.com/uc?id=drive-file_123'), null);
 
     let uploadedName = '';
     let uploadedMime = '';

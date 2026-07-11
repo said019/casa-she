@@ -1,9 +1,12 @@
 import path from 'path';
 
 export const isGoogleDriveConfigured = Boolean(
-    process.env.GOOGLE_CLIENT_ID
-    && process.env.GOOGLE_CLIENT_SECRET
-    && process.env.GOOGLE_REFRESH_TOKEN
+    process.env.GOOGLE_CLIENT_ID?.trim()
+    && process.env.GOOGLE_CLIENT_SECRET?.trim()
+    && process.env.GOOGLE_REFRESH_TOKEN?.trim()
+    // Never fall back to the account's Drive root.  Image storage is only
+    // considered configured when its dedicated destination folder is set.
+    && process.env.GOOGLE_DRIVE_FOLDER_ID?.trim()
 );
 
 function toSlug(value: string): string {
@@ -138,6 +141,19 @@ export async function uploadBufferToGoogleDrive(
         thumbnailUrl: uploadData.thumbnailLink || `https://drive.google.com/thumbnail?id=${uploadData.id}&sz=w640`,
         durationSeconds: Number.isFinite(durationMillis) && durationMillis > 0 ? Math.round(durationMillis / 1000) : 0,
     };
+}
+
+/**
+ * Reads a file through the Drive API using the server's OAuth credentials.
+ * Callers must validate/authorize the requested file ID before calling this;
+ * this helper deliberately never follows a user-provided URL.
+ */
+export async function downloadGoogleDriveFile(fileId: string): Promise<Response> {
+    const accessToken = await getGoogleDriveAccessToken();
+    return fetch(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
 }
 
 export function driveImageUrl(fileId: string, width = 512): string {
