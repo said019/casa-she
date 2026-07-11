@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
@@ -11,6 +12,7 @@ const PRODUCT_IMAGE_PORT = 3204;
 const PRODUCT_IMAGE_API = `http://localhost:${PRODUCT_IMAGE_PORT}/api`;
 const BACKEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const productImage = Buffer.from('product-image');
+const PRODUCT_IMAGE_MAX_TRANSPORT_BYTES = 10 * 1024 * 1024;
 
 async function expectRejects(
     action: () => Promise<unknown>,
@@ -106,6 +108,23 @@ async function productImageContract(): Promise<void> {
         nonImageBody.append('image', new Blob([Buffer.from('no es imagen')], { type: 'text/plain' }), 'nota.txt');
         const nonImage = await apiJson(`/products/${product.id}/image`, token, nonImageBody);
         assert.equal(nonImage.status, 400, `archivo no imagen: ${JSON.stringify(nonImage.json)}`);
+
+        const missingProductBody = new FormData();
+        missingProductBody.append('image', new Blob([productImage], { type: 'image/png' }), 'producto.png');
+        const missingProduct = await apiJson(`/products/${randomUUID()}/image`, token, missingProductBody);
+        assert.equal(missingProduct.status, 404, `producto inexistente: ${JSON.stringify(missingProduct.json)}`);
+
+        // El archivo queda justo en 10 MiB; el framing multipart lo hace exceder el
+        // presupuesto de transporte total. Debe rechazarlo ANTES de intentar el fallback local.
+        const aggregateLimitBody = new FormData();
+        aggregateLimitBody.append(
+            'image',
+            new Blob([Buffer.alloc(PRODUCT_IMAGE_MAX_TRANSPORT_BYTES)], { type: 'image/png' }),
+            'limite-transporte.png',
+        );
+        const aggregateLimit = await apiJson(`/products/${product.id}/image`, token, aggregateLimitBody);
+        assert.equal(aggregateLimit.status, 413, `límite total multipart: ${JSON.stringify(aggregateLimit.json)}`);
+        assert.match(aggregateLimit.json.error, /carga multipart.*10 MB/i);
 
         const validBody = new FormData();
         validBody.append('image', new Blob([productImage], { type: 'image/png' }), 'producto.png');

@@ -10,16 +10,57 @@ import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { ImageStorageError, subirImagen } from '../lib/imageStorage.js';
 
 const router = Router();
+const PRODUCT_IMAGE_MAX_TRANSPORT_BYTES = 10 * 1024 * 1024;
+// Cuando el request no trae Content-Length, este margen cubre los boundaries y
+// headers multipart. Solo se admite una parte de archivo y cero campos de texto.
+const PRODUCT_IMAGE_MAX_FILE_BYTES = PRODUCT_IMAGE_MAX_TRANSPORT_BYTES - 16 * 1024;
+
 const productImageUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 10 * 1024 * 1024 },
+    limits: {
+        fileSize: PRODUCT_IMAGE_MAX_FILE_BYTES,
+        fieldSize: 1024,
+        files: 1,
+        fields: 0,
+        // Busboy alcanza el límite antes de procesar el cierre; 2 admite una
+        // sola parte `image` y sigue rechazando cualquier parte adicional.
+        parts: 2,
+        fieldNameSize: 64,
+        headerPairs: 16,
+    },
 });
+
+function productImagePayloadTooLarge(res: Response, error = 'La carga multipart no debe superar 10 MB en total'): void {
+    res.status(413).json({ error });
+}
+
+// Multer limita cada archivo, no el request completo. El header incluye el
+// archivo, boundaries y cualquier parte adicional, así que se valida antes de
+// que Multer reserve memoria. El límite de archivo conservador protege también
+// requests chunked que no incluyen Content-Length.
+function enforceProductImageTransportLimit(req: Request, res: Response, next: NextFunction): void {
+    const rawContentLength = req.headers['content-length'];
+    const contentLength = typeof rawContentLength === 'string' ? Number(rawContentLength) : NaN;
+    if (Number.isSafeInteger(contentLength) && contentLength > PRODUCT_IMAGE_MAX_TRANSPORT_BYTES) {
+        productImagePayloadTooLarge(res);
+        return;
+    }
+    next();
+}
 
 function uploadProductImage(req: Request, res: Response, next: NextFunction): void {
     productImageUpload.single('image')(req, res, (error: unknown) => {
+        if (res.headersSent) return;
         if (error instanceof multer.MulterError) {
-            if (error.code === 'LIMIT_FILE_SIZE') {
-                res.status(413).json({ error: 'La imagen no debe pesar más de 10 MB' });
+            const payloadLimitCodes = new Set([
+                'LIMIT_PART_COUNT',
+                'LIMIT_FILE_SIZE',
+                'LIMIT_FILE_COUNT',
+                'LIMIT_FIELD_VALUE',
+                'LIMIT_FIELD_COUNT',
+            ]);
+            if (payloadLimitCodes.has(error.code)) {
+                productImagePayloadTooLarge(res, 'La imagen o sus partes superan el límite permitido de 10 MB');
                 return;
             }
             res.status(400).json({ error: 'No se pudo procesar la imagen' });
@@ -261,7 +302,7 @@ router.put('/:id', authenticate, requirePermission('inventario'), async (req: Re
 });
 
 // POST /api/products/:id/image - Upload product image (multipart field: image)
-router.post('/:id/image', authenticate, requirePermission('inventario'), uploadProductImage, async (req: Request, res: Response) => {
+router.post('/:id/image', authenticate, requirePermission('inventario'), enforceProductImageTransportLimit, uploadProductImage, async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const file = req.file;
