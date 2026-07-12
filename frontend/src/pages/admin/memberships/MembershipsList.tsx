@@ -39,7 +39,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, Search, CheckCircle2, XCircle, Plus } from 'lucide-react';
+import { AlertTriangle, Loader2, Search, CheckCircle2, XCircle, Plus } from 'lucide-react';
 import { MembershipActivationDialog, ActivationForm } from '@/components/memberships/MembershipActivationDialog';
 import { EditValidityDialog } from '@/components/memberships/EditValidityDialog';
 import { useIsElevated } from '@/hooks/useIsElevated';
@@ -117,6 +117,7 @@ export default function MembershipsList({
     const [cancellationMembership, setCancellationMembership] = useState<Membership | null>(null);
     const [cancelReason, setCancelReason] = useState('');
     const [cancelRefund, setCancelRefund] = useState(true);
+    const [externalRefundConfirmed, setExternalRefundConfirmed] = useState(false);
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const isElevated = useIsElevated();
@@ -197,12 +198,13 @@ export default function MembershipsList({
             queryClient.invalidateQueries({ queryKey: ['memberships'] });
             const refundInfo = data?.refund;
             const description = refundInfo?.applied
-                ? `Reembolsados ${refundInfo.payments_refunded.length} pago(s) y revertidos ${refundInfo.points_reversed} puntos.`
+                ? `Registrados como reembolsados ${refundInfo.payments_refunded.length} pago(s) y revertidos ${refundInfo.points_reversed} puntos.`
                 : 'La membresía ha sido cancelada.';
             toast({ title: 'Membresía cancelada', description });
             setCancellationMembership(null);
             setCancelReason('');
             setCancelRefund(true);
+            setExternalRefundConfirmed(false);
         },
         onError: (error) => {
             toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(error) });
@@ -382,8 +384,11 @@ export default function MembershipsList({
                                                             onClick={() => {
                                                                 setCancelReason('');
                                                                 setCancelRefund(true);
+                                                                setExternalRefundConfirmed(false);
                                                                 setCancellationMembership(m);
                                                             }}
+                                                            aria-label={`Cancelar membresía de ${m.user_name ?? 'usuario'}`}
+                                                            title="Cancelar membresía"
                                                         >
                                                             <XCircle className="h-4 w-4" />
                                                         </Button>
@@ -442,7 +447,10 @@ export default function MembershipsList({
 
                                 <div className="space-y-2">
                                     <Label>Estado Inicial</Label>
-                                    <Select onValueChange={(val: any) => setValue('status', val)} defaultValue="active">
+                                    <Select
+                                        onValueChange={(val) => setValue('status', val as AssignForm['status'])}
+                                        defaultValue="active"
+                                    >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Seleccionar estado" />
                                         </SelectTrigger>
@@ -535,7 +543,10 @@ export default function MembershipsList({
                     <Dialog
                         open={Boolean(cancellationMembership)}
                         onOpenChange={(nextOpen) => {
-                            if (!nextOpen && !cancelMutation.isPending) setCancellationMembership(null);
+                            if (!nextOpen && !cancelMutation.isPending) {
+                                setCancellationMembership(null);
+                                setExternalRefundConfirmed(false);
+                            }
                         }}
                     >
                         <DialogContent>
@@ -563,23 +574,52 @@ export default function MembershipsList({
                                     <Checkbox
                                         id="cancel-refund"
                                         checked={cancelRefund}
-                                        onCheckedChange={(v) => setCancelRefund(v === true)}
+                                        onCheckedChange={(v) => {
+                                            const checked = v === true;
+                                            setCancelRefund(checked);
+                                            if (!checked) setExternalRefundConfirmed(false);
+                                        }}
                                     />
                                     <div className="space-y-1">
                                         <Label htmlFor="cancel-refund" className="cursor-pointer">
-                                            Devolver el dinero al usuario
+                                            Registrar reembolso en Casa Shé
                                         </Label>
                                         <p className="text-xs text-muted-foreground">
-                                            Marca los pagos asociados como reembolsados y revierte los puntos otorgados.
-                                            Deja sin marcar si el dinero se queda en el estudio.
+                                            Marca los pagos asociados como reembolsados y revierte los puntos otorgados en el sistema.
                                         </p>
                                     </div>
                                 </div>
+                                {cancelRefund && (
+                                    <div className="space-y-3 rounded-xl border border-warning/35 bg-warning/10 p-4">
+                                        <div className="flex items-start gap-2">
+                                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+                                            <div>
+                                                <p className="text-sm font-semibold">Esta acción no envía dinero</p>
+                                                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                                                    Devuelve primero el pago por Mercado Pago, terminal, transferencia o efectivo. Después registra aquí el resultado.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-3 border-t border-warning/25 pt-3">
+                                            <Checkbox
+                                                id="external-refund-confirmed"
+                                                checked={externalRefundConfirmed}
+                                                onCheckedChange={(value) => setExternalRefundConfirmed(value === true)}
+                                            />
+                                            <Label htmlFor="external-refund-confirmed" className="cursor-pointer text-xs leading-relaxed">
+                                                Confirmo que el dinero ya fue devuelto por el método correspondiente.
+                                            </Label>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <DialogFooter>
                                 <Button
                                     variant="ghost"
-                                    onClick={() => setCancellationMembership(null)}
+                                    onClick={() => {
+                                        setCancellationMembership(null);
+                                        setExternalRefundConfirmed(false);
+                                    }}
                                     disabled={cancelMutation.isPending}
                                 >
                                     Volver
@@ -594,10 +634,10 @@ export default function MembershipsList({
                                             refund: cancelRefund,
                                         });
                                     }}
-                                    disabled={cancelMutation.isPending}
+                                    disabled={cancelMutation.isPending || (cancelRefund && !externalRefundConfirmed)}
                                 >
                                     {cancelMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Cancelar membresía
+                                    {cancelRefund ? 'Cancelar y registrar reembolso' : 'Cancelar sin reembolso'}
                                 </Button>
                             </DialogFooter>
                         </DialogContent>

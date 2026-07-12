@@ -30,7 +30,7 @@ interface Props {
 /**
  * Diálogo de cancelar reserva (estilo Fitune): muestra la ventana de "cancelación
  * gratuita" calculada en el servidor con hora CDMX, un switch para decidir si se
- * devuelve el crédito al cliente, y avisa que se le notificará por correo.
+ * devuelve el crédito al cliente y aclara el resultado antes de confirmar.
  * Solo lo usa staff (admin/recepción), que puede cancelar fuera de ventana.
  */
 export function CancelBookingDialog({ bookingId, open, onClose, onCancelled, force = false }: Props) {
@@ -46,13 +46,13 @@ export function CancelBookingDialog({ bookingId, open, onClose, onCancelled, for
     const minHours = preview?.minHours ?? 12;
     const withinWindow = !!preview && preview.hoursUntilClass != null && preview.hoursUntilClass >= minHours;
 
-    // Default del switch: dentro de la ventana gratuita → devolver; cancelación tardía → no.
-    // (El staff puede cambiarlo libremente.)
+    // El servidor es la fuente canónica para decidir la devolución sugerida.
+    // El staff puede cambiarla libremente antes de confirmar.
     useEffect(() => {
         if (force) { setRefund(true); return; } // quitar forzado: por defecto devolver el crédito
-        if (preview) setRefund(withinWindow);
+        if (preview) setRefund(preview.willRefund);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [force, preview?.hoursUntilClass, preview?.minHours]);
+    }, [force, preview?.willRefund]);
 
     const cancelM = useMutation({
         mutationFn: async () => api.post(`/bookings/${bookingId}/cancel`, { refundCredit: refund, ...(force ? { force: true } : {}) }),
@@ -65,7 +65,7 @@ export function CancelBookingDialog({ bookingId, open, onClose, onCancelled, for
     });
 
     return (
-        <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+        <Dialog open={open} onOpenChange={(o) => { if (!o && !cancelM.isPending) onClose(); }}>
             <DialogContent className="sm:max-w-[440px]">
                 <DialogHeader>
                     <DialogTitle>{force ? 'Quitar de la clase' : 'Cancelar reserva'}</DialogTitle>
@@ -85,7 +85,7 @@ export function CancelBookingDialog({ bookingId, open, onClose, onCancelled, for
                         <div>
                             <p className="text-sm font-semibold">Cancelación gratuita</p>
                             <p className="mt-1.5 flex items-center gap-2 text-sm text-muted-foreground">
-                                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${withinWindow ? 'bg-emerald-100 text-emerald-600' : 'bg-muted text-muted-foreground/50'}`}>
+                                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${withinWindow ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground/50'}`}>
                                     <Check className="h-3.5 w-3.5" />
                                 </span>
                                 {minHours} horas antes del inicio de la reserva
@@ -97,17 +97,36 @@ export function CancelBookingDialog({ bookingId, open, onClose, onCancelled, for
                                         : `Faltan ~${preview.hoursUntilClass}h para la clase: fuera de la ventana (cancelación tardía).`}
                                 </p>
                             )}
+                            {preview && preview.cancellationLimit < 999 && (
+                                <p className="mt-2 text-xs font-medium text-foreground/70">
+                                    Cancelaciones usadas: {preview.cancellationsUsed} de {preview.cancellationLimit}
+                                </p>
+                            )}
                         </div>
                         )}
 
-                        <div className="flex items-center gap-3">
-                            <Switch checked={refund} onCheckedChange={setRefund} disabled={cancelM.isPending} />
-                            <span className="text-sm">Devolver el crédito al usuario</span>
+                        <div className={`rounded-xl border p-3 ${refund ? 'border-success/25 bg-success/10' : 'border-warning/35 bg-warning/10'}`}>
+                            <div className="flex items-center gap-3">
+                                <Switch
+                                    id="refund-credit"
+                                    checked={refund}
+                                    onCheckedChange={setRefund}
+                                    disabled={cancelM.isPending}
+                                />
+                                <label htmlFor="refund-credit" className="cursor-pointer text-sm font-medium">
+                                    Devolver 1 crédito al usuario
+                                </label>
+                            </div>
+                            <p className="mt-2 pl-11 text-xs text-muted-foreground">
+                                {refund
+                                    ? 'La cancelación devolverá el crédito a la membresía.'
+                                    : 'La reserva se cancelará sin devolver el crédito.'}
+                            </p>
                         </div>
 
-                        <p className="flex items-start gap-2 text-sm text-amber-700">
-                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                            El usuario será notificado por correo electrónico
+                        <p className="flex items-start gap-2 text-sm text-muted-foreground">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                            Se notificará al usuario por los canales que tenga disponibles.
                         </p>
                     </div>
                 )}
@@ -121,7 +140,13 @@ export function CancelBookingDialog({ bookingId, open, onClose, onCancelled, for
                         onClick={() => cancelM.mutate()}
                         disabled={cancelM.isPending || isLoading}
                     >
-                        {cancelM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : (force ? 'Quitar' : 'Cancelar reserva')}
+                        {cancelM.isPending
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : force
+                                ? 'Quitar de la clase'
+                                : refund
+                                    ? 'Cancelar y devolver crédito'
+                                    : 'Cancelar sin devolución'}
                     </Button>
                 </DialogFooter>
             </DialogContent>

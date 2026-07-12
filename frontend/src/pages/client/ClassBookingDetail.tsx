@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { parseISO, format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -10,7 +11,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
-import { Calendar, Clock, User, Sparkles, MapPin } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Calendar, Clock, User, Sparkles, MapPin, AlertTriangle } from 'lucide-react';
 
 interface BookingDetail {
   booking_id: string;
@@ -39,6 +49,7 @@ export default function ClassBookingDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
 
   const { data, isLoading, isError } = useQuery<BookingDetail>({
     queryKey: ['booking-detail', bookingId],
@@ -55,6 +66,8 @@ export default function ClassBookingDetail() {
     willRefund: boolean;
     hoursUntilClass: number | null;
     minHours: number | null;
+    cancellationsUsed: number;
+    cancellationLimit: number;
     reason: string | null;
     code: string | null;
   }>({
@@ -72,9 +85,18 @@ export default function ClassBookingDetail() {
     mutationFn: async () => {
       return await api.post(`/bookings/${bookingId}/cancel`);
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
-      toast({ title: 'Reserva cancelada', description: 'Tu crédito ha sido devuelto (si aplica).' });
+      queryClient.invalidateQueries({ queryKey: ['booking-detail', bookingId] });
+      setIsCancelDialogOpen(false);
+
+      if (data?.booking_status === 'waitlist') {
+        toast({ title: 'Saliste de la lista de espera', description: 'No se gastó ningún crédito.' });
+      } else if (response.data?.refunded === true) {
+        toast({ title: 'Reserva cancelada', description: 'El crédito fue devuelto a tu membresía.' });
+      } else {
+        toast({ title: 'Reserva cancelada', description: 'Esta cancelación no devolvió crédito.' });
+      }
       navigate('/app/classes');
     },
     onError: (err) => {
@@ -174,7 +196,7 @@ export default function ClassBookingDetail() {
                   <Button
                     variant="outline"
                     className="w-full rounded-full border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    onClick={() => cancelMutation.mutate()}
+                    onClick={() => setIsCancelDialogOpen(true)}
                     disabled={cancelMutation.isPending}
                   >
                     {cancelMutation.isPending ? 'Saliendo...' : 'Salir de la lista de espera'}
@@ -196,7 +218,7 @@ export default function ClassBookingDetail() {
                   <Button
                     variant="outline"
                     className="w-full rounded-full border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    onClick={() => cancelMutation.mutate()}
+                    onClick={() => setIsCancelDialogOpen(true)}
                     disabled={cancelMutation.isPending}
                   >
                     {cancelMutation.isPending ? 'Cancelando...' : 'Cancelar reserva'}
@@ -221,6 +243,71 @@ export default function ClassBookingDetail() {
               </div>
             );
           })()}
+
+          <AlertDialog
+            open={isCancelDialogOpen}
+            onOpenChange={(open) => {
+              if (!cancelMutation.isPending) setIsCancelDialogOpen(open);
+            }}
+          >
+            <AlertDialogContent className="max-w-[calc(100%-2rem)] rounded-3xl sm:max-w-md">
+              <AlertDialogHeader>
+                <div className="mx-auto mb-1 flex h-11 w-11 items-center justify-center rounded-full bg-destructive/10 text-destructive sm:mx-0">
+                  <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <AlertDialogTitle>
+                  {data?.booking_status === 'waitlist'
+                    ? '¿Salir de la lista de espera?'
+                    : '¿Cancelar esta reserva?'}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {data?.booking_status === 'waitlist'
+                    ? 'Perderás tu posición actual. Esta acción no usa créditos ni cuenta como cancelación.'
+                    : 'Tu lugar quedará disponible para otra persona. Revisa el resultado antes de confirmar.'}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              {data?.booking_status === 'confirmed' && (
+                <div
+                  className={`rounded-2xl border p-4 ${
+                    preview?.willRefund
+                      ? 'border-success/25 bg-success/10'
+                      : 'border-warning/35 bg-warning/10'
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-foreground">
+                    {preview?.willRefund ? 'Se devolverá 1 crédito' : 'No se devolverá el crédito'}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    {preview?.willRefund
+                      ? 'El crédito regresará a la membresía con la que reservaste.'
+                      : `Estás fuera de la ventana de ${preview?.minHours ?? policy?.min_hours ?? 0} horas para devolución.`}
+                  </p>
+                  {preview && preview.cancellationLimit < 999 && (
+                    <p className="mt-2 text-xs font-medium text-foreground/75">
+                      Cancelaciones usadas: {preview.cancellationsUsed} de {preview.cancellationLimit}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <AlertDialogFooter className="gap-2 sm:gap-0">
+                <AlertDialogCancel disabled={cancelMutation.isPending}>Conservar mi lugar</AlertDialogCancel>
+                <Button
+                  variant="destructive"
+                  onClick={() => cancelMutation.mutate()}
+                  disabled={cancelMutation.isPending}
+                  className="min-h-11"
+                >
+                  {cancelMutation.isPending
+                    ? 'Procesando...'
+                    : data?.booking_status === 'waitlist'
+                      ? 'Sí, salir de la lista'
+                      : 'Sí, cancelar reserva'}
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </ClientLayout>
     </AuthGuard>
