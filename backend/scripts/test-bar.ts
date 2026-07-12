@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { isBarOpenAt, computeBarTotals, canBarTransition, pointsForTotal, canCustomerCancel, nextBarOpening, type BarConfig } from '../src/lib/bar.js';
+import { isBarOpenAt, computeBarTotals, canBarTransition, pointsForTotal, canCustomerCancel, nextBarOpening, isCardPaymentPending, type BarConfig } from '../src/lib/bar.js';
 
 const cfg: BarConfig = {
   enabled: true,
@@ -38,6 +38,13 @@ assert.equal(canBarTransition('pending', 'cancelled', 'customer'), true, 'client
 assert.equal(canBarTransition('preparing', 'cancelled', 'customer'), false, 'cliente NO cancela preparing');
 assert.equal(canBarTransition('delivered', 'preparing', 'staff'), false, 'terminal no transiciona');
 assert.equal(canBarTransition('pending', 'ready', 'staff'), false, 'no salta de pending a ready');
+
+// Una orden con tarjeta no entra a cola ni se prepara hasta que Mercado Pago la confirma.
+assert.equal(isCardPaymentPending('card', 'pending'), true, 'tarjeta pendiente no está lista para cola');
+assert.equal(isCardPaymentPending('card', 'failed'), true, 'tarjeta fallida tampoco está lista para cola');
+assert.equal(isCardPaymentPending('card', 'paid'), false, 'tarjeta aprobada sí está lista para cola');
+assert.equal(isCardPaymentPending('points', 'paid'), false, 'puntos pagados no se bloquean');
+assert.equal(isCardPaymentPending('reception', 'pending'), false, 'pago en barra puede permanecer en cola');
 
 // computeBarTotals con recargo por tarjeta
 const withFee = computeBarTotals([{ unit_price_mxn: 100, quantity: 1 }], { surchargePercent: 4 });

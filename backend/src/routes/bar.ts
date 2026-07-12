@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { query, queryOne, pool } from '../config/database.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { getSetting } from '../lib/settings.js';
-import { isBarOpenAt, nextBarOpening, BAR_CATEGORY_NAMES, computeBarTotals, pointsForTotal, canBarTransition, canCustomerCancel, type BarStatus, type BarConfig } from '../lib/bar.js';
+import { isBarOpenAt, nextBarOpening, BAR_CATEGORY_NAMES, computeBarTotals, pointsForTotal, canBarTransition, canCustomerCancel, isCardPaymentPending, type BarStatus, type BarConfig } from '../lib/bar.js';
 import { spendBarPoints, refundBarPoints } from '../lib/barPoints.js';
 import { sendWebPushToUser } from '../lib/web-push.js';
 import { createPreference, mpConfigured } from '../lib/mercadopago.js';
@@ -354,6 +354,7 @@ router.get('/orders/queue', authenticate, staffOnly, async (_req: Request, res: 
      FROM bar_orders o JOIN users u ON u.id = o.user_id
      LEFT JOIN bar_order_items i ON i.bar_order_id = o.id
      WHERE o.status IN ('pending','preparing','ready')
+       AND (o.payment_method <> 'card' OR o.payment_status = 'paid')
      GROUP BY o.id, u.display_name ORDER BY o.pickup_time ASC`);
   res.json(rows);
 });
@@ -361,11 +362,14 @@ router.get('/orders/queue', authenticate, staffOnly, async (_req: Request, res: 
 router.patch('/orders/:id/status', authenticate, staffOnly, async (req: Request, res: Response) => {
   const to = req.body?.status as BarStatus;
   if (!to) return res.status(400).json({ error: 'MISSING_STATUS' });
-  const o = await queryOne<{ status: BarStatus; user_id: string; payment_method: string; points_spent: number | null }>(
-    `SELECT status, user_id, payment_method, points_spent FROM bar_orders WHERE id = $1`, [req.params.id]);
+  const o = await queryOne<{ status: BarStatus; user_id: string; payment_method: string; payment_status: string; points_spent: number | null }>(
+    `SELECT status, user_id, payment_method, payment_status, points_spent FROM bar_orders WHERE id = $1`, [req.params.id]);
   if (!o) return res.status(404).json({ error: 'NOT_FOUND' });
   if (!canBarTransition(o.status, to, 'staff')) return res.status(400).json({ error: 'INVALID_TRANSITION' });
   if (to === 'cancelled' && !req.body?.cancellationReason) return res.status(400).json({ error: 'REASON_REQUIRED' });
+  if (to !== 'cancelled' && isCardPaymentPending(o.payment_method, o.payment_status)) {
+    return res.status(409).json({ error: 'CARD_PAYMENT_PENDING' });
+  }
   const cfg = await getSetting('bar_config');
   const stamp = to === 'preparing' ? 'preparing_at' : to === 'ready' ? 'ready_at' : to === 'delivered' ? 'delivered_at' : 'cancelled_at';
 
@@ -427,9 +431,9 @@ router.delete('/orders/:id', authenticate, async (req: Request, res: Response) =
   if (o.user_id !== req.user!.userId) return res.status(403).json({ error: 'FORBIDDEN' });
   if (!canBarTransition(o.status, 'cancelled', 'customer')) return res.status(400).json({ error: 'CANNOT_CANCEL' });
   const cfg = await getSetting('bar_config');
-  const full = await queryOne<{ pickup_time: string; payment_method: string; points_spent: number | null }>(
-    `SELECT pickup_time, payment_method, points_spent FROM bar_orders WHERE id=$1`, [req.params.id]);
-  if (full && !canCustomerCancel(new Date(full.pickup_time), new Date(), Number(cfg.cancellation_window_minutes ?? 60))) {
+  const full = await queryOne<{ pickup_time: string; payment_method: string; payment_status: string; points_spent: number | null }>(
+    `SELECT pickup_time, payment_method, payment_status, points_spent FROM bar_orders WHERE id=$1`, [req.params.id]);
+  if (full && !isCardPaymentPending(full.payment_method, full.payment_status) && !canCustomerCancel(new Date(full.pickup_time), new Date(), Number(cfg.cancellation_window_minutes ?? 60))) {
     return res.status(400).json({ error: 'CANCEL_WINDOW_CLOSED' });
   }
   const client = await pool.connect();

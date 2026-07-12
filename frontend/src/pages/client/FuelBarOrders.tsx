@@ -10,6 +10,7 @@ interface BarOrderSummary {
   id: string;
   status: string;
   payment_method: string;
+  payment_status?: string;
   total_mxn: number;
   created_at: string;
 }
@@ -33,6 +34,21 @@ const STATUS_COLOR: Record<string, string> = {
   delivered: 'bg-[#6B7F7E]',
   cancelled: 'bg-[#AE4836]',
 };
+
+function isCardPaymentPending(order: BarOrderSummary) {
+  return order.payment_method === 'card' && order.payment_status !== 'paid';
+}
+
+function orderStatusLabel(order: BarOrderSummary) {
+  if (isCardPaymentPending(order)) {
+    return order.payment_status === 'failed' ? 'Pago no completado' : 'Pago pendiente';
+  }
+  return STATUS_LABEL[order.status] || order.status;
+}
+
+function orderStatusColor(order: BarOrderSummary) {
+  return isCardPaymentPending(order) ? 'bg-[#C89B25]' : (STATUS_COLOR[order.status] || 'bg-gray-400');
+}
 
 export default function FuelBarOrders() {
   const nav = useNavigate();
@@ -83,17 +99,19 @@ export default function FuelBarOrders() {
                   onClick={() => nav(`/app/fuel-bar/order/${o.id}`)}
                   className="flex w-full items-center gap-4 rounded-[18px] border border-[rgba(22,38,26,.10)] bg-[rgba(255,255,255,.5)] p-4 text-left transition-all hover:bg-[rgba(42,78,54,.04)]"
                 >
-                  <div className={`h-3 w-3 flex-shrink-0 rounded-full ${STATUS_COLOR[o.status] || 'bg-gray-400'}`} />
+                  <div className={`h-3 w-3 flex-shrink-0 rounded-full ${orderStatusColor(o)}`} />
                   <div className="min-w-0 flex-1">
                     <div className="text-[14.5px] text-[#2A4E36]">
-                      {STATUS_LABEL[o.status] || o.status}
+                      {orderStatusLabel(o)}
                     </div>
                     <div className="mt-0.5 text-[11px] text-[#2A4E36] opacity-50">
                       {(() => {
                         try { return format(parseISO(o.created_at), "d MMM · HH:mm", { locale: es }); }
                         catch { return ''; }
                       })()}
-                      {o.payment_method === 'card' ? ' · Tarjeta' : o.payment_method === 'points' ? ' · Puntos' : ' · Pago en barra'}
+                      {o.payment_method === 'card'
+                        ? (isCardPaymentPending(o) ? ' · Tarjeta · Sin pagar' : ' · Tarjeta')
+                        : o.payment_method === 'points' ? ' · Puntos' : ' · Pago en barra'}
                     </div>
                   </div>
                   <span className="font-heading text-[15px] text-[#2A4E36]">
