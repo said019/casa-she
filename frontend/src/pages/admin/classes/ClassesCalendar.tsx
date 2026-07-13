@@ -57,7 +57,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/components/ui/use-toast';
 import {
     Loader2, ChevronLeft, ChevronRight, Calendar as CalendarIcon,
-    Plus, Repeat, Users, Trash2, Check, Edit, Phone, Clock, MapPin, Sparkles, X, RotateCcw, Lock, Unlock
+    Plus, Repeat, Users, Trash2, Check, Edit, Phone, Clock, MapPin, Sparkles, X, RotateCcw, Lock, Unlock,
+    RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -250,7 +251,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     const startStr = format(weekStart, 'yyyy-MM-dd');
     const endStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
 
-    const { data: classes } = useQuery<Class[]>({
+    const { data: classes, isLoading: classesLoading, isError: classesError, refetch: refetchClasses } = useQuery<Class[]>({
         queryKey: ['classes', startStr, endStr, studioFilter, programFilter],
         queryFn: async () => {
             const params = new URLSearchParams({ start: startStr, end: endStr });
@@ -259,6 +260,9 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
             const { data } = await api.get(`/classes?${params.toString()}`);
             return data;
         },
+        retry: 3,
+        retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
+        refetchOnWindowFocus: true,
     });
 
     // Closed days for visual indicator
@@ -729,9 +733,9 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
 
                             <div className="space-y-3 lg:min-w-[29rem]">
                                 <div className="grid gap-3 sm:grid-cols-3">
-                                    <CalendarStat label="Clases" value={activeClasses.length} />
-                                    <CalendarStat label="Reservas" value={totalBookings} />
-                                    <CalendarStat label="Cupos libres" value={openSpots} />
+                                    <CalendarStat label="Clases" value={classesLoading ? '…' : classesError ? '—' : activeClasses.length} />
+                                    <CalendarStat label="Reservas" value={classesLoading ? '…' : classesError ? '—' : totalBookings} />
+                                    <CalendarStat label="Cupos libres" value={classesLoading ? '…' : classesError ? '—' : openSpots} />
                                 </div>
                             </div>
                         </div>
@@ -822,7 +826,21 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                         </div>
                     </section>
 
-
+                    {classesLoading ? (
+                        <div className="flex min-h-64 flex-col items-center justify-center rounded-[1.75rem] border border-balance-sand/65 bg-[hsl(var(--admin-panel))]" aria-live="polite">
+                            <Loader2 className="h-6 w-6 animate-spin text-balance-olive" aria-hidden="true" />
+                            <p className="mt-3 text-sm font-medium text-balance-dark/65">Cargando calendario…</p>
+                        </div>
+                    ) : classesError ? (
+                        <div className="flex min-h-64 flex-col items-center justify-center rounded-[1.75rem] border border-destructive/25 bg-destructive/5 px-6 text-center" role="alert">
+                            <p className="font-semibold text-balance-dark">No pudimos cargar las clases</p>
+                            <p className="mt-1 max-w-md text-sm text-balance-dark/60">El calendario sigue guardado. Revisa la conexión con el servidor y vuelve a intentarlo.</p>
+                            <Button variant="outline" className="mt-5" onClick={() => refetchClasses()}>
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Volver a intentar
+                            </Button>
+                        </div>
+                    ) : (
                     <div className="overflow-hidden rounded-[1.75rem] border border-balance-sand/65 bg-[hsl(var(--admin-panel))] shadow-[0_22px_72px_-58px_rgba(51,42,34,0.75)]">
                         <div className="overflow-x-auto">
                             <div className="min-w-[980px]">
@@ -922,6 +940,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                             </div>
                         </div>
                     </div>
+                    )}
 
                     {/* Attendees Sheet */}
                     <Sheet open={isAttendeesOpen && !!selectedClass} onOpenChange={(open) => { setIsAttendeesOpen(open); if (!open) setSelectedClass(null); }}>
@@ -1822,7 +1841,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     );
 }
 
-function CalendarStat({ label, value }: { label: string; value: number }) {
+function CalendarStat({ label, value }: { label: string; value: number | string }) {
     return (
         <div className="rounded-[1.15rem] border border-balance-olive/16 bg-balance-cream/55 px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-balance-dark/48">{label}</p>

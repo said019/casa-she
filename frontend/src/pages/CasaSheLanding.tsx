@@ -146,7 +146,9 @@ function useWeekSchedule(weekOffset: number) {
       return grouped;
     },
     staleTime: 5 * 60 * 1000,
-    retry: false,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -511,7 +513,7 @@ function ClassChip({ c }: { c: ClassSlot }) {
 
 function Horario() {
   const [weekOffset, setWeekOffset] = useState(0);
-  const { data } = useWeekSchedule(weekOffset);
+  const { data, isLoading, isError, isFetching, refetch } = useWeekSchedule(weekOffset);
   const week = data ?? {};
   const { range, todayIdx, dayNums } = weekLabel(weekOffset);
   const totalClases = DAYS.reduce((n, d) => n + (week[d]?.length ?? 0), 0);
@@ -557,6 +559,24 @@ function Horario() {
           ))}
         </div>
 
+        {isLoading || (isFetching && !data) ? (
+          <div className="rounded-2xl border border-[rgba(39,74,42,0.14)] bg-white/45 px-6 py-14 text-center" aria-live="polite">
+            <p className={`${body} text-sm`} style={{ color: GREEN, opacity: 0.7 }}>Cargando las clases de esta semana…</p>
+          </div>
+        ) : isError ? (
+          <div className="rounded-2xl border border-[rgba(174,72,54,0.25)] bg-white/55 px-6 py-10 text-center" role="alert">
+            <p className={`${body} text-base font-medium`} style={{ color: GREEN }}>No pudimos cargar el horario.</p>
+            <p className={`${body} mt-2 text-sm`} style={{ color: GREEN, opacity: 0.65 }}>Las clases siguen guardadas. Revisa tu conexión e inténtalo de nuevo.</p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className={`${body} mt-5 rounded-full px-6 py-2.5 text-[12px] uppercase tracking-[0.18em]`}
+              style={{ backgroundColor: GREEN, color: CREAM }}
+            >
+              Volver a intentar
+            </button>
+          </div>
+        ) : (
         <div className="flex snap-x gap-3 overflow-x-auto pb-3 lg:grid lg:grid-cols-7 lg:overflow-visible">
           {DAYS.map((d, idx) => {
             const classes = week[d] ?? [];
@@ -592,6 +612,7 @@ function Horario() {
             );
           })}
         </div>
+        )}
 
         <div className="mt-10 text-center">
           <Link

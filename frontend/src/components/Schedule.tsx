@@ -4,7 +4,7 @@ import { addDays, addWeeks, format, isToday, parseISO, startOfWeek, subWeeks } f
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
-import { CalendarRange, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { CalendarRange, ChevronRight, Loader2, RefreshCw, SlidersHorizontal } from "lucide-react";
 import api from "@/lib/api";
 import {
   ScheduleClass,
@@ -87,14 +87,16 @@ export default function Schedule({ bookedIds, defaultFirstFacility }: SchedulePr
   const startDate = format(weekStart, "yyyy-MM-dd");
   const endDate = format(addDays(weekStart, 6), "yyyy-MM-dd");
 
-  const { data: apiClasses } = useQuery<ApiClass[]>({
+  const { data: apiClasses, isLoading, isError, isFetching, refetch } = useQuery<ApiClass[]>({
     queryKey: ["public-classes", startDate, endDate],
     queryFn: async () => {
       const { data } = await api.get(`/classes?start_date=${startDate}&end_date=${endDate}`);
       return data;
     },
-    retry: 1,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
     staleTime: 1000 * 60 * 2,
+    refetchOnWindowFocus: true,
   });
 
   const allClasses: ScheduleClass[] = useMemo(() => {
@@ -209,8 +211,26 @@ export default function Schedule({ bookedIds, defaultFirstFacility }: SchedulePr
           onClear={clearFilters}
         />
 
-        {/* Grid scaffold — cells filled in Task 1.3 */}
-        {hourRail.length === 0 ? (
+        {/* Un fallo de red nunca se presenta como si la semana estuviera vacía. */}
+        {isLoading || (isFetching && !apiClasses) ? (
+          <div className="mt-7 flex min-h-64 flex-col items-center justify-center rounded-2xl border border-bmb-ink/12 bg-bmb-paper px-6 text-center" aria-live="polite">
+            <Loader2 className="h-6 w-6 animate-spin text-bmb-ink/55" aria-hidden="true" />
+            <p className="mt-3 font-medium text-bmb-ink">Cargando clases…</p>
+          </div>
+        ) : isError ? (
+          <div className="mt-7 flex min-h-64 flex-col items-center justify-center rounded-2xl border border-destructive/25 bg-destructive/5 px-6 text-center" role="alert">
+            <p className="font-semibold text-bmb-ink">No pudimos cargar el horario</p>
+            <p className="mt-1 max-w-md text-sm text-bmb-ink/60">Tus clases siguen guardadas. Revisa tu conexión y vuelve a intentarlo.</p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-bmb-ink px-5 text-sm font-semibold text-bmb-cream"
+            >
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+              Volver a intentar
+            </button>
+          </div>
+        ) : hourRail.length === 0 ? (
           <EmptyWeek weekDays={weekDays} activeFilters={activeFilters} onNext={goNext} onClear={clearFilters} />
         ) : isMobile ? (
           <DaySpread
