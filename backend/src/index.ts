@@ -64,6 +64,13 @@ import { PHONE_BY_EMAIL, DOB_BY_EMAIL } from './data/fitune-contact-backfill.js'
 import { FITUNE_INACTIVE_EMAILS } from './data/fitune-inactive-members.js';
 import { REAL_START_BY_EMAIL } from './data/fitune-start-dates.js';
 import { CREDIT_FIXES } from './data/fitune-credit-fixes.js';
+import {
+    CASA_SHE_OFFICIAL_CLASS_TYPES,
+    CASA_SHE_OFFICIAL_FACILITY,
+    CASA_SHE_OFFICIAL_INSTRUCTORS,
+    CASA_SHE_OFFICIAL_SCHEDULE_VERSION,
+    buildCasaSheOfficialScheduleRows,
+} from './data/casa-she-official-schedule.js';
 import initializeCronJobs from './services/cron-jobs.js';
 
 // Load environment variables
@@ -3519,7 +3526,7 @@ async function runStartupMigrations(): Promise<void> {
     // ===========================================================================
     try {
         const CS_PLANS = ['Clase de prueba', 'Drop-in', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Membresía 360', 'Membresía Black', 'Salsa · 1 clase', 'Salsa · 4 clases'];
-        const CS_TYPES = ['Pilates Mat', 'Barre', 'Sculpt', 'Yoga Ashtanga', 'Yoga Vinyasa', 'Flex', 'Salsa'];
+        const CS_TYPES = CASA_SHE_OFFICIAL_CLASS_TYPES.map((type) => type.name);
 
         // Reglamento obligatorio: marca de aceptación por usuaria (NULL = no aceptado aún).
         await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reglamento_accepted_at TIMESTAMPTZ`);
@@ -3594,6 +3601,97 @@ async function runStartupMigrations(): Promise<void> {
 
         console.log('Casa Shé v1: catálogo, sede única y estado activo asegurados en cada arranque.');
     } catch (e) { console.error('Casa Shé v1 seed error:', e); }
+
+    // Horario oficial Casa Shé 1.8 (PDF del 13-jul-2026): 54 plantillas semanales.
+    // Se ejecuta una sola vez para que los cambios posteriores del admin no se reviertan
+    // en cada deploy. Las clases con fecha se sincronizan mediante el script operativo
+    // sync-casa-she-official-schedule.ts, que aborta si encuentra reservas activas.
+    try {
+        const marker = `casa_she_official_schedule_${CASA_SHE_OFFICIAL_SCHEDULE_VERSION}`;
+        const done = await queryOne<{ x: number }>(
+            `SELECT 1 AS x FROM system_settings WHERE key = $1`,
+            [marker]
+        );
+        if (!done) {
+            for (const name of CASA_SHE_OFFICIAL_INSTRUCTORS) {
+                const slug = name.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '');
+                const email = `${slug}@casashe.instructor.local`;
+                await query(
+                    `INSERT INTO users (email, display_name, role, phone, is_active)
+                     SELECT $1::varchar, $2::varchar, 'instructor', '0000000000', true
+                     WHERE NOT EXISTS (SELECT 1 FROM instructors WHERE display_name = $2::varchar)
+                       AND NOT EXISTS (SELECT 1 FROM users WHERE email = $1::varchar)`,
+                    [email, name]
+                );
+                await query(
+                    `INSERT INTO instructors (user_id, display_name, email, is_active, visible_public)
+                     SELECT u.id, $1::varchar, u.email, true, false
+                     FROM users u
+                     WHERE u.email = $2::varchar
+                       AND NOT EXISTS (SELECT 1 FROM instructors WHERE display_name = $1::varchar)`,
+                    [name, email]
+                );
+                await query(
+                    `UPDATE instructors SET is_active = true, updated_at = NOW()
+                     WHERE display_name = $1::varchar`,
+                    [name]
+                );
+            }
+
+            for (const type of CASA_SHE_OFFICIAL_CLASS_TYPES) {
+                await query(
+                    `INSERT INTO class_types
+                       (name, category, level, duration_minutes, max_capacity, color, spot_icon, is_active)
+                     SELECT $1::varchar, $2::class_category, 'all'::class_level, $3, $4, $5::varchar, $6::varchar, true
+                     WHERE NOT EXISTS (SELECT 1 FROM class_types WHERE name = $1::varchar)`,
+                    [type.name, type.category, type.durationMinutes, type.maxCapacity, type.color, type.spotIcon]
+                );
+                await query(
+                    `UPDATE class_types SET is_active = true, updated_at = NOW()
+                     WHERE name = $1::varchar`,
+                    [type.name]
+                );
+            }
+
+            const facility = await queryOne<{ id: string }>(
+                `SELECT id FROM facilities WHERE name = $1 LIMIT 1`,
+                [CASA_SHE_OFFICIAL_FACILITY]
+            );
+            if (!facility) throw new Error(`No existe la sede ${CASA_SHE_OFFICIAL_FACILITY}`);
+
+            // El PDF pasa a ser la fuente completa de verdad de las plantillas de esta sede.
+            await query(`DELETE FROM schedules WHERE facility_id = $1`, [facility.id]);
+            for (const row of buildCasaSheOfficialScheduleRows()) {
+                const classType = await queryOne<{ id: string }>(
+                    `SELECT id FROM class_types WHERE name = $1 AND category = $2 ORDER BY created_at NULLS FIRST LIMIT 1`,
+                    [row.classType, row.category]
+                );
+                const instructor = await queryOne<{ id: string }>(
+                    `SELECT id FROM instructors WHERE display_name = $1 ORDER BY created_at NULLS FIRST LIMIT 1`,
+                    [row.instructor]
+                );
+                if (!classType || !instructor) {
+                    throw new Error(`Referencia faltante en horario oficial: ${row.classType} / ${row.instructor}`);
+                }
+                await query(
+                    `INSERT INTO schedules
+                       (class_type_id, instructor_id, facility_id, day_of_week, start_time,
+                        end_time, max_capacity, is_recurring, is_active)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, true, true)`,
+                    [classType.id, instructor.id, facility.id, row.dayOfWeek, row.startTime,
+                     row.endTime, row.maxCapacity]
+                );
+            }
+
+            await query(
+                `INSERT INTO system_settings (key, value, description)
+                 VALUES ($1, $2::jsonb, 'Horario oficial Casa Shé 1.8 importado desde PDF')
+                 ON CONFLICT (key) DO NOTHING`,
+                [marker, JSON.stringify({ status: 'done', slots: 54, source: 'HORARIOS CASA SHE 1.8.pdf' })]
+            );
+            console.log(`Horario oficial Casa Shé ${CASA_SHE_OFFICIAL_SCHEDULE_VERSION}: 54 plantillas guardadas.`);
+        }
+    } catch (e) { console.error('Horario oficial Casa Shé migration error:', e); }
 
     // Migration 104: user_benefits — tabla de beneficios canjeados (recompensas de lealtad)
     try {
