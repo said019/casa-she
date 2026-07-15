@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { motion, useReducedMotion } from "framer-motion";
 import api from "@/lib/api";
 import { CasaShePattern } from "@/components/CasaShePattern";
+import { CoachSheet } from "@/components/CoachSheet";
 
 /**
  * Landing público de Casa Shé — réplica fiel de https://casashe.mx/
@@ -25,25 +27,28 @@ type Card = {
   title: string;
   planName: string;        // nombre exacto en la tabla plans (para cruzar precio/is_active)
   hint: string;
-  oferta?: boolean;
   color: string;
   artTitle: string;
   tagline: string;
-  light?: boolean;
+  image?: string;
+  applies: string;
+  kind: "Membresía" | "Paquete" | "Clase";
 };
+
+const STUDIO_CLASSES = "Pilates Mat · Barre · Sculpt · Yoga · Flex";
 
 // El precio real se obtiene del API (/plans). Solo se muestra la tarjeta si el plan
 // está activo en la DB. planName debe coincidir exactamente con plans.name.
 const CARDS: Card[] = [
-  { title: "MEMBRESÍA SHE BLACK", planName: "Membresía Black",  color: "#2E1B22", artTitle: "Membresía She Black", tagline: "Nuestra membresía más completa. Bienestar integral para volver a ti.", hint: "24 créditos · acceso total", oferta: true },
-  { title: "MEMBRESÍA 360",       planName: "Membresía 360",    color: "#2A4E36", artTitle: "Membresía 360",       tagline: "Tu bienestar integral empieza aquí. Movimiento, balance y comunidad en un solo lugar.", hint: "16 créditos al mes", oferta: true },
-  { title: "PAQUETE 12 CLASES",   planName: "Paquete 12",       color: "#AE4836", artTitle: "Paquete 12 clases",  tagline: "Constancia que se siente. Más sesiones para sostener tu práctica.", hint: "12 créditos · vigencia 1 mes" },
-  { title: "PAQUETE 8 CLASES",    planName: "Paquete 8",        color: "#8F7F36", artTitle: "Paquete 8 clases",   tagline: "Tu práctica, a tu ritmo. El balance ideal entre flexibilidad y constancia.", hint: "8 créditos · vigencia 1 mes" },
-  { title: "PAQUETE 5 CLASES",    planName: "Paquete 5",        color: "#6E4B34", artTitle: "Paquete 5 clases",   tagline: "Ideal para empezar. Una forma amable de volver a ti.", hint: "5 créditos · vigencia 1 mes" },
-  { title: "CLASE SUELTA",        planName: "Drop-in",          color: "#D6D5C2", light: true, artTitle: "Clase suelta",   tagline: "Muévete cuando lo necesites. Flexibilidad para acompañar tu día.", hint: "1 clase drop-in", oferta: true },
-  { title: "CLASE MUESTRA",       planName: "Clase de prueba",  color: "#E7E0CE", light: true, artTitle: "Clase muestra",  tagline: "Ven a sentirlo. Tu primer encuentro con Casa Shé.", hint: "Tu primera vez en casa" },
-  { title: "SALSA · 1 CLASE",     planName: "Salsa · 1 clase",  color: "#2E1B22", artTitle: "Salsa",              tagline: "Ritmo, cuerpo y comunidad. Baila y reconéctate.", hint: "1 clase de Salsa" },
-  { title: "SALSA · 4 CLASES",    planName: "Salsa · 4 clases", color: "#2E1B22", artTitle: "Salsa",              tagline: "Ritmo, cuerpo y comunidad. Baila y reconéctate.", hint: "4 clases de Salsa · vigencia 1 mes" },
+  { title: "MEMBRESÍA SHE BLACK", planName: "Membresía Black", color: "#2E1B22", artTitle: "Membresía She Black", tagline: "Nuestra membresía más completa para sostener una práctica constante y volver a ti.", hint: "24 créditos · vigencia 1 mes", image: "/casashe/card-black.jpeg", applies: STUDIO_CLASSES, kind: "Membresía" },
+  { title: "MEMBRESÍA 360", planName: "Membresía 360", color: "#2A4E36", artTitle: "Membresía 360", tagline: "Movimiento, balance y comunidad en una membresía diseñada para acompañar tu mes.", hint: "16 créditos · vigencia 1 mes", image: "/casashe/card-360.jpeg", applies: STUDIO_CLASSES, kind: "Membresía" },
+  { title: "PAQUETE 12 CLASES", planName: "Paquete 12", color: "#AE4836", artTitle: "Paquete 12 clases", tagline: "Constancia que se siente. Más sesiones para sostener tu práctica.", hint: "12 créditos · vigencia 1 mes", image: "/casashe/card-12.jpeg", applies: STUDIO_CLASSES, kind: "Paquete" },
+  { title: "PAQUETE 8 CLASES", planName: "Paquete 8", color: "#8F7F36", artTitle: "Paquete 8 clases", tagline: "El balance ideal entre flexibilidad y constancia, a tu ritmo.", hint: "8 créditos · vigencia 1 mes", image: "/casashe/card-8.jpeg", applies: STUDIO_CLASSES, kind: "Paquete" },
+  { title: "PAQUETE 5 CLASES", planName: "Paquete 5", color: "#6E4B34", artTitle: "Paquete 5 clases", tagline: "Una forma amable de empezar y encontrar tus clases favoritas.", hint: "5 créditos · vigencia 1 mes", image: "/casashe/card-5.jpeg", applies: STUDIO_CLASSES, kind: "Paquete" },
+  { title: "CLASE SUELTA", planName: "Drop-in", color: "#D6D5C2", artTitle: "Clase suelta", tagline: "Muévete cuando lo necesites, sin comprometer todo el mes.", hint: "1 crédito · vigencia 30 días", image: "/casashe/card-suelta.jpeg", applies: STUDIO_CLASSES, kind: "Clase" },
+  { title: "CLASE MUESTRA", planName: "Clase de prueba", color: "#E7E0CE", artTitle: "Clase muestra", tagline: "Ven a sentir Casa Shé y encuentra la práctica que conecta contigo.", hint: "1 crédito · vigencia 7 días", image: "/casashe/card-muestra.jpeg", applies: STUDIO_CLASSES, kind: "Clase" },
+  { title: "SALSA · 1 CLASE", planName: "Salsa · 1 clase", color: "#2E1B22", artTitle: "Salsa", tagline: "Ritmo, cuerpo y comunidad en una sesión para soltar y reconectar.", hint: "1 clase · vigencia 30 días", applies: "Salsa", kind: "Clase" },
+  { title: "SALSA · 4 CLASES", planName: "Salsa · 4 clases", color: "#2E1B22", artTitle: "Salsa", tagline: "Cuatro encuentros para aprender, bailar y hacer comunidad.", hint: "4 clases · vigencia 1 mes", applies: "Salsa", kind: "Paquete" },
 ];
 
 const PILLARS = [
@@ -70,6 +75,7 @@ const PILLARS = [
 const NAV = [
   { label: "Inicio", href: "#inicio" },
   { label: "Servicios", href: "#servicios" },
+  { label: "Coaches", href: "#equipo" },
   { label: "Horario", href: "#horario" },
   { label: "Fuel Bar", href: "#bar" },
   { label: "Nosotras", href: "#nosotras" },
@@ -102,6 +108,25 @@ interface ApiClass {
   start_time: string;  // HH:MM
   class_type_name?: string;
   instructor_name?: string;
+}
+
+interface ApiInstructor {
+  id: string;
+  display_name: string;
+  photo_url?: string | null;
+  specialties?: unknown;
+  tagline?: string | null;
+}
+
+function specialtiesFor(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+  if (typeof value !== "string" || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [value];
+  } catch {
+    return [value];
+  }
 }
 
 // Fecha local YYYY-MM-DD (evita el corrimiento de día de toISOString en UTC).
@@ -190,11 +215,11 @@ function Navbar() {
         boxShadow: scrolled ? "0 1px 0 rgba(39,74,42,0.12)" : "none",
       }}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex max-w-[1400px] items-center justify-between px-5 py-4 sm:px-8 lg:px-12">
         <a href="#inicio" aria-label="Casa Shé — inicio">
           <img src={scrolled ? LOGO : LOGO_CREAM} alt="Casa Shé" className="h-7 w-auto md:h-8" />
         </a>
-        <nav className={`${body} hidden items-center gap-8 text-[13px] uppercase tracking-[0.18em] md:flex`}>
+        <nav className={`${body} hidden items-center gap-7 text-[11px] uppercase tracking-[0.16em] xl:flex`}>
           {NAV.map((n) => (
             <a
               key={n.href}
@@ -215,7 +240,7 @@ function Navbar() {
         </nav>
         <Link
           to="/login"
-          className={`${body} text-[12px] uppercase tracking-[0.2em] md:hidden`}
+          className={`${body} text-[12px] uppercase tracking-[0.2em] xl:hidden`}
           style={{ color: scrolled ? GREEN : CREAM }}
         >
           Entrar
@@ -226,42 +251,66 @@ function Navbar() {
 }
 
 function Hero() {
+  const reduce = useReducedMotion();
+
   return (
-    <section id="inicio" className="relative flex min-h-screen items-center justify-center overflow-hidden">
+    <section id="inicio" className="relative min-h-[100dvh] overflow-hidden" style={{ backgroundColor: DEEP }}>
       <img
-        src="/casashe/espacio-salon.jpg"
-        alt="Interior de Casa Shé — estudio en la Condesa"
-        className="absolute inset-0 h-full w-full object-cover"
+        src="/casashe/hero.png"
+        alt="Salón de movimiento de Casa Shé"
+        className="absolute inset-0 h-full w-full object-cover object-center"
+        loading="eager"
+        decoding="async"
       />
-      <div className="absolute inset-0" style={{ backgroundColor: "rgba(28,51,32,0.55)" }} />
-      <div className="relative z-10 px-6 text-center" style={{ color: CREAM }}>
-        <h1 className="sr-only">Casa Shé</h1>
-        <p className={`${body} mb-7 text-[13px] uppercase tracking-[0.5em]`}>Wellness Hub</p>
-        <img
-          src={LOGO_CREAM}
-          alt="Casa Shé"
-          className="mx-auto w-[min(82vw,620px)]"
-        />
-        <p className={`${body} mx-auto mt-8 max-w-xl text-base tracking-[0.12em] sm:text-lg`}>
-          Pilates · Barre · Sculpt · Yoga · Flex · Salsa · Community
-        </p>
-        <p className={`${body} mt-2 text-sm tracking-[0.18em] opacity-80`}>
-          Alfonso Reyes 131, Condesa · CDMX
-        </p>
-        <a
-          href="#paquetes"
-          className={`${body} mt-10 inline-block rounded-full px-9 py-3.5 text-[13px] uppercase tracking-[0.28em] transition-all hover:scale-[1.03]`}
-          style={{ backgroundColor: CREAM, color: GREEN }}
-        >
-          Descubre nuestros paquetes
-        </a>
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(18,33,22,0.87)_0%,rgba(18,33,22,0.58)_42%,rgba(18,33,22,0.12)_78%),linear-gradient(0deg,rgba(18,33,22,0.62)_0%,transparent_42%)]" />
+
+      <div className="relative flex min-h-[100dvh] items-end px-5 pb-9 pt-28 sm:px-8 sm:pb-12 lg:px-12 lg:pb-14">
+        <div className="mx-auto w-full max-w-[1400px]" style={{ color: CREAM }}>
+          <motion.div
+            initial={reduce ? false : { opacity: 0, y: 22 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.75, ease: [0.23, 1, 0.32, 1] }}
+            className="max-w-[760px]"
+          >
+            <p className={`${body} text-[11px] uppercase tracking-[0.36em] text-white/72 sm:text-[12px]`}>
+              Wellness hub · Condesa, CDMX
+            </p>
+            <h1 className={`${display} mt-5 max-w-[12ch] text-[clamp(3.4rem,8vw,7.5rem)] font-light leading-[0.88] tracking-[-0.035em]`}>
+              Una casa para volver a ti.
+            </h1>
+            <p className={`${body} mt-6 max-w-[54ch] text-base leading-relaxed text-white/82 sm:text-lg`}>
+              Movimiento, nutrición y cuidado en comunidad. Pilates Mat, Barre, Sculpt, Yoga, Flex y Salsa en un espacio hecho para escucharte.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link
+                to="/register"
+                className={`${body} inline-flex min-h-12 items-center justify-center rounded-full px-8 text-[12px] uppercase tracking-[0.22em] transition-transform active:scale-[0.98]`}
+                style={{ backgroundColor: CREAM, color: GREEN }}
+              >
+                Reservar una clase
+              </Link>
+              <a
+                href="#paquetes"
+                className={`${body} inline-flex min-h-12 items-center justify-center rounded-full border border-white/45 px-8 text-[12px] uppercase tracking-[0.22em] text-white transition-colors hover:bg-white/10 active:scale-[0.98]`}
+              >
+                Ver paquetes
+              </a>
+            </div>
+          </motion.div>
+
+          <div className={`${body} mt-12 grid gap-3 border-t border-white/30 pt-4 text-[10px] uppercase tracking-[0.2em] text-white/68 sm:grid-cols-3 sm:text-[11px]`}>
+            <span>Grupos pequeños</span>
+            <span className="sm:text-center">Alfonso Reyes 131</span>
+            <span className="sm:text-right">La comunidad es la medicina</span>
+          </div>
+        </div>
       </div>
     </section>
   );
 }
 
 function Paquetes() {
-  const { data: apiPlans = [] } = useQuery<{ id: string; name: string; price: number; is_active: boolean }[]>({
+  const { data: apiPlans = [], isLoading, isError, refetch } = useQuery<{ id: string; name: string; price: number; is_active: boolean }[]>({
     queryKey: ["landing-plans"],
     queryFn: async () => (await api.get("/plans")).data,
     staleTime: 5 * 60 * 1000,
@@ -280,71 +329,117 @@ function Paquetes() {
     "$" + Number(price).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   return (
-    <section id="paquetes" className="px-6 py-24" style={{ backgroundColor: CREAM }}>
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-14 text-center">
-          <p className={`${body} text-[13px] uppercase tracking-[0.4em]`} style={{ color: GREEN, opacity: 0.6 }}>
-            Elige tu camino
+    <section id="paquetes" className="scroll-mt-20 px-5 py-20 sm:px-8 lg:px-12 lg:py-28" style={{ backgroundColor: CREAM }}>
+      <div className="mx-auto max-w-[1400px]">
+        <div className="grid gap-7 border-b border-[#2A4E36]/25 pb-8 md:grid-cols-[0.85fr_1.15fr] md:items-end">
+          <div>
+            <p className={`${body} text-[11px] uppercase tracking-[0.34em]`} style={{ color: GREEN, opacity: 0.62 }}>
+              Clase o paquete
+            </p>
+            <h2 className={`${display} mt-3 max-w-[10ch] text-5xl font-light leading-[0.95] sm:text-6xl lg:text-7xl`} style={{ color: GREEN }}>
+              Elige cómo quieres moverte.
+            </h2>
+          </div>
+          <p className={`${body} max-w-[58ch] text-base leading-relaxed md:justify-self-end md:text-lg`} style={{ color: GREEN, opacity: 0.72 }}>
+            Comienza con una clase, encuentra tu ritmo o construye constancia. Aquí ves con claridad qué incluye cada opción, en qué clases aplica y cuánto cuesta.
           </p>
-          <h2 className={`${display} mt-3 text-5xl font-light tracking-wide`} style={{ color: GREEN }}>
-            Nuestros Paquetes
-          </h2>
         </div>
-        <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((c) => {
+
+        {isLoading ? (
+          <div className="mt-8 grid gap-6 lg:grid-cols-2" aria-live="polite">
+            {[0, 1, 2, 3].map((item) => (
+              <div key={item} className="grid animate-pulse grid-cols-[140px_1fr] gap-6 border-b border-[#2A4E36]/15 py-6">
+                <span className="aspect-square bg-[#D6D5C2]/45" />
+                <span className="my-3 block bg-[#D6D5C2]/38" />
+              </div>
+            ))}
+          </div>
+        ) : isError ? (
+          <div className="mt-8 border border-[#AE4836]/30 px-6 py-12 text-center" role="alert">
+            <p className={`${body} text-base`} style={{ color: GREEN }}>No pudimos cargar los paquetes.</p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className={`${body} mt-5 min-h-11 rounded-full px-7 text-[11px] uppercase tracking-[0.2em] active:scale-[0.98]`}
+              style={{ backgroundColor: GREEN, color: CREAM }}
+            >
+              Volver a intentar
+            </button>
+          </div>
+        ) : visible.length === 0 ? (
+          <div className={`${body} mt-8 border border-dashed border-[#2A4E36]/25 px-6 py-12 text-center text-sm`} style={{ color: GREEN, opacity: 0.68 }}>
+            Los próximos paquetes aparecerán aquí.
+          </div>
+        ) : (
+        <div className="mt-6 grid gap-x-10 lg:grid-cols-2">
+          {visible.map((c, index) => {
             const plan = planByName[c.planName];
+            const featured = index === 0;
             return (
               <article
                 key={c.title}
-                className="group flex flex-col overflow-hidden rounded-2xl bg-white/60 ring-1 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
-                style={{ borderColor: "rgba(39,74,42,0.10)", boxShadow: "0 1px 0 rgba(39,74,42,0.06)" }}
+                className={`group grid border-b border-[#2A4E36]/22 py-7 sm:grid-cols-[minmax(170px,0.82fr)_1.18fr] sm:items-stretch ${featured ? "lg:col-span-2 lg:grid-cols-[minmax(340px,0.92fr)_1.08fr] lg:py-10" : ""}`}
               >
-                <div className="relative aspect-square overflow-hidden">
-                  <div className="relative h-full w-full transition-transform duration-500 group-hover:scale-105" style={{ backgroundColor: c.color }}>
-                    <CasaShePattern className="absolute inset-0 h-full w-full" color={c.light ? "rgba(0,0,0,0.10)" : "rgba(0,0,0,0.22)"} />
-                    <img src={c.light ? "/casashe/logo-monogram.png" : "/casashe/logo-monogram-cream.png"} alt="" aria-hidden="true" className="absolute left-1/2 top-6 h-12 w-12 -translate-x-1/2 object-contain" style={{ opacity: 0.9 }} />
-                    <div className="absolute bottom-6 left-6 right-6">
-                      <span className={`${display} block text-[2.3rem] leading-[1.02]`} style={{ color: c.light ? GREEN : CREAM }}>
-                        {c.artTitle}
-                      </span>
-                      <p className={`${body} mt-3 max-w-[26ch] text-[0.92rem] leading-snug`} style={{ color: c.light ? GREEN : CREAM, opacity: 0.78 }}>
-                        {c.tagline}
-                      </p>
-                    </div>
+                <div className="flex min-h-[220px] items-center justify-center overflow-hidden p-5 sm:min-h-0" style={{ backgroundColor: c.color }}>
+                  <div className={`relative aspect-square w-full max-w-[300px] overflow-hidden ${featured ? "lg:max-w-[380px]" : ""}`}>
+                    {c.image ? (
+                      <img
+                        src={c.image}
+                        alt={`Imagen de ${c.artTitle}`}
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.025]"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="relative flex h-full w-full items-end overflow-hidden p-7" style={{ color: CREAM }}>
+                        <CasaShePattern className="absolute inset-0 h-full w-full opacity-80" color="rgba(246,240,228,0.18)" />
+                        <img src="/casashe/logo-monogram-cream.png" alt="" aria-hidden="true" className="absolute left-1/2 top-7 h-11 w-11 -translate-x-1/2 object-contain" />
+                        <span className={`${display} relative block text-5xl font-light leading-none`}>{c.artTitle}</span>
+                      </div>
+                    )}
                   </div>
-                  {c.oferta && (
-                    <span
-                      className={`${body} absolute right-4 top-4 flex h-[4.2rem] w-[4.2rem] items-center justify-center rounded-full text-center text-[13px]`}
-                      style={{ backgroundColor: "#AE4836", color: CREAM }}
-                    >
-                      ¡Oferta!
-                    </span>
-                  )}
                 </div>
-                <div className="flex flex-1 flex-col items-center px-6 py-7 text-center">
-                  <h3 className={`${body} text-lg uppercase tracking-[0.14em]`} style={{ color: GREEN }}>
+                <div className="flex flex-col justify-between py-6 sm:py-4 sm:pl-7 lg:pl-10">
+                  <div>
+                    <p className={`${body} text-[10px] uppercase tracking-[0.28em]`} style={{ color: GREEN, opacity: 0.55 }}>
+                      {c.kind} · {String(index + 1).padStart(2, "0")}
+                    </p>
+                    <h3 className={`${display} mt-2 text-3xl font-light leading-none sm:text-4xl ${featured ? "lg:text-6xl" : ""}`} style={{ color: GREEN }}>
                     {c.title}
-                  </h3>
-                  <p className={`${body} mt-1 text-[13px] tracking-wide`} style={{ color: GREEN, opacity: 0.55 }}>
-                    {c.hint}
-                  </p>
-                  <div className={`${display} mt-4 flex items-baseline justify-center gap-2`}>
-                    <span className="text-4xl font-medium" style={{ color: GREEN }}>
-                      {fmt(plan.price)}
-                    </span>
+                    </h3>
+                    <p className={`${body} mt-4 max-w-[44ch] text-[15px] leading-relaxed`} style={{ color: GREEN, opacity: 0.76 }}>
+                      {c.tagline}
+                    </p>
+                    <p className={`${body} mt-3 text-[12px] uppercase tracking-[0.12em]`} style={{ color: GREEN, opacity: 0.52 }}>
+                      {c.hint}
+                    </p>
                   </div>
-                  <Link
-                    to={`/register?plan=${plan.id}`}
-                    className={`${body} mt-6 w-full rounded-full py-3 text-[12px] uppercase tracking-[0.24em] transition-colors`}
-                    style={{ backgroundColor: GREEN, color: CREAM }}
-                  >
-                    Comprar
-                  </Link>
+
+                  <div className="mt-7 border-t border-[#2A4E36]/20 pt-5">
+                    <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+                      <div>
+                        <p className={`${body} text-[9px] uppercase tracking-[0.26em]`} style={{ color: GREEN, opacity: 0.48 }}>Aplica en</p>
+                        <p className={`${body} mt-1 max-w-[42ch] text-sm leading-relaxed`} style={{ color: GREEN, opacity: 0.78 }}>{c.applies}</p>
+                      </div>
+                      <div className="sm:text-right">
+                        <p className={`${body} text-[9px] uppercase tracking-[0.26em]`} style={{ color: GREEN, opacity: 0.48 }}>Inversión</p>
+                        <p className={`${display} mt-1 text-4xl leading-none`} style={{ color: GREEN }}>{fmt(plan.price)}</p>
+                      </div>
+                    </div>
+                    <Link
+                      to={`/register?plan=${plan.id}`}
+                      className={`${body} mt-5 inline-flex min-h-11 items-center justify-center rounded-full px-7 text-[11px] uppercase tracking-[0.22em] transition-transform active:scale-[0.98]`}
+                      style={{ backgroundColor: GREEN, color: CREAM }}
+                    >
+                      Elegir esta opción
+                    </Link>
+                  </div>
                 </div>
               </article>
             );
           })}
         </div>
+        )}
       </div>
     </section>
   );
@@ -352,37 +447,40 @@ function Paquetes() {
 
 function Servicios() {
   return (
-    <section id="servicios" className="px-6 py-24" style={{ backgroundColor: "#F6EFDB" }}>
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-20 text-center">
-          <p className={`${body} text-[13px] uppercase tracking-[0.4em]`} style={{ color: GREEN, opacity: 0.6 }}>
+    <section id="servicios" className="scroll-mt-20 px-5 py-20 sm:px-8 lg:px-12 lg:py-28" style={{ backgroundColor: "#F6EFDB" }}>
+      <div className="mx-auto max-w-[1400px]">
+        <div className="mb-16 grid gap-5 border-b border-[#2A4E36]/25 pb-8 md:grid-cols-[1fr_auto] md:items-end">
+          <div>
+          <p className={`${body} text-[11px] uppercase tracking-[0.34em]`} style={{ color: GREEN, opacity: 0.6 }}>
             Nuestros Servicios
           </p>
-          <h2 className={`${display} mt-3 text-6xl font-light tracking-wide`} style={{ color: GREEN }}>
+          <h2 className={`${display} mt-3 text-5xl font-light leading-none sm:text-6xl lg:text-7xl`} style={{ color: GREEN }}>
             Una experiencia 360°
           </h2>
-          <p className={`${body} mt-4 text-base tracking-[0.18em]`} style={{ color: GREEN, opacity: 0.7 }}>
+          </div>
+          <p className={`${body} text-sm tracking-[0.14em] md:text-right`} style={{ color: GREEN, opacity: 0.65 }}>
             Pilates Mat · Barre · Sculpt · Yoga · Flex · Salsa
           </p>
         </div>
 
-        <div className="space-y-20">
+        <div className="space-y-20 lg:space-y-28">
           {PILLARS.map((p, i) => (
             <div
               key={p.title}
-              className={`grid items-center gap-10 md:grid-cols-2 ${i % 2 === 1 ? "md:[&>figure]:order-2" : ""}`}
+              className="grid items-center gap-7 md:grid-cols-12 md:gap-0"
             >
-              <figure className="overflow-hidden rounded-2xl">
-                <img src={p.img} alt={p.title} className="aspect-[4/3] w-full object-cover" />
+              <figure className={`relative overflow-hidden md:col-span-7 ${i % 2 === 1 ? "md:order-2 md:col-start-6" : ""}`}>
+                <img src={p.img} alt={p.title} className="aspect-[4/5] w-full object-cover sm:aspect-[16/11]" loading="lazy" decoding="async" />
+                <span className={`${body} absolute bottom-4 left-4 text-[10px] uppercase tracking-[0.25em] text-white/80`}>Casa Shé · 0{i + 1}</span>
               </figure>
-              <div className={i % 2 === 1 ? "md:pr-10" : "md:pl-10"}>
+              <div className={`relative border-t border-[#2A4E36]/30 pt-6 md:col-span-5 md:bg-[#F6EFDB] md:p-10 lg:p-14 ${i % 2 === 1 ? "md:order-1 md:col-start-1 md:mr-[-3rem] md:pr-16" : "md:ml-[-3rem] md:pl-16"}`}>
                 <p className={`${body} text-[12px] uppercase tracking-[0.3em]`} style={{ color: GREEN, opacity: 0.55 }}>
                   {p.eyebrow}
                 </p>
-                <h3 className={`${display} mt-2 text-5xl font-light`} style={{ color: GREEN }}>
+                <h3 className={`${display} mt-3 text-5xl font-light leading-none lg:text-6xl`} style={{ color: GREEN }}>
                   {p.title}
                 </h3>
-                <p className={`${body} mt-5 text-lg leading-relaxed`} style={{ color: GREEN, opacity: 0.82 }}>
+                <p className={`${body} mt-5 text-base leading-relaxed lg:text-lg`} style={{ color: GREEN, opacity: 0.78 }}>
                   {p.text}
                 </p>
               </div>
@@ -390,6 +488,104 @@ function Servicios() {
           ))}
         </div>
       </div>
+    </section>
+  );
+}
+
+function Coaches() {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [openName, setOpenName] = useState<string | null>(null);
+  const { data: instructors = [], isLoading, isError } = useQuery<ApiInstructor[]>({
+    queryKey: ["landing-instructors"],
+    queryFn: async () => (await api.get("/instructors")).data,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  return (
+    <section id="equipo" className="scroll-mt-20 py-20 lg:py-28" style={{ backgroundColor: DEEP, color: CREAM }}>
+      <div className="mx-auto max-w-[1400px] px-5 sm:px-8 lg:px-12">
+        <div className="grid gap-5 border-b border-white/25 pb-7 md:grid-cols-[1fr_0.9fr] md:items-end">
+          <div>
+            <p className={`${body} text-[11px] uppercase tracking-[0.34em] text-white/55`}>Quiénes te guían</p>
+            <h2 className={`${display} mt-3 text-5xl font-light leading-none sm:text-6xl lg:text-7xl`}>Nuestro equipo.</h2>
+          </div>
+          <p className={`${body} max-w-[52ch] text-base leading-relaxed text-white/68 md:justify-self-end`}>
+            Cada coach acompaña desde una mirada distinta. Conoce su forma de enseñar, sus disciplinas y las clases que comparte en Casa Shé.
+          </p>
+        </div>
+
+        {isLoading ? (
+          <div className="mt-8 flex gap-3 overflow-hidden" aria-live="polite">
+            {[0, 1, 2, 3].map((item) => (
+              <div key={item} className="aspect-[3/4] min-w-[76vw] animate-pulse bg-white/8 sm:min-w-[330px] lg:min-w-0 lg:flex-1" />
+            ))}
+          </div>
+        ) : isError ? (
+          <div className={`${body} mt-8 border border-white/20 px-6 py-10 text-center text-sm text-white/65`} role="alert">
+            No pudimos cargar al equipo en este momento.
+          </div>
+        ) : instructors.length === 0 ? (
+          <div className={`${body} mt-8 border border-dashed border-white/25 px-6 py-14 text-center text-sm text-white/65`}>
+            Los perfiles de nuestras coaches aparecerán aquí.
+          </div>
+        ) : (
+          <div className="scrollbar-none mt-8 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3">
+            {instructors.map((coach, index) => {
+              const specialties = specialtiesFor(coach.specialties);
+              return (
+                <button
+                  key={coach.id}
+                  type="button"
+                  onClick={() => {
+                    setOpenId(coach.id);
+                    setOpenName(coach.display_name);
+                  }}
+                  className="group relative aspect-[3/4] min-w-[76vw] snap-start overflow-hidden border border-white/15 text-left active:scale-[0.985] sm:min-w-[330px] lg:min-w-[calc(25%_-_0.5625rem)]"
+                >
+                  {coach.photo_url ? (
+                    <img
+                      src={coach.photo_url}
+                      alt={coach.display_name}
+                      className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.025]"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  ) : (
+                    <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[linear-gradient(145deg,#233D2B_0%,#17291C_52%,#101D14_100%)]">
+                      <CasaShePattern className="absolute inset-0 h-full w-full opacity-35" color="rgba(246,240,228,0.18)" />
+                      <img src={LOGO_CREAM} alt="" aria-hidden="true" className="relative w-[58%] opacity-12" />
+                      <span className={`${body} absolute left-5 top-5 text-[9px] uppercase tracking-[0.26em] text-white/42`}>
+                        Retrato próximamente
+                      </span>
+                    </div>
+                  )}
+                  <span className="absolute inset-0 bg-[linear-gradient(180deg,transparent_45%,rgba(15,27,18,0.9)_100%)]" />
+                  <span className="absolute inset-x-0 bottom-0 block p-5">
+                    <span className={`${body} text-[9px] uppercase tracking-[0.24em] text-white/55`}>
+                      Coach {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <span className={`${display} mt-1 block text-3xl font-light leading-none text-white`}>
+                      {coach.display_name}
+                    </span>
+                    <span className={`${body} mt-2 block text-xs text-white/64`}>
+                      {specialties.length > 0 ? specialties.slice(0, 3).join(" · ") : "Movimiento y comunidad"}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <CoachSheet
+        instructorId={openId}
+        instructorName={openName}
+        onClose={() => {
+          setOpenId(null);
+          setOpenName(null);
+        }}
+      />
     </section>
   );
 }
@@ -630,18 +826,20 @@ function Horario() {
 
 function FuelBar() {
   return (
-    <section id="bar" className="relative overflow-hidden">
-      <img src="/casashe/espacio-hidratacion.jpg" alt="Fuel Bar de Casa Shé" className="absolute inset-0 h-full w-full object-cover" />
-      <div className="absolute inset-0" style={{ backgroundColor: "rgba(28,51,32,0.64)" }} />
-      <div className="relative z-10 mx-auto max-w-3xl px-6 py-32 text-center" style={{ color: CREAM }}>
+    <section id="bar" className="relative min-h-[72dvh] overflow-hidden">
+      <img src="/casashe/espacio-hidratacion.jpg" alt="Fuel Bar de Casa Shé" className="absolute inset-0 h-full w-full object-cover object-center" loading="lazy" decoding="async" />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(18,33,22,0.86)_0%,rgba(18,33,22,0.48)_48%,rgba(18,33,22,0.12)_100%)]" />
+      <div className="relative z-10 mx-auto flex min-h-[72dvh] max-w-[1400px] items-end px-5 py-16 sm:px-8 lg:px-12 lg:py-20" style={{ color: CREAM }}>
+        <div className="max-w-2xl border-l border-white/45 pl-6 sm:pl-10">
         <p className={`${body} text-[12px] uppercase tracking-[0.4em]`} style={{ opacity: 0.8 }}>
           Fuel Bar
         </p>
-        <h2 className={`${display} mt-3 text-5xl font-light tracking-wide sm:text-6xl`}>Recarga consciente</h2>
-        <p className={`${body} mx-auto mt-5 max-w-xl text-lg leading-relaxed`} style={{ opacity: 0.9 }}>
+        <h2 className={`${display} mt-3 text-5xl font-light leading-none sm:text-6xl lg:text-7xl`}>Recarga consciente.</h2>
+        <p className={`${body} mt-5 max-w-xl text-base leading-relaxed sm:text-lg`} style={{ opacity: 0.86 }}>
           Bebidas funcionales, smoothies y snacks que nutren tu práctica. Hecho para que sigas en movimiento,
           dentro y fuera del estudio.
         </p>
+        </div>
       </div>
     </section>
   );
@@ -649,19 +847,27 @@ function FuelBar() {
 
 function Nosotras() {
   return (
-    <section id="nosotras" className="px-6 py-28 text-center" style={{ backgroundColor: CREAM }}>
-      <div className="mx-auto max-w-3xl">
-        <img src="/casashe/logo-monogram.png" alt="" aria-hidden className="mx-auto mb-8 h-12 w-auto opacity-90" />
-        <p className={`${body} text-[13px] uppercase tracking-[0.4em]`} style={{ color: GREEN, opacity: 0.6 }}>
-          Nosotras
-        </p>
-        <h2 className={`${display} mt-4 text-4xl font-light leading-snug sm:text-5xl`} style={{ color: GREEN }}>
-          Un hub de bienestar para mujeres, en el corazón de la Condesa.
-        </h2>
-        <p className={`${body} mx-auto mt-6 max-w-2xl text-lg leading-relaxed`} style={{ color: GREEN, opacity: 0.8 }}>
-          Casa Shé es comunidad, movimiento y cuidado. Grupos pequeños, atención cercana y un espacio para que cada
-          mujer encuentre lo que su cuerpo necesita. La comunidad es la medicina.
-        </p>
+    <section id="nosotras" className="scroll-mt-20 px-5 py-20 sm:px-8 lg:px-12 lg:py-28" style={{ backgroundColor: CREAM }}>
+      <div className="mx-auto grid max-w-[1400px] gap-8 md:grid-cols-12 md:items-center md:gap-0">
+        <figure className="relative md:col-span-7">
+          <img src="/casashe/espacio-detalles.jpg" alt="Detalles del espacio Casa Shé" className="aspect-[4/5] w-full object-cover sm:aspect-[16/11]" loading="lazy" decoding="async" />
+          <figcaption className={`${body} absolute bottom-4 left-4 text-[10px] uppercase tracking-[0.25em] text-white/80`}>
+            Alfonso Reyes 131 · Condesa
+          </figcaption>
+        </figure>
+        <div className="border-t border-[#2A4E36]/30 pt-7 md:col-span-5 md:ml-[-3.5rem] md:bg-[#F6F0E4] md:p-12 lg:p-16">
+          <img src="/casashe/logo-monogram.png" alt="" aria-hidden="true" className="mb-8 h-10 w-auto opacity-85" />
+          <p className={`${body} text-[11px] uppercase tracking-[0.34em]`} style={{ color: GREEN, opacity: 0.6 }}>Nosotras</p>
+          <h2 className={`${display} mt-4 text-5xl font-light leading-[0.98] lg:text-6xl`} style={{ color: GREEN }}>
+            Bienestar para mujeres, en el corazón de la Condesa.
+          </h2>
+          <p className={`${body} mt-6 text-base leading-relaxed lg:text-lg`} style={{ color: GREEN, opacity: 0.78 }}>
+            Casa Shé es comunidad, movimiento y cuidado. Grupos pequeños, atención cercana y un espacio para que cada mujer encuentre lo que su cuerpo necesita.
+          </p>
+          <p className={`${display} mt-8 text-3xl italic leading-none`} style={{ color: GREEN }}>
+            La comunidad es la medicina.
+          </p>
+        </div>
       </div>
     </section>
   );
@@ -700,6 +906,7 @@ export default function CasaSheLanding() {
       <Hero />
       <Paquetes />
       <Servicios />
+      <Coaches />
       <Horario />
       <FuelBar />
       <Nosotras />
