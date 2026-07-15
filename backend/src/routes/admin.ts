@@ -215,6 +215,25 @@ router.get('/clients/:id/full-profile', async (req: Request, res: Response) => {
       WHERE user_id = $1
     `, [id]);
 
+        // 5b. Historial de PAGOS reales (monto, método, referencia, quién lo registró) — antes
+        // invisible en esta ficha: recepción tenía que ir a la pantalla global de pagos y
+        // buscar manualmente cuando una clienta reclamaba "yo ya pagué" delante suyo, el peor
+        // momento para no tener el dato a la mano en la misma pantalla.
+        const payments = await query(`
+      SELECT pay.id, pay.amount, pay.currency, pay.payment_method, pay.status,
+             pay.reference, pay.reference_id, pay.provider, pay.notes,
+             pay.created_at, pay.completed_at,
+             p.name as plan_name,
+             proc.display_name as processed_by_name
+      FROM payments pay
+      LEFT JOIN memberships m ON pay.membership_id = m.id
+      LEFT JOIN plans p ON m.plan_id = p.id
+      LEFT JOIN users proc ON pay.processed_by = proc.id
+      WHERE pay.user_id = $1
+      ORDER BY pay.created_at DESC
+      LIMIT 30
+    `, [id]);
+
         // 6. Get current active membership (prefer one with class credits over inscription-only)
         const currentMembership = await queryOne(`
       SELECT m.*,
@@ -236,6 +255,7 @@ router.get('/clients/:id/full-profile', async (req: Request, res: Response) => {
             memberships,
             currentMembership,
             recentBookings: bookings,
+            payments,
             loyaltyPoints: parseInt(loyalty?.total || '0', 10)
         });
 

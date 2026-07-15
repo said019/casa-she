@@ -13,7 +13,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
     ArrowRight,
-    Cake,
     Eye,
     EyeOff,
     Loader2,
@@ -31,7 +30,6 @@ const registerSchema = z.object({
     phone: z
         .string()
         .regex(/^\+52[0-9]{10}$/, 'Formato: +52 seguido de 10 dígitos'),
-    dateOfBirth: z.string().optional().or(z.literal('')),
     password: z
         .string()
         .min(8, 'Mínimo 8 caracteres')
@@ -50,7 +48,7 @@ type RegisterForm = z.infer<typeof registerSchema>;
 
 const easeOut = [0.23, 1, 0.32, 1] as const;
 const fieldClass =
-    'h-12 rounded-xl border-bmb-dark/15 bg-white/70 pl-11 text-bmb-dark placeholder:text-bmb-dark/40 focus-visible:border-bmb-dark/45 focus-visible:ring-bmb-dark/15';
+    'h-12 rounded-xl border-[#B66049]/20 bg-white/75 pl-11 text-[#392A25] placeholder:text-[#392A25]/40 focus-visible:border-[#B66049]/55 focus-visible:ring-[#B66049]/15';
 const fieldMotion = {
     initial: { opacity: 0, y: 8 },
     animate: { opacity: 1, y: 0 },
@@ -117,7 +115,6 @@ export default function Register() {
                 password: data.password,
                 displayName: data.displayName,
                 phone: data.phone,
-                dateOfBirth: data.dateOfBirth || undefined,
                 acceptsTerms: data.acceptsTerms,
                 acceptsCommunications: data.acceptsCommunications,
                 referralCode: data.referralCode || undefined,
@@ -131,6 +128,9 @@ export default function Register() {
         <AuthShell
             title="Únete a Casa Shé"
             subtitle="Crea tu cuenta para reservar y comprar paquetes."
+            brandImageSrc="/casashe/espacio-salon.jpg"
+            brandImageAlt="Salón de Casa Shé"
+            brandImagePosition="object-center"
             footer={
                 <>
                     ¿Ya tienes cuenta?{' '}
@@ -208,20 +208,6 @@ export default function Register() {
                         )}
                     </motion.div>
 
-                    <motion.div {...fieldMotion} transition={{ duration: 0.28, delay: 0.16, ease: easeOut }} className="space-y-2">
-                        <Label htmlFor="dateOfBirth">Fecha de nacimiento</Label>
-                        <div className="relative">
-                            <Cake className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-bmb-dark/40" />
-                            <Input
-                                id="dateOfBirth"
-                                type="date"
-                                className={fieldClass}
-                                {...register('dateOfBirth')}
-                                disabled={isLoading}
-                            />
-                        </div>
-                    </motion.div>
-
                     <motion.div {...fieldMotion} transition={{ duration: 0.28, delay: 0.2, ease: easeOut }} className="space-y-2">
                         <Label htmlFor="password">Contraseña</Label>
                         <div className="relative">
@@ -288,7 +274,7 @@ export default function Register() {
                                 checked={acceptsTerms}
                                 onCheckedChange={(checked) => setValue('acceptsTerms', checked as boolean)}
                                 disabled={isLoading}
-                                className="mt-0.5 border-bmb-dark data-[state=checked]:bg-bmb-dark data-[state=checked]:text-bmb-cream"
+                                className="mt-0.5 border-[#B66049] data-[state=checked]:bg-[#B66049] data-[state=checked]:text-[#FBF7F2]"
                             />
                             <label htmlFor="acceptsTerms" className="cursor-pointer font-body text-sm leading-relaxed text-bmb-dark/78">
                                 Acepto los{' '}
@@ -311,7 +297,7 @@ export default function Register() {
                                 checked={acceptsCommunications}
                                 onCheckedChange={(checked) => setValue('acceptsCommunications', checked as boolean)}
                                 disabled={isLoading}
-                                className="mt-0.5 border-bmb-dark data-[state=checked]:bg-bmb-dark data-[state=checked]:text-bmb-cream"
+                                className="mt-0.5 border-[#B66049] data-[state=checked]:bg-[#B66049] data-[state=checked]:text-[#FBF7F2]"
                             />
                             <label htmlFor="acceptsCommunications" className="cursor-pointer font-body text-sm leading-relaxed text-bmb-dark/78">
                                 Deseo recibir promociones, novedades y recompensas por email.
@@ -328,7 +314,7 @@ export default function Register() {
                 >
                     <Button
                         type="submit"
-                        className="h-12 w-full rounded-full bg-bmb-dark font-body text-bmb-cream hover:bg-bmb-dark/90"
+                        className="h-12 w-full rounded-full bg-[#B66049] font-body text-[#FBF7F2] shadow-[0_16px_28px_-18px_rgba(117,54,38,.75)] hover:bg-[#A6533F]"
                         disabled={isLoading}
                     >
                         {isLoading ? (

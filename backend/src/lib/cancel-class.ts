@@ -1,5 +1,6 @@
 import { query, queryOne } from '../config/database.js';
-import { sendWebPushToUser } from './web-push.js';
+import { writeInAppNotification } from './in-app-notifications.js';
+import { sendClassCancelledEmail } from '../services/email.js';
 
 /**
  * Cancel a class and all its active bookings, refunding membership credits.
@@ -25,11 +26,24 @@ export async function cancelClassWithRefunds(
         return { class: null, cancelledBookings: 0, refundedCredits: 0 };
     }
 
-    // Get all active bookings for this class
+    // Nombre del tipo de clase + fecha/hora, para el mensaje a las afectadas.
+    const classType = await queryOne<{ name: string }>(
+        `SELECT name FROM class_types WHERE id = $1`,
+        [(result as any).class_type_id]
+    );
+    const className = classType?.name || 'tu clase';
+    const classDateStr = (result as any).date instanceof Date
+        ? (result as any).date.toISOString().slice(0, 10)
+        : String((result as any).date).slice(0, 10);
+    const startTime = String((result as any).start_time || '').slice(0, 5);
+    const endTime = String((result as any).end_time || '').slice(0, 5);
+
+    // Get all active bookings for this class (con datos del cliente para notificar)
     const bookingsToCancel = await query(
-        `SELECT b.*, m.id as membership_id
+        `SELECT b.*, m.id as membership_id, u.email as user_email, u.display_name as user_name
          FROM bookings b
          LEFT JOIN memberships m ON b.membership_id = m.id
+         LEFT JOIN users u ON b.user_id = u.id
          WHERE b.class_id = $1 AND b.status IN ('confirmed', 'waitlist')`,
         [classId]
     );
@@ -54,13 +68,9 @@ export async function cancelClassWithRefunds(
            WHERE booking_id = $1 AND status = 'pending'`,
           [booking.id]).catch((e: any) => console.error('bar cascade (cancel class):', e?.message));
 
-        // Aviso push al usuario afectado (fire-and-forget; nunca rompe el flujo)
-        if (booking.user_id) {
-            void sendWebPushToUser(booking.user_id, { title: 'Clase cancelada', body: 'El estudio canceló una de tus clases. Revisa tus reservas.', url: '/app/classes', tag: 'class_cancelled' });
-        }
-
         // Refund credit to the bucket the booking consumed
-        if (booking.status === 'confirmed' && booking.membership_id && booking.consumed_category) {
+        const willRefund = booking.status === 'confirmed' && booking.membership_id && booking.consumed_category;
+        if (willRefund) {
             const col = booking.consumed_category === 'reformer' ? 'reformer_remaining' : 'multi_remaining';
             await query(
                 `UPDATE memberships SET ${col} = ${col} + 1 WHERE id = $1 AND ${col} IS NOT NULL`,
@@ -80,6 +90,36 @@ export async function cancelClassWithRefunds(
                   WHERE used_on_booking_id = $1 AND status = 'used' AND expires_at > NOW()`,
                 [booking.id]
             ).catch((e: any) => console.error('reactivar free_class benefit (cancel class):', e?.message));
+        }
+
+        // Aviso in-app (campanita) + push web al usuario afectado — writeInAppNotification
+        // ya dispara ambos. WhatsApp NO se usa aquí a propósito: política de la dueña
+        // (2026-06-23, ver lib/whatsapp.ts) limita el número a solo 3 mensajes automáticos
+        // para evitar que WhatsApp lo bloquee por spam; el respaldo es el correo de abajo.
+        if (booking.user_id) {
+            void writeInAppNotification({
+                userId: booking.user_id,
+                type: 'class_cancelled',
+                title: 'Clase cancelada',
+                body: `El estudio canceló tu clase de ${className} del ${classDateStr}${startTime ? ` (${startTime})` : ''}.`,
+                data: { class_id: classId, reason },
+            });
+        }
+
+        // Correo de respaldo: antes solo se avisaba por push (depende de tener la app
+        // agregada a la pantalla de inicio, poco común en iPhone) — una clienta podía
+        // presentarse al estudio a una clase que ya estaba cancelada sin enterarse antes.
+        if (booking.user_email) {
+            void sendClassCancelledEmail({
+                to: booking.user_email,
+                clientName: booking.user_name || 'Cliente',
+                className,
+                classDate: classDateStr,
+                startTime,
+                endTime,
+                reason,
+                refunded: Boolean(willRefund),
+            }).catch((e: any) => console.error('email cancel class:', e?.message));
         }
     }
 

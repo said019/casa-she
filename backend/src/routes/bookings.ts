@@ -15,6 +15,7 @@ import { selectMembershipForBooking, toDbClient, pickBestMembership } from '../l
 import { awardCheckinPoints } from '../lib/loyalty.js';
 import { joinWaitlist, waitlistOffer, compactWaitlist, promoteNextFromWaitlist } from '../lib/waitlist.js';
 import { cdmxWallClockToUtc } from '../lib/schedule.js';
+import { sendAdminBookingAlert } from '../lib/admin-booking-alert.js';
 
 const router = Router();
 
@@ -290,7 +291,13 @@ router.post('/bulk-month', authenticate, requireRole('admin'), async (req: Reque
         let membership: any = null;
         if (membershipId) {
             const { rows } = await client.query(
-                `SELECT * FROM memberships WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+                `SELECT m.*,
+                        p.reformer_credits AS plan_reformer_credits,
+                        p.multi_credits AS plan_multi_credits
+                   FROM memberships m
+                   JOIN plans p ON p.id = m.plan_id
+                  WHERE m.id = $1 AND m.user_id = $2
+                  FOR UPDATE OF m`,
                 [membershipId, userId]
             );
             membership = rows[0] || null;
@@ -302,11 +309,16 @@ router.post('/bulk-month', authenticate, requireRole('admin'), async (req: Reque
             // memberships are studio-eligible (matches prior bulk behavior).
             const { rows } = await client.query(
                 `SELECT m.*,
+                        p.reformer_credits AS plan_reformer_credits,
+                        p.multi_credits AS plan_multi_credits,
                         COALESCE(m.facility_id, o.facility_id) AS bound_facility_id
                  FROM memberships m
+                 JOIN plans p ON p.id = m.plan_id
                  LEFT JOIN orders o ON o.id = m.order_id
                  WHERE m.user_id = $1 AND m.status = 'active'
                    AND (m.${bulkCatCol} IS NULL OR m.${bulkCatCol} >= $2)
+                   AND (p.${bulkCategory === 'reformer' ? 'reformer_credits' : 'multi_credits'} IS NULL
+                        OR p.${bulkCategory === 'reformer' ? 'reformer_credits' : 'multi_credits'} >= $2)
                  FOR UPDATE OF m`,
                 [userId, targetClasses.length]
             );
@@ -314,6 +326,8 @@ router.post('/bulk-month', authenticate, requireRole('admin'), async (req: Reque
                 id: r.id,
                 reformer_remaining: r.reformer_remaining ?? null,
                 multi_remaining: r.multi_remaining ?? null,
+                plan_reformer_credits: r.plan_reformer_credits,
+                plan_multi_credits: r.plan_multi_credits,
                 end_date: r.end_date ? new Date(r.end_date).toISOString() : null,
                 created_at: new Date(r.created_at).toISOString(),
                 bound_facility_id: r.bound_facility_id ?? null,
@@ -325,6 +339,18 @@ router.post('/bulk-month', authenticate, requireRole('admin'), async (req: Reque
         if (!membership) {
             await client.query('ROLLBACK');
             return res.status(400).json({ error: 'No se encontró una membresía válida con suficientes créditos para las clases seleccionadas.' });
+        }
+
+        const bulkPlanCatCredits = membership[
+            bulkCategory === 'reformer' ? 'plan_reformer_credits' : 'plan_multi_credits'
+        ];
+        if (bulkPlanCatCredits !== null && bulkPlanCatCredits < targetClasses.length) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                error: bulkCategory === 'reformer'
+                    ? 'Estas clases requieren un paquete de Salsa con suficientes créditos.'
+                    : 'El paquete seleccionado no incluye suficientes créditos para estas clases.'
+            });
         }
 
         // Vigencia: el dueño quiere bloquear reservas en clases posteriores al vencimiento
@@ -687,9 +713,12 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                 if (membershipId) {
                     // Explicit membership: validate ownership, status, credits, studio.
                     const membershipRes = await client.query(
-                        `SELECT m.*, COALESCE(m.facility_id, o.facility_id) AS bound_facility_id,
+                        `SELECT m.*,
+                                p.reformer_credits, p.multi_credits,
+                                COALESCE(m.facility_id, o.facility_id) AS bound_facility_id,
                                 f.name AS bound_facility_name
                          FROM memberships m
+                         JOIN plans p ON p.id = m.plan_id
                          LEFT JOIN orders o ON o.id = m.order_id
                          LEFT JOIN facilities f ON f.id = COALESCE(m.facility_id, o.facility_id)
                          WHERE m.id = $1 AND m.user_id = $2`,
@@ -720,12 +749,19 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                     }
                     const cat: 'reformer' | 'multi' = classDetails.class_category;
                     const catCol = cat === 'reformer' ? 'reformer_remaining' : 'multi_remaining';
+                    const planCatCol = cat === 'reformer' ? 'reformer_credits' : 'multi_credits';
                     const catRemaining = membership[catCol];
-                    if (catRemaining !== null && catRemaining <= 0) {
+                    const planCatCredits = membership[planCatCol];
+                    if (
+                        (planCatCredits !== null && planCatCredits <= 0) ||
+                        (catRemaining !== null && catRemaining <= 0)
+                    ) {
                         await client.query('ROLLBACK');
                         releaseClient();
                         return res.status(403).json({
-                            error: `Tu membresía no incluye clases de ${cat === 'reformer' ? 'Salsa' : 'Clases'} o ya no te quedan créditos.`,
+                            error: cat === 'reformer'
+                                ? 'Esta clase requiere un crédito de Salsa. Elige Clase de Salsa o Paquete de Salsa.'
+                                : 'Tu membresía no incluye esta clase o ya no te quedan créditos.',
                             code: 'NEEDS_PURCHASE',
                         });
                     }
@@ -756,7 +792,9 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                         await client.query('ROLLBACK');
                         releaseClient();
                         return res.status(400).json({
-                            error: 'No tienes una membresía válida con créditos para una clase en este estudio.',
+                            error: classDetails.class_category === 'reformer'
+                                ? 'Esta clase requiere un crédito de Salsa. Elige Clase de Salsa o Paquete de Salsa.'
+                                : 'No tienes una membresía válida con créditos para una clase en este estudio.',
                             code: 'NEEDS_PURCHASE',
                         });
                     }
@@ -819,7 +857,8 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
 
         // Note: trigger_update_booking_count updates the classes table count automatically.
 
-        // Send booking confirmation (WhatsApp + email) — async, don't block response
+        // Send client confirmation and the studio's internal alert without blocking
+        // or rolling back the booking if either notification channel fails.
         try {
             const notifSettings = await queryOne(
                 "SELECT value FROM system_settings WHERE key = 'notification_settings'"
@@ -832,28 +871,28 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
             );
             const cancelHours = Number(cancelPolicy?.value?.min_hours ?? 4);
 
-            if (shouldSend) {
-                const user = await queryOne<{ display_name: string; phone: string; email: string }>(
-                    'SELECT display_name, phone, email FROM users WHERE id = $1',
-                    [userId]
-                );
-                const classInfo = await queryOne<any>(`
-                    SELECT ct.name as class_name, c.date, c.start_time, c.end_time,
-                           i.display_name as instructor_name,
-                           f.name as facility_name
-                    FROM classes c
-                    JOIN class_types ct ON c.class_type_id = ct.id
-                    JOIN instructors i ON c.instructor_id = i.id
-                    LEFT JOIN facilities f ON c.facility_id = f.id
-                    WHERE c.id = $1
-                `, [classId]);
+            const user = await queryOne<{ display_name: string; phone: string; email: string }>(
+                'SELECT display_name, phone, email FROM users WHERE id = $1',
+                [userId]
+            );
+            const classInfo = await queryOne<any>(`
+                SELECT ct.name as class_name, c.date, c.start_time, c.end_time,
+                       i.display_name as instructor_name,
+                       f.name as facility_name
+                FROM classes c
+                JOIN class_types ct ON c.class_type_id = ct.id
+                LEFT JOIN instructors i ON c.instructor_id = i.id
+                LEFT JOIN facilities f ON c.facility_id = f.id
+                WHERE c.id = $1
+            `, [classId]);
 
-                if (classInfo) {
-                    const isoDate = classInfo.date instanceof Date
-                        ? `${classInfo.date.getUTCFullYear()}-${String(classInfo.date.getUTCMonth()+1).padStart(2,'0')}-${String(classInfo.date.getUTCDate()).padStart(2,'0')}`
-                        : String(classInfo.date).split('T')[0];
-                    const startHm = classInfo.start_time?.substring(0, 5);
+            if (classInfo) {
+                const isoDate = classInfo.date instanceof Date
+                    ? `${classInfo.date.getUTCFullYear()}-${String(classInfo.date.getUTCMonth()+1).padStart(2,'0')}-${String(classInfo.date.getUTCDate()).padStart(2,'0')}`
+                    : String(classInfo.date).split('T')[0];
+                const startHm = classInfo.start_time?.substring(0, 5);
 
+                if (shouldSend) {
                     if (user?.phone) {
                         const classDateEs = new Date(isoDate + 'T00:00:00').toLocaleDateString('es-MX');
                         sendBookingConfirmation(
@@ -880,9 +919,20 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                         }).catch(err => console.error('[email] booking confirmation:', err));
                     }
                 }
+
+                if (user) {
+                    void sendAdminBookingAlert({
+                        clientName: user.display_name || 'Cliente',
+                        className: classInfo.class_name,
+                        date: isoDate,
+                        time: startHm,
+                        instructorName: classInfo.instructor_name || null,
+                        facilityName: classInfo.facility_name || null,
+                    });
+                }
             }
         } catch (notifErr) {
-            console.error('[notifications] booking confirm non-blocking error:', notifErr);
+            console.error('[notifications] booking notification non-blocking error:', notifErr);
         }
 
         // Update Apple + Google Wallet passes (credits changed)

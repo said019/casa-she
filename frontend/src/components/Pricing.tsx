@@ -106,7 +106,7 @@ export default function Pricing() {
         ) : visible.length === 0 ? (
           <p className="mt-12 text-center font-heading text-bmb-ink/55">No hay planes en esta categoría.</p>
         ) : (
-          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {visible.map((p) => {
               const total = (p.reformer_credits ?? 0) + (p.multi_credits ?? 0);
               const perClass =
@@ -123,14 +123,14 @@ export default function Pricing() {
               return (
                 <article
                   key={p.id}
-                  className="flex flex-col border border-l-[3px] border-bmb-ink/15 bg-bmb-paper p-6 text-bmb-ink"
+                  className="flex flex-col border border-l-[3px] border-bmb-ink/15 bg-bmb-paper p-5 text-bmb-ink"
                   style={{ borderLeftColor: TYPE_COLOR[getPackageType(p)] }}
                 >
                   <p className="editorial-caption-sm" style={{ color: TYPE_COLOR[getPackageType(p)] }}>
                     {packagePresentations[getPackageType(p)].shortTitle}
                   </p>
-                  <h3 className="mt-2 font-heading text-2xl leading-tight">{p.name}</h3>
-                  <p className="mt-3 font-heading tabular-nums text-4xl text-bmb-gold">{mxn(p.price)}</p>
+                  <h3 className="mt-2 font-heading text-xl leading-tight">{p.name}</h3>
+                  <p className="mt-3 font-heading tabular-nums text-3xl text-bmb-gold">{mxn(p.price)}</p>
                   <p className="mt-1 editorial-caption text-bmb-ink/55">{creditsLabel(p)}</p>
                   {perClass !== null && (
                     <p className="mt-0.5 editorial-caption-sm text-bmb-ink/40">≈ {mxn(perClass)} / clase</p>
@@ -146,7 +146,7 @@ export default function Pricing() {
                   </ul>
                   <Link
                     to="/login"
-                    className="mt-6 block w-full border border-bmb-ink px-4 py-3 text-center text-sm font-semibold uppercase tracking-[0.12em] text-bmb-ink transition-colors hover:border-bmb-gold hover:bg-bmb-gold hover:text-bmb-ink"
+                    className="mt-6 block w-full border border-bmb-ink px-4 py-2.5 text-center text-sm font-semibold uppercase tracking-[0.12em] text-bmb-ink transition-colors hover:border-bmb-gold hover:bg-bmb-gold hover:text-bmb-ink"
                   >
                     Elegir
                   </Link>

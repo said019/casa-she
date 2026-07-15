@@ -4,13 +4,13 @@ import { z } from 'zod';
 import { query, queryOne, pool } from '../config/database.js';
 import { authenticate, requireRole, optionalAuth } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/requirePermission.js';
-import { applyDiscountToOrder, resolveDiscountForOrder } from './discount-codes.js';
+import { resolveDiscountForOrder } from './discount-codes.js';
 import { sendMembershipActivatedEmail, sendOrderRejectedEmail } from '../services/email.js';
 import { sendMembershipActivatedNotice, sendWhatsAppMessage } from '../lib/whatsapp.js';
 import { awardPaymentLoyaltyPoints, awardReferralBonus, reversePaymentLoyaltyPoints, reverseReferralBonus, consumeSampleClassDiscount, canBuySamplePlan } from '../lib/loyalty.js';
 import { toDbClient } from '../lib/membershipSelection.js';
 import { notifyMembershipRenewed, notifyPointsEarnedExternal } from '../lib/notifications.js';
-import { mpConfigured, createPreference, syncPayment } from '../lib/mercadopago.js';
+import { mpConfigured, createPreference, syncPayment, searchPaymentByExternalReference } from '../lib/mercadopago.js';
 import { finalizePaidOrder } from '../lib/orderFulfillment.js';
 import { ImageStorageError, subirComprobante } from '../lib/imageStorage.js';
 import { downloadGoogleDriveFile } from '../lib/googleDrive.js';
@@ -451,6 +451,8 @@ router.get('/:id', authenticate, async (req: Request, res: Response) => {
                 o.approved_at,
                 o.rejected_at,
                 o.rejection_reason,
+                o.mp_status_detail,
+                o.reviewed_by,
                 o.expires_at,
                 u.id as user_id,
                 u.display_name as user_name,
@@ -535,7 +537,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
             });
             if (!allowed) {
                 return res.status(409).json({
-                    error: 'La Clase Muestra es solo para nuevas clientas. Ya cuentas con un paquete activo.'
+                    error: 'La Clase Muestra es solo para nuevas clientas y de un solo uso por persona.'
                 });
             }
         }
@@ -593,6 +595,26 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
         let order: any;
         try {
             await dbClient.query('BEGIN');
+
+            // Reclama el uso del código de descuento DENTRO de la tx, de forma atómica.
+            // resolveDiscountForOrder (arriba) es solo un pre-check sin lock — dos compras
+            // casi simultáneas con el mismo código de un solo uso podían ambas pasarlo y
+            // ambas incrementar current_uses después (vía applyDiscountToOrder, ya fuera de
+            // cualquier transacción), sobrepasando max_uses sin que quedara ningún rastro de
+            // que algo falló. El UPDATE condicional aquí es la reclamación real: si otra tx
+            // ya agotó el código entre el pre-check y este punto, rowCount=0 y se aborta la
+            // orden con un error claro, en vez de crearla con un descuento que ya no cabía.
+            if (discount_code_id && appliedDiscount > 0) {
+                const claim = await dbClient.query(
+                    `UPDATE discount_codes SET current_uses = current_uses + 1
+                     WHERE id = $1 AND (max_uses IS NULL OR current_uses < max_uses)`,
+                    [discount_code_id]
+                );
+                if ((claim.rowCount ?? 0) === 0) {
+                    throw new Error('DISCOUNT_CODE_EXHAUSTED');
+                }
+            }
+
             const founderRow = await dbClient.query(
                 `SELECT is_founder, founder_first_package_used FROM users WHERE id = $1 FOR UPDATE`,
                 [userId]
@@ -660,15 +682,10 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
             dbClient.release();
         }
 
-        // Apply discount code (increment usage counter)
-        if (discount_code_id && appliedDiscount > 0) {
-            try {
-                await applyDiscountToOrder(discount_code_id, order.id, appliedDiscount);
-            } catch (discountError) {
-                console.error('Error applying discount to order:', discountError);
-                // Order still created, discount just not tracked
-            }
-        }
+        // El uso del código de descuento ya se reclamó atómicamente DENTRO de la transacción
+        // (arriba) y discount_code_id/discount_amount ya quedaron en el INSERT de la orden —
+        // no se vuelve a incrementar current_uses aquí (antes esto duplicaba el conteo en el
+        // camino feliz, además de ser la mitad del hueco de carrera de EC3).
 
         // MercadoPago Checkout Pro para pago con tarjeta
         let checkout_url: string | null = null;
@@ -708,7 +725,10 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
             plan_duration: plan.duration_days,
             checkout_url,
         });
-    } catch (error) {
+    } catch (error: any) {
+        if (error?.message === 'DISCOUNT_CODE_EXHAUSTED') {
+            return res.status(400).json({ error: 'Este código de descuento ya alcanzó su límite de usos' });
+        }
         console.error('Create order error:', error);
         res.status(500).json({ error: 'Error al crear orden' });
     }
@@ -731,14 +751,28 @@ router.post('/:id/pay-with-card', authenticate, async (req: Request, res: Respon
         `, [id, userId]);
 
         if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
-        if (order.status !== 'pending_payment') {
+        // 'rejected' permite reintentar, pero SOLO si (a) el método era card/online — una
+        // transferencia rechazada debe pasar por el flujo de comprobante + revisión manual,
+        // no generar un checkout de MP directo; y (b) reviewed_by es NULL — si un admin
+        // rechazó esta orden explícitamente (POST /:id/reject, que puede incluso revertir una
+        // orden YA APROBADA por fraude/disputa), esta ruta no debe dejar que la clienta la
+        // reactive pagando de nuevo, deshaciendo esa decisión editorial sin que nadie la
+        // revise. Solo un rechazo AUTOMÁTICO de MP (reviewed_by nunca seteado por el webhook)
+        // habilita el reintento self-service.
+        const isCardLike = order.payment_method === 'card' || order.payment_method === 'online';
+        const isRetry = order.status === 'rejected' && isCardLike && !order.reviewed_by;
+        if (order.status !== 'pending_payment' && !isRetry) {
             return res.status(400).json({ error: 'Esta orden ya no acepta pagos' });
         }
 
         if (!mpConfigured()) {
             return res.status(503).json({ error: 'Pago con tarjeta no disponible' });
         }
-        if (order.mp_checkout_url) {
+        // En un reintento tras rechazo, el mp_checkout_url guardado apunta a la preferencia
+        // YA FALLIDA — reusarlo mostraría el mismo pago rechazado en vez de dejar capturar
+        // datos de tarjeta frescos. Solo se reusa el cache cuando la orden sigue pendiente
+        // (evita crear preferencias duplicadas en MP para el mismo intento sin resolver).
+        if (order.mp_checkout_url && !isRetry) {
             return res.json({ checkout_url: order.mp_checkout_url });
         }
         const pref = await createPreference({
@@ -750,10 +784,17 @@ router.post('/:id/pay-with-card', authenticate, async (req: Request, res: Respon
             notificationUrl: process.env.BACKEND_URL ? `${process.env.BACKEND_URL}/webhooks/mercadopago` : undefined,
         });
         await query(
+            // mp_payment_id/mp_status_detail se limpian en un reintento: si no, una
+            // notificación de MP que llegue tarde para el intento VIEJO (ya rechazado) podría
+            // sincronizarse contra ese id obsoleto en vez de que sync-mp busque el pago más
+            // reciente por external_reference.
             `UPDATE orders SET payment_method='card', payment_provider='mercadopago',
-                    mp_checkout_url=$1, updated_at=NOW()
+                    mp_checkout_url=$1, status=CASE WHEN $3 THEN 'pending_payment' ELSE status END,
+                    mp_payment_id=CASE WHEN $3 THEN NULL ELSE mp_payment_id END,
+                    mp_status_detail=CASE WHEN $3 THEN NULL ELSE mp_status_detail END,
+                    updated_at=NOW()
              WHERE id=$2`,
-            [pref.checkoutUrl, order.id]);
+            [pref.checkoutUrl, order.id, isRetry]);
         res.json({ checkout_url: pref.checkoutUrl });
     } catch (err: any) {
         console.error('Pay with card error:', err.message);
@@ -772,16 +813,34 @@ router.post('/:id/sync-mp', authenticate, requireRole('admin', 'super_admin'), a
         const order = await queryOne<{ id: string; mp_payment_id: string | null }>(
             `SELECT id, mp_payment_id FROM orders WHERE id = $1`, [id]);
         if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
-        if (!order.mp_payment_id) {
-            return res.status(400).json({ error: 'La orden no tiene un pago de MercadoPago que reconciliar.' });
+
+        // Si el webhook nunca llegó, mp_payment_id nunca se pobló (solo el webhook lo
+        // escribe) — antes esta ruta 400eaba aquí mismo, dejando a una clienta que SÍ pagó
+        // sin ningún camino de reconciliación más que cancelar su orden. Se busca el pago
+        // real en MP por external_reference (= este orderId) antes de rendirse.
+        let mpPaymentId = order.mp_payment_id;
+        if (!mpPaymentId) {
+            const found = await searchPaymentByExternalReference(id);
+            if (!found) {
+                return res.status(400).json({ error: 'No se encontró ningún pago de MercadoPago para esta orden.' });
+            }
+            mpPaymentId = String(found.id);
         }
-        const payment = await syncPayment(String(order.mp_payment_id));
+
+        const payment = await syncPayment(String(mpPaymentId));
         await query(
-            `UPDATE orders SET mp_payment_status=$1, mp_status_detail=$2, provider_synced_at=NOW(), updated_at=NOW()
-             WHERE id=$3`,
-            [payment.status, payment.status_detail, id]);
+            `UPDATE orders SET mp_payment_id=$1, mp_payment_status=$2, mp_status_detail=$3,
+                    payment_provider='mercadopago', provider_synced_at=NOW(), updated_at=NOW()
+             WHERE id=$4`,
+            [String(payment.id), payment.status, payment.status_detail, id]);
         if (payment.status === 'approved') {
             await finalizePaidOrder(id, { provider: 'mercadopago', paymentRef: String(payment.id) });
+        } else if (payment.status === 'rejected' || payment.status === 'cancelled') {
+            await query(
+                `UPDATE orders SET status='rejected', rejected_at=NOW(), updated_at=NOW()
+                 WHERE id=$1 AND status='pending_payment'`,
+                [id]
+            );
         }
         res.json({ status: payment.status, status_detail: payment.status_detail });
     } catch (err: any) {

@@ -40,7 +40,11 @@ export interface Order {
   checkout_url?: string | null;
   mp_payment_id?: string | null;
   mp_payment_status?: string | null;
+  mp_status_detail?: string | null;
   payment_provider?: string | null;
+  // Presente solo si un admin rechazó/revisó esta orden manualmente (POST /:id/reject);
+  // un rechazo automático del webhook de MP nunca lo setea.
+  reviewed_by?: string | null;
 }
 
 // Payment proof attached to an order

@@ -1108,13 +1108,12 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Migration 047: studio_closed_days lista.');
     } catch (e) { console.error('Migration 047 error:', e); }
 
-    // Migration 048: borrar plantillas (schedules) de salas cruft del base (Hot Room/Wunda/Barre).
-    // 108 filas con coach placeholder "Coach Balance"; las reales son de BMB Tepa/San Miguel.
-    // classes.schedule_id es ON DELETE SET NULL, así que es seguro.
+    // Migration 048: neutralizada para Casa Shé. La versión heredada borraba en CADA
+    // arranque todo schedule cuya sede no comenzara con "BMB". Como la sede única se
+    // llama "Casa Shé — Condesa", eso vaciaba la plantilla semanal de producción y
+    // dejaba las clases ya generadas con schedule_id = NULL.
     try {
-        await query(`DELETE FROM schedules
-                      WHERE facility_id IN (SELECT id FROM facilities WHERE name NOT ILIKE 'BMB%')`);
-        console.log('Migration 048: plantillas de salas cruft borradas.');
+        console.log('Migration 048: neutralizada para preservar plantillas Casa Shé.');
     } catch (e) { console.error('Migration 048 error:', e); }
 
     // Migration 049: facility_id en egresos (asignar gastos a una sucursal -> utilidad por local).
@@ -3658,6 +3657,92 @@ async function runStartupMigrations(): Promise<void> {
         await query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_memberships_order_id ON memberships(order_id) WHERE order_id IS NOT NULL`);
         console.log('Migration 107b: ux_memberships_order_id ready.');
     } catch (e) { console.error('Migration 107b error (¿duplicados preexistentes de order_id? limpiar manualmente):', e); }
+
+    // Migration 114: recuperar la plantilla Casa Shé eliminada por la antigua Migration 048.
+    // Solo convierte en schedule los patrones que aparecen en al menos dos fechas futuras;
+    // así una clase extraordinaria creada a mano nunca se vuelve recurrente por accidente.
+    // Después vuelve a enlazar las clases huérfanas para que editar/cancelar una serie y la
+    // generación de semanas funcionen otra vez. Gateada para no reconstruir horarios que la
+    // admin elimine deliberadamente después de esta reparación.
+    try {
+        const restored114 = await queryOne<{ name: string }>(
+            `SELECT name FROM migration_flags WHERE name = 'casashe_restore_schedules_v1'`
+        );
+        if (!restored114) {
+            const recovered = await query(`
+                WITH recurring_patterns AS (
+                    SELECT c.class_type_id,
+                           c.instructor_id,
+                           c.facility_id,
+                           EXTRACT(DOW FROM c.date)::int AS day_of_week,
+                           c.start_time,
+                           c.end_time,
+                           c.max_capacity
+                    FROM classes c
+                    JOIN facilities f ON f.id = c.facility_id
+                    WHERE f.name = 'Casa Shé — Condesa'
+                      AND c.date >= CURRENT_DATE
+                      AND c.status = 'scheduled'
+                    GROUP BY c.class_type_id, c.instructor_id, c.facility_id,
+                             EXTRACT(DOW FROM c.date)::int, c.start_time,
+                             c.end_time, c.max_capacity
+                    HAVING COUNT(DISTINCT c.date) >= 2
+                )
+                INSERT INTO schedules (
+                    class_type_id, instructor_id, facility_id, day_of_week,
+                    start_time, end_time, max_capacity, is_recurring, is_active
+                )
+                SELECT p.class_type_id,
+                       p.instructor_id,
+                       p.facility_id,
+                       p.day_of_week,
+                       p.start_time,
+                       p.end_time,
+                       p.max_capacity,
+                       true,
+                       true
+                FROM recurring_patterns p
+                WHERE NOT EXISTS (
+                       SELECT 1
+                       FROM schedules s
+                       WHERE s.class_type_id = p.class_type_id
+                         AND s.instructor_id = p.instructor_id
+                         AND s.facility_id = p.facility_id
+                         AND s.day_of_week = p.day_of_week
+                         AND s.start_time = p.start_time
+                   )
+                ON CONFLICT DO NOTHING
+                RETURNING id
+            `);
+
+            const relinked = await query(`
+                UPDATE classes c
+                   SET schedule_id = s.id,
+                       updated_at = NOW()
+                  FROM schedules s, facilities f
+                 WHERE c.schedule_id IS NULL
+                   AND c.facility_id = f.id
+                   AND f.name = 'Casa Shé — Condesa'
+                   AND c.date >= CURRENT_DATE
+                   AND c.status = 'scheduled'
+                   AND s.class_type_id = c.class_type_id
+                   AND s.instructor_id = c.instructor_id
+                   AND s.facility_id = c.facility_id
+                   AND s.day_of_week = EXTRACT(DOW FROM c.date)::int
+                   AND s.start_time = c.start_time
+                   AND s.end_time = c.end_time
+                   AND s.max_capacity = c.max_capacity
+                RETURNING c.id
+            `);
+
+            await query(`
+                INSERT INTO migration_flags (name)
+                VALUES ('casashe_restore_schedules_v1')
+                ON CONFLICT DO NOTHING
+            `);
+            console.log(`Migration 114: ${recovered.length} horarios recuperados y ${relinked.length} clases reenlazadas.`);
+        }
+    } catch (e) { console.error('Migration 114 error:', e); }
 
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }

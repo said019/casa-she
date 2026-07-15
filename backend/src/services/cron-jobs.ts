@@ -22,6 +22,9 @@ import {
 } from '../lib/whatsapp.js';
 import { writeInAppNotification } from '../lib/in-app-notifications.js';
 import { getLoyaltyConfig, type DbClient } from '../lib/loyalty.js';
+import { mpConfigured, searchPaymentByExternalReference, syncPayment } from '../lib/mercadopago.js';
+import { finalizePaidOrder } from '../lib/orderFulfillment.js';
+import { notifyPointsEarnedExternal } from '../lib/notifications.js';
 
 // ============================================
 // TIPOS
@@ -349,17 +352,27 @@ async function markExpiredMemberships(): Promise<void> {
     logJob(jobName, 'Marcando membresías expiradas...');
 
     try {
+        // Días de gracia configurables (system_settings.membership_expiry_policy, editable
+        // desde el panel) antes de marcar 'expired' — antes era comportamiento fijo en código
+        // (0 días: expiraba el mismo día del vencimiento), la fuente #1 de conflictos con
+        // clientas según la auditoría: créditos ya pagados se perdían de golpe sin que la
+        // dueña pudiera dar ni un día de cortesía.
+        const policyRow = await queryOne<{ value: any }>(
+            `SELECT value FROM system_settings WHERE key = 'membership_expiry_policy'`
+        );
+        const graceDays = Math.max(0, Number(policyRow?.value?.grace_days ?? 0));
+
         const result = await query(`
             UPDATE memberships
             SET status = 'expired', updated_at = NOW()
             WHERE status = 'active'
-            AND end_date < CURRENT_DATE
+            AND end_date < ((NOW() AT TIME ZONE 'America/Mexico_City')::date - ($1 || ' days')::interval)
             RETURNING id
-        `);
+        `, [graceDays]);
 
         const count = result.length;
         if (count > 0) {
-            logJob(jobName, `${count} membresías marcadas como expiradas`);
+            logJob(jobName, `${count} membresías marcadas como expiradas (gracia: ${graceDays}d)`);
         } else {
             logJob(jobName, 'No hay membresías para marcar');
         }
@@ -401,6 +414,73 @@ async function cleanupExpiredOrders(): Promise<void> {
 
         await recordJobExecution(jobName, true, `Expired: ${count}`);
 
+    } catch (error) {
+        logError(jobName, error);
+        await recordJobExecution(jobName, false, String(error));
+    }
+}
+
+// ============================================
+// JOB 7b: RECONCILIAR ÓRDENES DE TARJETA ATORADAS
+// Ejecuta cada hora — respaldo proactivo del botón "Reconciliar" de OrdersVerification.tsx.
+// cleanupExpiredOrders arriba SOLO limpia transferencias sin pagar (48h); una orden con
+// tarjeta cuyo webhook de MercadoPago nunca llegó (deploy, timeout, secret mal configurado)
+// se quedaba en 'pending_payment' para siempre sin que NADIE se enterara — la clienta pagó
+// y el estudio ni se entera de que hay un pago por reconciliar hasta que ella reclama.
+// ============================================
+
+async function reconcileCardOrders(): Promise<void> {
+    const jobName = 'RECONCILE_CARD_ORDERS';
+    logJob(jobName, 'Reconciliando órdenes de tarjeta pendientes...');
+
+    if (!mpConfigured()) {
+        await recordJobExecution(jobName, true, 'MercadoPago no configurado, se omite.');
+        return;
+    }
+
+    try {
+        // Ventana: al menos 15 min desde que se creó (dar tiempo a completar el checkout) y
+        // no más de 7 días (evitar re-consultar en MP checkouts genuinamente abandonados para
+        // siempre, con reconciliación manual disponible vía el botón admin si hiciera falta).
+        const stuckOrders = await query<{ id: string; order_number: string }>(`
+            SELECT id, order_number FROM orders
+            WHERE status = 'pending_payment'
+              AND payment_method = 'card'
+              AND created_at < NOW() - INTERVAL '15 minutes'
+              AND created_at > NOW() - INTERVAL '7 days'
+        `);
+
+        let reconciled = 0;
+        let approved = 0;
+        for (const order of stuckOrders) {
+            try {
+                const found = await searchPaymentByExternalReference(order.id);
+                if (!found) continue;
+                const payment = await syncPayment(String(found.id));
+                await query(
+                    `UPDATE orders SET mp_payment_id=$1, mp_payment_status=$2, mp_status_detail=$3,
+                            payment_provider='mercadopago', provider_synced_at=NOW(), updated_at=NOW()
+                     WHERE id=$4`,
+                    [String(payment.id), payment.status, payment.status_detail, order.id]
+                );
+                reconciled++;
+                if (payment.status === 'approved') {
+                    await finalizePaidOrder(order.id, { provider: 'mercadopago', paymentRef: String(payment.id) });
+                    approved++;
+                } else if (payment.status === 'rejected' || payment.status === 'cancelled') {
+                    await query(
+                        `UPDATE orders SET status='rejected', rejected_at=NOW(), updated_at=NOW()
+                         WHERE id=$1 AND status='pending_payment'`,
+                        [order.id]
+                    );
+                }
+            } catch (e: any) {
+                console.error(`[${jobName}] error reconciliando orden ${order.order_number}:`, e?.message);
+            }
+        }
+
+        logJob(jobName, `${stuckOrders.length} órdenes revisadas, ${reconciled} con pago encontrado, ${approved} aprobadas.`);
+        await recordJobExecution(jobName, true, `Checked: ${stuckOrders.length}, reconciled: ${reconciled}, approved: ${approved}`);
     } catch (error) {
         logError(jobName, error);
         await recordJobExecution(jobName, false, String(error));
@@ -590,6 +670,11 @@ export async function birthdayBonus(client?: DbClient): Promise<void> {
                 [points, u.id]
             );
             granted++;
+            // Antes se acreditaban en silencio: la clienta nunca se enteraba de que recibió
+            // el bono. sendPointsEarnedNotice (WhatsApp) ya está desactivado por la política
+            // de la dueña (lib/whatsapp.ts) y no-opea solo; el correo SÍ se envía (birthday
+            // está en EMAIL_REASONS).
+            void notifyPointsEarnedExternal(u.id, points, 'birthday');
         }
         await recordJobExecution(jobName, true, `birthday bonuses granted: ${granted}`);
         logJob(jobName, `granted to ${granted} users`);
@@ -651,6 +736,9 @@ export async function anniversaryBonus(client?: DbClient): Promise<void> {
                 [points, u.id]
             );
             granted++;
+            // Mismo respaldo que birthdayBonus: WhatsApp no-opea por la política de la
+            // dueña, el correo sí se envía (anniversary está en EMAIL_REASONS).
+            void notifyPointsEarnedExternal(u.id, points, 'anniversary');
         }
         await recordJobExecution(jobName, true, `anniversary bonuses granted: ${granted}`);
         logJob(jobName, `granted to ${granted} users`);
@@ -888,6 +976,12 @@ export function initializeCronJobs(): void {
         timezone: 'America/Mexico_City',
     });
     console.log('  ✅ CLEANUP_ORDERS - Cada 6 horas');
+
+    // Cada hora - Reconciliar órdenes de tarjeta atoradas (webhook de MP perdido)
+    cron.schedule('20 * * * *', reconcileCardOrders, {
+        timezone: 'America/Mexico_City',
+    });
+    console.log('  ✅ RECONCILE_CARD_ORDERS - Cada hora');
 
     // Cada 30 min - Marcar no-shows y completar clases, LUEGO auto-check-in de respaldo.
     // Antes corrían en cron.schedule separados (:05/:35 vs :10/:40): con ambos anclados en

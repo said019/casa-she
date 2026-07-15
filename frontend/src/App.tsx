@@ -10,6 +10,8 @@ import UpdatePrompt from "@/components/UpdatePrompt";
 // Public pages
 import Index from "./pages/Index";
 import CasaSheLanding from "./pages/CasaSheLanding";
+import BioLink, { BioContact, BioLocation, BioPackages, BioReserve, BioSchedule, BioSpace } from "./pages/BioLink";
+import { BioCheckoutFinalize, BioGuestCheckout } from "./pages/BioGuestCheckout";
 import NotFound from "./pages/NotFound";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
@@ -84,12 +86,14 @@ import GeneralSettings from "./pages/admin/settings/GeneralSettings";
 import StudioSettings from "./pages/admin/settings/StudioSettings";
 import PoliciesSettings from "./pages/admin/settings/PoliciesSettings";
 import AdminCancellationPolicy from "./pages/admin/settings/CancellationPolicy";
+import MembershipExpiryPolicy from "./pages/admin/settings/MembershipExpiryPolicy";
 import NotificationSettings from "./pages/admin/settings/NotificationSettings";
 import ClosedDays from "./pages/admin/settings/ClosedDays";
 import WhatsAppSettings from "./pages/admin/settings/WhatsAppSettings";
 import AdminOnboardingRules from "./pages/admin/settings/OnboardingRules";
 import BarSettings from "./pages/admin/settings/BarSettings";
 import BarExtras from "./pages/admin/settings/BarExtras";
+import TotalPassSettings from "./pages/admin/settings/TotalPassSettings";
 import BarQueue from "./pages/admin/bar/BarQueue";
 
 // Loyalty pages
@@ -220,6 +224,16 @@ const App = () => (
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<CasaSheLanding />} />
+            <Route path="/bio" element={<BioLink />} />
+            <Route path="/bio-link" element={<BioLink />} />
+            <Route path="/bio/reservar" element={<BioReserve />} />
+            <Route path="/bio/horarios" element={<BioSchedule />} />
+            <Route path="/bio/pagar/:classId" element={<BioGuestCheckout />} />
+            <Route path="/bio/finalizar" element={<BioCheckoutFinalize />} />
+            <Route path="/bio/paquetes" element={<BioPackages />} />
+            <Route path="/bio/espacio" element={<BioSpace />} />
+            <Route path="/bio/ubicacion" element={<BioLocation />} />
+            <Route path="/bio/contacto" element={<BioContact />} />
             <Route path="/inicio-clasico" element={<Index />} />
             <Route path="/clases/:classId" element={<LegacyClientBookRedirect />} />
             <Route path="/coaches/:slug" element={<Navigate to="/#equipo" replace />} />
@@ -323,10 +337,12 @@ const App = () => (
             <Route path="/admin/settings/studio" element={<StudioSettings />} />
             <Route path="/admin/settings/policies" element={<PoliciesSettings />} />
             <Route path="/admin/settings/cancellations" element={<AdminCancellationPolicy />} />
+            <Route path="/admin/settings/membership-expiry" element={<MembershipExpiryPolicy />} />
             <Route path="/admin/settings/notifications" element={<NotificationSettings />} />
             <Route path="/admin/settings/closed-days" element={<ClosedDays />} />
             <Route path="/admin/settings/whatsapp" element={<WhatsAppSettings />} />
             <Route path="/admin/settings/onboarding" element={<AdminOnboardingRules />} />
+            <Route path="/admin/settings/totalpass" element={<TotalPassSettings />} />
             <Route path="/admin/settings/bar" element={<BarSettings />} />
             <Route path="/admin/settings/bar/extras" element={<BarExtras />} />
             <Route path="/admin/bar/queue" element={<BarQueue />} />

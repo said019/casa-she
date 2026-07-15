@@ -46,6 +46,13 @@ export interface CandidateMembership {
   id: string;
   reformer_remaining: number | null; // null = ilimitado, 0 = sin acceso
   multi_remaining: number | null;
+  /**
+   * Configuración actual del plan. Si viene incluida, también debe permitir la
+   * categoría: evita que una membresía legacy/corrupta con remaining=NULL abra
+   * una categoría que el producto nunca incluyó.
+   */
+  plan_reformer_credits?: number | null;
+  plan_multi_credits?: number | null;
   end_date: string | null;           // ISO date o null = sin vigencia
   created_at: string;                // ISO timestamp
   bound_facility_id: string | null;  // null = mixto / sin atar
@@ -53,6 +60,10 @@ export interface CandidateMembership {
 
 function remainingFor(m: CandidateMembership, category: ClassCategory): number | null {
   return category === 'reformer' ? m.reformer_remaining : m.multi_remaining;
+}
+
+function planCreditsFor(m: CandidateMembership, category: ClassCategory): number | null | undefined {
+  return category === 'reformer' ? m.plan_reformer_credits : m.plan_multi_credits;
 }
 
 /** Estudio: elegible si no está atada, o atada exactamente al estudio de la clase. */
@@ -63,6 +74,9 @@ function isStudioEligible(m: CandidateMembership, classFacilityId: string | null
 
 /** Categoría: elegible si ilimitada (null) o con al menos 1 crédito del bucket. */
 function isCategoryEligible(m: CandidateMembership, category: ClassCategory): boolean {
+  const configured = planCreditsFor(m, category);
+  if (configured !== undefined && configured !== null && configured < 1) return false;
+
   const r = remainingFor(m, category);
   return r === null || r >= 1;
 }
@@ -101,6 +115,8 @@ export type MembershipRow = Record<string, unknown> & {
   id: string;
   reformer_remaining: number | null;
   multi_remaining: number | null;
+  plan_reformer_credits: number | null;
+  plan_multi_credits: number | null;
   end_date: string | Date | null;
   created_at: string | Date;
   bound_facility_id: string | null;
@@ -128,16 +144,21 @@ export async function selectMembershipForBooking(params: {
   // `col` se interpola en SQL: el ternario lo restringe a dos literales fijos
   // (nunca entra input del usuario), así que es seguro frente a inyección.
   const col = category === 'reformer' ? 'reformer_remaining' : 'multi_remaining';
+  const planCol = category === 'reformer' ? 'reformer_credits' : 'multi_credits';
   const { rows } = await db.query(
     `SELECT m.*,
+            p.reformer_credits AS plan_reformer_credits,
+            p.multi_credits AS plan_multi_credits,
             COALESCE(m.facility_id, o.facility_id) AS bound_facility_id
        FROM memberships m
+       JOIN plans p ON p.id = m.plan_id
        LEFT JOIN orders o ON o.id = m.order_id
       WHERE m.user_id = $1
         AND m.status = 'active'
         AND (m.start_date IS NULL OR m.start_date <= $3::date)
         AND (m.end_date IS NULL OR m.end_date >= $3::date)
         AND (m.${col} IS NULL OR m.${col} >= $2)
+        AND (p.${planCol} IS NULL OR p.${planCol} >= $2)
       FOR UPDATE OF m`,
     [userId, requiredCredits, classDate],
   );
@@ -146,6 +167,8 @@ export async function selectMembershipForBooking(params: {
     id: r.id,
     reformer_remaining: r.reformer_remaining,
     multi_remaining: r.multi_remaining,
+    plan_reformer_credits: r.plan_reformer_credits,
+    plan_multi_credits: r.plan_multi_credits,
     end_date: r.end_date ? new Date(r.end_date).toISOString() : null,
     created_at: new Date(r.created_at).toISOString(),
     bound_facility_id: r.bound_facility_id ?? null,

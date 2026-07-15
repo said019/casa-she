@@ -5,6 +5,7 @@ import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api';
+import { isRewardAvailable, useLoyaltyRewards } from '@/hooks/useLoyaltyRewards';
 import { fetchMyMembership } from '@/lib/memberships';
 import type { BookingClient } from '@/types/booking';
 import type { ClientMembership } from '@/types/membership';
@@ -39,14 +40,6 @@ import { useBarConfig } from '@/lib/api/bar';
 
 interface WalletSummary {
   pointsBalance: number;
-}
-
-interface LoyaltyReward {
-  id: string;
-  name: string;
-  points_cost: number;
-  is_active: boolean;
-  stock: number | null;
 }
 
 const statusLabel: Record<ClientMembership['status'], string> = {
@@ -99,10 +92,7 @@ export default function ClientDashboard() {
     queryFn: async () => (await api.get('/wallet/pass')).data,
   });
 
-  const { data: loyaltyRewards, isLoading: loyaltyRewardsLoading } = useQuery<LoyaltyReward[]>({
-    queryKey: ['loyalty-rewards'],
-    queryFn: async () => (await api.get('/loyalty/rewards')).data,
-  });
+  const { data: loyaltyRewards, isLoading: loyaltyRewardsLoading } = useLoyaltyRewards();
 
   const { data: latestVideos } = useQuery<any[]>({
     queryKey: ['latest-videos'],
@@ -147,7 +137,7 @@ export default function ClientDashboard() {
   const pointsBalance = walletSummary?.pointsBalance ?? 0;
   const nextReward = useMemo(() => {
     return (loyaltyRewards || [])
-      .filter((reward) => reward.is_active && (reward.stock === null || reward.stock > 0))
+      .filter(isRewardAvailable)
       .sort((a, b) => a.points_cost - b.points_cost)[0] || null;
   }, [loyaltyRewards]);
   const rewardTarget = nextReward?.points_cost ?? null;

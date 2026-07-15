@@ -79,7 +79,11 @@ export async function createPreference(input: CreatePreferenceInput): Promise<Cr
 // Header x-signature: "ts=<timestamp>,v1=<hmac>". Manifest exacto que exige MP:
 //   id:<dataId>;request-id:<xRequestId>;ts:<ts>;
 // HMAC-SHA256 con MP_WEBHOOK_SECRET, comparación en tiempo constante.
-// secret vacío → se OMITE la verificación (modo legacy; nunca en producción).
+// Fail-closed: sin secreto configurado, se RECHAZA el webhook (nunca se acepta como si la
+// firma fuera válida). Antes esto fallaba abierto (`return true`) — si MP_WEBHOOK_SECRET
+// llegara a faltar por un error de configuración/rotación, cualquier request sin firma
+// habría sido aceptado como webhook legítimo, pudiendo activar membresías/pagos falsos.
+// Mismo criterio que ya usa stripe-webhook.ts (rechaza si falta el secret).
 export function verifyWebhookSignature(params: {
     xSignature: string | undefined;
     xRequestId: string | undefined;
@@ -87,7 +91,7 @@ export function verifyWebhookSignature(params: {
     secret: string;
 }): boolean {
     const { xSignature, xRequestId, dataId, secret } = params;
-    if (!secret) return true; // legacy: sin secreto configurado, no se puede verificar
+    if (!secret) return false;
     if (!xSignature || !dataId) return false;
     const parts: Record<string, string> = {};
     for (const kv of xSignature.split(',')) {
@@ -129,6 +133,36 @@ export async function syncPayment(mpPaymentId: string): Promise<MpPayment> {
         status: String(p.status ?? ''),
         status_detail: String(p.status_detail ?? ''),
         external_reference: p.external_reference ?? null,
+        transaction_amount: p.transaction_amount ?? null,
+    };
+}
+
+/**
+ * Busca un pago por external_reference (= orderId, ver createPreference) cuando NO se
+ * conoce su mp_payment_id — el caso exacto de una orden pagada cuyo webhook nunca llegó
+ * (deploy, timeout, MP_WEBHOOK_SECRET mal configurado). Sin esto, una clienta que sí pagó
+ * quedaba sin ningún camino de reconciliación más que cancelar su orden. Devuelve el pago
+ * más reciente (si hay varios intentos), priorizando cualquiera que esté 'approved'.
+ */
+export async function searchPaymentByExternalReference(orderId: string): Promise<MpPayment | null> {
+    const resp = await fetch(
+        `${MP_API}/v1/payments/search?external_reference=${encodeURIComponent(orderId)}&sort=date_created&criteria=desc`,
+        { headers: { 'Authorization': `Bearer ${accessToken()}` } }
+    );
+    if (!resp.ok) {
+        const txt = await resp.text().catch(() => '');
+        throw new Error(`MP_PAYMENT_SEARCH_FAILED ${resp.status}: ${txt.slice(0, 300)}`);
+    }
+    const body = await resp.json() as { results?: Partial<MpPayment>[] };
+    const results = body.results ?? [];
+    if (results.length === 0) return null;
+    const approved = results.find((p) => p.status === 'approved');
+    const p = approved ?? results[0];
+    return {
+        id: p.id ?? '',
+        status: String(p.status ?? ''),
+        status_detail: String(p.status_detail ?? ''),
+        external_reference: p.external_reference ?? orderId,
         transaction_amount: p.transaction_amount ?? null,
     };
 }

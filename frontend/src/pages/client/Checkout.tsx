@@ -17,10 +17,12 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { savePendingBioBooking } from '@/lib/bioQuickBooking';
 import {
   getClassesLabel,
   getPackagePresentation,
   getPackageType,
+  isSalsaPlan,
   packageOrder,
   packagePresentations,
 } from '@/lib/planPresentation';
@@ -47,6 +49,8 @@ interface Plan {
   price: number;
   duration_days: number;
   class_limit: number | null;
+  reformer_credits?: number | null;
+  multi_credits?: number | null;
   description: string | null;
   is_active: boolean;
   is_internal?: boolean;
@@ -127,6 +131,8 @@ export default function Checkout() {
   const queryClient = useQueryClient();
 
   const preselectedPlanId = searchParams.get('plan');
+  const bookingClassId = searchParams.get('classId');
+  const isBioQuickCheckout = searchParams.get('source') === 'bio' && Boolean(bookingClassId);
 
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(preselectedPlanId);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<OrderPaymentMethod>('bank_transfer');
@@ -138,7 +144,7 @@ export default function Checkout() {
     setCopiedField(field);
     setTimeout(() => setCopiedField(null), 2000);
   };
-  const [step, setStep] = useState<'plan' | 'payment' | 'confirm'>('plan');
+  const [step, setStep] = useState<'plan' | 'payment' | 'confirm'>(isBioQuickCheckout ? 'payment' : 'plan');
 
   // Discount code state
   const [discountCode, setDiscountCode] = useState('');
@@ -163,6 +169,18 @@ export default function Checkout() {
       return res.data.filter((p: Plan) => p.is_active && !p.is_internal).sort((a: Plan, b: Plan) => (a.sort_order || 0) - (b.sort_order || 0));
     },
   });
+
+  const { data: bookingClass, isLoading: bookingClassLoading } = useQuery<{
+    class_type_name?: string;
+    class_category?: 'reformer' | 'multi';
+  }>({
+    queryKey: ['checkout-class-requirement', bookingClassId],
+    queryFn: async () => (await api.get(`/classes/${bookingClassId}`)).data,
+    enabled: Boolean(bookingClassId),
+  });
+  const requiresSalsaPlan =
+    bookingClass?.class_category === 'reformer' ||
+    bookingClass?.class_type_name?.toLowerCase() === 'salsa';
 
   // Fetch user membership status 
   // We need to know if they have an active "membership_fee" plan
@@ -235,6 +253,9 @@ export default function Checkout() {
     },
     onSuccess: (order) => {
       queryClient.invalidateQueries({ queryKey: ['my-orders'] });
+      if (bookingClassId) {
+        savePendingBioBooking({ classId: bookingClassId, orderId: order.id });
+      }
       if (order.checkout_url) {
         window.location.href = order.checkout_url;
         return;
@@ -266,6 +287,10 @@ export default function Checkout() {
   const selectedPlan = plans?.find(p => p.id === selectedPlanId);
   const visiblePlans = (plans || []).filter((plan) => {
     if (isMembershipFeePlan(plan) && hasActiveMembershipFee) return false;
+    if (requiresSalsaPlan) {
+      const salsaCredits = plan.reformer_credits;
+      return isSalsaPlan(plan) && (salsaCredits === null || Number(salsaCredits) > 0);
+    }
     return true;
   });
   const groupedPlans = packageOrder
@@ -275,6 +300,35 @@ export default function Checkout() {
     }))
     .filter((group) => group.plans.length > 0);
   const needsStudio = !!selectedPlan?.requires_studio_selection;
+
+  useEffect(() => {
+    if (!isBioQuickCheckout || selectedPlanId || !plans?.length) return;
+    const quickPlan = plans.find((plan) => {
+      const name = plan.name.toLowerCase();
+      return plan.is_active && !plan.is_internal && (
+        name.includes('clase suelta') || name.includes('drop') || plan.class_limit === 1
+      );
+    });
+    if (quickPlan) {
+      setSelectedPlanId(quickPlan.id);
+      setStep('payment');
+    } else {
+      setStep('plan');
+    }
+  }, [isBioQuickCheckout, plans, selectedPlanId]);
+
+  useEffect(() => {
+    if (!requiresSalsaPlan || !selectedPlanId || !plans?.length) return;
+    const selected = plans.find((plan) => plan.id === selectedPlanId);
+    if (selected && !isSalsaPlan(selected)) {
+      setSelectedPlanId(null);
+      setStep('plan');
+    }
+  }, [plans, requiresSalsaPlan, selectedPlanId]);
+
+  useEffect(() => {
+    if (isBioQuickCheckout && cardEnabled) setSelectedPaymentMethod('card');
+  }, [cardEnabled, isBioQuickCheckout]);
 
   const handlePlanSelect = (planId: string) => {
     setSelectedPlanId(planId);
@@ -400,7 +454,8 @@ export default function Checkout() {
               size="icon"
               className="rounded-full bg-[#FBF7EE]/72 text-[#2E1B22] hover:bg-[#D6D5C2]/55"
               onClick={() => {
-                if (step === 'payment') setStep('plan');
+                if (step === 'payment' && isBioQuickCheckout) navigate('/bio/horarios');
+                else if (step === 'payment') setStep('plan');
                 else if (step === 'confirm') setStep('payment');
                 else navigate('/app');
               }}
@@ -409,38 +464,44 @@ export default function Checkout() {
             </Button>
             <div>
               <h1 className="text-3xl font-semibold tracking-[-0.04em] text-balance-dark sm:text-4xl">
-                {step === 'plan' && 'Elige tu forma de moverte'}
-                {step === 'payment' && 'Pago tranquilo'}
-                {step === 'confirm' && 'Confirmar orden'}
+                {step === 'plan' && (requiresSalsaPlan ? 'Elige tu opción de Salsa' : 'Elige tu forma de moverte')}
+                {step === 'payment' && (isBioQuickCheckout ? 'Paga tu clase' : 'Pago tranquilo')}
+                {step === 'confirm' && (isBioQuickCheckout ? 'Confirma y vuelve a reservar' : 'Confirmar orden')}
               </h1>
               <p className="mt-1 text-sm text-balance-dark/62">
-                {step === 'plan' && 'Elige el paquete que va contigo.'}
-                {step === 'payment' && 'Elige el método que te quede más cómodo.'}
-                {step === 'confirm' && 'Revisa los detalles de tu compra'}
+                {step === 'plan' && (requiresSalsaPlan
+                  ? 'Para reservar esta clase sólo aplican Clase de Salsa o Paquete de Salsa.'
+                  : 'Elige el paquete que va contigo.')}
+                {step === 'payment' && (isBioQuickCheckout ? 'Tu clase seguirá seleccionada durante el pago.' : 'Elige el método que te quede más cómodo.')}
+                {step === 'confirm' && (isBioQuickCheckout ? 'Después del pago volverás a la clase elegida.' : 'Revisa los detalles de tu compra')}
               </p>
             </div>
           </div>
           </section>
 
           <div className="flex items-center gap-2 text-sm">
+            {!isBioQuickCheckout && (
+              <>
             <Badge variant={step === 'plan' ? 'default' : 'secondary'} className={step === 'plan' ? 'rounded-full bg-[#2A4E36] text-[#F6F0E4]' : 'rounded-full bg-[#D6D5C2]/50 text-[#2E1B22]/68'}>1. Plan</Badge>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            <Badge variant={step === 'payment' ? 'default' : 'secondary'} className={step === 'payment' ? 'rounded-full bg-[#2A4E36] text-[#F6F0E4]' : 'rounded-full bg-[#D6D5C2]/50 text-[#2E1B22]/68'}>2. Pago</Badge>
+              </>
+            )}
+            <Badge variant={step === 'payment' ? 'default' : 'secondary'} className={step === 'payment' ? 'rounded-full bg-[#2A4E36] text-[#F6F0E4]' : 'rounded-full bg-[#D6D5C2]/50 text-[#2E1B22]/68'}>{isBioQuickCheckout ? '1. Pago' : '2. Pago'}</Badge>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            <Badge variant={step === 'confirm' ? 'default' : 'secondary'} className={step === 'confirm' ? 'rounded-full bg-[#2A4E36] text-[#F6F0E4]' : 'rounded-full bg-[#D6D5C2]/50 text-[#2E1B22]/68'}>3. Confirmar</Badge>
+            <Badge variant={step === 'confirm' ? 'default' : 'secondary'} className={step === 'confirm' ? 'rounded-full bg-[#2A4E36] text-[#F6F0E4]' : 'rounded-full bg-[#D6D5C2]/50 text-[#2E1B22]/68'}>{isBioQuickCheckout ? '2. Confirmar' : '3. Confirmar'}</Badge>
           </div>
 
           {/* Step 1: Select Plan */}
           {step === 'plan' && (
             <div>
-              {plansLoading ? (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {plansLoading || (Boolean(bookingClassId) && bookingClassLoading) ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {[0, 1, 2].map((i) => (
-                    <Skeleton key={i} className="h-[26rem] w-full rounded-2xl" />
+                    <Skeleton key={i} className="h-[20rem] w-full rounded-2xl" />
                   ))}
                 </div>
               ) : visiblePlans.length > 0 ? (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {[...visiblePlans]
                     .sort((a, b) => (getPlanCardMeta(a.name)?.order ?? 99) - (getPlanCardMeta(b.name)?.order ?? 99))
                     .map((plan) => {
@@ -457,7 +518,7 @@ export default function Checkout() {
                             isSelected ? 'ring-2 ring-[#2A4E36]' : 'ring-[#2A4E36]/10'
                           }`}
                         >
-                          <div className="relative aspect-square overflow-hidden">
+                          <div className="relative aspect-[4/3] overflow-hidden">
                             {meta ? (
                               <div
                                 className="relative h-full w-full transition-transform duration-500 group-hover:scale-105"
@@ -471,18 +532,18 @@ export default function Checkout() {
                                   src={meta.light ? '/casashe/logo-monogram.png' : '/casashe/logo-monogram-cream.png'}
                                   alt=""
                                   aria-hidden="true"
-                                  className="absolute left-1/2 top-6 h-12 w-12 -translate-x-1/2 object-contain"
+                                  className="absolute left-1/2 top-5 h-10 w-10 -translate-x-1/2 object-contain"
                                   style={{ opacity: 0.9 }}
                                 />
-                                <div className="absolute bottom-6 left-6 right-6">
+                                <div className="absolute bottom-5 left-5 right-5">
                                   <span
-                                    className="block font-heading text-[2.3rem] leading-[1.02]"
+                                    className="block font-heading text-[1.7rem] leading-[1.02]"
                                     style={{ color: meta.light ? '#2A4E36' : '#F6F0E4' }}
                                   >
                                     {meta.artTitle}
                                   </span>
                                   <p
-                                    className="mt-3 max-w-[26ch] font-['Baskervville'] text-[0.92rem] leading-snug"
+                                    className="mt-2 max-w-[26ch] font-['Baskervville'] text-[0.82rem] leading-snug"
                                     style={{ color: meta.light ? '#2A4E36' : '#F6F0E4', opacity: 0.78 }}
                                   >
                                     {meta.tagline}
@@ -491,36 +552,36 @@ export default function Checkout() {
                               </div>
                             ) : (
                               <div className="flex h-full w-full items-center justify-center bg-[#2A4E36]/10">
-                                <CasaSheMark className="h-20 w-20 opacity-40" />
+                                <CasaSheMark className="h-16 w-16 opacity-40" />
                               </div>
                             )}
                             {meta?.oferta && (
                               <span
-                                className="absolute left-4 top-4 flex h-[4.2rem] w-[4.2rem] items-center justify-center rounded-full text-center font-['Baskervville'] text-[13px]"
+                                className="absolute left-3 top-3 flex h-14 w-14 items-center justify-center rounded-full text-center font-['Baskervville'] text-[11px]"
                                 style={{ backgroundColor: '#AE4836', color: '#F6F0E4' }}
                               >
                                 ¡Oferta!
                               </span>
                             )}
                             {isSelected && (
-                              <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-[#F6F0E4] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2A4E36]">
-                                <CheckCircle2 className="h-3.5 w-3.5" />
+                              <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#F6F0E4] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#2A4E36]">
+                                <CheckCircle2 className="h-3 w-3" />
                                 Elegido
                               </span>
                             )}
                           </div>
-                          <div className="flex flex-1 flex-col items-center px-6 py-7 text-center">
-                            <h3 className="font-heading text-lg uppercase tracking-[0.14em] text-[#2A4E36]">{meta?.title ?? plan.name}</h3>
-                            <p className="mt-1 text-[13px] tracking-wide text-[#2A4E36]/55">
+                          <div className="flex flex-1 flex-col items-center px-5 py-5 text-center">
+                            <h3 className="font-heading text-base uppercase tracking-[0.12em] text-[#2A4E36]">{meta?.title ?? plan.name}</h3>
+                            <p className="mt-1 text-[12px] tracking-wide text-[#2A4E36]/55">
                               {meta?.hint ?? `${plan.duration_days} días`}
                             </p>
-                            <div className="mt-4 flex items-baseline justify-center gap-2 font-heading">
+                            <div className="mt-3 flex items-baseline justify-center gap-2 font-heading">
                               {meta?.was && (
-                                <span className="text-lg text-[#2A4E36]/40 line-through">{meta.was}</span>
+                                <span className="text-base text-[#2A4E36]/40 line-through">{meta.was}</span>
                               )}
-                              <span className="text-4xl font-medium text-[#2A4E36]">{formatPrice(price)}</span>
+                              <span className="text-3xl font-medium text-[#2A4E36]">{formatPrice(price)}</span>
                             </div>
-                            <span className="mt-6 w-full rounded-full bg-[#2A4E36] py-3 text-[12px] uppercase tracking-[0.24em] text-[#F6F0E4] transition-colors group-hover:bg-[#16261A]">
+                            <span className="mt-5 w-full rounded-full bg-[#2A4E36] py-2.5 text-[11px] uppercase tracking-[0.22em] text-[#F6F0E4] transition-colors group-hover:bg-[#16261A]">
                               {isSelected ? 'Continuar' : 'Comprar'}
                             </span>
                           </div>
@@ -532,7 +593,9 @@ export default function Checkout() {
                 <Card className="rounded-[1.25rem]">
                   <CardContent className="py-8 text-center">
                     <p className="text-muted-foreground">
-                      No hay planes disponibles en este momento.
+                      {requiresSalsaPlan
+                        ? 'Para reservar una clase de Salsa necesitas un paquete de Salsa. No hay opciones disponibles ahora.'
+                        : 'No hay planes disponibles en este momento.'}
                     </p>
                   </CardContent>
                 </Card>

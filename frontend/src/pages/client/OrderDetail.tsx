@@ -32,8 +32,9 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { clearPendingBioBooking, getPendingBioBooking } from '@/lib/bioQuickBooking';
 import { PaymentProofImage, PaymentProofOpenButton } from '@/components/orders/PaymentProofContent';
-import type { OrderWithProofs, OrderStatus, BankInfo } from '@/types/order';
+import type { OrderWithProofs, OrderStatus, OrderPaymentMethod, BankInfo } from '@/types/order';
 import {
   ArrowLeft,
   Building2,
@@ -60,6 +61,39 @@ const statusConfig: Record<OrderStatus, { label: string; icon: typeof Clock; var
   cancelled: { label: 'Cancelado', icon: XCircle, variant: 'secondary' },
 };
 
+// Traduce el status_detail que manda MercadoPago a un mensaje claro y accionable — antes
+// la clienta solo veía "Pago rechazado" genérico sin saber si fue su banco, un dato mal
+// tecleado, o algo que el estudio deba resolver. Motivos frecuentes documentados por MP;
+// fallback genérico para el resto.
+const MP_REJECTION_MESSAGES: Record<string, string> = {
+  cc_rejected_insufficient_amount: 'Tu tarjeta no tiene fondos suficientes.',
+  cc_rejected_bad_filled_card_number: 'Revisa el número de tarjeta, parece incorrecto.',
+  cc_rejected_bad_filled_date: 'Revisa la fecha de vencimiento de tu tarjeta.',
+  cc_rejected_bad_filled_security_code: 'Revisa el código de seguridad (CVV) de tu tarjeta.',
+  cc_rejected_bad_filled_other: 'Algún dato de tu tarjeta no coincide con tu banco.',
+  cc_rejected_call_for_authorize: 'Tu banco requiere que autorices el pago directamente con ellos.',
+  cc_rejected_card_disabled: 'Tu tarjeta está deshabilitada para compras en línea. Contacta a tu banco.',
+  cc_rejected_duplicated_payment: 'Ya intentaste este pago hace un momento. Espera unos minutos antes de reintentar.',
+  cc_rejected_high_risk: 'Tu banco rechazó el pago por seguridad. Intenta con otra tarjeta.',
+  cc_rejected_max_attempts: 'Alcanzaste el máximo de intentos con esta tarjeta. Intenta más tarde u otra tarjeta.',
+  cc_rejected_other_reason: 'Tu banco rechazó el pago sin dar un motivo específico. Intenta con otra tarjeta.',
+};
+
+function rejectionMessage(order: { payment_method: OrderPaymentMethod | null; mp_status_detail?: string | null; admin_notes: string | null; reviewed_by?: string | null }): string {
+  // Si un admin revisó y rechazó esta orden a mano (reviewed_by seteado — puede incluir
+  // revertir una aprobación por fraude/disputa), su motivo real (admin_notes) es lo que debe
+  // verse — no el mapeo genérico de MP, que asumiría (incorrectamente) que fue el banco quien
+  // rechazó y sugeriría reintentar, cuando el reintento por esta vía está bloqueado a propósito.
+  if (order.reviewed_by) {
+    return order.admin_notes || 'Un administrador revisó y rechazó esta orden. Contacta al estudio para más detalles.';
+  }
+  if (order.payment_method === 'card' || order.payment_method === 'online') {
+    const detail = order.mp_status_detail ?? '';
+    return MP_REJECTION_MESSAGES[detail] || 'Tu banco rechazó el pago. Verifica tus datos o intenta con otra tarjeta.';
+  }
+  return order.admin_notes || 'Tu comprobante no pudo ser validado. Por favor contacta al estudio.';
+}
+
 export default function OrderDetail() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
@@ -74,6 +108,9 @@ export default function OrderDetail() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [pendingBioBooking] = useState(() => getPendingBioBooking());
+  const bioClassId = pendingBioBooking?.orderId === orderId ? pendingBioBooking.classId : null;
+  const reserveDestination = bioClassId ? `/app/book/${bioClassId}?source=bio` : '/app/book';
   
   // Fetch order details
   const { data: order, isLoading } = useQuery<OrderWithProofs>({
@@ -275,7 +312,15 @@ export default function OrderDetail() {
   const statusInfo = statusConfig[order.status];
   const canUploadProof = order.status === 'pending_payment' && order.payment_method === 'bank_transfer';
   const hasProofs = order.payment_proofs && order.payment_proofs.length > 0;
-  const canPayWithCard = order.status === 'pending_payment';
+  // Una orden con tarjeta RECHAZADA debe poder reintentarse sin perder el contexto (mismo
+  // paquete, misma orden) — antes solo 'pending_payment' mostraba el botón de pago, así que
+  // un pago rechazado dejaba a la clienta sin ningún camino claro para volver a intentar.
+  // PERO no si un admin la revisó y rechazó a mano (reviewed_by): el backend bloquea ese
+  // reintento a propósito (pay-with-card exige !reviewed_by), así que el botón tampoco debe
+  // aparecer — mostrarlo solo para que falle con 400 al hacer clic sería una UX rota.
+  const isCardOrOnline = order.payment_method === 'card' || order.payment_method === 'online';
+  const canPayWithCard = order.status === 'pending_payment'
+    || (order.status === 'rejected' && isCardOrOnline && !order.reviewed_by);
   
   return (
     <AuthGuard requiredRoles={['client']}>
@@ -682,10 +727,14 @@ export default function OrderDetail() {
                   <div>
                     <p className="font-medium text-success">¡Pago aprobado!</p>
                     <p className="text-sm text-success">
-                      Tu membresía ha sido activada. Ya puedes reservar clases.
+                      {bioClassId
+                        ? 'Tu pago está listo. Sólo falta confirmar tu lugar en la clase que elegiste.'
+                        : 'Tu membresía ha sido activada. Ya puedes reservar clases.'}
                     </p>
                     <Button asChild className="mt-3" size="sm">
-                      <Link to="/app/classes">Reservar clase</Link>
+                      <Link to={reserveDestination} onClick={() => bioClassId && clearPendingBioBooking()}>
+                        {bioClassId ? 'Confirmar mi lugar' : 'Reservar clase'}
+                      </Link>
                     </Button>
                   </div>
                 </div>
@@ -700,9 +749,12 @@ export default function OrderDetail() {
                   <XCircle className="h-5 w-5 text-red-600 mt-0.5" />
                   <div>
                     <p className="font-medium text-red-800">Pago rechazado</p>
-                    <p className="text-sm text-red-700">
-                      {order.admin_notes || 'Tu comprobante no pudo ser validado. Por favor contacta al estudio.'}
-                    </p>
+                    <p className="text-sm text-red-700">{rejectionMessage(order)}</p>
+                    {isCardOrOnline && !order.reviewed_by && (
+                      <p className="text-sm text-red-700 mt-1">
+                        Puedes reintentar el pago con la misma tarjeta u otra en esta misma página.
+                      </p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -716,7 +768,9 @@ export default function OrderDetail() {
             </Button>
             {order.status === 'approved' && (
               <Button asChild className="flex-1">
-                <Link to="/app/classes">Reservar clase</Link>
+                <Link to={reserveDestination} onClick={() => bioClassId && clearPendingBioBooking()}>
+                  {bioClassId ? 'Confirmar mi lugar' : 'Reservar clase'}
+                </Link>
               </Button>
             )}
             {order.status === 'pending_payment' && (

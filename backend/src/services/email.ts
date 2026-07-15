@@ -288,6 +288,75 @@ export async function sendClassCancelledToCoach({
 }
 
 // =============================================================================
+// 2a. Class cancelled by the studio (client) — respaldo por email cuando WhatsApp
+// está desactivado por política (ver lib/whatsapp.ts). Antes solo se avisaba por push
+// web, que depende de que la clienta tenga la app agregada a su pantalla de inicio
+// (poco común en iPhone) — sin este correo podía presentarse a una clase ya cancelada.
+// =============================================================================
+export async function sendClassCancelledEmail({
+    to,
+    clientName,
+    className,
+    classDate,
+    startTime,
+    endTime,
+    reason,
+    refunded,
+}: {
+    to: string;
+    clientName: string;
+    className: string;
+    classDate: string;          // YYYY-MM-DD
+    startTime?: string;
+    endTime?: string;
+    reason?: string | null;
+    refunded: boolean;
+}) {
+    try {
+        // Alumnas de plataforma (TotalPass/Wellhub/Fitpass): por pedido del dueño NO reciben
+        // ninguna notificación automática salvo la confirmación de su propia reserva. Mismo
+        // guard que ya aplican sendMembershipActivatedEmail/sendClientWelcomeEmail/sendPointsEarnedEmail.
+        if (await isPlatformMemberByEmail(to)) return null;
+        const dateLabel = new Date(classDate + 'T00:00:00').toLocaleDateString('es-MX', {
+            weekday: 'long', day: 'numeric', month: 'long',
+        });
+        const refundText = refunded
+            ? 'Tu crédito ya fue devuelto automáticamente a tu paquete/membresía.'
+            : 'Esta clase era gratuita, así que no se descontó ningún crédito.';
+        const html = simpleTemplate({
+            heading: 'Tu clase fue cancelada',
+            body: `
+                <p>Hola ${clientName}, el estudio canceló esta clase:</p>
+                ${infoBox(`
+                    <div style="font-size:18px;font-weight:600;color:${brand.dark};margin-bottom:6px;">${className}</div>
+                    <div><strong>Día:</strong> ${dateLabel}</div>
+                    ${startTime ? `<div><strong>Horario:</strong> ${startTime}${endTime ? ` – ${endTime}` : ''}</div>` : ''}
+                    ${reason ? `<div style="margin-top:6px;"><strong>Motivo:</strong> ${reason}</div>` : ''}
+                `)}
+                <p style="font-size:13px;color:${brand.text};">${refundText}</p>
+            `,
+            button: { label: 'Buscar otra clase', href: `${getFrontendUrl()}/app/classes` },
+        });
+
+        const { data, error } = await getResend().emails.send({
+            from: getEmailFrom(),
+            to: [to],
+            subject: `Clase cancelada — ${className}`,
+            html,
+        });
+
+        if (error) {
+            console.error('[email] sendClassCancelledEmail:', error);
+            return null;
+        }
+        return { id: data?.id };
+    } catch (err) {
+        console.error('[email] sendClassCancelledEmail:', err);
+        return null;
+    }
+}
+
+// =============================================================================
 // 3a. Recurring class assignment notification (coach)
 // =============================================================================
 

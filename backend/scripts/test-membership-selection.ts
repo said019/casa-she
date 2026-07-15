@@ -9,6 +9,34 @@ const base = (o: Partial<CandidateMembership>): CandidateMembership => ({
 // Multi-only no puede reservar reformer (reformer_remaining = 0)
 assert.equal(pickBestMembership([base({ reformer_remaining: 0, multi_remaining: 5 })], 'reformer', null), null);
 
+// Defensa contra datos legacy: aunque la membresía diga NULL (ilimitado), el plan
+// de Clase Muestra tiene Salsa=0 y nunca debe abrir una clase de Salsa.
+assert.equal(
+  pickBestMembership([
+    base({
+      reformer_remaining: null,
+      multi_remaining: 1,
+      plan_reformer_credits: 0,
+      plan_multi_credits: 1,
+    }),
+  ], 'reformer', null),
+  null,
+);
+
+// El producto de Salsa sí puede consumir su bucket de Salsa.
+assert.equal(
+  pickBestMembership([
+    base({
+      id: 'salsa',
+      reformer_remaining: 1,
+      multi_remaining: 0,
+      plan_reformer_credits: 1,
+      plan_multi_credits: 0,
+    }),
+  ], 'reformer', null)?.id,
+  'salsa',
+);
+
 // Reformer-only sí reserva reformer
 assert.equal(
   pickBestMembership([base({ id: 'r', reformer_remaining: 4, multi_remaining: 0 })], 'reformer', null)?.id,

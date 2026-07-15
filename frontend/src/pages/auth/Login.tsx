@@ -32,7 +32,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 const easeOut = [0.23, 1, 0.32, 1] as const;
 const fieldClass =
-    'h-12 rounded-xl border-bmb-dark/15 bg-white/70 pl-11 text-bmb-dark placeholder:text-bmb-dark/40 focus-visible:border-bmb-dark/45 focus-visible:ring-bmb-dark/15';
+    'h-12 rounded-xl border-[#B66049]/20 bg-white/75 pl-11 text-[#392A25] placeholder:text-[#392A25]/40 focus-visible:border-[#B66049]/55 focus-visible:ring-[#B66049]/15';
 
 export default function Login() {
     const [showPassword, setShowPassword] = useState(false);
@@ -185,7 +185,7 @@ export default function Login() {
                 >
                     <Button
                         type="submit"
-                        className="h-12 w-full rounded-full bg-bmb-dark font-body text-bmb-cream hover:bg-bmb-dark/90"
+                        className="h-12 w-full rounded-full bg-[#B66049] font-body text-[#FBF7F2] shadow-[0_16px_28px_-18px_rgba(117,54,38,.75)] hover:bg-[#A6533F]"
                         disabled={isLoading}
                     >
                         {isLoading ? (

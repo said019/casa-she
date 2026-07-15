@@ -1,9 +1,14 @@
+import { TotalPassLogo } from '@/components/brands/TotalPassLogo';
+
 /**
  * Distintivo de plataforma (Totalpass/Wellhub/Fitpass) para identificar en las reservas
  * a los alumnos con un plan interno. Se auto-oculta si no hay color (planes normales).
  */
 export function PlatformBadge({ name, color }: { name?: string | null; color?: string | null }) {
   if (!name || !color) return null;
+  if (name.toLowerCase().replace(/\s+/g, '').includes('totalpass')) {
+    return <TotalPassLogo className="px-2 py-0.5" imageClassName="h-2.5" />;
+  }
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold leading-none"

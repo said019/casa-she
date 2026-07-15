@@ -9,21 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import api, { getErrorMessage } from '@/lib/api';
+import { formatRewardValue, isRewardAvailable, useLoyaltyRewards } from '@/hooks/useLoyaltyRewards';
 import { Gift, History, Sparkles, BadgePercent, Package, CalendarPlus, Award, Copy, Share2, Users, Star, Flame, ShoppingBag, Smartphone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/components/ui/use-toast';
-
-interface LoyaltyReward {
-  id: string;
-  name: string;
-  description: string | null;
-  points_cost: number;
-  reward_type: string;
-  reward_value: string | null;
-  is_active: boolean;
-  stock: number | null;
-}
 
 interface ReferralStats {
   code: string;
@@ -227,14 +217,11 @@ export default function WalletClub() {
     isLoading: rewardsLoading,
     isError: rewardsIsError,
     error: rewardsError,
-  } = useQuery<LoyaltyReward[]>({
-    queryKey: ['loyalty-rewards'],
-    queryFn: async () => (await api.get('/loyalty/rewards')).data,
-  });
+  } = useLoyaltyRewards();
 
   const recentActivity = (loyaltyData?.history || []).slice(0, 3);
   const activeRewards = (rewards || [])
-    .filter((r) => r.is_active && (r.stock === null || r.stock > 0))
+    .filter(isRewardAvailable)
     .slice(0, 3);
 
   const pointsBalance = walletData?.pointsBalance ?? loyaltyData?.totalPoints ?? 0;
@@ -500,7 +487,9 @@ export default function WalletClub() {
                   Canjear recompensas
                 </CardTitle>
                 <Button variant="ghost" size="sm" asChild>
-                  <Link to="/app/wallet/rewards">Ver todas</Link>
+                  <Link to="/app/wallet/rewards">
+                    {rewards && rewards.length > activeRewards.length ? `Ver las ${rewards.length}` : 'Ver todas'}
+                  </Link>
                 </Button>
               </CardHeader>
               <CardContent>
@@ -517,6 +506,7 @@ export default function WalletClub() {
                     {activeRewards.map((reward) => {
                       const canAfford = pointsBalance >= reward.points_cost;
                       const Icon = getRewardIcon(reward.reward_type);
+                      const rewardValue = formatRewardValue(reward);
                       return (
                         <div
                           key={reward.id}
@@ -527,7 +517,12 @@ export default function WalletClub() {
                           <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-[1rem] bg-balance-cream text-balance-olive">
                             <Icon className="h-5 w-5" />
                           </div>
-                          <p className="mt-2 text-sm font-medium line-clamp-2">{reward.name}</p>
+                          <p className="mt-2 text-sm font-medium leading-snug line-clamp-2">{reward.name}</p>
+                          {rewardValue && (
+                            <p className="mt-1 min-h-8 text-[11px] leading-4 text-muted-foreground line-clamp-2">
+                              {rewardValue}
+                            </p>
+                          )}
                           <p className={canAfford ? 'text-xs font-semibold text-emerald-700' : 'text-xs text-muted-foreground'}>
                             {reward.points_cost} pts
                           </p>

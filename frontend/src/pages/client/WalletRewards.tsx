@@ -17,18 +17,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import api, { getErrorMessage } from '@/lib/api';
+import { formatRewardValue, isRewardInStock, rewardTypeLabels, useLoyaltyRewards, type LoyaltyReward } from '@/hooks/useLoyaltyRewards';
 import { ArrowLeft, Gift, Loader2, Star, Sparkles, BadgePercent, CalendarPlus, Package, Award } from 'lucide-react';
-
-interface LoyaltyReward {
-  id: string;
-  name: string;
-  description: string | null;
-  points_cost: number;
-  reward_type: string;
-  reward_value: string | null;
-  is_active: boolean;
-  stock: number | null;
-}
 
 interface WalletPassResponse {
   pointsBalance: number;
@@ -38,17 +28,6 @@ interface RedeemResponse {
   message?: string;
   newBalance: number;
 }
-
-const rewardTypeLabels: Record<string, string> = {
-  discount: 'Descuento',
-  free_class: 'Clase gratis',
-  product: 'Producto',
-  membership_extension: 'Membresía',
-  bar_discount: 'Descuento barra',
-  product_discount: 'Descuento ropa',
-  free_drink: 'Bebida gratis',
-  discount_package: 'Descuento paquete',
-};
 
 const rewardTypeIcons = {
   discount: BadgePercent,
@@ -60,27 +39,6 @@ const rewardTypeIcons = {
   free_drink: Package,
   discount_package: BadgePercent,
 } as const;
-
-function formatRewardValue(reward: LoyaltyReward): string {
-  const raw = reward.reward_value;
-  if (!raw) return '';
-  let v: any = raw;
-  if (typeof raw === 'string') {
-    try { v = JSON.parse(raw); } catch { return raw; }
-  }
-  switch (reward.reward_type) {
-    case 'free_class':
-      return `Tipo: ${v.class_type || 'cualquiera'}`;
-    case 'bar_discount':
-    case 'product_discount':
-    case 'discount_package':
-      return `${v.discount_type === 'fixed' ? `$${v.amount}` : `${v.amount}%`} de descuento`;
-    case 'free_drink':
-      return `${v.quantity || 1} bebida(s) gratis`;
-    default:
-      return '';
-  }
-}
 
 export default function WalletRewards() {
   const [selectedReward, setSelectedReward] = useState<LoyaltyReward | null>(null);
@@ -102,10 +60,7 @@ export default function WalletRewards() {
     isLoading: rewardsLoading,
     isError: rewardsIsError,
     error: rewardsError,
-  } = useQuery<LoyaltyReward[]>({
-    queryKey: ['loyalty-rewards'],
-    queryFn: async () => (await api.get('/loyalty/rewards')).data,
-  });
+  } = useLoyaltyRewards();
 
   const pointsBalance = wallet?.pointsBalance ?? 0;
   const activeRewards = (rewards || []).filter((reward) => reward.is_active);
@@ -139,7 +94,7 @@ export default function WalletRewards() {
     redeemMutation.mutate(selectedReward.id);
   };
 
-  const isOutOfStock = (reward: LoyaltyReward) => reward.stock !== null && reward.stock <= 0;
+  const isOutOfStock = (reward: LoyaltyReward) => !isRewardInStock(reward);
   const canRedeem = (reward: LoyaltyReward) => pointsBalance >= reward.points_cost && !isOutOfStock(reward);
   const pointsAfterRedeem = selectedReward
     ? Math.max(pointsBalance - selectedReward.points_cost, 0)
@@ -157,7 +112,7 @@ export default function WalletRewards() {
                 Beneficios
               </div>
               <h1 className="text-3xl font-semibold tracking-[-0.04em] text-balance-dark sm:text-4xl">Recompensas</h1>
-              <p className="mt-1 text-sm text-balance-dark/62">Canjea tus puntos por beneficios exclusivos.</p>
+              <p className="mt-1 text-sm text-balance-dark/62">Beneficios configurados para ti, listos para canjear con tus puntos.</p>
             </div>
             <div className="flex flex-col gap-2 sm:items-end">
               <div className="rounded-[1.25rem] border border-balance-olive/16 bg-balance-cream/60 px-4 py-3">

@@ -68,22 +68,22 @@ export default {
         balance: {
           dark: "#16261A",   // verde casa profundo — secciones oscuras
           olive: "#2A4E36",  // Verde Casa — primario (logo)
-          cream: "#F6F0E4",  // Avena — background
-          gold: "#AE4836",   // Arcilla — detalle cálido profundo
-          sand: "#D8D2BC",   // Arena — bordes/superficies suaves
+          cream: "#F2E8DF",  // Nude avena — background
+          gold: "#B66049",   // Terracota — acción cálida
+          sand: "#DCC9BA",   // Arena rosada — superficies suaves
         },
         bmb: {
-          gold: "#2A4E36",     // Verde Casa — acento primario (era dorado)
-          deepgold: "#AE4836", // Arcilla — acento cálido para hover/activo
-          cream: "#F6F0E4",    // Avena — fondo
-          paper: "#FFFDF6",    // crema más clara — tarjetas
-          taupe: "#D8D2BC",    // Arena
+          gold: "#B66049",     // Terracota — acento primario
+          deepgold: "#9F4F3D", // Terracota profundo — hover/activo
+          cream: "#F2E8DF",    // Nude avena — fondo
+          paper: "#FBF7F2",    // Marfil — tarjetas
+          taupe: "#DCC9BA",    // Arena rosada
           mauve: "#8C6A57",    // arcilla apagada
           rose: "#C9B7A0",     // arena cálida
-          blush: "#EDE3D2",    // avena suave
+          blush: "#EAD8CB",    // nude rosado
           leaf: "#2A4E36",     // Verde Casa
           moss: "#B6A43C",     // Musgo — mostaza de marca (acento decorativo)
-          clay: "#AE4836",     // Arcilla
+          clay: "#B66049",     // Terracota
           dark: "#16261A",     // verde casa profundo
           // `ink` es alias semántico para texto/editorial.
           ink: "#2E1B22",      // Ciruela — texto
@@ -92,14 +92,14 @@ export default {
         casa: {
           verde: "#2A4E36",    // Verde Casa — primario
           profundo: "#16261A", // Verde profundo — secciones oscuras
-          avena: "#F6F0E4",    // Avena — fondo
+          avena: "#F2E8DF",    // Nude avena — fondo
           musgo: "#6C8424",    // Musgo — éxito / disciplina
           ciruela: "#2E1B22",  // Ciruela — texto
-          arcilla: "#AE4836",  // Arcilla — acento cálido
-          arena: "#D6D5C2",    // Arena — bordes / superficies suaves
+          arcilla: "#B66049",  // Terracota — acento cálido
+          arena: "#DCC9BA",    // Arena rosada — bordes / superficies
           mostaza: "#B4A248",  // Mostaza — oro / aviso
         },
-        arcilla: "#AE4836",    // acento de marca (distinto del semántico destructive)
+        arcilla: "#B66049",    // acento de marca (distinto del semántico destructive)
         mostaza: "#B4A248",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

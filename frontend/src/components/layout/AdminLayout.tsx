@@ -180,6 +180,7 @@ const sidebarItems: SidebarItem[] = [
             { href: '/admin/settings/whatsapp', label: 'WhatsApp' },
             { href: '/admin/settings/closed-days', label: 'Días cerrados' },
             { href: '/admin/settings/onboarding', label: 'Perfilador' },
+            { href: '/admin/settings/totalpass', label: 'TotalPass' },
         ],
     },
 ];
@@ -318,7 +319,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     const pageTitle = pageNames[sectionName] || 'Admin';
 
     const SidebarContent = ({ mobile = false }: { mobile?: boolean }) => (
-        <div className="h-full overflow-y-auto overflow-x-hidden px-3 py-4">
+        <div className="admin-navigation h-full overflow-y-auto overflow-x-hidden px-3 py-4">
             <nav className="space-y-1.5" aria-label="Navegación de administración">
                 {sidebarItems.map((item) => {
                     const Icon = item.icon;
@@ -334,14 +335,14 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                                     className={cn(
                                         'group flex w-full items-center justify-between rounded-[1rem] px-3 py-2.5 text-sm font-semibold transition-[background,color,transform] duration-200 ease-admin-flow active:scale-[0.99]',
                                         hasActiveChild
-                                            ? 'bg-[#DDE4D5] text-balance-dark shadow-[0_14px_34px_-28px_rgba(166,119,106,0.42)]'
-                                            : 'text-balance-dark/62 hover:bg-balance-cream/80 hover:text-balance-dark'
+                                            ? 'bg-balance-cream/14 text-balance-cream'
+                                            : 'text-[rgba(246,240,228,0.66)] hover:bg-balance-cream/8 hover:text-balance-cream'
                                     )}
                                 >
                                     <span className="flex min-w-0 items-center gap-3">
                                         <span className={cn(
                                             'flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.85rem] transition-colors',
-                                            hasActiveChild ? 'bg-balance-cream/62 text-[#AE4836]' : 'bg-[#DDE4D5]/35 text-[#AE4836] group-hover:bg-[#DDE4D5]/55'
+                                            hasActiveChild ? 'bg-balance-cream/12 text-[#D8D2BC]' : 'bg-balance-cream/6 text-[#D8D2BC] group-hover:bg-balance-cream/10'
                                         )}>
                                             <Icon className="h-[18px] w-[18px]" />
                                         </span>
@@ -360,14 +361,14 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -4 }}
                                             transition={{ duration: 0.16 }}
-                                            className="ml-5 mt-1 space-y-1 border-l border-balance-sand/60 pl-4"
+                                            className="ml-5 mt-1 space-y-1 border-l border-balance-cream/14 pl-4"
                                         >
                                             {item.children.map((child) => {
                                                 if (child.kind === 'header') {
                                                     return (
                                                         <div
                                                             key={`header-${child.label}`}
-                                                            className="px-3 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                                                            className="px-3 pt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[rgba(246,240,228,0.38)]"
                                                         >
                                                             {child.label}
                                                         </div>
@@ -381,8 +382,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                                                         className={cn(
                                                             'block rounded-[0.85rem] px-3 py-2 text-sm transition-[background,color,transform] duration-200 active:scale-[0.99]',
                                                             isActive(child.href!)
-                                                                ? 'bg-[#DDE4D5]/58 text-balance-dark font-semibold'
-                                                                : 'text-balance-dark/56 hover:bg-balance-cream/75 hover:text-balance-dark'
+                                                                ? 'bg-balance-cream/12 font-semibold text-balance-cream'
+                                                                : 'text-[rgba(246,240,228,0.58)] hover:bg-balance-cream/8 hover:text-balance-cream'
                                                         )}
                                                     >
                                                         {child.label}
@@ -404,13 +405,13 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                                 className={cn(
                                     'group flex items-center gap-3 rounded-[1rem] px-3 py-2.5 text-sm font-semibold transition-[background,color,transform] duration-200 ease-admin-flow active:scale-[0.99]',
                                     isActive(item.href!)
-                                        ? 'bg-[#DDE4D5] text-balance-dark shadow-[0_14px_34px_-28px_rgba(166,119,106,0.42)]'
-                                        : 'text-balance-dark/62 hover:bg-balance-cream/80 hover:text-balance-dark'
+                                        ? 'bg-balance-cream/14 text-balance-cream'
+                                        : 'text-[rgba(246,240,228,0.66)] hover:bg-balance-cream/8 hover:text-balance-cream'
                                 )}
                             >
                                 <span className={cn(
                                     'flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.85rem] transition-colors',
-                                    isActive(item.href!) ? 'bg-balance-cream/62 text-[#AE4836]' : 'bg-[#DDE4D5]/35 text-[#AE4836] group-hover:bg-[#DDE4D5]/55'
+                                    isActive(item.href!) ? 'bg-balance-cream/12 text-[#D8D2BC]' : 'bg-balance-cream/6 text-[#D8D2BC] group-hover:bg-balance-cream/10'
                                 )}>
                                     <Icon className="h-[18px] w-[18px]" />
                                 </span>
@@ -429,18 +430,15 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
             <aside
                 className={cn(
-                    'fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-balance-sand/55 bg-[hsl(var(--admin-panel))]/95 shadow-[18px_0_55px_-46px_rgba(51,42,34,0.7)] transition-[width] duration-300 ease-admin-flow md:flex pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]',
+                    'fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-balance-cream/10 bg-balance-dark shadow-[18px_0_55px_-46px_rgba(22,38,26,0.9)] transition-[width] duration-300 ease-admin-flow md:flex pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]',
                     sidebarCollapsed ? 'w-[5.25rem]' : 'w-[18rem]'
                 )}
             >
                 <div className="flex h-[5.25rem] items-center justify-between px-4">
                     {!sidebarCollapsed && (
-                        <Link to="/admin/dashboard" className="flex min-w-0 items-center gap-3">
-                            <CasaSheLogo variant="mark" className="h-9 w-9 text-balance-gold" />
-                            <div className="min-w-0">
-                                <span className="block truncate text-[0.95rem] font-semibold tracking-[-0.02em] text-balance-dark">Casa Shé</span>
-                                <span className="block text-[10px] font-semibold uppercase tracking-[0.24em] text-balance-olive">Studio admin</span>
-                            </div>
+                        <Link to="/admin/dashboard" className="flex min-w-0 flex-col items-start gap-1.5">
+                            <CasaSheLogo tone="cream" className="h-7 w-auto max-w-[9.5rem]" />
+                            <span className="text-[9px] font-semibold uppercase tracking-[0.28em] text-[rgba(246,240,228,0.72)]">Studio admin</span>
                         </Link>
                     )}
                     <Button
@@ -448,7 +446,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                         size="icon"
                         onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
                         className={cn(
-                            'h-10 w-10 rounded-full border border-[#DDE4D5] bg-[#DDE4D5]/40 text-[#AE4836] transition-all duration-200 hover:bg-[#DDE4D5] hover:text-balance-dark active:scale-[0.96]',
+                            'h-10 w-10 rounded-full border border-balance-cream/14 bg-balance-cream/8 text-balance-cream transition-all duration-200 hover:bg-balance-cream/14 hover:text-balance-cream active:scale-[0.96]',
                             sidebarCollapsed && 'mx-auto'
                         )}
                         aria-label={sidebarCollapsed ? 'Expandir navegación' : 'Contraer navegación'}
@@ -474,20 +472,17 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                             animate={{ x: 0 }}
                             exit={{ x: '-100%' }}
                             transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-                            className="fixed inset-y-0 left-0 z-50 flex w-[19rem] max-w-[88vw] flex-col border-r border-balance-sand/60 bg-[hsl(var(--admin-panel))] shadow-2xl md:hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+                            className="fixed inset-y-0 left-0 z-50 flex w-[19rem] max-w-[88vw] flex-col border-r border-balance-cream/10 bg-balance-dark shadow-2xl md:hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
                         >
                             <div className="flex h-[5.25rem] items-center justify-between px-4">
-                                <Link to="/admin/dashboard" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3">
-                                    <CasaSheLogo variant="mark" className="h-9 w-9 text-balance-gold" />
-                                    <div>
-                                        <span className="block text-sm font-semibold text-balance-dark">Casa Shé</span>
-                                        <span className="block text-[10px] uppercase tracking-[0.22em] text-balance-olive">Admin</span>
-                                    </div>
+                                <Link to="/admin/dashboard" onClick={() => setMobileMenuOpen(false)} className="flex flex-col items-start gap-1.5">
+                                    <CasaSheLogo tone="cream" className="h-7 w-auto max-w-[9.5rem]" />
+                                    <span className="text-[9px] uppercase tracking-[0.24em] text-[rgba(246,240,228,0.72)]">Studio admin</span>
                                 </Link>
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-10 w-10 rounded-full bg-balance-cream/80"
+                                    className="h-10 w-10 rounded-full bg-balance-cream/10 text-balance-cream hover:bg-balance-cream/16 hover:text-balance-cream"
                                     onClick={() => setMobileMenuOpen(false)}
                                     aria-label="Cerrar navegación"
                                 >

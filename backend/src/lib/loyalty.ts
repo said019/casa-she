@@ -613,20 +613,25 @@ export async function reverseReferralBonus(params: {
 
 /**
  * Pure decision: a user may buy the Clase Muestra only if they have NO active
- * package membership (class_limit > 1). activePackageCount is produced by the
- * DB query in canBuySamplePlan.
- * Kept intentionally thin (single condition) for unit testing; extend here if the gate grows.
+ * package membership (class_limit > 1) AND have never had one approved before
+ * (the trial is one-per-person, not one-per-active-membership — otherwise a
+ * client can repurchase it every time her previous package lapses). Both
+ * inputs are produced by the DB query in canBuySamplePlan.
  */
-export function isSamplePurchaseAllowed(activePackageCount: number): boolean {
-  return activePackageCount === 0;
+export function isSamplePurchaseAllowed(activePackageCount: number, everUsedSample: boolean = false): boolean {
+  return activePackageCount === 0 && !everUsedSample;
 }
 
 /**
  * True if the user can buy the Clase Muestra ($99, package_type='sample').
  * Blocked when they already hold an ACTIVE, non-expired membership of a real
- * package (plan.class_limit > 1). Intentionally does NOT block on the sample
- * plan itself or on single drop-in plans (class_limit = 1) — only real
- * multi-class packages count. Input validation — no FOR UPDATE needed.
+ * package (plan.class_limit > 1) — intentionally does NOT block on the sample
+ * plan itself or on single drop-in plans (class_limit = 1), only real
+ * multi-class packages count — OR when they already had a sample order
+ * approved at any point in the past, active or not. Without the historical
+ * check, a client could buy the Clase Muestra, let it lapse, and buy it again
+ * indefinitely — the trial is meant to be one-per-person, not a recurring
+ * discount the studio unknowingly keeps re-granting.
  */
 export async function canBuySamplePlan(params: {
   db: DbClient;
@@ -634,16 +639,23 @@ export async function canBuySamplePlan(params: {
 }): Promise<boolean> {
   const { db, userId } = params;
   const r = await db.query(
-    `SELECT COUNT(*)::int AS n
-       FROM memberships m
-       JOIN plans p ON p.id = m.plan_id
-      WHERE m.user_id = $1
-        AND m.status = 'active'
-        AND (m.end_date IS NULL
-             OR m.end_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'
-                               AT TIME ZONE 'America/Mexico_City')::date)
-        AND p.class_limit > 1`,
+    `SELECT
+        (SELECT COUNT(*)::int
+           FROM memberships m
+           JOIN plans p ON p.id = m.plan_id
+          WHERE m.user_id = $1
+            AND m.status = 'active'
+            AND (m.end_date IS NULL
+                 OR m.end_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'
+                                   AT TIME ZONE 'America/Mexico_City')::date)
+            AND p.class_limit > 1) AS active_count,
+        EXISTS (
+          SELECT 1 FROM orders o
+          JOIN plans p ON p.id = o.plan_id
+          WHERE o.user_id = $1 AND p.package_type = 'sample' AND o.status = 'approved'
+        ) AS ever_used_sample`,
     [userId],
   );
-  return isSamplePurchaseAllowed(r.rows[0]?.n ?? 0);
+  const row = r.rows[0] ?? {};
+  return isSamplePurchaseAllowed(Number(row.active_count ?? 0), Boolean(row.ever_used_sample));
 }

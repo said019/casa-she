@@ -359,18 +359,4 @@ export async function resolveDiscountForOrder(params: {
     return { ok: true, discountAmount: Math.max(0, discountAmount) };
 }
 
-export async function applyDiscountToOrder(codeId: string, orderId: string, discountAmount: number) {
-    // Increment usage
-    await query(
-        `UPDATE discount_codes SET current_uses = current_uses + 1 WHERE id = $1`,
-        [codeId]
-    );
-
-    // Link discount to order
-    await query(
-        `UPDATE orders SET discount_code_id = $1, discount_amount = $2 WHERE id = $3`,
-        [codeId, discountAmount, orderId]
-    );
-}
-
 export default router;

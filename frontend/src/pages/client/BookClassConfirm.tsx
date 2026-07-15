@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import api, { getErrorMessage } from '@/lib/api';
 import { ClientLayout } from '@/components/layout/ClientLayout';
 import { AuthGuard } from '@/components/layout/AuthGuard';
@@ -27,6 +27,7 @@ interface ClassDetail {
   booking_closed?: boolean;
   class_type_name: string;
   class_type_color: string;
+  class_category?: 'reformer' | 'multi';
   instructor_id: string;
   instructor_name: string;
   instructor_photo: string | null;
@@ -40,6 +41,8 @@ interface ClassDetail {
 export default function BookClassConfirm() {
   const { classId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isBioFlow = searchParams.get('source') === 'bio';
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
@@ -96,11 +99,16 @@ export default function BookClassConfirm() {
       }
       // Sin créditos / sin membresía válida → llevar a comprar en vez de solo mostrar el error.
       if (err?.response?.data?.code === 'NEEDS_PURCHASE') {
+        const requiresSalsa = data?.class_category === 'reformer' || data?.class_type_name?.toLowerCase() === 'salsa';
         toast({
-          title: 'Necesitas créditos para reservar',
-          description: 'Te llevamos a comprar un paquete o membresía.',
+          title: requiresSalsa ? 'Necesitas un crédito de Salsa' : 'Necesitas créditos para reservar',
+          description: requiresSalsa
+            ? 'Para esta clase sólo puedes elegir Clase de Salsa o Paquete de Salsa.'
+            : 'Te llevamos a comprar un paquete o membresía.',
         });
-        navigate('/app/checkout');
+        navigate(classId
+          ? `/app/checkout?${isBioFlow ? 'source=bio&' : ''}classId=${encodeURIComponent(classId)}`
+          : '/app/checkout');
         return;
       }
       toast({
@@ -131,6 +139,17 @@ export default function BookClassConfirm() {
       if (err?.response?.data?.code === 'REGLAMENTO_REQUIRED') {
         setPendingAction('waitlist');
         setRegOpen(true);
+        return;
+      }
+      if (err?.response?.data?.code === 'NEEDS_PURCHASE') {
+        const requiresSalsa = data?.class_category === 'reformer' || data?.class_type_name?.toLowerCase() === 'salsa';
+        toast({
+          title: requiresSalsa ? 'Necesitas un crédito de Salsa' : 'Necesitas créditos para reservar',
+          description: requiresSalsa
+            ? 'Para esta clase sólo puedes elegir Clase de Salsa o Paquete de Salsa.'
+            : 'Te llevamos a comprar un paquete o membresía.',
+        });
+        navigate(classId ? `/app/checkout?classId=${encodeURIComponent(classId)}` : '/app/checkout');
         return;
       }
       toast({ variant: 'destructive', title: 'No se pudo anotar', description: getErrorMessage(err) });
@@ -278,7 +297,9 @@ export default function BookClassConfirm() {
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      * Se descontará 1 crédito de tu membresía activa.
+                      {data.class_category === 'reformer' || data.class_type_name?.toLowerCase() === 'salsa'
+                        ? '* Se descontará 1 crédito de Salsa. Sólo aplican Clase de Salsa o Paquete de Salsa.'
+                        : '* Se descontará 1 crédito de tu membresía activa.'}
                     </p>
                   )}
                   <p className="text-xs font-medium text-balance-olive flex items-center gap-1.5">

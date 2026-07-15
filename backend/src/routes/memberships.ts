@@ -1138,7 +1138,10 @@ router.post('/:id/resume', authenticate, requireRole('admin', 'super_admin', 're
 const UpdateDatesSchema = z.object({
     startDate: dateString.optional(),
     endDate: dateString.optional(),
-    reason: z.string().trim().max(500).optional(),
+    // Motivo obligatorio para CUALQUIER rol (antes era opcional para todos): un ajuste manual
+    // de vigencia es exactamente la clase de acción que debe quedar auditada con un porqué,
+    // sin importar si quien lo hace es admin, super_admin o recepción.
+    reason: z.string().trim().min(5, 'Debes incluir un motivo (mínimo 5 caracteres) para ajustar la vigencia.').max(500),
 }).refine(
     (d) => d.startDate !== undefined || d.endDate !== undefined,
     { message: 'Proporciona startDate y/o endDate', path: ['startDate'] },
@@ -1280,18 +1283,27 @@ router.patch('/:id/credits', authenticate, requireRole('admin', 'super_admin', '
             return res.status(404).json({ error: 'Membresía no encontrada' });
         }
 
-        // Reglas específicas para recepción: motivo obligatorio y |delta| ≤ 3 por bucket.
-        // Reception master y admin (o reception con creditos_sin_limite) no tienen límite de delta;
-        // motivo sigue obligatorio para recepción normal.
+        // Motivo obligatorio para CUALQUIER rol que ajuste créditos, sin excepción por permiso.
+        // Antes esta validación vivía DENTRO de `if (!sinLimite)`: admin/super_admin/recepción
+        // con el permiso 'creditos_sin_limite' podían sumar créditos SIN dar ningún motivo —
+        // exactamente la puerta trasera para regalar clases sin dejar rastro auditable, y
+        // precisamente para quien tiene más poder de hacerlo (el rol con MENOS restricciones
+        // era el único sin obligación de explicarse). El límite de ±3 por movimiento sigue
+        // siendo exclusivo de recepción sin el permiso — eso sí es una restricción de alcance,
+        // no de trazabilidad.
+        const reasonTextGlobal = typeof reason === 'string' ? reason.trim() : '';
+        if (reasonTextGlobal.length < 5) {
+            return res.status(400).json({ error: 'Debes incluir un motivo (mínimo 5 caracteres) para ajustar créditos.' });
+        }
+
+        // Límite de |delta| ≤ 3 por bucket: exclusivo de recepción SIN el permiso
+        // 'creditos_sin_limite'. Reception master y admin (o reception con el permiso) no
+        // tienen límite de delta.
         const meRow = await queryOne<{ role: string; permissions: unknown; is_reception_master: boolean }>(
             `SELECT role, permissions, is_reception_master FROM users WHERE id = $1`, [req.user!.userId]
         );
         const sinLimite = hasPermission({ role: meRow?.role, permissions: meRow?.permissions, is_reception_master: meRow?.is_reception_master }, 'creditos_sin_limite');
         if (!sinLimite) {
-            const reasonText = typeof reason === 'string' ? reason.trim() : '';
-            if (reasonText.length < 5) {
-                return res.status(400).json({ error: 'Recepción debe incluir un motivo (mínimo 5 caracteres) para ajustar créditos.' });
-            }
             const checkDelta = (label: string, before: number | null | undefined, after: number | null | undefined) => {
                 if (after === undefined) return null;
                 const b = before == null ? 0 : Number(before);

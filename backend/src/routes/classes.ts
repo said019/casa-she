@@ -303,6 +303,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         c.current_bookings, c.status, c.class_type_id, c.instructor_id,
         c.facility_id, c.is_free, c.free_label, c.booking_closed,
         ct.name as class_type_name, ct.color as class_type_color,
+        ct.category as class_category,
         i.display_name as instructor_name, i.photo_url as instructor_photo,
         f.name as facility_name
       FROM classes c

@@ -35,7 +35,7 @@ export default function StudioPricing() {
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="max-w-4xl mx-auto bg-gradient-to-r from-[#6B5B4F] to-[#8B7B6F] text-white p-8 md:p-12 rounded-lg shadow-xl"
+              className="max-w-4xl mx-auto bg-gradient-to-r from-[#6B5B4F] to-[#8B7B6F] text-white p-6 md:p-10 rounded-lg shadow-xl"
             >
               <div className="text-center">
                 <p className="text-xs uppercase tracking-[0.3em] mb-3 text-white/80" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -59,7 +59,7 @@ export default function StudioPricing() {
           )}
 
           {/* Plans Grid */}
-          <div className="grid-fluid gap-8 max-w-[1400px] mx-auto" style={{ '--min-col-size': '280px' } as React.CSSProperties}>
+          <div className="grid-fluid gap-6 max-w-[1400px] mx-auto" style={{ '--min-col-size': '260px' } as React.CSSProperties}>
             {isLoading ? (
               Array.from({ length: 4 }).map((_, index) => (
                 <Skeleton key={index} className="h-96 w-full bg-white/50" />
@@ -87,8 +87,8 @@ export default function StudioPricing() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    className={`relative bg-white p-8 border-2 transition-all duration-300 ${isPopular
-                      ? 'border-[#6B5B4F] shadow-lg scale-105'
+                    className={`relative bg-white p-6 border-2 transition-all duration-300 ${isPopular
+                      ? 'border-[#6B5B4F] shadow-lg scale-[1.02]'
                       : 'border-transparent hover:border-[#E8E4DD] hover:shadow-md'
                       }`}
                   >
@@ -107,13 +107,13 @@ export default function StudioPricing() {
                     </p>
 
                     {/* Plan Name */}
-                    <h3 className="text-xl font-semibold text-[#2A2A2A] mb-4 min-h-[56px]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                    <h3 className="text-lg font-semibold text-[#2A2A2A] mb-3 min-h-[48px]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                       {plan.name}
                     </h3>
 
                     {/* Price */}
                     <div className="mb-2">
-                      <span className="text-4xl font-bold text-[#2A2A2A]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                      <span className="text-3xl font-bold text-[#2A2A2A]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                         ${Number(plan.price).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                       </span>
                       {isUnlimited && (

@@ -577,6 +577,7 @@ export default function ClientDetail() {
                                 <TabsList className="rounded-xl bg-muted/50">
                                     <TabsTrigger value="memberships" className="rounded-lg font-body data-[state=active]:bg-balance-gold data-[state=active]:text-white">Membresias</TabsTrigger>
                                     <TabsTrigger value="history" className="rounded-lg font-body data-[state=active]:bg-balance-gold data-[state=active]:text-white">Historial Clases</TabsTrigger>
+                                    <TabsTrigger value="payments" className="rounded-lg font-body data-[state=active]:bg-balance-gold data-[state=active]:text-white">Pagos</TabsTrigger>
                                     <TabsTrigger value="notes" className="rounded-lg font-body data-[state=active]:bg-balance-gold data-[state=active]:text-white">Notas Internas</TabsTrigger>
                                     <TabsTrigger value="crm" className="rounded-lg font-body data-[state=active]:bg-balance-gold data-[state=active]:text-white">Mensajes</TabsTrigger>
                                     <TabsTrigger value="bitacora" className="rounded-lg font-body data-[state=active]:bg-balance-gold data-[state=active]:text-white">Bitácora</TabsTrigger>
@@ -808,6 +809,61 @@ export default function ClientDetail() {
                                                 </div>
                                             ) : (
                                                 <p className="text-muted-foreground font-body text-sm">No hay clases registradas recientemente.</p>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                </TabsContent>
+
+                                {/* Pagos Tab: historial de pagos REALES (monto, método, referencia) — antes
+                                    invisible en la ficha; recepción tenía que buscarlo en la pantalla global
+                                    de pagos cuando una clienta reclamaba "yo ya pagué" delante suyo. */}
+                                <TabsContent value="payments" className="mt-4">
+                                    <Card className="rounded-2xl border-border/40">
+                                        <CardContent className="p-6">
+                                            <h3 className="text-lg font-heading font-semibold mb-4">Historial de Pagos</h3>
+                                            {client.payments?.length > 0 ? (
+                                                <div className="space-y-3">
+                                                    {client.payments.map((pay: any) => {
+                                                        const amount = new Intl.NumberFormat('es-MX', { style: 'currency', currency: pay.currency || 'MXN' }).format(Number(pay.amount));
+                                                        const methodLabel: Record<string, string> = {
+                                                            cash: 'Efectivo', transfer: 'Transferencia', card: 'Tarjeta', online: 'En línea',
+                                                        };
+                                                        const statusLabel: Record<string, string> = {
+                                                            completed: 'Completado', refunded: 'Reembolsado', pending: 'Pendiente', failed: 'Fallido',
+                                                        };
+                                                        const statusClass: Record<string, string> = {
+                                                            completed: 'bg-emerald-100 text-emerald-800',
+                                                            refunded: 'bg-muted text-muted-foreground',
+                                                            pending: 'bg-amber-100 text-amber-800',
+                                                            failed: 'bg-red-100 text-red-800',
+                                                        };
+                                                        return (
+                                                            <div key={pay.id} className="flex items-center justify-between p-3.5 bg-muted/20 rounded-xl border border-border/30 hover:border-border/50 transition-colors">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="h-8 w-8 rounded-lg bg-balance-gold/10 flex items-center justify-center">
+                                                                        <DollarSign className="h-4 w-4 text-balance-gold" />
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="font-medium font-body text-sm">
+                                                                            {amount} · {methodLabel[pay.payment_method] || pay.payment_method}
+                                                                            {pay.plan_name ? ` — ${pay.plan_name}` : ''}
+                                                                        </div>
+                                                                        <div className="text-xs text-muted-foreground font-body">
+                                                                            {formatDbDate((pay.completed_at || pay.created_at)?.slice(0, 10))}
+                                                                            {pay.reference ? ` · Ref: ${pay.reference}` : pay.reference_id ? ` · Ref: ${pay.reference_id}` : ''}
+                                                                            {pay.processed_by_name ? ` · Registrado por ${pay.processed_by_name}` : ''}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <Badge className={`rounded-lg text-xs font-body ${statusClass[pay.status] || 'bg-muted text-foreground'}`}>
+                                                                    {statusLabel[pay.status] || pay.status}
+                                                                </Badge>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <p className="text-muted-foreground font-body text-sm">No hay pagos registrados para esta clienta.</p>
                                             )}
                                         </CardContent>
                                     </Card>

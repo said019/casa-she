@@ -7,54 +7,54 @@
 @layer base {
   :root {
     /* Casa Shé Palette
-     * Avena:       #F6F0E4 — Background (40 50% 93%)
-     * Arena:       #D8D2BC — Borders / quiet surfaces (47 26% 79%)
-     * Verde Casa:  #2A4E36 — Primary actions & accents (140 30% 24%)
-     * Arcilla:     #AE4836 — Deep warm accent / destructive (15 59% 45%)
-     * Ciruela:     #2E1B22 — Foreground / text (338 26% 14%)
+     * Nude:        #F2E8DF — Background principal
+     * Marfil:      #FBF7F2 — Tarjetas y superficies
+     * Terracota:   #B66049 — Acciones primarias
+     * Verde Casa:  #2A4E36 — Identidad y acento selectivo
+     * Tinta:       #392A25 — Texto editorial
      * Musgo:       #B6A43C — Mustard accent / warning (51 50% 47%)
      */
-    --background: 40 50% 93%;
-    --foreground: 338 26% 14%;
+    --background: 28 41% 91%;
+    --foreground: 16 23% 18%;
 
-    --card: 40 47% 96%;
-    --card-foreground: 338 26% 14%;
+    --card: 30 43% 97%;
+    --card-foreground: 16 23% 18%;
 
-    --popover: 40 47% 96%;
-    --popover-foreground: 338 26% 14%;
+    --popover: 30 43% 97%;
+    --popover-foreground: 16 23% 18%;
 
-    --primary: 140 30% 24%;
-    --primary-foreground: 40 50% 95%;
+    --primary: 12 43% 50%;
+    --primary-foreground: 30 43% 97%;
 
-    --secondary: 47 26% 79%;
-    --secondary-foreground: 338 26% 16%;
+    --secondary: 26 31% 82%;
+    --secondary-foreground: 16 23% 18%;
 
-    --muted: 44 38% 88%;
-    --muted-foreground: 135 8% 36%;
+    --muted: 28 32% 88%;
+    --muted-foreground: 19 12% 40%;
 
-    --accent: 47 32% 84%;
-    --accent-foreground: 338 26% 16%;
+    --accent: 24 35% 84%;
+    --accent-foreground: 16 23% 18%;
 
     /* Error separado del Arcilla (más rojo) para no confundirse con el acento cálido */
     --destructive: 5 62% 44%;
     --destructive-foreground: 44 78% 96%;
 
     /* Arcilla como token de acento de marca (ya no es el semántico de error) */
-    --arcilla: 9 53% 45%;
+    --arcilla: 12 43% 50%;
     --mostaza: 50 43% 49%;
 
-    --border: 47 22% 78%;
-    --input: 47 22% 78%;
-    --ring: 140 30% 24%;
+    --border: 26 25% 79%;
+    --input: 26 25% 79%;
+    --ring: 12 43% 50%;
 
     --radius: 0.5rem;
 
     /* Custom tokens — Casa Shé */
-    --hero-gradient: linear-gradient(135deg, hsl(44 78% 94%) 0%, hsl(47 40% 86%) 52%, hsl(135 20% 80%) 100%);
-    --card-gradient: linear-gradient(180deg, hsl(44 64% 97%) 0%, hsl(44 40% 91%) 100%);
+    --hero-gradient: linear-gradient(135deg, hsl(30 43% 97%) 0%, hsl(28 41% 91%) 52%, hsl(22 32% 84%) 100%);
+    --card-gradient: linear-gradient(180deg, hsl(30 43% 98%) 0%, hsl(28 34% 92%) 100%);
     --overlay-dark: linear-gradient(180deg, hsla(135, 27%, 12%, 0.2) 0%, hsla(135, 27%, 12%, 0.6) 100%);
-    --glow-sage: 0 18px 42px hsla(135, 23%, 24%, 0.18);
-    --glow-warm: 0 18px 42px hsla(15, 59%, 45%, 0.16);
+    --glow-sage: 0 18px 42px hsla(140, 30%, 24%, 0.13);
+    --glow-warm: 0 18px 42px hsla(12, 43%, 50%, 0.18);
 
     /* Typography */
     --font-heading: 'Instrument Serif', serif;
@@ -66,9 +66,9 @@
     --transition-bounce: all 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 
     /* Admin shell tokens */
-    --admin-bg: 40 33% 91%;
-    --admin-panel: 40 45% 96%;
-    --admin-rail: 47 28% 88%;
+    --admin-bg: 28 32% 91%;
+    --admin-panel: 30 40% 96%;
+    --admin-rail: 27 28% 87%;
 
     /* Casa Shé semantic status colors (armonizados con el sistema) */
     --success: 78 56% 33%;        /* Musgo #6C8424 */
@@ -78,14 +78,14 @@
     --info: 174 16% 37%;          /* Teal apagado #4F6D6A */
     --info-foreground: 44 78% 96%;
 
-    --sidebar-background: 40 45% 96%;
-    --sidebar-foreground: 338 26% 14%;
-    --sidebar-primary: 140 30% 24%;
-    --sidebar-primary-foreground: 40 50% 95%;
-    --sidebar-accent: 47 34% 89%;
-    --sidebar-accent-foreground: 338 26% 14%;
-    --sidebar-border: 47 22% 82%;
-    --sidebar-ring: 140 30% 24%;
+    --sidebar-background: 30 40% 96%;
+    --sidebar-foreground: 16 23% 18%;
+    --sidebar-primary: 12 43% 50%;
+    --sidebar-primary-foreground: 30 43% 97%;
+    --sidebar-accent: 27 35% 90%;
+    --sidebar-accent-foreground: 16 23% 18%;
+    --sidebar-border: 26 24% 83%;
+    --sidebar-ring: 12 43% 50%;
   }
 
   .dark {

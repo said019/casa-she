@@ -43,6 +43,7 @@ import {
   User,
   Calendar,
   CreditCard,
+  RefreshCw,
 } from 'lucide-react';
 
 const statusConfig: Record<OrderStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -147,6 +148,35 @@ function OrdersVerificationInner() {
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'No se pudo cancelar la orden',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Reconciliar manualmente con MercadoPago: cubre el caso de que el webhook nunca haya
+  // llegado (deploy, timeout, secret mal configurado) — antes una clienta que SÍ pagó con
+  // tarjeta se quedaba sin ningún camino salvo cancelar su orden como si nunca hubiera
+  // pagado. Busca el pago por external_reference si aún no se conoce su mp_payment_id.
+  const syncMpMutation = useMutation({
+    mutationFn: async (orderId: string) => (await api.post(`/orders/${orderId}/sync-mp`)).data,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['orders-pending'] });
+      const statusLabels: Record<string, string> = {
+        approved: 'Pago aprobado — membresía activada.',
+        rejected: 'El pago fue rechazado por el banco.',
+        cancelled: 'El pago fue cancelado.',
+        pending: 'El pago sigue pendiente en Mercado Pago.',
+        in_process: 'El pago sigue en revisión en Mercado Pago.',
+      };
+      toast({
+        title: 'Reconciliado con Mercado Pago',
+        description: statusLabels[data?.status] || `Estado actual: ${data?.status || 'desconocido'}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'No se pudo reconciliar',
+        description: error.response?.data?.error || 'No se encontró un pago asociado en Mercado Pago.',
         variant: 'destructive',
       });
     },
@@ -333,11 +363,22 @@ function OrdersVerificationInner() {
                           {order.payment_method === 'card' ? (
                             // Las órdenes con tarjeta se liquidan automáticamente por el
                             // webhook de Mercado Pago (checkout hospedado) — nunca se aprueban a
-                            // mano. Si el cliente abandona el pago, el admin puede cancelarla.
+                            // mano. Si el webhook nunca llegó pero la clienta sí pagó,
+                            // "Reconciliar" busca el pago real en MP antes de que el admin
+                            // recurra a cancelar (que borraría el acceso de alguien que pagó).
                             <div className="flex items-center gap-2 justify-end">
                               <Badge variant="outline" className="text-muted-foreground">
                                 Esperando pago en Mercado Pago
                               </Badge>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={syncMpMutation.isPending}
+                                onClick={() => syncMpMutation.mutate(order.id)}
+                              >
+                                <RefreshCw className="h-4 w-4 mr-1" />
+                                Reconciliar
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -354,27 +395,18 @@ function OrdersVerificationInner() {
                               </Button>
                             </div>
                           ) : (
+                            // Abrir la ficha primero (igual que "Comprobantes por
+                            // verificar"): el admin revisa monto, persona y el
+                            // comprobante —si lo hay— antes de aprobar/rechazar desde
+                            // el pie del diálogo. Evita aprobar de golpe sin revisar.
                             <div className="flex gap-2 justify-end">
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedOrder(order);
-                                  setActionType('approve');
-                                }}
-                              >
-                                <CheckCircle2 className="h-4 w-4 mr-1" />
-                                Aprobar
-                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => {
-                                  setSelectedOrder(order);
-                                  setActionType('reject');
-                                }}
+                                onClick={() => setSelectedOrder(order)}
                               >
-                                <XCircle className="h-4 w-4 mr-1" />
-                                Rechazar
+                                <Eye className="h-4 w-4 mr-1" />
+                                Revisar
                               </Button>
                             </div>
                           )}

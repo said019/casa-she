@@ -28,15 +28,15 @@ export interface PackagePresentation {
   text: string;
 }
 
-// Orden de presentación en el checkout: Membresías primero (como en el index),
-// luego Paquetes de créditos, y al final Primera vez / clase suelta.
-export const packageOrder: PackageType[] = ['membership', 'mixto', 'sample', 'individual'];
+// El recorrido comercial empieza por la opción de entrada y continúa de menor
+// a mayor inversión. Los catálogos que agrupan por tipo respetan este orden.
+export const packageOrder: PackageType[] = ['sample', 'mixto', 'membership', 'individual'];
 
 const CARD_BASE =
   'bg-[#FBF7EE] text-[#2E1B22] shadow-[0_24px_80px_-68px_rgba(42,33,24,.55)]';
 
 export const packagePresentations: Record<PackageType, PackagePresentation> = {
-  // Membresías mensuales (360 / Black) — Verde Casa
+  // Membresías mensuales (360 / SHÉ Black) — Terracota Casa Shé
   membership: {
     type: 'membership',
     title: 'Membresías',
@@ -47,14 +47,14 @@ export const packagePresentations: Record<PackageType, PackagePresentation> = {
     bestFor: 'Ideal si vienes seguido y quieres lo más completo.',
     rule: 'Se renueva cada mes.',
     accentLabel: 'mensual',
-    surface: 'bg-[#2A4E36]',
-    panel: 'bg-[#E9EFE4] text-[#2E1B22] ring-[#2A4E36]/20',
-    card: `${CARD_BASE} ring-[#2A4E36]/15 hover:ring-[#2A4E36]/40`,
-    chip: 'bg-[#2A4E36] text-[#F6F0E4]',
-    badge: 'bg-[#DDE4D5] text-[#2A4E36] ring-[#2A4E36]/20',
-    cta: 'bg-[#2A4E36] text-[#F6F0E4] hover:bg-[#16261A]',
-    selected: 'ring-2 ring-[#2A4E36]/55 shadow-[0_22px_74px_-56px_rgba(42,78,54,.82)]',
-    dot: 'bg-[#2A4E36]',
+    surface: 'bg-[#AE4836]',
+    panel: 'bg-[#F4E6E1] text-[#2E1B22] ring-[#AE4836]/20',
+    card: `${CARD_BASE} ring-[#AE4836]/15 hover:ring-[#AE4836]/40`,
+    chip: 'bg-[#AE4836] text-[#F6F0E4]',
+    badge: 'bg-[#F1DED8] text-[#AE4836] ring-[#AE4836]/20',
+    cta: 'bg-[#AE4836] text-[#F6F0E4] hover:bg-[#934434]',
+    selected: 'ring-2 ring-[#AE4836]/50 shadow-[0_22px_74px_-56px_rgba(174,72,54,.72)]',
+    dot: 'bg-[#AE4836]',
     text: 'text-[#6B554D]',
   },
   // Paquetes de créditos (5 / 8 / 12) — Musgo
@@ -127,6 +127,43 @@ function normalizePlanText(value: string) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '');
+}
+
+export interface CatalogPlanInput extends PlanPresentationInput {
+  price: number | string;
+  sort_order?: number | null;
+}
+
+export function isIntroClass(plan: PlanPresentationInput) {
+  const name = normalizePlanText(plan.name);
+  const category = normalizePlanText(plan.category || '');
+
+  return (
+    category.includes('trial') ||
+    name.includes('muestra') ||
+    name.includes('prueba') ||
+    name.includes('primera vez') ||
+    name.includes('primer vez') ||
+    name.includes('primera clase')
+  );
+}
+
+export function isSalsaPlan(plan: PlanPresentationInput) {
+  return normalizePlanText(plan.name).includes('salsa');
+}
+
+export function sortCatalogPlans(planA: CatalogPlanInput, planB: CatalogPlanInput) {
+  // Salsa cierra el catálogo completo, incluso cuando el nombre indica muestra.
+  const salsaDifference = Number(isSalsaPlan(planA)) - Number(isSalsaPlan(planB));
+  if (salsaDifference !== 0) return salsaDifference;
+
+  const introDifference = Number(isIntroClass(planB)) - Number(isIntroClass(planA));
+  if (introDifference !== 0) return introDifference;
+
+  const priceDifference = Number(planA.price) - Number(planB.price);
+  if (priceDifference !== 0) return priceDifference;
+
+  return (planA.sort_order ?? 0) - (planB.sort_order ?? 0);
 }
 
 export function getPackageType(plan: PlanPresentationInput): PackageType {

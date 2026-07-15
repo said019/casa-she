@@ -77,7 +77,7 @@ export async function joinWaitlist(params: { userId: string; classId: string }):
     try {
         await client.query('BEGIN');
         const clsRes = await client.query(
-            `SELECT c.*, ct.category AS class_category FROM classes c
+            `SELECT c.*, ct.category AS class_category, ct.name AS class_type_name FROM classes c
              JOIN class_types ct ON ct.id = c.class_type_id
              WHERE c.id = $1 FOR UPDATE OF c`, [classId]);
         const cls = clsRes.rows[0];
@@ -124,7 +124,14 @@ export async function joinWaitlist(params: { userId: string; classId: string }):
         });
         if (!picked) {
             await client.query('ROLLBACK');
-            return { ok: false, status: 400, error: 'Necesitas una membresía con créditos de esta categoría para anotarte' };
+            return {
+                ok: false,
+                status: 400,
+                error: cls.class_category === 'reformer'
+                    ? 'Esta clase requiere un crédito de Salsa. Elige Clase de Salsa o Paquete de Salsa.'
+                    : 'Necesitas una membresía con créditos de esta categoría para anotarte',
+                code: 'NEEDS_PURCHASE',
+            };
         }
         const ins = await client.query(
             `INSERT INTO bookings (class_id, user_id, membership_id, status, waitlist_position, booked_by)

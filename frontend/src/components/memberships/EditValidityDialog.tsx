@@ -25,7 +25,7 @@ import {
  * PATCH /memberships/:id/dates permite admin/super_admin/reception), así que el
  * botón NO se esconde por elevación.
  *
- * Llama PATCH /memberships/:id/dates con { startDate?, endDate?, reason? }.
+ * Llama PATCH /memberships/:id/dates con { startDate?, endDate?, reason } (reason obligatorio).
  * El backend reactiva una membresía vencida si el nuevo vencimiento llega a hoy
  * o después, y la vence si quedó en el pasado.
  *
@@ -84,15 +84,16 @@ export function EditValidityDialog({
     }, [open, membership.start_date, membership.end_date]);
 
     const datesInvalid = Boolean(startDate && endDate && endDate < startDate);
-    // El backend exige al menos una de las dos fechas.
+    // El backend exige al menos una de las dos fechas Y un motivo (mínimo 5 caracteres,
+    // para cualquier rol) — un ajuste manual de vigencia debe quedar auditado con un porqué.
     const noDates = !startDate && !endDate;
+    const reasonTooShort = reason.trim().length < 5;
 
     const save = useMutation({
         mutationFn: async () => {
-            const payload: Record<string, string> = {};
+            const payload: Record<string, string> = { reason: reason.trim() };
             if (startDate) payload.startDate = startDate;
             if (endDate) payload.endDate = endDate;
-            if (reason.trim()) payload.reason = reason.trim();
             return api.patch(`/memberships/${membership.id}/dates`, payload);
         },
         onSuccess: () => {
@@ -150,7 +151,7 @@ export function EditValidityDialog({
                     )}
 
                     <div className="space-y-1">
-                        <Label htmlFor="ev-reason">Motivo (opcional)</Label>
+                        <Label htmlFor="ev-reason">Motivo (mínimo 5 caracteres)</Label>
                         <Textarea
                             id="ev-reason"
                             value={reason}
@@ -159,7 +160,7 @@ export function EditValidityDialog({
                             rows={2}
                         />
                         <p className="text-xs text-muted-foreground">
-                            Si el vencimiento llega a hoy o después, una membresía vencida se reactiva.
+                            Si el vencimiento llega a hoy o después, una membresía vencida se reactiva. El motivo es obligatorio y queda en bitácora.
                         </p>
                     </div>
                 </div>
@@ -170,7 +171,7 @@ export function EditValidityDialog({
                     </Button>
                     <Button
                         onClick={() => save.mutate()}
-                        disabled={save.isPending || datesInvalid || noDates}
+                        disabled={save.isPending || datesInvalid || noDates || reasonTooShort}
                     >
                         {save.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                         Guardar

@@ -22,7 +22,8 @@ router.post('/', async (req: Request, res: Response) => {
         return res.status(200).json({ ignored: true });
     }
 
-    // Verificación de firma (HMAC del panel de MP). secret vacío → se omite (log).
+    // Verificación de firma (HMAC del panel de MP). Fail-closed: secret vacío = firma inválida
+    // (verifyWebhookSignature ya lo trata como !validSig, ver lib/mercadopago.ts).
     const secret = process.env.MP_WEBHOOK_SECRET || '';
     const validSig = verifyWebhookSignature({
         xSignature: req.headers['x-signature'] as string | undefined,
@@ -31,11 +32,12 @@ router.post('/', async (req: Request, res: Response) => {
         secret,
     });
     if (!validSig) {
-        console.warn(`[MP webhook] firma inválida para pago ${dataId}`);
+        console.warn(
+            secret
+                ? `[MP webhook] firma inválida para pago ${dataId}`
+                : '[MP webhook] MP_WEBHOOK_SECRET no configurado — webhook rechazado (fail-closed)'
+        );
         return res.status(401).send('invalid signature');
-    }
-    if (!secret) {
-        console.warn('[MP webhook] MP_WEBHOOK_SECRET vacío — verificación de firma omitida (inseguro).');
     }
 
     // Idempotencia real de BD: UNIQUE(provider, event_key). Reenvíos de MP se ignoran.
@@ -81,8 +83,12 @@ router.post('/', async (req: Request, res: Response) => {
                 // Idempotente: si la orden ya está approved, no hace nada.
                 await finalizePaidOrder(orderId, { provider: 'mercadopago', paymentRef: String(payment.id) });
             } else if (payment.status === 'rejected' || payment.status === 'cancelled') {
+                // Antes solo se fijaba rejected_at sin cambiar orders.status: la orden se
+                // quedaba en 'pending_payment' para siempre ("Esperando pago"), sin que la
+                // clienta viera ningún mensaje de rechazo ni pudiera reintentar con claridad —
+                // parecía que su compra seguía en trámite cuando en realidad ya falló.
                 await query(
-                    `UPDATE orders SET rejected_at=NOW(), updated_at=NOW()
+                    `UPDATE orders SET status='rejected', rejected_at=NOW(), updated_at=NOW()
                      WHERE id=$1 AND status='pending_payment'`,
                     [orderId]
                 );

@@ -53,7 +53,9 @@ assert.equal(verifyWebhookSignature({ xSignature: `ts=${ts},v1=deadbeef`, xReque
 assert.equal(verifyWebhookSignature({ xSignature, xRequestId, dataId: 'OTRO', secret }), false, 'dataId distinto falla');
 // falta header
 assert.equal(verifyWebhookSignature({ xSignature: undefined, xRequestId, dataId, secret }), false, 'sin x-signature falla');
-// secreto vacío → modo legacy, se omite (true)
-assert.equal(verifyWebhookSignature({ xSignature, xRequestId, dataId, secret: '' }), true, 'sin secreto se omite');
+// secreto vacío → fail-closed: se rechaza (false). Antes fallaba abierto (true) — un
+// webhook falsificado se habría aceptado como válido si MP_WEBHOOK_SECRET llegara a
+// faltar por error de configuración (P0-4, pre-prod audit 2026-07-16).
+assert.equal(verifyWebhookSignature({ xSignature, xRequestId, dataId, secret: '' }), false, 'sin secreto se rechaza (fail-closed)');
 
 console.log('test-mercadopago OK');

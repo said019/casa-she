@@ -120,6 +120,65 @@ router.put(
 );
 
 // ============================================
+// MEMBERSHIP EXPIRY POLICY — días de gracia tras el vencimiento antes de marcar la
+// membresía 'expired' (lo lee markExpiredMemberships, services/cron-jobs.ts). Antes era
+// comportamiento fijo en código (0 días, expira el mismo día del vencimiento) — la propia
+// auditoría lo marca como "la fuente #1 de conflictos con clientas": créditos ya pagados
+// se pierden de golpe sin que la dueña pueda ajustar ni un día de cortesía.
+// ============================================
+
+const EXPIRY_POLICY_DEFAULT = {
+    grace_days: 0,
+};
+
+const ExpiryPolicySchema = z.object({
+    grace_days: z.coerce.number().int().min(0).max(30),
+});
+
+router.get('/membership-expiry-policy', authenticate, async (_req: Request, res: Response) => {
+    try {
+        const row = await queryOne<{ value: any }>(
+            `SELECT value FROM system_settings WHERE key = 'membership_expiry_policy'`
+        );
+        const merged = { ...EXPIRY_POLICY_DEFAULT, ...(row?.value || {}) };
+        res.json(merged);
+    } catch (error: any) {
+        console.error('Get membership expiry policy error:', error.message);
+        res.status(500).json({ error: 'Error al obtener política de vencimiento' });
+    }
+});
+
+router.put(
+    '/membership-expiry-policy',
+    authenticate,
+    requireRole('admin', 'super_admin'),
+    async (req: Request, res: Response) => {
+        const parsed = ExpiryPolicySchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                error: 'Datos inválidos',
+                details: parsed.error.flatten().fieldErrors,
+            });
+        }
+        try {
+            await query(
+                `INSERT INTO system_settings (key, value, updated_by, updated_at)
+                 VALUES ('membership_expiry_policy', $1::jsonb, $2, NOW())
+                 ON CONFLICT (key) DO UPDATE SET
+                    value = EXCLUDED.value,
+                    updated_by = EXCLUDED.updated_by,
+                    updated_at = NOW()`,
+                [JSON.stringify(parsed.data), req.user!.userId]
+            );
+            res.json({ ok: true, policy: parsed.data });
+        } catch (error: any) {
+            console.error('Update membership expiry policy error:', error.message);
+            res.status(500).json({ error: 'Error al guardar política', detail: error.message });
+        }
+    }
+);
+
+// ============================================
 // GET /api/settings/bar-config — autenticados (admin edita; el cliente usa /api/bar/config)
 // PUT /api/settings/bar-config — solo admin
 // IMPORTANT: must be before /:key to avoid being caught by the param route
