@@ -128,18 +128,18 @@ export function WalletQr() {
 
   return (
     <section aria-labelledby="digital-pass-title" className="overflow-hidden rounded-[2rem] border border-balance-sand/65 bg-balance-cream/70 shadow-[0_24px_70px_-52px_rgba(49,55,42,0.8)]">
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_250px]">
-        <div className="relative isolate min-h-[320px] overflow-hidden bg-[#344734] px-6 py-7 text-[#F6F1E5] sm:px-8 sm:py-8">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(110%_90%_at_5%_0%,rgba(218,196,148,0.25),transparent_56%)]" />
-          <div className="pointer-events-none absolute -bottom-36 -right-24 h-80 w-80 rounded-full border border-[#F6F1E5]/10" />
-          <div className="pointer-events-none absolute -bottom-24 -right-12 h-56 w-56 rounded-full border border-[#F6F1E5]/10" />
-          <CasaSheMark
-            aria-hidden="true"
-            tone="cream"
-            className="pointer-events-none absolute -right-8 -top-10 h-52 w-52 opacity-[0.06]"
-          />
+      <div className="relative isolate overflow-hidden bg-[#344734] text-[#F6F1E5]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(110%_90%_at_5%_0%,rgba(218,196,148,0.25),transparent_56%)]" />
+        <div className="pointer-events-none absolute -bottom-36 right-16 h-80 w-80 rounded-full border border-[#F6F1E5]/10" />
+        <div className="pointer-events-none absolute -bottom-24 right-28 h-56 w-56 rounded-full border border-[#F6F1E5]/10" />
+        <CasaSheMark
+          aria-hidden="true"
+          tone="cream"
+          className="pointer-events-none absolute -right-8 -top-10 h-52 w-52 opacity-[0.06]"
+        />
 
-          <div className="relative flex h-full flex-col">
+        <div className="relative grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_290px]">
+          <div className="flex min-h-[310px] flex-col px-6 py-7 sm:px-8 sm:py-8">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#F6F1E5]/58">Casa Shé</p>
@@ -173,22 +173,40 @@ export function WalletQr() {
               </div>
             </dl>
           </div>
-        </div>
 
-        <div className="flex flex-col items-center justify-center bg-[#EFE7D7] p-6 lg:border-l lg:border-balance-sand/55">
-          <div className="rounded-[1.35rem] border border-balance-sand/55 bg-white p-3 shadow-[0_16px_32px_-24px_rgba(49,55,42,0.55)]">
-            <QRCodeCanvas
-              value={data.qrPayload}
-              size={176}
-              level="M"
-              marginSize={1}
-              bgColor="#FFFFFF"
-              fgColor="#273728"
-              className="h-auto w-full max-w-[176px]"
-            />
+          <div className="px-5 pb-6 sm:px-8 sm:pb-8 lg:flex lg:items-center lg:border-l lg:border-[#F6F1E5]/10 lg:p-6">
+            <div className="w-full rounded-[1.55rem] border border-[#F6F1E5]/15 bg-[#F6F1E5]/[0.08] p-4 shadow-[0_20px_44px_-34px_rgba(15,22,15,0.9)] backdrop-blur-sm">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.21em] text-[#F6F1E5]/62">Acceso personal</p>
+                <span className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#E1CCA0]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#E1CCA0]" />
+                  {status}
+                </span>
+              </div>
+
+              <div className="mt-4 grid grid-cols-[128px_minmax(0,1fr)] items-center gap-4 lg:grid-cols-1 lg:gap-3">
+                <div className="rounded-[1.15rem] bg-[#FAF8F1] p-2.5 shadow-[0_16px_32px_-24px_rgba(15,22,15,0.9)] lg:mx-auto lg:w-full lg:max-w-[178px] lg:p-3">
+                  <QRCodeCanvas
+                    value={data.qrPayload}
+                    size={176}
+                    level="M"
+                    marginSize={1}
+                    bgColor="#FAF8F1"
+                    fgColor="#273728"
+                    style={{ width: '100%', height: 'auto' }}
+                  />
+                </div>
+
+                <div className="min-w-0 lg:text-center">
+                  <p className="truncate text-sm font-semibold text-[#F6F1E5]">{data.memberName}</p>
+                  <p className="mt-0.5 truncate text-xs text-[#E1CCA0]">{data.planName ?? 'Pase de recepción'}</p>
+                  <p className="mt-3 text-[11px] leading-relaxed text-[#F6F1E5]/58 lg:mx-auto lg:max-w-[20ch]">
+                    Preséntalo en recepción al llegar.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-          <p className="mt-4 text-center text-xs font-semibold uppercase tracking-[0.17em] text-balance-dark/68">QR de recepción</p>
-          <p className="mt-1 max-w-[22ch] text-center text-xs leading-relaxed text-balance-dark/52">Muéstralo al llegar para identificarte.</p>
         </div>
       </div>
 
