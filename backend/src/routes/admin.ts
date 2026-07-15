@@ -15,6 +15,7 @@ import {
 } from '../services/email.js';
 import { getFrontendUrl } from '../services/email-templates.js';
 import { fillStudioCounts } from '../lib/dashboardStudio.js';
+import { manualDiscountNote, resolveManualPriceAdjustment } from '../lib/manual-price-adjustment.js';
 
 const router = Router();
 
@@ -360,7 +361,7 @@ router.get('/notifications', async (req: Request, res: Response) => {
 // ============================================
 router.post('/physical-sale', async (req: Request, res: Response) => {
     try {
-        const { userId, planId, paymentDate, amount, paymentMethod, reference, notes } = req.body;
+        const { userId, planId, paymentDate, paymentMethod, reference, notes, reason, discountType, discountValue } = req.body;
 
         if (!userId || !planId) {
             return res.status(400).json({ error: 'Usuario y plan son requeridos' });
@@ -377,6 +378,29 @@ router.post('/physical-sale', async (req: Request, res: Response) => {
         if (!plan) {
             return res.status(404).json({ error: 'Plan no encontrado' });
         }
+
+        const method = paymentMethod || 'cash';
+        if (!['cash', 'transfer', 'card', 'online', 'gratis'].includes(method)) {
+            return res.status(400).json({ error: 'Método de pago inválido' });
+        }
+        const isGratis = method === 'gratis';
+        const adjustmentReason = String(reason ?? notes ?? '').trim();
+        if (isGratis && adjustmentReason.length < 5) {
+            return res.status(400).json({ error: 'El comentario es obligatorio para una cortesía gratis (mínimo 5 caracteres).' });
+        }
+        const manualAdjustment = resolveManualPriceAdjustment({
+            listPrice: Number(plan.price), discountType, discountValue, reason: adjustmentReason,
+        });
+        if (!manualAdjustment.ok) return res.status(400).json({ error: manualAdjustment.error });
+        if (isGratis && manualAdjustment.applied) {
+            return res.status(400).json({ error: 'Una cortesía gratis no puede combinarse con otro descuento.' });
+        }
+        const paymentAmount = isGratis ? 0 : manualAdjustment.amount;
+        const auditNotes = isGratis
+            ? [notes, `Cortesía gratis. Motivo: ${adjustmentReason}`].filter(Boolean).join(' | ')
+            : manualAdjustment.applied
+                ? [notes, manualDiscountNote(manualAdjustment)].filter(Boolean).join(' | ')
+                : (notes || null);
 
         // Calculate dates
         const startDate = paymentDate || new Date().toISOString().split('T')[0];
@@ -396,30 +420,32 @@ router.post('/physical-sale', async (req: Request, res: Response) => {
             plan.class_limit ?? null,
             plan.reformer_credits ?? null,
             plan.multi_credits ?? null,
-            paymentMethod || 'cash',
+            method,
             reference || null
         ]);
 
         // Create order record for reporting
         const order = await queryOne(`
             INSERT INTO orders (
-                user_id, plan_id, subtotal, tax_amount, total_amount,
+                user_id, plan_id, subtotal, discount_amount, tax_amount, total_amount,
                 currency, payment_method, customer_notes, status, paid_at, approved_at, membership_id
-            ) VALUES ($1, $2, $3, 0, $3, 'MXN', $4, $5, 'approved', NOW(), NOW(), $6)
+            ) VALUES ($1, $2, $3, $4, 0, $5, 'MXN', $6, $7, 'approved', NOW(), NOW(), $8)
             RETURNING *
-        `, [userId, planId, amount || plan.price, paymentMethod || 'cash', notes || null, membership.id]);
+        `, [userId, planId, Number(plan.price), isGratis ? Number(plan.price) : manualAdjustment.discountAmount,
+            paymentAmount, method, auditNotes, membership.id]);
 
         // Create payment row so revenue reports include this physical sale
         const payment = await queryOne(`
             INSERT INTO payments (
                 user_id, membership_id, order_id, amount, currency,
-                payment_method, status, processed_by, completed_at
-            ) VALUES ($1, $2, $3, $4, 'MXN', $5, 'completed', $6, NOW())
+                payment_method, notes, status, processed_by, completed_at
+            ) VALUES ($1, $2, $3, $4, 'MXN', $5, $6, 'completed', $7, NOW())
             RETURNING id
         `, [
             userId, membership.id, order.id,
-            amount || plan.price,
-            paymentMethod || 'cash',
+            paymentAmount,
+            method,
+            auditNotes,
             req.user?.userId || null,
         ]);
 

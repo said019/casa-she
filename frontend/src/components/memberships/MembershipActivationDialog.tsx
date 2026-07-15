@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,7 +18,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useIsElevated } from '@/hooks/useIsElevated';
-import { GRATIS_REASON_MIN_LENGTH } from '@/lib/membershipPaymentMethods';
+import { ManualPriceAdjustmentFields } from '@/components/payments/ManualPriceAdjustmentFields';
+import { calculateManualDiscount, MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH } from '@/lib/manualDiscount';
 
 const activationSchema = z.object({
   paymentMethod: z.enum(['cash', 'transfer', 'card', 'online', 'gratis'], {
@@ -26,6 +27,8 @@ const activationSchema = z.object({
   }),
   // Motivo obligatorio cuando paymentMethod === 'gratis' (lo valida el botón / backend).
   reason: z.string().optional(),
+  discountType: z.enum(['percentage', 'fixed']).optional(),
+  discountValue: z.coerce.number().min(0).optional(),
   paymentReference: z.string().max(255).optional(),
   startDate: z.string().min(1, 'Selecciona la fecha de inicio'),
   notes: z.string().max(500).optional(),
@@ -71,6 +74,7 @@ export function MembershipActivationDialog({
   onActivate,
 }: MembershipActivationDialogProps) {
   const isElevated = useIsElevated();
+  const [discountEnabled, setDiscountEnabled] = useState(false);
   const visibleMethods = isElevated
     ? [...ACTIVATION_BASE_METHODS, 'gratis' as const]
     : ACTIVATION_BASE_METHODS;
@@ -103,25 +107,40 @@ export function MembershipActivationDialog({
     reset({
       paymentMethod: resolvedPaymentMethod,
       reason: '',
+      discountType: 'percentage',
+      discountValue: 0,
       paymentReference: membership.payment_reference || '',
       startDate: today,
       notes: '',
       notifyMember: true,
       generateWalletPass: false,
     });
+    setDiscountEnabled(false);
   }, [membership, reset, today, isElevated]);
 
   const paymentMethod = watch('paymentMethod');
   const reason = watch('reason');
+  const discountType = watch('discountType') ?? 'percentage';
+  const discountValue = watch('discountValue') ?? 0;
   const notifyMember = watch('notifyMember');
   const isGratis = paymentMethod === 'gratis';
 
-  const amount = membership?.price_paid ?? membership?.plan_price ?? null;
+  const amount = membership?.plan_price ?? membership?.price_paid ?? null;
   const currency = membership?.plan_currency || 'MXN';
+  const adjustment = calculateManualDiscount(amount ?? 0, discountEnabled && !isGratis, discountType, discountValue);
+  const adjustmentNeedsComment = isGratis || discountEnabled;
+  const adjustmentValid = (!discountEnabled || adjustment.valid) &&
+    (!adjustmentNeedsComment || (reason ?? '').trim().length >= MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH);
 
   const onSubmit = (data: ActivationForm) => {
     if (!membership) return;
-    onActivate(membership.id, data);
+    const payload = { ...data };
+    if (!discountEnabled || isGratis) {
+      delete payload.discountType;
+      delete payload.discountValue;
+    }
+    if (!adjustmentNeedsComment) delete payload.reason;
+    onActivate(membership.id, payload);
   };
 
   return (
@@ -166,21 +185,19 @@ export function MembershipActivationDialog({
             )}
           </div>
 
-          {isGratis && (
-            <div className="space-y-2">
-              <Label>
-                Motivo (obligatorio) <span className="text-destructive">*</span>
-              </Label>
-              <Textarea
-                placeholder="Ej. Cortesía por promoción / compensación"
-                rows={2}
-                {...register('reason')}
-              />
-              <p className="text-xs text-muted-foreground">
-                Se registra en $0 y queda en bitácora (mínimo {GRATIS_REASON_MIN_LENGTH} caracteres).
-              </p>
-            </div>
-          )}
+          <ManualPriceAdjustmentFields
+            idPrefix="activate-membership"
+            listPrice={amount ?? 0}
+            isGratis={isGratis}
+            discountEnabled={discountEnabled}
+            discountType={discountType}
+            discountValue={String(discountValue || '')}
+            comment={reason ?? ''}
+            onDiscountEnabledChange={setDiscountEnabled}
+            onDiscountTypeChange={(value) => setValue('discountType', value)}
+            onDiscountValueChange={(value) => setValue('discountValue', Number(value) || 0)}
+            onCommentChange={(value) => setValue('reason', value)}
+          />
 
           <div className="space-y-2">
             <Label>Referencia (opcional)</Label>
@@ -226,7 +243,7 @@ export function MembershipActivationDialog({
               disabled={
                 isSubmitting ||
                 !membership ||
-                (isGratis && (reason ?? '').trim().length < GRATIS_REASON_MIN_LENGTH)
+                !adjustmentValid
               }
             >
               Activar Membresía

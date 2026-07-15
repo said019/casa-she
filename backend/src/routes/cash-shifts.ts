@@ -7,6 +7,7 @@ import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { logAction } from '../lib/audit.js';
 import { isElevated } from '../lib/elevation.js';
 import { requireElevated } from '../middleware/elevation.js';
+import { manualDiscountNote, resolveManualPriceAdjustment } from '../lib/manual-price-adjustment.js';
 
 const router = Router();
 const STAFF = ['admin', 'super_admin', 'reception'] as const;
@@ -94,7 +95,7 @@ router.get('/current', authenticate, requirePermission('caja'), async (req: Requ
 // POST /sell-membership { user_id, plan_id, payment_method, facility_id? }
 router.post('/sell-membership', authenticate, requirePermission('vender'), async (req: Request, res: Response) => {
     const sellerId = req.user?.userId;
-    const { user_id, plan_id, payment_method, reason, start_date } = req.body;
+    const { user_id, plan_id, payment_method, reason, start_date, discount_type, discount_value } = req.body;
     if (!user_id || !plan_id) return res.status(400).json({ error: 'Falta user_id o plan_id' });
     // Fecha de inicio opcional (YYYY-MM-DD). Default: hoy. Permite cobrar hoy pero que la
     // membresía arranque otro día (p. ej. pagar sábado y que corra desde el lunes) sin perder días.
@@ -137,6 +138,21 @@ router.post('/sell-membership', authenticate, requirePermission('vender'), async
         [plan_id]
     );
     if (!plan) return res.status(404).json({ error: 'Plan no encontrado' });
+
+    const manualAdjustment = resolveManualPriceAdjustment({
+        listPrice: Number((plan as any).price),
+        discountType: discount_type,
+        discountValue: discount_value,
+        reason,
+    });
+    if (!manualAdjustment.ok) return res.status(400).json({ error: manualAdjustment.error });
+    if (isGratis && manualAdjustment.applied) {
+        return res.status(400).json({ error: 'Una cortesía gratis no puede combinarse con otro descuento.' });
+    }
+    const paymentAmount = isGratis ? 0 : manualAdjustment.amount;
+    const paymentNotes = isGratis
+        ? `Cortesía gratis. Motivo: ${gratisReason}`
+        : manualAdjustment.applied ? manualDiscountNote(manualAdjustment) : null;
 
     // Aviso de doble cobro: si la clienta YA tiene una membresía activa, no vender sin
     // confirmación explícita (body.confirm === true). Evita cobrar dos veces el mismo plan.
@@ -198,12 +214,11 @@ router.post('/sell-membership', authenticate, requirePermission('vender'), async
             [
                 user_id,
                 m.id,
-                // Cortesía $0: amount=0 (no da puntos ni suma a caja). Si no, precio de lista del plan.
-                isGratis ? 0 : (plan as any).price,
+                paymentAmount,
                 (plan as any).currency ?? 'MXN',
                 pm,
                 null,   // reference
-                isGratis ? `Cortesía gratis. Motivo: ${gratisReason}` : null,   // notes
+                paymentNotes,
                 sellerId,
                 // Sin caja para gratis: shift_id NULL (la cortesía no entra al corte).
                 isGratis ? null : (shift as any).id,
@@ -219,13 +234,22 @@ router.post('/sell-membership', authenticate, requirePermission('vender'), async
             entityId: m.id,
             description: isGratis
                 ? `Membresía GRATIS en mostrador. Motivo: ${gratisReason}`
+                : manualAdjustment.applied
+                    ? `Venta de membresía con descuento. ${manualDiscountNote(manualAdjustment)}`
                 : 'Venta de membresía en mostrador',
             newData: {
                 plan_id: m.plan_id,
                 user_id: m.user_id,
                 payment_method: m.payment_method,
                 facility_id: facilityId,
+                amount: paymentAmount,
                 ...(isGratis ? { gratis: true, reason: gratisReason } : {}),
+                ...(manualAdjustment.applied ? {
+                    discount_type: manualAdjustment.discountType,
+                    discount_value: manualAdjustment.discountValue,
+                    discount_amount: manualAdjustment.discountAmount,
+                    reason: manualAdjustment.reason,
+                } : {}),
             },
             req,
         });
