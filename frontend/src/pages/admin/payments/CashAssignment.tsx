@@ -809,7 +809,7 @@ function CashAssignmentInner() {
                         />
 
                         {/* Amount & Date Row */}
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                           <div className="space-y-3">
                             <Label className="flex items-center gap-2 text-base font-semibold">
                               <DollarSign className="h-4 w-4 text-primary" />

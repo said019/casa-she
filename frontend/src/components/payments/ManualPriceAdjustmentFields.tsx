@@ -49,10 +49,10 @@ export function ManualPriceAdjustmentFields({
   const commentTooShort = hasAdjustment && comment.trim().length < MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH;
 
   return (
-    <div className="space-y-4 border-t border-border/70 pt-4">
+    <div className="min-w-0 space-y-4 border-t border-border/70 pt-4">
       {!isGratis && (
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
+        <div className="flex items-center justify-between gap-4 rounded-lg bg-muted/30 px-3 py-3">
+          <div className="min-w-0 space-y-1">
             <Label htmlFor={`${idPrefix}-discount-toggle`}>Aplicar descuento</Label>
             <p className="text-xs leading-5 text-muted-foreground">
               Se aplica al total sin importar el método de pago.
@@ -60,6 +60,7 @@ export function ManualPriceAdjustmentFields({
           </div>
           <Switch
             id={`${idPrefix}-discount-toggle`}
+            className="shrink-0"
             checked={discountEnabled}
             onCheckedChange={onDiscountEnabledChange}
           />
@@ -71,7 +72,7 @@ export function ManualPriceAdjustmentFields({
           <div className="space-y-2">
             <Label htmlFor={`${idPrefix}-discount-type`}>Tipo de descuento</Label>
             <Select value={discountType} onValueChange={(value) => onDiscountTypeChange(value as ManualDiscountType)}>
-              <SelectTrigger id={`${idPrefix}-discount-type`}>
+              <SelectTrigger id={`${idPrefix}-discount-type`} className="h-11 w-full text-base sm:text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -87,12 +88,14 @@ export function ManualPriceAdjustmentFields({
             <Input
               id={`${idPrefix}-discount-value`}
               type="number"
+              inputMode="decimal"
               min="0"
               max={discountType === 'percentage' ? '99.99' : undefined}
               step="0.01"
               value={discountValue}
               onChange={(event) => onDiscountValueChange(event.target.value)}
               placeholder={discountType === 'percentage' ? 'Ej. 10' : 'Ej. 250'}
+              className="h-11 text-base sm:text-sm"
             />
             {!adjustment.valid && (
               <p className="text-xs text-destructive">
@@ -115,6 +118,7 @@ export function ManualPriceAdjustmentFields({
             value={comment}
             onChange={(event) => onCommentChange(event.target.value)}
             rows={2}
+            className="min-h-[88px] text-base sm:text-sm"
             placeholder={isGratis ? 'Ej. Cortesía autorizada por promoción' : 'Ej. Descuento autorizado por gerencia'}
           />
           <p className={commentTooShort ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'}>
@@ -125,17 +129,17 @@ export function ManualPriceAdjustmentFields({
 
       {hasAdjustment && listPrice > 0 && (
         <div className="space-y-2 rounded-lg border border-border/70 bg-muted/30 p-3 text-sm">
-          <div className="flex justify-between gap-4 text-muted-foreground">
+          <div className="flex items-baseline justify-between gap-4 text-muted-foreground">
             <span>Precio de lista</span>
-            <span className="tabular-nums">{mxn.format(listPrice)}</span>
+            <span className="shrink-0 tabular-nums">{mxn.format(listPrice)}</span>
           </div>
-          <div className="flex justify-between gap-4 text-muted-foreground">
+          <div className="flex items-baseline justify-between gap-4 text-muted-foreground">
             <span>{isGratis ? 'Cortesía' : 'Descuento'}</span>
-            <span className="tabular-nums">-{mxn.format(isGratis ? listPrice : adjustment.discountAmount)}</span>
+            <span className="shrink-0 tabular-nums">-{mxn.format(isGratis ? listPrice : adjustment.discountAmount)}</span>
           </div>
-          <div className="flex justify-between gap-4 border-t border-border/70 pt-2 font-semibold">
+          <div className="flex items-baseline justify-between gap-4 border-t border-border/70 pt-2 font-semibold">
             <span>Total a registrar</span>
-            <span className="tabular-nums">{mxn.format(isGratis ? 0 : adjustment.total)}</span>
+            <span className="shrink-0 tabular-nums">{mxn.format(isGratis ? 0 : adjustment.total)}</span>
           </div>
         </div>
       )}

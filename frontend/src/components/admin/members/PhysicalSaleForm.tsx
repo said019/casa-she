@@ -237,7 +237,7 @@ export const PhysicalSaleForm = ({
           <CardTitle className="text-lg">Detalles del Pago</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="paymentDate">
                 Fecha de Pago <span className="text-red-500">*</span>
@@ -267,7 +267,7 @@ export const PhysicalSaleForm = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="paymentMethod">
                 Método de Pago <span className="text-red-500">*</span>
@@ -328,7 +328,7 @@ export const PhysicalSaleForm = ({
       </Card>
 
       {/* Botones */}
-      <div className="flex gap-3 justify-end">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
           Cancelar
         </Button>

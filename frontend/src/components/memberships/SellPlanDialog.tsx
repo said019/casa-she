@@ -138,7 +138,7 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
                         </Select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-2">
                             <Label htmlFor="sell-start">Inicio</Label>
                             <Input id="sell-start" type="date" value={assignStartDate}
