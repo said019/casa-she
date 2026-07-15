@@ -148,7 +148,7 @@ export async function getMembershipData(membershipId: string): Promise<Membershi
                     ELSE m.status
                 END as status,
                 u.created_at as member_since,
-                (SELECT rc.code FROM referral_codes rc WHERE rc.user_id = m.user_id LIMIT 1) as referral_code,
+                u.referral_code as referral_code,
                 (SELECT (c.date || 'T' || SUBSTRING(c.start_time::text, 1, 5) || ':00-06:00')
                  FROM bookings b2 JOIN classes c ON b2.class_id = c.id
                  WHERE b2.user_id = m.user_id AND b2.status = 'confirmed'
@@ -551,7 +551,20 @@ export async function checkAppleWalletConfig(): Promise<{ configured: boolean; t
         result.hasAPNsKey = !!APPLE_APNS_KEY_BASE64;
         result.hasKeyId = !!APPLE_KEY_ID;
         const assetsDir = path.resolve(process.cwd(), 'wallet-assets');
-        result.hasCertificates = fs.existsSync(path.join(assetsDir, 'pass.pem')) && fs.existsSync(path.join(assetsDir, 'pass.key')) && fs.existsSync(path.join(assetsDir, 'wwdr.pem'));
+        const configuredFile = (envPath: string | undefined, fallback: string) => {
+            const filePath = envPath || fallback;
+            return fs.existsSync(path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath));
+        };
+        const hasEnvCertificates = !!(
+            process.env.APPLE_PASS_CERT_BASE64 &&
+            process.env.APPLE_PASS_KEY_BASE64 &&
+            process.env.APPLE_WWDR_BASE64
+        );
+        const hasFileCertificates =
+            configuredFile(process.env.APPLE_PASS_CERT, path.join(assetsDir, 'pass.pem')) &&
+            configuredFile(process.env.APPLE_PASS_KEY, path.join(assetsDir, 'pass.key')) &&
+            configuredFile(process.env.APPLE_WWDR, path.join(assetsDir, 'wwdr.pem'));
+        result.hasCertificates = hasEnvCertificates || hasFileCertificates;
         result.configured = !!(result.teamId && result.passTypeId && result.hasAuthToken && result.hasCertificates);
         result.canSendPush = !!(result.teamId && result.hasAPNsKey && result.hasKeyId);
     } catch (error) { result.error = String(error); }

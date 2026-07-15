@@ -217,6 +217,8 @@ router.get('/pass', authenticate, requireRole('client'), async (req: Request, re
             ? WALLET_ELIGIBLE_STATUSES.has(membership.status)
             : false;
 
+        const appleConfig = await checkAppleWalletConfig();
+
         res.json({
             memberName: user?.display_name || 'Miembro',
             memberSince: user?.created_at || null,
@@ -230,6 +232,7 @@ router.get('/pass', authenticate, requireRole('client'), async (req: Request, re
             qrPayload: buildQrPayload(userId, membership?.id),
             walletPasses,
             canDownloadPass,
+            applePassAvailable: appleConfig.configured,
         });
     } catch (error) {
         console.error('Wallet pass error:', error);
@@ -358,6 +361,18 @@ router.post('/pass/apple', authenticate, requireRole('client'), async (req: Requ
         if (!membership) {
             return res.status(404).json({ error: 'No tienes una membresía disponible para generar pase' });
         }
+
+        const appleConfig = await checkAppleWalletConfig();
+        if (!appleConfig.configured) {
+            return res.status(503).json({
+                error: 'Apple Wallet está temporalmente en configuración. Tu pase y QR siguen disponibles dentro de la app.',
+                code: 'APPLE_WALLET_NOT_CONFIGURED',
+            });
+        }
+
+        // Valida la firma antes de mandar al navegador a la URL pública. Así cualquier
+        // problema de certificado se presenta dentro de la app y no como una página JSON.
+        await buildApplePassBuffer(membership.id);
 
         // Generate temporary download token
         const token = generateDownloadToken(membership.id);
