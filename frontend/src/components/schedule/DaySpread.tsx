@@ -9,9 +9,10 @@ interface Props {
   classes: ScheduleClass[];
   now: Date;
   onPick: (c: ScheduleClass) => void;
+  bookingClassId?: string | null;
 }
 
-export function DaySpread({ weekDays, selectedDate, onSelectDate, classes, now, onPick }: Props) {
+export function DaySpread({ weekDays, selectedDate, onSelectDate, classes, now, onPick, bookingClassId }: Props) {
   const dayClasses = classes
     .filter((c) => isSameDay(parseISO(c.time), selectedDate))
     .sort((a, b) => a.time.localeCompare(b.time));
@@ -65,14 +66,17 @@ export function DaySpread({ weekDays, selectedDate, onSelectDate, classes, now, 
         ) : (
           <div>
             {dayClasses.map((c) => {
+              const isBooking = bookingClassId === c.id;
               const status = getCellStatus(c, now);
               const isPast = status === "past";
               return (
                 <button
                   key={c.id}
                   onClick={() => onPick(c)}
+                  disabled={isBooking}
+                  aria-busy={isBooking}
                   className={`relative grid w-full grid-cols-[60px_1fr_70px] items-baseline gap-3 border-b border-dotted border-bmb-ink/20 px-3 py-3 pl-5 text-left ${
-                    isPast ? "opacity-40" : ""
+                    isBooking ? "cursor-wait opacity-65" : isPast ? "opacity-40" : ""
                   }`}
                 >
                   <span className="absolute inset-y-2.5 left-1.5 w-[3px] rounded-full" style={{ backgroundColor: classColor(c) }} aria-hidden="true" />
@@ -89,7 +93,7 @@ export function DaySpread({ weekDays, selectedDate, onSelectDate, classes, now, 
                     className="text-right editorial-caption-sm"
                     style={{ color: classColor(c) }}
                   >
-                    {status === "full" ? "LLENA" : `${c.spots} de ${c.maxSpots}`}
+                    {isBooking ? "RESERVANDO" : status === "full" ? "LLENA" : `${c.spots} de ${c.maxSpots}`}
                   </span>
                 </button>
               );

@@ -78,15 +78,17 @@ router.post('/register', async (req: Request, res: Response) => {
         display_name,
         phone,
         role,
+        onboarding_required,
         accepts_communications,
         date_of_birth,
         accepted_terms_at
-      ) VALUES ($1, $2, $3, $4, 'client', $5, $6, NOW())
+      ) VALUES ($1, $2, $3, $4, 'client', false, $5, $6, NOW())
       RETURNING
         id, email, phone, display_name, photo_url, role,
         emergency_contact_name, emergency_contact_phone, health_notes,
         accepts_communications, date_of_birth, receive_reminders,
-        receive_promotions, receive_weekly_summary, created_at, updated_at`,
+        receive_promotions, receive_weekly_summary, onboarding_required,
+        onboarding_completed_at, onboarding_invite_dismissed_at, created_at, updated_at`,
             [email.toLowerCase(), passwordHash, displayName, phone, acceptsCommunications, dateOfBirth || null]
         );
 

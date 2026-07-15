@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useNavigate, useParams } from 'react-router-dom';
+import type { AxiosError } from 'axios';
 import api, { getErrorMessage } from '@/lib/api';
 import { ClientLayout } from '@/components/layout/ClientLayout';
 import { AuthGuard } from '@/components/layout/AuthGuard';
@@ -36,6 +37,10 @@ interface ClassDetail {
   is_free?: boolean;
   free_label?: string | null;
 }
+
+type BookingApiError = {
+  code?: string;
+};
 
 export default function BookClassConfirm() {
   const { classId } = useParams();
@@ -83,12 +88,12 @@ export default function BookClassConfirm() {
       // por eso parecía que "no se jalaban los créditos".
       queryClient.invalidateQueries({ queryKey: ['my-membership'] });
       toast({
-        title: '¡Reserva exitosa!',
-        description: 'Llega 10 min antes y trae ropa cómoda. Recuerda: cancela hasta 5 h antes para no perder tu crédito.',
+        title: 'Reserva confirmada',
+        description: `Tu lugar quedó apartado. Cancela con al menos ${cancelHours} ${cancelHours === 1 ? 'hora' : 'horas'} de anticipación para recuperar tu crédito.`,
       });
       navigate('/app/classes');
     },
-    onError: (err: any) => {
+    onError: (err: AxiosError<BookingApiError>) => {
       if (err?.response?.data?.code === 'REGLAMENTO_REQUIRED') {
         setPendingAction('book');
         setRegOpen(true);
@@ -123,7 +128,7 @@ export default function BookClassConfirm() {
       });
       navigate('/app/classes');
     },
-    onError: (err: any) => {
+    onError: (err: AxiosError<BookingApiError>) => {
       if (err?.response?.data?.code === 'SPOT_AVAILABLE') {
         bookMutation.mutate(); // se liberó un lugar: reservar normal
         return;
@@ -163,8 +168,8 @@ export default function BookClassConfirm() {
       <ClientLayout>
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold font-heading">Confirmar reserva</h1>
-            <p className="text-muted-foreground">Revisa los detalles antes de confirmar.</p>
+            <h1 className="text-2xl font-bold font-heading">Detalle de la clase</h1>
+            <p className="text-muted-foreground">Consulta el horario, el cupo y la ubicación.</p>
           </div>
 
           {isLoading ? (
@@ -312,7 +317,7 @@ export default function BookClassConfirm() {
                 onClick={handleBook}
                 disabled={!canBook || bookMutation.isPending || isFull || isClosed || isBookingPaused || isCancelled || isPast}
               >
-                {bookMutation.isPending ? 'Reservando...' : isBookingPaused ? 'Reservas pausadas' : isClosed ? 'Clase cerrada' : isPast ? 'Clase ya pasada' : 'Confirmar reserva'}
+                {bookMutation.isPending ? 'Reservando...' : isBookingPaused ? 'Reservas pausadas' : isClosed ? 'Clase cerrada' : isPast ? 'Clase ya pasada' : 'Reservar ahora'}
               </Button>
             )}
           </div>

@@ -3459,8 +3459,16 @@ async function runStartupMigrations(): Promise<void> {
     // === Onboarding Perfilador (Fase 2) ===
     try {
       await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed_at TIMESTAMPTZ`);
-      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_required BOOLEAN NOT NULL DEFAULT true`);
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_required BOOLEAN NOT NULL DEFAULT false`);
+      await query(`ALTER TABLE users ALTER COLUMN onboarding_required SET DEFAULT false`);
       await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_invite_dismissed_at TIMESTAMPTZ`);
+
+      // El perfilador dejó de ser parte obligatoria del registro. Libera también a
+      // las cuentas creadas con el default anterior para que entren y reserven directo.
+      await query(`UPDATE users
+                      SET onboarding_required = false
+                    WHERE onboarding_required = true
+                      AND onboarding_completed_at IS NULL`);
 
       await query(`CREATE TABLE IF NOT EXISTS onboarding_responses (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

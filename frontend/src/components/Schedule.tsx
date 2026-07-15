@@ -47,6 +47,10 @@ interface ScheduleProps {
   bookedIds?: Set<string>;
   /** Cuando true, el filtro arranca en la primera sucursal en vez de "Todas" (evita mezclar ambas en el grid). */
   defaultFirstFacility?: boolean;
+  /** En el portal de clientas permite reservar al tocar la clase, sin pantalla intermedia. */
+  onClassPick?: (classItem: ScheduleClass) => void;
+  /** Clase cuya reserva se está procesando; mantiene feedback visible en conexiones lentas. */
+  bookingClassId?: string | null;
 }
 
 // Disciplinas de Casa Shé con su color de la paleta de marca (para la leyenda).
@@ -59,7 +63,7 @@ const DISCIPLINES: { label: string; color: string }[] = [
   { label: "Salsa", color: "#2E1B22" },          // Ciruela
 ];
 
-export default function Schedule({ bookedIds, defaultFirstFacility }: ScheduleProps = {}) {
+export default function Schedule({ bookedIds, defaultFirstFacility, onClassPick, bookingClassId }: ScheduleProps = {}) {
   const navigate = useNavigate();
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [filters, setFilters] = useState<ScheduleFilters>({ facility: "all", category: "all", instructor: "all", timeOfDay: "all" });
@@ -162,6 +166,7 @@ export default function Schedule({ bookedIds, defaultFirstFacility }: SchedulePr
 
   const weekDays = useMemo(() => getWeekDays(weekStart), [weekStart]);
   const hourRail = useMemo(() => buildHourRail(visibleClasses), [visibleClasses]);
+  const pickClass = onClassPick ?? ((classItem: ScheduleClass) => navigate(`/app/book/${classItem.id}`));
 
   const ROW_HEIGHT = 60;
   const HEADER_HEIGHT = 56;
@@ -239,7 +244,8 @@ export default function Schedule({ bookedIds, defaultFirstFacility }: SchedulePr
             onSelectDate={setSelectedDate}
             classes={visibleClasses}
             now={now}
-            onPick={(c) => navigate(`/app/book/${c.id}`)}
+            onPick={pickClass}
+            bookingClassId={bookingClassId}
           />
         ) : (
         <div className="relative mt-6">
@@ -278,7 +284,15 @@ export default function Schedule({ bookedIds, defaultFirstFacility }: SchedulePr
           ))}
 
           {hourRail.map((h) => (
-            <Row key={h} hour={h} weekDays={weekDays} classes={visibleClasses} now={now} onPick={(c) => navigate(`/app/book/${c.id}`)} />
+            <Row
+              key={h}
+              hour={h}
+              weekDays={weekDays}
+              classes={visibleClasses}
+              now={now}
+              onPick={pickClass}
+              bookingClassId={bookingClassId}
+            />
           ))}
           </div>
         </div>
@@ -393,12 +407,14 @@ function Row({
   classes,
   now,
   onPick,
+  bookingClassId,
 }: {
   hour: number;
   weekDays: Date[];
   classes: ScheduleClass[];
   now: Date;
   onPick: (c: ScheduleClass) => void;
+  bookingClassId?: string | null;
 }) {
   const label = `${hour % 12 || 12}`;
   const period = hour < 12 ? "am" : "pm";
@@ -419,6 +435,7 @@ function Row({
             }`}
           >
             {cellClasses.map((c) => {
+              const isBooking = bookingClassId === c.id;
               const status = getCellStatus(c, now);
               const isPast = status === "past";
               const isFull = status === "full";
@@ -446,9 +463,11 @@ function Row({
                 <button
                   key={c.id}
                   onClick={() => onPick(c)}
+                  disabled={isBooking}
+                  aria-busy={isBooking}
                   style={isColored ? { backgroundColor: withAlpha(color, 0.1), borderColor: withAlpha(color, 0.34) } : undefined}
                   className={`relative block w-full overflow-hidden rounded-lg ${bgClass} border border-bmb-ink/[0.07] py-2 pl-3 pr-2 mb-1.5 text-left shadow-[0_1px_2px_rgba(42,33,24,0.05)] transition-[transform,box-shadow,border-color] duration-150 hover:-translate-y-px hover:border-bmb-gold/50 hover:shadow-[0_10px_22px_-12px_rgba(42,33,24,0.45)] ${
-                    isPast ? "opacity-45" : isClosed ? "opacity-60" : ""
+                    isBooking ? "cursor-wait opacity-70" : isPast ? "opacity-45" : isClosed ? "opacity-60" : ""
                   }`}
                 >
                   <span className="absolute inset-y-1.5 left-0 w-[3.5px] rounded-full" style={{ backgroundColor: accent }} aria-hidden="true" />
@@ -472,6 +491,11 @@ function Row({
                     {isFull && !isClosed && (
                       <span className="shrink-0 rounded-full border border-bmb-deepgold/70 px-1.5 py-0 editorial-caption-sm text-bmb-deepgold">
                         Llena
+                      </span>
+                    )}
+                    {isBooking && (
+                      <span className="shrink-0 rounded-full border border-bmb-gold/70 px-1.5 py-0 editorial-caption-sm text-bmb-gold">
+                        Reservando
                       </span>
                     )}
                   </div>
