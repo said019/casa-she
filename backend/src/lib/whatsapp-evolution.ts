@@ -11,11 +11,11 @@ export class EvolutionAPIClient {
     constructor(instanceName?: string) {
         const baseURL = process.env.EVOLUTION_API_URL;
         const apiKey = process.env.EVOLUTION_API_KEY;
-        // Una instancia por sucursal (San Miguel / Tepa). Si no se pasa, usa el default
-        // del env (compatibilidad) o 'bmb-san-miguel' (principal).
+        // Casa Shé opera una sola instancia. El nombre también puede configurarse
+        // por ambiente para conservar la sesión al mover de infraestructura.
         this.instanceName = instanceName
             || process.env.EVOLUTION_INSTANCE_NAME
-            || 'bmb-san-miguel';
+            || 'casa-she';
 
         if (!baseURL || !apiKey) {
             console.warn('[Evolution] EVOLUTION_API_URL o EVOLUTION_API_KEY no configurados');
@@ -236,10 +236,10 @@ const clientsByInstance = new Map<string, EvolutionAPIClient>();
 
 /**
  * Devuelve el cliente para una instancia concreta (cacheado).
- * Sin argumento → instancia principal (San Miguel).
+ * Sin argumento → instancia principal de Casa Shé.
  */
 export function getEvolutionClient(instanceName?: string): EvolutionAPIClient {
-    const name = instanceName || process.env.EVOLUTION_INSTANCE_NAME || 'bmb-san-miguel';
+    const name = instanceName || process.env.EVOLUTION_INSTANCE_NAME || 'casa-she';
     let client = clientsByInstance.get(name);
     if (!client) {
         client = new EvolutionAPIClient(name);

@@ -1,9 +1,7 @@
 /**
  * Configuración de WhatsApp de Casa Shé.
  *
- * Casa Shé opera una sola sede. Conservamos como último fallback el nombre técnico
- * de la instancia histórica para no desconectar una sesión ya vinculada en Evolution;
- * ese identificador no se usa como etiqueta ni se muestra como marca al usuario.
+ * Casa Shé opera una sola sede y una sola instancia de WhatsApp.
  */
 
 export interface WaInstanceDef {
@@ -21,8 +19,7 @@ export const WA_INSTANCES: WaInstanceDef[] = [
         name:
             process.env.EVOLUTION_INSTANCE_CASA_SHE
             || process.env.EVOLUTION_INSTANCE_NAME
-            || process.env.EVOLUTION_INSTANCE_SAN_MIGUEL
-            || 'bmb-san-miguel',
+            || 'casa-she',
         label: 'Casa Shé',
         facilityName: 'Casa Shé — Condesa',
         facilityMatch: /casa\s*sh[eé]|condesa/i,

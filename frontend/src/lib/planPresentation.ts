@@ -148,7 +148,15 @@ export function isIntroClass(plan: PlanPresentationInput) {
   );
 }
 
+export function isSalsaPlan(plan: PlanPresentationInput) {
+  return normalizePlanText(plan.name).includes('salsa');
+}
+
 export function sortCatalogPlans(planA: CatalogPlanInput, planB: CatalogPlanInput) {
+  // Salsa cierra el catálogo completo, incluso cuando el nombre indica muestra.
+  const salsaDifference = Number(isSalsaPlan(planA)) - Number(isSalsaPlan(planB));
+  if (salsaDifference !== 0) return salsaDifference;
+
   const introDifference = Number(isIntroClass(planB)) - Number(isIntroClass(planA));
   if (introDifference !== 0) return introDifference;
 
