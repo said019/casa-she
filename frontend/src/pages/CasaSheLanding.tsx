@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "framer-motion";
 import api from "@/lib/api";
@@ -107,7 +107,9 @@ interface ApiClass {
   date: string;        // YYYY-MM-DD (día real de la clase)
   start_time: string;  // HH:MM
   class_type_name?: string;
+  instructor_id?: string | null;
   instructor_name?: string;
+  status?: string;
 }
 
 interface ApiInstructor {
@@ -116,6 +118,14 @@ interface ApiInstructor {
   photo_url?: string | null;
   specialties?: unknown;
   tagline?: string | null;
+}
+
+interface LandingCoach {
+  key: string;
+  profileId: string | null;
+  display_name: string;
+  photo_url?: string | null;
+  specialties?: unknown;
 }
 
 function specialtiesFor(value: unknown): string[] {
@@ -127,6 +137,14 @@ function specialtiesFor(value: unknown): string[] {
   } catch {
     return [value];
   }
+}
+
+function normalizeCoachName(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLocaleLowerCase("es-MX");
 }
 
 // Fecha local YYYY-MM-DD (evita el corrimiento de día de toISOString en UTC).
@@ -495,11 +513,78 @@ function Servicios() {
 function Coaches() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [openName, setOpenName] = useState<string | null>(null);
-  const { data: instructors = [], isLoading, isError } = useQuery<ApiInstructor[]>({
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const scheduleEnd = new Date(today);
+  scheduleEnd.setDate(today.getDate() + 90);
+  const scheduleStartYMD = localYMD(today);
+  const scheduleEndYMD = localYMD(scheduleEnd);
+
+  const {
+    data: instructors = [],
+    isLoading: areProfilesLoading,
+  } = useQuery<ApiInstructor[]>({
     queryKey: ["landing-instructors"],
-    queryFn: async () => (await api.get("/instructors")).data,
+    queryFn: async () => {
+      const { data } = await api.get<ApiInstructor[]>("/instructors");
+      return Array.isArray(data) ? data : [];
+    },
     staleTime: 10 * 60 * 1000,
   });
+
+  const {
+    data: scheduledClasses = [],
+    isLoading: areClassesLoading,
+    isError: areClassesUnavailable,
+  } = useQuery<ApiClass[]>({
+    queryKey: ["landing-scheduled-coaches", scheduleStartYMD, scheduleEndYMD],
+    queryFn: async () => {
+      const { data } = await api.get<ApiClass[]>(
+        `/classes?start=${scheduleStartYMD}&end=${scheduleEndYMD}`,
+      );
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 3,
+  });
+
+  const coaches = useMemo<LandingCoach[]>(() => {
+    const profilesById = new Map(instructors.map((coach) => [coach.id, coach]));
+    const profilesByName = new Map(
+      instructors.map((coach) => [normalizeCoachName(coach.display_name), coach]),
+    );
+    const scheduled = new Map<string, { instructorId: string | null; name: string }>();
+
+    for (const classItem of scheduledClasses) {
+      const name = classItem.instructor_name?.trim();
+      if (!name || (classItem.status && classItem.status !== "scheduled")) continue;
+      const key = classItem.instructor_id
+        ? `id:${classItem.instructor_id}`
+        : `name:${normalizeCoachName(name)}`;
+      if (!scheduled.has(key)) {
+        scheduled.set(key, { instructorId: classItem.instructor_id ?? null, name });
+      }
+    }
+
+    return Array.from(scheduled.entries())
+      .map(([key, scheduledCoach]) => {
+        const profile =
+          (scheduledCoach.instructorId
+            ? profilesById.get(scheduledCoach.instructorId)
+            : undefined) ?? profilesByName.get(normalizeCoachName(scheduledCoach.name));
+        return {
+          key,
+          profileId: profile?.id ?? null,
+          display_name: profile?.display_name ?? scheduledCoach.name,
+          photo_url: profile?.photo_url,
+          specialties: profile?.specialties,
+        };
+      })
+      .sort((a, b) => a.display_name.localeCompare(b.display_name, "es-MX"));
+  }, [instructors, scheduledClasses]);
+
+  const isLoading = areProfilesLoading || areClassesLoading;
 
   return (
     <section id="equipo" className="scroll-mt-20 py-20 lg:py-28" style={{ backgroundColor: DEEP, color: CREAM }}>
@@ -510,7 +595,7 @@ function Coaches() {
             <h2 className={`${display} mt-3 text-5xl font-light leading-none sm:text-6xl lg:text-7xl`}>Nuestro equipo.</h2>
           </div>
           <p className={`${body} max-w-[52ch] text-base leading-relaxed text-white/68 md:justify-self-end`}>
-            Cada coach acompaña desde una mirada distinta. Conoce su forma de enseñar, sus disciplinas y las clases que comparte en Casa Shé.
+            Aquí aparece únicamente el equipo vinculado al calendario vigente de Casa Shé. Conoce sus disciplinas y próximas clases.
           </p>
         </div>
 
@@ -520,28 +605,20 @@ function Coaches() {
               <div key={item} className="aspect-[3/4] min-w-[76vw] animate-pulse bg-white/8 sm:min-w-[330px] lg:min-w-0 lg:flex-1" />
             ))}
           </div>
-        ) : isError ? (
+        ) : areClassesUnavailable ? (
           <div className={`${body} mt-8 border border-white/20 px-6 py-10 text-center text-sm text-white/65`} role="alert">
             No pudimos cargar al equipo en este momento.
           </div>
-        ) : instructors.length === 0 ? (
+        ) : coaches.length === 0 ? (
           <div className={`${body} mt-8 border border-dashed border-white/25 px-6 py-14 text-center text-sm text-white/65`}>
-            Los perfiles de nuestras coaches aparecerán aquí.
+            Aún no hay coaches vinculados a clases próximas.
           </div>
         ) : (
           <div className="scrollbar-none mt-8 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3">
-            {instructors.map((coach, index) => {
+            {coaches.map((coach, index) => {
               const specialties = specialtiesFor(coach.specialties);
-              return (
-                <button
-                  key={coach.id}
-                  type="button"
-                  onClick={() => {
-                    setOpenId(coach.id);
-                    setOpenName(coach.display_name);
-                  }}
-                  className="group relative aspect-[3/4] min-w-[76vw] snap-start overflow-hidden border border-white/15 text-left active:scale-[0.985] sm:min-w-[330px] lg:min-w-[calc(25%_-_0.5625rem)]"
-                >
+              const card = (
+                <>
                   {coach.photo_url ? (
                     <img
                       src={coach.photo_url}
@@ -571,7 +648,27 @@ function Coaches() {
                       {specialties.length > 0 ? specialties.slice(0, 3).join(" · ") : "Movimiento y comunidad"}
                     </span>
                   </span>
+                </>
+              );
+
+              const className = "group relative aspect-[3/4] min-w-[76vw] snap-start overflow-hidden border border-white/15 text-left sm:min-w-[330px] lg:min-w-[calc(25%_-_0.5625rem)]";
+              return coach.profileId ? (
+                <button
+                  key={coach.key}
+                  type="button"
+                  data-coach-name={coach.display_name}
+                  onClick={() => {
+                    setOpenId(coach.profileId);
+                    setOpenName(coach.display_name);
+                  }}
+                  className={`${className} active:scale-[0.985]`}
+                >
+                  {card}
                 </button>
+              ) : (
+                <article key={coach.key} data-coach-name={coach.display_name} className={className}>
+                  {card}
+                </article>
               );
             })}
           </div>
