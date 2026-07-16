@@ -64,7 +64,7 @@ import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 
-const DAYS = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 const generateSchema = z.object({
     startDate: z.date(),
@@ -143,7 +143,7 @@ interface ClassesCalendarProps {
 
 export default function ClassesCalendar({ initialGenerateOpen = false, embedded = false }: ClassesCalendarProps) {
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 0 }));
+    const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
     const [mobileSelectedDay, setMobileSelectedDay] = useState(new Date());
     const [isGenerateOpen, setIsGenerateOpen] = useState(initialGenerateOpen);
     const [isBulkFreeOpen, setIsBulkFreeOpen] = useState(false);
@@ -197,12 +197,12 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     }, [searchParams]);
 
     useEffect(() => {
-        setWeekStart(startOfWeek(currentDate, { weekStartsOn: 0 }));
+        setWeekStart(startOfWeek(currentDate, { weekStartsOn: 1 }));
     }, [currentDate]);
 
     useEffect(() => {
         const today = new Date();
-        const currentWeekStart = startOfWeek(today, { weekStartsOn: 0 });
+        const currentWeekStart = startOfWeek(today, { weekStartsOn: 1 });
         setMobileSelectedDay(isSameDay(weekStart, currentWeekStart) ? today : weekStart);
     }, [weekStart]);
 
@@ -519,15 +519,15 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     });
 
     // Forms
-    // Calculate next full week (Sunday to Saturday)
-    const nextSunday = startOfWeek(addDays(new Date(), 7), { weekStartsOn: 0 });
-    const nextSaturday = addDays(nextSunday, 6);
+    // La operación de Casa Shé trabaja semanas completas de lunes a domingo.
+    const nextMonday = startOfWeek(addDays(new Date(), 7), { weekStartsOn: 1 });
+    const nextSunday = addDays(nextMonday, 6);
 
     const generateForm = useForm<GenerateForm>({
         resolver: zodResolver(generateSchema),
         defaultValues: {
-            startDate: nextSunday,
-            endDate: nextSaturday
+            startDate: nextMonday,
+            endDate: nextSunday
         }
     });
 
@@ -730,31 +730,36 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
 
     const content = (
                 <div className="space-y-5">
-                    <section className="relative overflow-hidden rounded-[1.6rem] bg-balance-dark text-balance-cream shadow-[0_28px_80px_-58px_rgba(22,38,26,.95)]">
-                        <img
-                            src="/casashe/espacio-detalles.jpg"
-                            alt=""
-                            aria-hidden="true"
-                            className="absolute inset-0 h-full w-full object-cover opacity-[0.16]"
-                        />
-                        <div className="absolute inset-0 bg-[linear-gradient(100deg,rgba(22,38,26,.96)_0%,rgba(22,38,26,.82)_58%,rgba(42,78,54,.66)_100%)]" />
-                        <div className="relative grid gap-8 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_minmax(27rem,.72fr)] lg:items-end lg:p-9">
-                            <div className="min-w-0">
-                                <div className="mb-5 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-balance-cream/58">
-                                    <Sparkles className="h-3.5 w-3.5 text-[#B4A248]" />
-                                    Operación semanal
+                    <section className="overflow-hidden rounded-[1.6rem] bg-balance-dark text-balance-cream shadow-[0_28px_80px_-58px_rgba(22,38,26,.95)]">
+                        <div className="grid lg:grid-cols-[minmax(0,1.08fr)_minmax(22rem,.92fr)]">
+                            <div className="flex min-w-0 flex-col justify-between p-5 sm:p-7 lg:p-9">
+                                <div>
+                                    <div className="mb-5 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-balance-cream/58">
+                                        <Sparkles className="h-3.5 w-3.5 text-[#B4A248]" />
+                                        Operación semanal
+                                    </div>
+                                    <h1 className="text-4xl font-medium capitalize tracking-[-0.045em] sm:text-5xl">
+                                        {format(currentDate, 'MMMM yyyy', { locale: es })}
+                                    </h1>
+                                    <p className="mt-3 text-sm text-balance-cream/62">{weekRange}</p>
                                 </div>
-                                <h1 className="text-4xl font-medium capitalize tracking-[-0.045em] sm:text-5xl">
-                                    {format(currentDate, 'MMMM yyyy', { locale: es })}
-                                </h1>
-                                <p className="mt-3 text-sm text-balance-cream/62">{weekRange}</p>
+                                <div className="mt-8 grid grid-cols-3 border-y border-balance-cream/16 py-4">
+                                    <CalendarStat label="Clases" value={classesLoading ? '…' : classesError ? '—' : activeClasses.length} />
+                                    <CalendarStat label="Reservas" value={classesLoading ? '…' : classesError ? '—' : totalBookings} />
+                                    <CalendarStat label="Libres" value={classesLoading ? '…' : classesError ? '—' : openSpots} />
+                                </div>
                             </div>
-
-                            <div className="grid grid-cols-3 border-y border-balance-cream/16 py-4">
-                                <CalendarStat label="Clases" value={classesLoading ? '…' : classesError ? '—' : activeClasses.length} />
-                                <CalendarStat label="Reservas" value={classesLoading ? '…' : classesError ? '—' : totalBookings} />
-                                <CalendarStat label="Libres" value={classesLoading ? '…' : classesError ? '—' : openSpots} />
-                            </div>
+                            <figure className="relative min-h-[14rem] overflow-hidden border-t border-balance-cream/12 lg:min-h-[19rem] lg:border-l lg:border-t-0">
+                                <img
+                                    src="/casashe/espacio-detalles.jpg"
+                                    alt="Detalle del estudio Casa Shé"
+                                    className="absolute inset-0 h-full w-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(22,38,26,.08)_20%,rgba(22,38,26,.72)_100%)] lg:bg-[linear-gradient(90deg,rgba(22,38,26,.36)_0%,rgba(22,38,26,.04)_42%,rgba(22,38,26,.45)_100%)]" />
+                                <figcaption className="absolute bottom-4 left-5 text-[9px] font-semibold uppercase tracking-[0.24em] text-balance-cream/72">
+                                    Casa Shé · Condesa
+                                </figcaption>
+                            </figure>
                         </div>
                     </section>
 
@@ -860,7 +865,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                     ) : (
                     <>
                     <div className="space-y-4 lg:hidden">
-                        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none" aria-label="Días de la semana">
+                        <div className="grid grid-cols-7 border-y border-balance-sand/70 py-2" aria-label="Días de la semana">
                             {weekDays.map((day, i) => {
                                 const selected = isSameDay(day, mobileSelectedDay);
                                 const today = isSameDay(day, new Date());
@@ -873,18 +878,22 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                         onClick={() => setMobileSelectedDay(day)}
                                         aria-pressed={selected}
                                         className={cn(
-                                            'min-w-[4.15rem] rounded-[1rem] border px-2 py-3 text-center transition-[background-color,border-color,transform] active:scale-[0.97]',
+                                            'relative min-w-0 px-0.5 py-2 text-center transition-[color,transform] active:scale-[0.96]',
                                             selected
-                                                ? 'border-balance-olive bg-balance-olive text-balance-cream'
+                                                ? 'text-balance-dark after:absolute after:inset-x-1 after:bottom-0 after:h-[2px] after:bg-balance-olive'
                                                 : today
-                                                    ? 'border-balance-olive/45 bg-balance-cream/82 text-balance-dark'
-                                                    : 'border-balance-sand/70 bg-balance-cream/58 text-balance-dark/62',
-                                            isClosed && !selected && 'border-destructive/25 bg-destructive/5'
+                                                    ? 'text-balance-dark'
+                                                    : 'text-balance-dark/55',
+                                            isClosed && !selected && 'text-destructive'
                                         )}
                                     >
-                                        <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] opacity-65">{DAYS[i]}</span>
-                                        <span className="mt-1 block text-xl font-semibold tabular-nums">{format(day, 'd')}</span>
-                                        <span className="mt-1 block text-[10px] font-semibold opacity-58">{dayClasses.length} cls.</span>
+                                        <span className="block text-[9px] font-semibold uppercase tracking-[0.08em] opacity-65">{DAYS[i].slice(0, 2)}</span>
+                                        <span className={cn(
+                                            'mx-auto mt-1 flex h-8 w-8 items-center justify-center rounded-full text-lg font-semibold tabular-nums',
+                                            selected && 'bg-balance-olive text-balance-cream',
+                                            today && !selected && 'border border-balance-olive/55'
+                                        )}>{format(day, 'd')}</span>
+                                        <span className="mt-1 block text-[8px] font-semibold opacity-55">{dayClasses.length}</span>
                                     </button>
                                 );
                             })}
