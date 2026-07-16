@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import api from "@/lib/api";
 import { CasaShePattern } from "@/components/CasaShePattern";
 import { CoachSheet } from "@/components/CoachSheet";
+import { isIntroClass, sortCatalogPlans } from "@/lib/planPresentation";
 
 /**
  * Landing público de Casa Shé — réplica fiel de https://casashe.mx/
@@ -28,9 +29,7 @@ type Card = {
   planName: string;        // nombre exacto en la tabla plans (para cruzar precio/is_active)
   hint: string;
   color: string;
-  artTitle: string;
   tagline: string;
-  image?: string;
   applies: string;
   kind: "Membresía" | "Paquete" | "Clase";
 };
@@ -40,15 +39,15 @@ const STUDIO_CLASSES = "Pilates Mat · Barre · Sculpt · Yoga · Flex";
 // El precio real se obtiene del API (/plans). Solo se muestra la tarjeta si el plan
 // está activo en la DB. planName debe coincidir exactamente con plans.name.
 const CARDS: Card[] = [
-  { title: "MEMBRESÍA SHE BLACK", planName: "Membresía Black", color: "#2E1B22", artTitle: "Membresía She Black", tagline: "Nuestra membresía más completa para sostener una práctica constante y volver a ti.", hint: "24 créditos · vigencia 1 mes", image: "/casashe/card-black.jpeg", applies: STUDIO_CLASSES, kind: "Membresía" },
-  { title: "MEMBRESÍA 360", planName: "Membresía 360", color: "#2A4E36", artTitle: "Membresía 360", tagline: "Movimiento, balance y comunidad en una membresía diseñada para acompañar tu mes.", hint: "16 créditos · vigencia 1 mes", image: "/casashe/card-360.jpeg", applies: STUDIO_CLASSES, kind: "Membresía" },
-  { title: "PAQUETE 12 CLASES", planName: "Paquete 12", color: "#AE4836", artTitle: "Paquete 12 clases", tagline: "Constancia que se siente. Más sesiones para sostener tu práctica.", hint: "12 créditos · vigencia 1 mes", image: "/casashe/card-12.jpeg", applies: STUDIO_CLASSES, kind: "Paquete" },
-  { title: "PAQUETE 8 CLASES", planName: "Paquete 8", color: "#8F7F36", artTitle: "Paquete 8 clases", tagline: "El balance ideal entre flexibilidad y constancia, a tu ritmo.", hint: "8 créditos · vigencia 1 mes", image: "/casashe/card-8.jpeg", applies: STUDIO_CLASSES, kind: "Paquete" },
-  { title: "PAQUETE 5 CLASES", planName: "Paquete 5", color: "#6E4B34", artTitle: "Paquete 5 clases", tagline: "Una forma amable de empezar y encontrar tus clases favoritas.", hint: "5 créditos · vigencia 1 mes", image: "/casashe/card-5.jpeg", applies: STUDIO_CLASSES, kind: "Paquete" },
-  { title: "CLASE SUELTA", planName: "Drop-in", color: "#D6D5C2", artTitle: "Clase suelta", tagline: "Muévete cuando lo necesites, sin comprometer todo el mes.", hint: "1 crédito · vigencia 30 días", image: "/casashe/card-suelta.jpeg", applies: STUDIO_CLASSES, kind: "Clase" },
-  { title: "CLASE MUESTRA", planName: "Clase de prueba", color: "#E7E0CE", artTitle: "Clase muestra", tagline: "Ven a sentir Casa Shé y encuentra la práctica que conecta contigo.", hint: "1 crédito · vigencia 7 días", image: "/casashe/card-muestra.jpeg", applies: STUDIO_CLASSES, kind: "Clase" },
-  { title: "SALSA · 1 CLASE", planName: "Salsa · 1 clase", color: "#2E1B22", artTitle: "Salsa", tagline: "Ritmo, cuerpo y comunidad en una sesión para soltar y reconectar.", hint: "1 clase · vigencia 30 días", applies: "Salsa", kind: "Clase" },
-  { title: "SALSA · 4 CLASES", planName: "Salsa · 4 clases", color: "#2E1B22", artTitle: "Salsa", tagline: "Cuatro encuentros para aprender, bailar y hacer comunidad.", hint: "4 clases · vigencia 1 mes", applies: "Salsa", kind: "Paquete" },
+  { title: "MEMBRESÍA SHE BLACK", planName: "Membresía Black", color: "#2E1B22", tagline: "Nuestra membresía más completa para sostener una práctica constante y volver a ti.", hint: "24 créditos · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Membresía" },
+  { title: "MEMBRESÍA 360", planName: "Membresía 360", color: "#2A4E36", tagline: "Movimiento, balance y comunidad en una membresía diseñada para acompañar tu mes.", hint: "16 créditos · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Membresía" },
+  { title: "PAQUETE 12 CLASES", planName: "Paquete 12", color: "#AE4836", tagline: "Constancia que se siente. Más sesiones para sostener tu práctica.", hint: "12 créditos · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Paquete" },
+  { title: "PAQUETE 8 CLASES", planName: "Paquete 8", color: "#8F7F36", tagline: "El balance ideal entre flexibilidad y constancia, a tu ritmo.", hint: "8 créditos · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Paquete" },
+  { title: "PAQUETE 5 CLASES", planName: "Paquete 5", color: "#6E4B34", tagline: "Una forma amable de empezar y encontrar tus clases favoritas.", hint: "5 créditos · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Paquete" },
+  { title: "CLASE SUELTA", planName: "Drop-in", color: "#D6D5C2", tagline: "Muévete cuando lo necesites, sin comprometer todo el mes.", hint: "1 crédito · vigencia 30 días", applies: STUDIO_CLASSES, kind: "Clase" },
+  { title: "CLASE MUESTRA", planName: "Clase de prueba", color: "#E7E0CE", tagline: "Ven a sentir Casa Shé y encuentra la práctica que conecta contigo.", hint: "1 crédito · vigencia 7 días", applies: STUDIO_CLASSES, kind: "Clase" },
+  { title: "SALSA · 1 CLASE", planName: "Salsa · 1 clase", color: "#2E1B22", tagline: "Ritmo, cuerpo y comunidad en una sesión para soltar y reconectar.", hint: "1 clase · vigencia 30 días", applies: "Salsa", kind: "Clase" },
+  { title: "SALSA · 4 CLASES", planName: "Salsa · 4 clases", color: "#2E1B22", tagline: "Cuatro encuentros para aprender, bailar y hacer comunidad.", hint: "4 clases · vigencia 1 mes", applies: "Salsa", kind: "Paquete" },
 ];
 
 const PILLARS = [
@@ -328,7 +327,8 @@ function Hero() {
 }
 
 function Paquetes() {
-  const { data: apiPlans = [], isLoading, isError, refetch } = useQuery<{ id: string; name: string; price: number; is_active: boolean }[]>({
+  const reduceMotion = useReducedMotion();
+  const { data: apiPlans = [], isLoading, isError, refetch } = useQuery<{ id: string; name: string; price: number; is_active: boolean; sort_order?: number | null }[]>({
     queryKey: ["landing-plans"],
     queryFn: async () => (await api.get("/plans")).data,
     staleTime: 5 * 60 * 1000,
@@ -338,10 +338,12 @@ function Paquetes() {
   const planByName = Object.fromEntries(apiPlans.map((p) => [p.name, p]));
 
   // Solo muestra tarjetas cuyo plan existe Y está activo en la DB
-  const visible = CARDS.filter((c) => {
-    const p = planByName[c.planName];
-    return p && p.is_active;
-  });
+  const visible = CARDS
+    .filter((c) => {
+      const p = planByName[c.planName];
+      return p && p.is_active;
+    })
+    .sort((a, b) => sortCatalogPlans(planByName[a.planName], planByName[b.planName]));
 
   const fmt = (price: number) =>
     "$" + Number(price).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -389,71 +391,85 @@ function Paquetes() {
             Los próximos paquetes aparecerán aquí.
           </div>
         ) : (
-        <div className="mt-6 grid gap-x-10 lg:grid-cols-2">
+        <div className="mt-8 grid gap-4 lg:grid-cols-2">
           {visible.map((c, index) => {
             const plan = planByName[c.planName];
-            const featured = index === 0;
+            const featured = index === 0 && isIntroClass(plan);
             return (
-              <article
+              <motion.article
                 key={c.title}
-                className={`group grid border-b border-[#2A4E36]/22 py-7 sm:grid-cols-[minmax(170px,0.82fr)_1.18fr] sm:items-stretch ${featured ? "lg:col-span-2 lg:grid-cols-[minmax(340px,0.92fr)_1.08fr] lg:py-10" : ""}`}
+                initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+                whileInView={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ type: "spring", stiffness: 100, damping: 20, delay: index * 0.055 }}
+                whileHover={reduceMotion ? undefined : { y: -3 }}
+                className={`relative overflow-hidden rounded-[1.75rem] border p-6 sm:p-7 ${featured
+                  ? "lg:col-span-2 border-[#2A4E36] bg-[#2A4E36] text-[#F6F0E4] shadow-[0_30px_90px_-68px_rgba(22,38,26,0.72)]"
+                  : "border-[#2A4E36]/20 bg-white/45 text-[#2A4E36] shadow-[0_24px_72px_-62px_rgba(42,78,54,0.46)]"
+                }`}
               >
-                <div className="flex min-h-[220px] items-center justify-center overflow-hidden p-5 sm:min-h-0" style={{ backgroundColor: c.color }}>
-                  <div className={`relative aspect-square w-full max-w-[300px] overflow-hidden ${featured ? "lg:max-w-[380px]" : ""}`}>
-                    {c.image ? (
-                      <img
-                        src={c.image}
-                        alt={`Imagen de ${c.artTitle}`}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.025]"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    ) : (
-                      <div className="relative flex h-full w-full items-end overflow-hidden p-7" style={{ color: CREAM }}>
-                        <CasaShePattern className="absolute inset-0 h-full w-full opacity-80" color="rgba(246,240,228,0.18)" />
-                        <img src="/casashe/logo-monogram-cream.png" alt="" aria-hidden="true" className="absolute left-1/2 top-7 h-11 w-11 -translate-x-1/2 object-contain" />
-                        <span className={`${display} relative block text-5xl font-light leading-none`}>{c.artTitle}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-col justify-between py-6 sm:py-4 sm:pl-7 lg:pl-10">
+                <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: featured ? "#E1CCA0" : c.color }} />
+                {featured && !reduceMotion && (
+                  <motion.span
+                    aria-hidden="true"
+                    className="absolute inset-x-0 top-0 h-1 origin-left bg-[#E1CCA0]"
+                    animate={{ scaleX: [0.18, 1, 0.18], opacity: [0.45, 1, 0.45] }}
+                    transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                )}
+
+                <div className={`grid h-full gap-8 ${featured ? "md:grid-cols-[1.25fr_0.75fr] md:items-end" : ""}`}>
                   <div>
-                    <p className={`${body} text-[10px] uppercase tracking-[0.28em]`} style={{ color: GREEN, opacity: 0.55 }}>
-                      {c.kind} · {String(index + 1).padStart(2, "0")}
-                    </p>
-                    <h3 className={`${display} mt-2 text-3xl font-light leading-none sm:text-4xl ${featured ? "lg:text-6xl" : ""}`} style={{ color: GREEN }}>
-                    {c.title}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <p className={`${body} text-[10px] uppercase tracking-[0.28em] opacity-60`}>
+                        {c.kind} · {String(index + 1).padStart(2, "0")}
+                      </p>
+                      {featured && (
+                        <span className={`${body} inline-flex items-center gap-2 rounded-full border border-[#F6F0E4]/30 px-3 py-1 text-[9px] uppercase tracking-[0.2em]`}>
+                          <motion.span
+                            className="h-1.5 w-1.5 rounded-full bg-[#E1CCA0]"
+                            animate={reduceMotion ? undefined : { scale: [1, 1.45, 1], opacity: [0.65, 1, 0.65] }}
+                            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                          />
+                          Empieza aquí
+                        </span>
+                      )}
+                    </div>
+                    <h3 className={`${display} mt-4 text-4xl font-light leading-[0.95] sm:text-5xl ${featured ? "lg:text-6xl" : ""}`}>
+                      {c.title}
                     </h3>
-                    <p className={`${body} mt-4 max-w-[44ch] text-[15px] leading-relaxed`} style={{ color: GREEN, opacity: 0.76 }}>
+                    <p className={`${body} mt-4 max-w-[48ch] text-[15px] leading-relaxed opacity-75`}>
                       {c.tagline}
-                    </p>
-                    <p className={`${body} mt-3 text-[12px] uppercase tracking-[0.12em]`} style={{ color: GREEN, opacity: 0.52 }}>
-                      {c.hint}
                     </p>
                   </div>
 
-                  <div className="mt-7 border-t border-[#2A4E36]/20 pt-5">
-                    <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-                      <div>
-                        <p className={`${body} text-[9px] uppercase tracking-[0.26em]`} style={{ color: GREEN, opacity: 0.48 }}>Aplica en</p>
-                        <p className={`${body} mt-1 max-w-[42ch] text-sm leading-relaxed`} style={{ color: GREEN, opacity: 0.78 }}>{c.applies}</p>
+                  <div className={`border-t pt-5 ${featured ? "border-[#F6F0E4]/22" : "border-[#2A4E36]/18"}`}>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-2 sm:col-span-1">
+                        <p className={`${body} text-[9px] uppercase tracking-[0.26em] opacity-50`}>Incluye</p>
+                        <p className={`${body} mt-1 text-sm leading-relaxed opacity-80`}>{c.hint}</p>
                       </div>
-                      <div className="sm:text-right">
-                        <p className={`${body} text-[9px] uppercase tracking-[0.26em]`} style={{ color: GREEN, opacity: 0.48 }}>Inversión</p>
-                        <p className={`${display} mt-1 text-4xl leading-none`} style={{ color: GREEN }}>{fmt(plan.price)}</p>
+                      <div className="col-span-2 sm:col-span-1">
+                        <p className={`${body} text-[9px] uppercase tracking-[0.26em] opacity-50`}>Aplica en</p>
+                        <p className={`${body} mt-1 text-sm leading-relaxed opacity-80`}>{c.applies}</p>
                       </div>
                     </div>
-                    <Link
-                      to={`/register?plan=${plan.id}`}
-                      className={`${body} mt-5 inline-flex min-h-11 items-center justify-center rounded-full px-7 text-[11px] uppercase tracking-[0.22em] transition-transform active:scale-[0.98]`}
-                      style={{ backgroundColor: GREEN, color: CREAM }}
-                    >
-                      Elegir esta opción
-                    </Link>
+
+                    <div className="mt-6 flex flex-col gap-4 border-t border-current/15 pt-5 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <p className={`${body} text-[9px] uppercase tracking-[0.26em] opacity-50`}>Inversión</p>
+                        <p className={`${display} mt-1 text-4xl leading-none sm:text-5xl`}>{fmt(plan.price)}</p>
+                      </div>
+                      <Link
+                        to={`/register?plan=${plan.id}`}
+                        className={`${body} inline-flex min-h-11 items-center justify-center rounded-full px-7 text-[11px] uppercase tracking-[0.22em] transition-transform active:scale-[0.98] ${featured ? "bg-[#F6F0E4] text-[#2A4E36]" : "bg-[#2A4E36] text-[#F6F0E4]"}`}
+                      >
+                        Elegir esta opción
+                      </Link>
+                    </div>
                   </div>
                 </div>
-              </article>
+              </motion.article>
             );
           })}
         </div>

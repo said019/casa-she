@@ -28,9 +28,9 @@ export interface PackagePresentation {
   text: string;
 }
 
-// Orden de presentación en el checkout: Membresías primero (como en el index),
-// luego Paquetes de créditos, y al final Primera vez / clase suelta.
-export const packageOrder: PackageType[] = ['membership', 'mixto', 'sample', 'individual'];
+// El recorrido comercial empieza por la opción de entrada y continúa de menor
+// a mayor inversión. Los catálogos que agrupan por tipo respetan este orden.
+export const packageOrder: PackageType[] = ['sample', 'mixto', 'membership', 'individual'];
 
 const CARD_BASE =
   'bg-[#FBF7EE] text-[#2E1B22] shadow-[0_24px_80px_-68px_rgba(42,33,24,.55)]';
@@ -127,6 +127,35 @@ function normalizePlanText(value: string) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '');
+}
+
+export interface CatalogPlanInput extends PlanPresentationInput {
+  price: number | string;
+  sort_order?: number | null;
+}
+
+export function isIntroClass(plan: PlanPresentationInput) {
+  const name = normalizePlanText(plan.name);
+  const category = normalizePlanText(plan.category || '');
+
+  return (
+    category.includes('trial') ||
+    name.includes('muestra') ||
+    name.includes('prueba') ||
+    name.includes('primera vez') ||
+    name.includes('primer vez') ||
+    name.includes('primera clase')
+  );
+}
+
+export function sortCatalogPlans(planA: CatalogPlanInput, planB: CatalogPlanInput) {
+  const introDifference = Number(isIntroClass(planB)) - Number(isIntroClass(planA));
+  if (introDifference !== 0) return introDifference;
+
+  const priceDifference = Number(planA.price) - Number(planB.price);
+  if (priceDifference !== 0) return priceDifference;
+
+  return (planA.sort_order ?? 0) - (planB.sort_order ?? 0);
 }
 
 export function getPackageType(plan: PlanPresentationInput): PackageType {

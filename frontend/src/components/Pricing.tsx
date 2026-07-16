@@ -7,6 +7,7 @@ import {
   packagePresentations,
   getPackageType,
   getClassesLabel,
+  sortCatalogPlans,
   type PackageType,
 } from "@/lib/planPresentation";
 
@@ -63,7 +64,7 @@ export default function Pricing() {
   });
 
   const active = useMemo(
-    () => [...plans].filter((p) => p.is_active && !p.is_internal).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+    () => [...plans].filter((p) => p.is_active && !p.is_internal).sort(sortCatalogPlans),
     [plans],
   );
 
