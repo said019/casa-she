@@ -20,7 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Calendar, Clock, User, Sparkles, MapPin, AlertTriangle } from 'lucide-react';
+import { Calendar, Clock, User, Sparkles, AlertTriangle } from 'lucide-react';
 
 interface BookingDetail {
   booking_id: string;
@@ -175,18 +175,6 @@ export default function ClassBookingDetail() {
                 )}
               </CardContent>
             </Card>
-          )}
-
-          {data?.booking_status === 'confirmed' && (
-            <Button
-              className="w-full rounded-full bg-balance-olive text-balance-cream hover:bg-balance-olive/90"
-              asChild
-            >
-              <Link to={`/app/classes/${bookingId}/spot`}>
-                <MapPin className="h-4 w-4 mr-2" />
-                Elige tu lugar
-              </Link>
-            </Button>
           )}
 
           {(() => {

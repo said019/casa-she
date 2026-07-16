@@ -14,7 +14,6 @@ import NotFound from "./pages/NotFound";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import CancellationPolicy from "./pages/CancellationPolicy";
-import MapsExport from "./pages/MapsExport";
 
 // Auth pages
 import Login from "./pages/auth/Login";
@@ -40,7 +39,6 @@ import ClientProfile from "./pages/client/Profile";
 import ProfileEdit from "./pages/client/ProfileEdit";
 import ProfileMembership from "./pages/client/ProfileMembership";
 import ProfilePreferences from "./pages/client/ProfilePreferences";
-import SelectReformer from "./pages/client/SelectReformer";
 import Notifications from "./pages/client/Notifications";
 import ClientCheckout from "./pages/client/Checkout";
 import ClientOrders from "./pages/client/Orders";
@@ -110,7 +108,6 @@ import InstructorDetail from "./pages/admin/reports/InstructorDetail";
 
 // Facilities page
 import FacilitiesList from "./pages/admin/facilities/FacilitiesList";
-import FacilityLayoutEditor from "./pages/admin/facilities/FacilityLayoutEditor";
 
 // Orders/Payments verification page
 
@@ -227,7 +224,7 @@ const App = () => (
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/cancellation-policy" element={<CancellationPolicy />} />
-            <Route path="/maps-export" element={<MapsExport />} />
+            <Route path="/maps-export" element={<Navigate to="/" replace />} />
 
             {/* Auth Routes */}
             <Route path="/login" element={<Login />} />
@@ -246,7 +243,7 @@ const App = () => (
             <Route path="/app/book/:classId" element={<BookClassConfirm />} />
             <Route path="/app/classes" element={<MyBookings />} />
             <Route path="/app/classes/:bookingId" element={<ClassBookingDetail />} />
-            <Route path="/app/classes/:bookingId/spot" element={<SelectReformer />} />
+            <Route path="/app/classes/:bookingId/spot" element={<Navigate to="/app/classes" replace />} />
             <Route path="/app/wallet" element={<WalletClub />} />
             <Route path="/app/wallet/rewards" element={<WalletRewards />} />
             <Route path="/app/wallet/history" element={<WalletHistory />} />
@@ -338,7 +335,7 @@ const App = () => (
             <Route path="/admin/migrations/history" element={<ClientMigrationPage />} />
 
             <Route path="/admin/facilities" element={<FacilitiesList />} />
-            <Route path="/admin/facilities/:facilityId/layout" element={<FacilityLayoutEditor />} />
+            <Route path="/admin/facilities/:facilityId/layout" element={<Navigate to="/admin/facilities" replace />} />
             <Route path="/admin/orders" element={<Navigate to="/admin/payments" replace />} />
             <Route path="/admin/orders/verification" element={<Navigate to="/admin/payments" replace />} />
 
