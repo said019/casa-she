@@ -51,6 +51,8 @@ interface ScheduleProps {
   onClassPick?: (classItem: ScheduleClass) => void;
   /** Clase cuya reserva se está procesando; mantiene feedback visible en conexiones lentas. */
   bookingClassId?: string | null;
+  /** Ajusta espaciado y encabezado cuando el calendario vive dentro del portal de clientas. */
+  variant?: "public" | "app";
 }
 
 // Disciplinas de Casa Shé con su color de la paleta de marca (para la leyenda).
@@ -63,7 +65,7 @@ const DISCIPLINES: { label: string; color: string }[] = [
   { label: "Salsa", color: "#2E1B22" },          // Ciruela
 ];
 
-export default function Schedule({ bookedIds, defaultFirstFacility, onClassPick, bookingClassId }: ScheduleProps = {}) {
+export default function Schedule({ bookedIds, defaultFirstFacility, onClassPick, bookingClassId, variant = "public" }: ScheduleProps = {}) {
   const navigate = useNavigate();
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [filters, setFilters] = useState<ScheduleFilters>({ facility: "all", category: "all", instructor: "all", timeOfDay: "all" });
@@ -82,6 +84,14 @@ export default function Schedule({ bookedIds, defaultFirstFacility, onClassPick,
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
   }, []);
+
+  // Al navegar semanas en móvil, el día activo debe pertenecer a la semana visible.
+  // Antes podía quedarse seleccionado un día de la semana anterior y aparentar que no había clases.
+  useEffect(() => {
+    const today = new Date();
+    const isVisibleWeek = format(weekStart, "yyyy-MM-dd") === format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
+    setSelectedDate(isVisibleWeek ? today : weekStart);
+  }, [weekStart]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000);
@@ -174,22 +184,26 @@ export default function Schedule({ bookedIds, defaultFirstFacility, onClassPick,
   const lastHour = hourRail[hourRail.length - 1] ?? 21;
 
   return (
-    <section id="horarios" className="bg-bmb-cream py-20 lg:py-24 scroll-mt-24">
-      <div className="mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-12">
+    <section
+      id="horarios"
+      className={variant === "app" ? "scroll-mt-24 bg-transparent py-3 sm:py-5" : "scroll-mt-24 bg-bmb-cream py-20 lg:py-24"}
+    >
+      <div className={variant === "app" ? "mx-auto w-full" : "mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-12"}>
 
         {/* Masthead */}
         <header className="flex flex-col gap-4 border-b-2 border-bmb-ink pb-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="editorial-caption text-bmb-ink/55">
+            <p className="editorial-caption text-bmb-ink/70">
               Semana {format(weekStart, "w")} · {format(weekStart, "d MMM", { locale: es })} — {format(addDays(weekStart, 6), "d MMM", { locale: es })}
             </p>
-            <h2 className="mt-1 font-heading text-2xl sm:text-3xl text-bmb-ink lg:text-5xl">
-              Horarios <span className="italic" style={{ color: "#AE4836" }}>Casa Shé</span>
+            <h2 className="mt-1 font-heading text-3xl text-bmb-ink sm:text-4xl lg:text-5xl">
+              {variant === "app" ? "Elige tu" : "Horarios"}{" "}
+              <span className="italic" style={{ color: "#AE4836" }}>{variant === "app" ? "próxima clase" : "Casa Shé"}</span>
             </h2>
           </div>
           <div className="flex flex-col gap-2 lg:items-end">
-            <span className="editorial-caption whitespace-nowrap text-bmb-ink/55">
-              {format(weekStart, "MMMM · MMMM", { locale: es }).split("·")[0].trim()} · MMXXVI
+            <span className="editorial-caption whitespace-nowrap text-bmb-ink/70">
+              {format(weekStart, "MMMM yyyy", { locale: es })}
             </span>
             <div className="flex flex-wrap gap-2">
               <NavBtn onClick={goPrev}>‹ Sem. ant.</NavBtn>
@@ -270,7 +284,7 @@ export default function Schedule({ bookedIds, defaultFirstFacility, onClassPick,
                 isToday(d) ? "bg-bmb-gold/10" : "bg-bmb-paper"
               }`}
             >
-              <div className="editorial-caption-sm opacity-70">{format(d, "EEE", { locale: es })}</div>
+              <div className="editorial-caption-sm text-bmb-ink/70">{format(d, "EEE", { locale: es })}</div>
               <div className="mt-1 flex justify-center">
                 <span
                   className={`flex h-9 w-9 items-center justify-center rounded-full font-heading text-xl font-semibold leading-none ${
@@ -421,8 +435,8 @@ function Row({
   return (
     <>
       <div className="border-r border-b border-bmb-ink/15 bg-bmb-paper px-2 py-3 text-right">
-        <div className="font-heading text-base tabular-nums leading-none opacity-60">{label}</div>
-        <div className="editorial-caption-sm opacity-55 mt-0.5">{period}</div>
+        <div className="font-heading text-base tabular-nums leading-none text-bmb-ink/72">{label}</div>
+        <div className="editorial-caption-sm mt-0.5 text-bmb-ink/70">{period}</div>
       </div>
       {weekDays.map((day) => {
         const cellClasses = classesAt(classes, day, hour);
@@ -467,18 +481,17 @@ function Row({
                   aria-busy={isBooking}
                   style={isColored ? { backgroundColor: withAlpha(color, 0.1), borderColor: withAlpha(color, 0.34) } : undefined}
                   className={`relative block w-full overflow-hidden rounded-lg ${bgClass} border border-bmb-ink/[0.07] py-2 pl-3 pr-2 mb-1.5 text-left shadow-[0_1px_2px_rgba(42,33,24,0.05)] transition-[transform,box-shadow,border-color] duration-150 hover:-translate-y-px hover:border-bmb-gold/50 hover:shadow-[0_10px_22px_-12px_rgba(42,33,24,0.45)] ${
-                    isBooking ? "cursor-wait opacity-70" : isPast ? "opacity-45" : isClosed ? "opacity-60" : ""
+                    isBooking ? "cursor-wait opacity-70" : isPast ? "bg-bmb-ink/[0.025] saturate-[0.55]" : isClosed ? "bg-amber-50/55 saturate-[0.7]" : ""
                   }`}
                 >
                   <span className="absolute inset-y-1.5 left-0 w-[3.5px] rounded-full" style={{ backgroundColor: accent }} aria-hidden="true" />
                   <div className="flex items-center justify-between gap-1">
                     <span
-                      className={`text-[12.5px] font-bold tabular-nums leading-none ${isBooked ? "text-bmb-cream" : ""}`}
-                      style={isBooked ? undefined : { color }}
+                      className={`text-[12.5px] font-bold tabular-nums leading-none ${isBooked ? "text-bmb-cream" : "text-bmb-ink/80"}`}
                     >
                       {format(parseISO(c.time), "HH:mm")}
                       {c.endTime && (
-                        <span className={`ml-0.5 font-normal ${isBooked ? "text-bmb-cream/70" : "text-bmb-ink/45"}`}>
+                        <span className={`ml-0.5 font-normal ${isBooked ? "text-bmb-cream/80" : "text-bmb-ink/70"}`}>
                           –{c.endTime.slice(0, 5)}
                         </span>
                       )}
@@ -510,7 +523,7 @@ function Row({
                   <div className={`mt-1 truncate text-[13px] font-semibold leading-tight ${isBooked ? "text-bmb-cream" : "text-bmb-ink"}`}>
                     {c.name}
                   </div>
-                  <div className={`mt-1 flex items-center justify-between gap-2 ${isBooked ? "text-bmb-cream/70" : "text-bmb-ink/60"}`}>
+                  <div className={`mt-1 flex items-center justify-between gap-2 ${isBooked ? "text-bmb-cream/80" : "text-bmb-ink/72"}`}>
                     <span className="truncate text-[11px]">{c.instructor}</span>
                     <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${isBooked ? "bg-bmb-cream/20 text-bmb-cream" : "bg-bmb-ink/[0.06] text-bmb-ink/70"}`}>
                       {c.maxSpots - c.spots}/{c.maxSpots}

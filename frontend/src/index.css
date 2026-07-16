@@ -235,7 +235,7 @@
   }
 
   .admin-shell {
-    font-family: var(--font-body);
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-variant-numeric: tabular-nums;
   }
 
@@ -245,7 +245,12 @@
   .admin-shell h4,
   .admin-shell h5,
   .admin-shell h6 {
-    font-family: var(--font-body);
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  .admin-shell .font-body,
+  .admin-shell .font-heading {
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
 
   .client-app-shell {

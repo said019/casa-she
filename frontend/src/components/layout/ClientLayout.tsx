@@ -104,7 +104,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                 style={{ top: '0', paddingTop: 'max(env(safe-area-inset-top, 0px), 8px)' }}
             >
                 <div className="mx-auto flex h-[4.8rem] max-w-[1480px] items-center justify-between gap-3 px-5 sm:px-8 lg:px-10">
-                    <Link to="/app" className="flex min-w-0 items-center gap-3">
+                    <Link to="/app" aria-label="Inicio Casa Shé" className="flex min-w-0 items-center gap-3">
                         <CasaSheLogo variant="mark" className="h-10 w-10 text-bmb-gold" />
                         <div className="hidden min-w-0 sm:block">
                             <span className="block truncate font-heading text-xl font-medium leading-none tracking-[-0.02em] text-bmb-dark">

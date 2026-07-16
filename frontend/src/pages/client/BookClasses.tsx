@@ -124,21 +124,37 @@ export default function BookClasses() {
   return (
     <AuthGuard requiredRoles={["client"]}>
       <ClientLayout>
-        <div className="-mx-4 sm:-mx-6 lg:-mx-8">
-          <div className="landing-sans bg-bmb-cream min-h-screen">
-            <div className="mx-auto max-w-[1440px] px-5 pt-10 sm:px-8 lg:px-12">
-              <div className="flex items-baseline justify-between editorial-caption text-bmb-ink/55 border-b border-bmb-ink pb-3">
-                <span>Reservar — horarios</span>
-                <span>Casa Shé</span>
+        <div className="space-y-5 pb-4">
+          <section className="relative min-h-[17rem] overflow-hidden rounded-[1.5rem] bg-balance-dark text-balance-cream sm:min-h-[21rem]">
+            <img
+              src="/casashe/espacio-salon.jpg"
+              alt="Salón de Casa Shé"
+              className="absolute inset-0 h-full w-full object-cover object-center"
+              loading="eager"
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(22,38,26,.94)_0%,rgba(22,38,26,.72)_54%,rgba(22,38,26,.32)_100%)]" />
+            <div className="relative flex min-h-[17rem] max-w-3xl flex-col justify-end p-6 sm:min-h-[21rem] sm:p-9 lg:p-12">
+              <p className="editorial-caption text-balance-cream/68">Reservas · Casa Shé</p>
+              <h1 className="mt-3 max-w-2xl font-heading text-4xl leading-[0.96] tracking-[-0.035em] text-balance-cream sm:text-6xl">
+                Haz espacio para <span className="italic text-[#D6D5C2]">volver a ti.</span>
+              </h1>
+              <p className="mt-4 max-w-xl text-sm leading-6 text-balance-cream/72 sm:text-base">
+                Toca una clase disponible y tu lugar quedará reservado de inmediato.
+              </p>
+              <div className="mt-6 flex items-center gap-3 border-t border-balance-cream/20 pt-4 text-[10px] font-semibold uppercase tracking-[0.22em] text-balance-cream/58">
+                <span>Condesa</span>
+                <span className="h-1 w-1 rounded-full bg-[#B4A248]" aria-hidden="true" />
+                <span>Movimiento · comunidad · bienestar</span>
               </div>
             </div>
-            <Schedule
-              bookedIds={bookedIds}
-              defaultFirstFacility
-              onClassPick={reserveDirectly}
-              bookingClassId={bookingMutation.isPending ? pendingClass?.id ?? null : null}
-            />
-          </div>
+          </section>
+          <Schedule
+            variant="app"
+            bookedIds={bookedIds}
+            defaultFirstFacility
+            onClassPick={reserveDirectly}
+            bookingClassId={bookingMutation.isPending ? pendingClass?.id ?? null : null}
+          />
         </div>
         <ReglamentoGate
           open={regOpen}
