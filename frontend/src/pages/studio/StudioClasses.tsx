@@ -22,7 +22,7 @@ export default function StudioClasses() {
               Clases diseñadas para cada objetivo
             </h1>
             <p className="text-sm text-[#7A7A7A]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-              Barre, Pilates Mat, Hot Pilates y Sculpt conviven en un mismo espacio. Todas nuestras sesiones están limitadas a 6 personas para garantizar atención personalizada.
+              Pilates Mat, Barre, Sculpt, Yoga, Flex y Salsa conviven en un mismo espacio. Trabajamos en grupos pequeños para cuidar tu experiencia.
             </p>
           </div>
 
@@ -89,11 +89,11 @@ export default function StudioClasses() {
               </h3>
               <p className="text-xs italic text-[#A2A88B] mb-3" style={{ fontFamily: "'DM Sans', sans-serif" }}>strength meets precision</p>
               <p className="text-sm text-[#5A5A5A] leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                A diferencia del pilates reformer, la resistencia proviene principalmente del peso corporal, la gravedad y la contracción muscular. Es una práctica en el piso diseñada para fortalecer y tonificar tu cuerpo, especialmente los músculos más profundos del core (abdomen, espalda baja y pelvis) fundamentales para el movimiento. Combina elongación y contracción, buscando siempre la conexión mente-cuerpo y una ejecución lenta y controlada con esto mejoras tu flexibilidad, postura y equilibrio, mientras trabajas con precisión y concentración.
+                Práctica en piso diseñada para fortalecer y tonificar el cuerpo, especialmente los músculos profundos del core. Combina elongación y contracción con una ejecución lenta y controlada para mejorar flexibilidad, postura y equilibrio.
               </p>
             </motion.div>
 
-            {/* Hot Pilates */}
+            {/* Flex & Flow */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -106,14 +106,14 @@ export default function StudioClasses() {
                 </svg>
               </div>
               <span className="text-xs text-[#5A5A5A] uppercase tracking-wider block mb-1" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                Sábados
+                Consulta el calendario
               </span>
               <h3 className="text-xl font-semibold text-[#2A2A2A] mb-1" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                Hot Pilates
+                Flex & Flow
               </h3>
-              <p className="text-xs italic text-[#D4A574] mb-3" style={{ fontFamily: "'DM Sans', sans-serif" }}>energy unleashed</p>
+              <p className="text-xs italic text-[#D4A574] mb-3" style={{ fontFamily: "'DM Sans', sans-serif" }}>move with ease</p>
               <p className="text-sm text-[#5A5A5A] leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                Es una versión más dinámica y energizante del yoga tradicional. Con secuencias rápidas y posturas retadoras, yoga sculpt te hará sudar mientras te diviertes. Es ideal para aumentar tu fuerza, flexibilidad y concentración, además de brindarte un desafío emocionante que te hará sentirte lleno de energía.
+                Movilidad, estiramientos profundos y secuencias fluidas para soltar tensión, ampliar tu rango de movimiento y reconectar con la respiración.
               </p>
             </motion.div>
 

@@ -537,7 +537,7 @@ router.post('/test-emails', async (req: Request, res: Response) => {
                 to,
                 instructorName: sampleName,
                 email: to,
-                temporaryPassword: 'BalanceTemp2026!',
+                temporaryPassword: 'CasaSheTemp2026!',
                 loginUrl: `${getFrontendUrl()}/coach/login`,
                 coachNumber: 'C-007',
             }),
@@ -549,7 +549,7 @@ router.post('/test-emails', async (req: Request, res: Response) => {
             () => sendClassAssignmentNotification({
                 to,
                 coachName: sampleName,
-                className: 'Hot Pilates',
+                className: 'Pilates Mat',
                 classDate: startStr,
                 startTime: '07:00',
                 endTime: '08:00',
@@ -575,15 +575,15 @@ router.post('/test-emails', async (req: Request, res: Response) => {
             'Admin publica un evento y lo anuncia a la lista de clientes',
             () => sendEventAnnouncementEmail({
                 to,
-                eventTitle: 'Masterclass de Reformer',
+                eventTitle: 'Masterclass de Yoga Vinyasa',
                 eventType: 'Masterclass',
                 eventDate: startStr,
                 startTime: '18:00',
                 endTime: '19:30',
-                location: 'BMB Studio — Sala Reformer',
+                location: 'Casa Shé — Condesa',
                 price: 350,
                 instructor: 'Danna',
-                description: 'Sesión especial enfocada en core profundo y postura, con cupo limitado a 6 lugares.',
+                description: 'Sesión especial enfocada en movilidad, respiración y postura, con cupo limitado.',
             }),
         );
 

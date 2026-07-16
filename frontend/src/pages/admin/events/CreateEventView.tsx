@@ -199,7 +199,7 @@ export default function CreateEventView({ onBack, onSave, isSaving, initialData 
                     id="title"
                     value={form.title}
                     onChange={(e) => update({ title: e.target.value })}
-                    placeholder="Ej: Masterclass de Reformer Avanzado"
+                    placeholder="Ej: Masterclass de Yoga Vinyasa"
                     className={cn("mt-1.5", errors.title && "border-destructive")}
                   />
                   {errors.title && <p className="text-xs text-destructive mt-1">{errors.title}</p>}

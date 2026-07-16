@@ -20,7 +20,6 @@ interface WhatsAppStatus {
 interface InstanceDef {
     key: string;
     label: string;
-    name: string;
     facilityName: string;
     primary: boolean;
 }
@@ -32,7 +31,7 @@ interface ConnectionResult {
     status?: any;
 }
 
-/** Panel de una sucursal: estado, QR, conectar/desconectar y prueba — todo por instancia. */
+/** Panel del WhatsApp único de Casa Shé. */
 function InstancePanel({ instance }: { instance: InstanceDef }) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -187,7 +186,7 @@ function InstancePanel({ instance }: { instance: InstanceDef }) {
     );
 }
 
-/** Grid de instancias de WhatsApp por sucursal. Reutilizable en admin y recepción. */
+/** Panel de WhatsApp reutilizable en admin y recepción. */
 export function WhatsAppManager() {
     const { data, isLoading } = useQuery<{ instances: InstanceDef[] }>({
         queryKey: ['whatsapp-instances'],
@@ -211,7 +210,7 @@ export function WhatsAppManager() {
                     <Loader2 className="w-4 h-4 animate-spin" /> Cargando instancias…
                 </div>
             ) : (
-                <div className="grid gap-6 md:grid-cols-2">
+                <div className="grid max-w-2xl gap-6">
                     {instances.map((inst) => (
                         <InstancePanel key={inst.key} instance={inst} />
                     ))}

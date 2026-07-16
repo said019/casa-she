@@ -139,7 +139,7 @@ export function AdjustCreditsDialog({
                             <SelectContent>
                                 {availableBuckets.map((b) => (
                                     <SelectItem key={b} value={b}>
-                                        {b === 'reformer_remaining' ? 'Reformer' : b === 'multi_remaining' ? 'Multi' : 'Clases (sin categoría)'}
+                                        {b === 'reformer_remaining' ? 'Salsa' : b === 'multi_remaining' ? 'Clases' : 'Clases (sin categoría)'}
                                     </SelectItem>
                                 ))}
                             </SelectContent>

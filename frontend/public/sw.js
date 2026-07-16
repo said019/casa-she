@@ -1,4 +1,4 @@
-// BMB Studio — service worker
+// Casa Shé — service worker
 //
 // Strategy:
 // 1. NEVER cache /api/* responses — those must always come from the network so

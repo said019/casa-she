@@ -797,10 +797,7 @@ router.post('/:id/resend-credentials', requireRole('admin', 'super_admin', 'rece
             [passwordHash, id]
         );
 
-        // ¿Con qué WhatsApp (sucursal) se manda el reenvío?
-        //  - admin/super_admin/recepción master: eligen vía body.whatsappKey ('san-miguel' | 'tepa').
-        //  - recepción normal: por el WhatsApp de SU sucursal (automático).
-        //  - sin elección / sin sucursal: el principal (San Miguel).
+        // Casa Shé usa una sola instancia; whatsappKey se conserva por compatibilidad.
         let waInstance: string | undefined;
         const whatsappKey = typeof req.body?.whatsappKey === 'string' ? req.body.whatsappKey : null;
         if (whatsappKey && isElevated(req.user)) {

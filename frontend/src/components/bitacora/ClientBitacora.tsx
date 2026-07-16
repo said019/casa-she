@@ -34,7 +34,7 @@ interface Cancelacion {
 
 // Etiqueta del crédito por categoría consumida/devuelta.
 function catLabel(cat: string | null): string {
-  return cat === 'reformer' ? 'reformer' : cat === 'multi' ? 'multi' : 'crédito';
+  return cat === 'reformer' ? 'Salsa' : cat === 'multi' ? 'clase' : 'crédito';
 }
 
 interface AjusteCredito {
@@ -85,7 +85,7 @@ function creditDelta(adj: AjusteCredito): string {
     if (prev === null || next === null) continue;
     const delta = next - prev;
     if (delta !== 0) {
-      const label = key === 'reformer_remaining' ? 'reformer' : key === 'multi_remaining' ? 'multi' : 'clases';
+      const label = key === 'reformer_remaining' ? 'Salsa' : key === 'multi_remaining' ? 'clases' : 'clases';
       buckets.push(`${delta > 0 ? '+' : ''}${delta} ${label}`);
     }
   }

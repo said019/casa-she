@@ -768,13 +768,13 @@ function MembresiaTab() {
                 </div>
                 {plan.reformer_credits != null && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Créditos Reformer</span>
+                    <span className="text-muted-foreground">Créditos Salsa</span>
                     <span>{plan.reformer_credits}</span>
                   </div>
                 )}
                 {plan.multi_credits != null && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Créditos Multi</span>
+                    <span className="text-muted-foreground">Créditos de clases</span>
                     <span>{plan.multi_credits}</span>
                   </div>
                 )}

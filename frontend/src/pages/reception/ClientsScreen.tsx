@@ -285,7 +285,7 @@ function SellPlanDialog({ clientId, onDone }: { clientId: string; onDone: () => 
                         </Select>
                         {plan && (
                             <p className="text-xs text-muted-foreground mt-1">
-                                {plan.reformer_credits ?? 0} reformer · {plan.multi_credits ?? 0} multi
+                                {plan.reformer_credits ?? 0} salsa · {plan.multi_credits ?? 0} clases
                                 {plan.class_limit ? ` · ${plan.class_limit} clases` : ''}
                             </p>
                         )}
@@ -523,7 +523,7 @@ function AdjustCreditsDialog({ membership, onDone }: { membership: ClientMembers
                             <SelectContent>
                                 {availableBuckets.map((b) => (
                                     <SelectItem key={b} value={b}>
-                                        {b === 'reformer_remaining' ? 'Reformer' : b === 'multi_remaining' ? 'Multi' : 'Clases (sin categoría)'}
+                                        {b === 'reformer_remaining' ? 'Salsa' : b === 'multi_remaining' ? 'Clases' : 'Clases (sin categoría)'}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -665,9 +665,7 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
     const elevated = useIsElevated();
     const [editingInfo, setEditingInfo] = useState(false);
     const [form, setForm] = useState({ displayName: '', email: '', phone: '' });
-    // Admin/master eligen con qué WhatsApp (sucursal) se mandan las credenciales.
-    // Recepción normal no ve selector: el backend usa el WhatsApp de su sucursal.
-    const [waKey, setWaKey] = useState<'san-miguel' | 'tepa'>('san-miguel');
+    const waKey = 'casa-she';
 
     const { data: memberships = [] } = useQuery<ClientMembership[]>({
         queryKey: ['client-memberships', client?.id],

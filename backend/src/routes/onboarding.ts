@@ -22,7 +22,7 @@ const SubmitSchema = z.object({
 async function loadCatalog(): Promise<OnboardingCatalog> {
   const cts = await query<{ id: string; name: string }>(
     `SELECT id, name FROM class_types WHERE name = ANY($1::text[])`,
-    [['Pilates Mat', 'Yoga', 'Aeroyoga', 'Telas', 'Taller']]
+    [['Pilates Mat', 'Barre', 'Sculpt', 'Yoga', 'Yoga Ashtanga', 'Yoga Vinyasa', 'Flex', 'Salsa']]
   );
   const plans = await query<{ id: string; name: string; price: number }>(
     `SELECT id, name, price FROM plans WHERE name = ANY($1::text[])`,
@@ -30,6 +30,8 @@ async function loadCatalog(): Promise<OnboardingCatalog> {
   );
   const disciplines: OnboardingCatalog['disciplines'] = {};
   for (const c of cts) disciplines[c.name] = { id: c.id };
+  // El motor usa la familia "Yoga"; enlaza con un tipo vigente si no existe ese alias.
+  disciplines.Yoga ??= disciplines['Yoga Vinyasa'] ?? disciplines['Yoga Ashtanga'];
   const planMap: OnboardingCatalog['plans'] = {};
   for (const p of plans) planMap[p.name] = { id: p.id, price: Number(p.price) };
   return { disciplines, plans: planMap };

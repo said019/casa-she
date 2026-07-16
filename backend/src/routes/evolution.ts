@@ -6,12 +6,12 @@ import { authenticate, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
-// Admin, super_admin y recepción pueden gestionar/conectar el WhatsApp por sucursal.
+// Admin, super_admin y recepción pueden gestionar el WhatsApp de Casa Shé.
 router.use(authenticate);
 router.use(requireRole('admin', 'super_admin', 'reception'));
 
-// Resuelve la instancia (sucursal) desde ?instance= o body.instance ('san-miguel' | 'tepa').
-// Sin parámetro → instancia principal (San Miguel).
+// Resuelve la instancia desde ?instance= o body.instance ('casa-she').
+// Sin parámetro → la instancia única.
 function resolveInstance(req: Request): string {
     const key = (req.query.instance as string) || req.body?.instance;
     return key ? instanceByKey(key) : WA_PRIMARY_INSTANCE;
@@ -19,14 +19,13 @@ function resolveInstance(req: Request): string {
 
 /**
  * GET /api/evolution/instances
- * Lista las instancias configuradas (una por sucursal) para el panel admin.
+ * Lista la instancia configurada para el panel admin.
  */
 router.get('/instances', async (_req: Request, res: Response) => {
     res.json({
         instances: WA_INSTANCES.map((i) => ({
             key: i.key,
             label: i.label,
-            name: i.name,
             facilityName: i.facilityName,
             primary: i.primary,
         })),
@@ -34,8 +33,8 @@ router.get('/instances', async (_req: Request, res: Response) => {
 });
 
 /**
- * GET /api/evolution/status?instance=san-miguel|tepa
- * Estado de conexión de una instancia (sucursal).
+ * GET /api/evolution/status?instance=casa-she
+ * Estado de conexión de WhatsApp.
  */
 router.get('/status', async (req: Request, res: Response) => {
     try {
@@ -56,7 +55,7 @@ router.get('/status', async (req: Request, res: Response) => {
 
 /**
  * POST /api/evolution/connect  { instance? }
- * Inicia conexión y devuelve el QR de la instancia (sucursal).
+ * Inicia conexión y devuelve el QR.
  */
 router.post('/connect', async (req: Request, res: Response) => {
     try {
@@ -94,7 +93,7 @@ router.post('/connect', async (req: Request, res: Response) => {
 
 /**
  * POST /api/evolution/logout  { instance? }
- * Cierra sesión de una instancia (sucursal).
+ * Cierra la sesión de WhatsApp.
  */
 router.post('/logout', async (req: Request, res: Response) => {
     try {
@@ -111,7 +110,7 @@ router.post('/logout', async (req: Request, res: Response) => {
 
 /**
  * POST /api/evolution/test  { phone, message?, instance? }
- * Envía un mensaje de prueba desde la instancia (sucursal) indicada.
+ * Envía un mensaje de prueba desde Casa Shé.
  */
 router.post('/test', async (req: Request, res: Response) => {
     try {

@@ -492,7 +492,7 @@ export default function CoachProfile() {
                                 {[
                                     { id: 'displayName', label: 'Nombre para mostrar', placeholder: 'Tu nombre', field: 'displayName' as const },
                                     { id: 'phone', label: 'Teléfono', placeholder: '55 1234 5678', field: 'phone' as const },
-                                    { id: 'tagline', label: 'Frase del sitio público', placeholder: 'Reformer & fuerza · reinventa tu mejor versión', field: 'tagline' as const },
+                                    { id: 'tagline', label: 'Frase del sitio público', placeholder: 'Movimiento consciente · fuerza y presencia', field: 'tagline' as const },
                                 ].map(({ id, label, placeholder, field }) => (
                                     <div key={id} className="space-y-1.5">
                                         <Label htmlFor={id} className="font-body text-[10px] uppercase tracking-[2px] text-muted-foreground/70">{label}</Label>
@@ -562,7 +562,7 @@ export default function CoachProfile() {
                                             onKeyDown={(e) => {
                                                 if (e.key === 'Enter') { e.preventDefault(); const v = newSpecialty.trim(); if (v && !specialties.includes(v)) setSpecialties([...specialties, v]); setNewSpecialty(''); }
                                             }}
-                                            placeholder="Ej. Reformer, Mat, Embarazadas…"
+                                            placeholder="Ej. Pilates Mat, Barre, Yoga…"
                                             className="font-body text-sm"
                                         />
                                         <Button type="button" variant="outline" size="sm" className="px-3" onClick={() => { const v = newSpecialty.trim(); if (v && !specialties.includes(v)) setSpecialties([...specialties, v]); setNewSpecialty(''); }}>

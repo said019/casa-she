@@ -119,7 +119,7 @@ export default function SelectReformer() {
     spotKind === 'mat'     ? 'mat' :
     spotKind === 'barre'   ? 'barre' :
     spotKind === 'wunda'   ? 'wunda' :
-    spotKind === 'reformer'? 'reformer' :
+    spotKind === 'reformer'? 'lugar' :
     'lugar';
   const defaultImg = mapData?.facility?.default_reformer_image_url ?? DEFAULT_ICON_BY_KIND[spotKind];
   const freeCount  = mapData?.reformers.filter((r) => !r.is_occupied).length ?? 0;

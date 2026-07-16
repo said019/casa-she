@@ -44,9 +44,9 @@ function creditsLabel(p: Plan): string {
   const mul = p.multi_credits;
   const total = (ref ?? 0) + (mul ?? 0);
   if (ref === null && mul === null) return "Acceso ilimitado";
-  if (ref === null) return "Reformer ilimitado";
-  if (mul === null) return "Multi ilimitado";
-  if ((ref ?? 0) > 0 && (mul ?? 0) > 0) return `${ref} reformer · ${mul} multi`;
+  if (ref === null) return "Salsa ilimitada";
+  if (mul === null) return "Clases ilimitadas";
+  if ((ref ?? 0) > 0 && (mul ?? 0) > 0) return `${ref} salsa · ${mul} clases`;
   if (total > 0) return `${total} ${total === 1 ? "clase" : "clases"}`;
   return getClassesLabel(p.class_limit, 1);
 }

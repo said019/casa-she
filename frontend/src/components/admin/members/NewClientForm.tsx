@@ -16,10 +16,8 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Loader2, UserPlus, Info, Search, UserCheck, X } from 'lucide-react';
 import api from '@/lib/api';
-import { useIsElevated } from '@/hooks/useIsElevated';
 
 const newClientSchema = z.object({
   displayName: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
@@ -29,7 +27,7 @@ const newClientSchema = z.object({
   dateOfBirth: z.string().optional().or(z.literal('')),
   acceptsCommunications: z.boolean().default(false),
   // Mono-sede: la bienvenida sale del único WhatsApp; se conserva el campo por compatibilidad.
-  whatsappKey: z.enum(['san-miguel', 'tepa']).optional(),
+  whatsappKey: z.literal('casa-she').optional(),
 });
 
 type NewClientForm = z.infer<typeof newClientSchema>;
@@ -48,17 +46,15 @@ interface NewClientFormProps {
 }
 
 export const NewClientForm = ({ onSubmit, isLoading, onCancel }: NewClientFormProps) => {
-  const isElevated = useIsElevated();
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<NewClientForm>({
     resolver: zodResolver(newClientSchema),
     defaultValues: {
       acceptsCommunications: false,
-      whatsappKey: 'san-miguel',
+      whatsappKey: 'casa-she',
     },
   });
 
   const acceptsCommunications = watch('acceptsCommunications');
-  const whatsappKey = watch('whatsappKey');
 
   // Search state
   const [searchTerm, setSearchTerm] = useState('');

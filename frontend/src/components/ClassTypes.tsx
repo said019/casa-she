@@ -15,54 +15,43 @@ interface ClassType {
 type Cat = ScheduleClass["category"];
 
 const CAT_LABEL: Record<Cat, string> = {
-  reformer: "Reformer",
-  hot: "Hot",
-  pole: "Pole",
+  reformer: "Salsa",
+  hot: "Clases",
+  pole: "Clases",
   barre: "Barre",
   sculpt: "Sculpt",
   yoga: "Yoga",
-  general: "Funcional",
+  general: "Movimiento",
 };
 
 const CAT_ORDER: Cat[] = ["reformer", "hot", "pole", "barre", "sculpt", "yoga", "general"];
 
 // Descripción corta por categoría (fallback).
 const CAT_DESC: Record<Cat, string> = {
-  reformer: "Trabajo preciso sobre el reformer: control y postura.",
-  hot: "En sala caliente: más intensidad y sudor.",
-  pole: "Fuerza, gracia y confianza en la barra.",
+  reformer: "Ritmo, coordinación y energía en movimiento.",
+  hot: "Movimiento consciente y fuerza.",
+  pole: "Movimiento consciente y fuerza.",
   barre: "Tono y postura con movimientos pequeños y precisos.",
   sculpt: "Definición con pesas y altas repeticiones.",
   yoga: "Movilidad, respiración y equilibrio.",
-  general: "Entrenamiento funcional para fuerza y resistencia.",
+  general: "Una práctica para moverte, fortalecerte y volver a ti.",
 };
 
 // Descripción corta por clase (la BD las trae vacías).
 const CLASS_DESC: Record<string, string> = {
-  "Reformer Classic": "Reformer clásico: control, postura y core con precisión.",
-  "Pilates Reformer": "Pilates en reformer: fuerza profunda y alineación.",
-  "Reformer Jumpboard": "Reformer con jumpboard: cardio de bajo impacto, saltas y tonificas.",
-  "Reformer Flow": "Secuencias fluidas en reformer: movilidad y control.",
-  "Reformer Sculpt": "Reformer con pesas: tono y definición total.",
-  "Restore Reformer": "Reformer suave y restaurativo: recupera y estira.",
-  "Hot Pilates": "Pilates en sala caliente: sudas y despiertas.",
-  "Hot Barre": "Barre en calor: tono y resistencia intensos.",
-  "Hot Sculpt": "Sculpt con calor y pesas: pura definición.",
-  "Hot Yoga": "Yoga en calor: flexibilidad, fuerza y soltura.",
-  "Pole Dance": "Pole con arte y técnica: fuerza y confianza.",
-  "Pole Fitness": "Pole de fuerza y acondicionamiento.",
-  "Barre": "Ballet, yoga y pilates: tono sin impacto.",
-  "Barre Studio": "Barre de estudio: postura y trabajo de piernas.",
-  "Sculpt": "Pesos ligeros, muchas reps: tono dirigido.",
-  "Yoga": "Movilidad, respiración y calma. La base de todo.",
-  "Yoga Sculpt": "Yoga con pesas: fuerza y flexibilidad.",
+  "Barre": "Ballet, pilates y pulsos controlados para fortalecer postura y piernas.",
+  "Sculpt": "Resistencia y repeticiones para ganar fuerza y definición.",
+  "Sculpt Booty": "Trabajo enfocado en glúteos y piernas con resistencia.",
+  "Yoga": "Movilidad, respiración y calma.",
+  "Yoga Ashtanga": "Secuencia estructurada para fuerza, flexibilidad y enfoque.",
+  "Yoga Vinyasa": "Flujo de posturas al ritmo de la respiración.",
   "Pilates Mat": "Pilates en colchoneta: core, control y alineación.",
+  "Power Mat": "Pilates Mat dinámico para fortalecer todo el cuerpo.",
+  "Pilates Booty": "Pilates enfocado en core, glúteos y piernas.",
   "Flex": "Movilidad y estiramiento profundo para recuperar.",
-  "Funcional": "Entrenamiento funcional: fuerza para tu día a día.",
-  "Full Body Funcional": "Funcional de cuerpo completo: fuerza y cardio.",
-  "Lower Body Funcional": "Funcional de piernas y glúteos.",
-  "Upper Body Funcional": "Funcional de brazos, espalda y core.",
-  "Twerk": "Baile y cardio: suelta, diviértete y tonifica.",
+  "Flex & Flow": "Movilidad y secuencias suaves para soltar tensión.",
+  "Salsa": "Ritmo, coordinación y energía para disfrutar el movimiento.",
+  "Navakarana": "Práctica de yoga dinámica, rítmica y consciente.",
 };
 
 function descFor(name: string, dbDesc: string | null | undefined, cat: Cat): string {

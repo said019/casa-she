@@ -3310,13 +3310,8 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Migration 095: referral codes discount zeroed.');
     } catch (e) { console.error('Migration 095 error:', e); }
 
-    // Settings reales del estudio (idempotente). Corrige los placeholders stale de
-    // la base clonada SIN pisar valores ya personalizados por el admin.
-    //   - studio_info: rellena por-clave SOLO cuando está vacía o sigue siendo un
-    //     placeholder conocido ('Catarsis Studio' / 'Balance Studio'); merge sobre el JSON.
-    //   - bank_info: corrige al banco real SOLO si sigue siendo el placeholder
-    //     stale (Balance Studio / BBVA / CLABE '012...'); si ya tiene Mercado Pago
-    //     u otro valor real, NO lo toca.
+    // Defaults seguros de Casa Shé. Solo completan vacíos o reemplazan valores heredados
+    // conocidos; nunca inventan teléfono, WhatsApp ni datos bancarios.
     try {
         // 1) Si la fila no existe, sembrar los valores reales directamente.
         await query(
@@ -3324,34 +3319,41 @@ async function runStartupMigrations(): Promise<void> {
              VALUES ('studio_info', $1::jsonb, 'Información del estudio')
              ON CONFLICT (key) DO NOTHING`,
             [JSON.stringify({
-                name: 'BMB Studio',
-                address: 'Calle Primero de Mayo 1, Diamante, 54763 Cuautitlán Izcalli, Méx.',
-                phone: '5543860391',
-                email: 'hola@bmbstudio.mx',
-                website: '',
-                description: '',
-                social_media: { instagram: '@bmbstudio', facebook: '', whatsapp: '5543860391' },
+                name: 'Casa Shé',
+                address: 'Alfonso Reyes 131, Condesa, CDMX',
+                phone: '',
+                email: 'casashecondesa@gmail.com',
+                website: 'https://casashe.mx',
+                description: 'Wellness para mujeres en la Condesa, CDMX.',
+                social_media: { instagram: '@casashe.mx', facebook: '', whatsapp: '' },
             })]
         );
-        // 2) Si la fila existe, merge por-clave SOLO sobre vacíos/null/placeholders stale.
-        //    jsonb_set/COALESCE evita pisar lo que el admin ya personalizó.
+        // Si la fila existe, completar únicamente campos vacíos y valores de marca heredados.
         await query(
             `UPDATE system_settings SET value = value
                 || jsonb_build_object(
-                     'name', CASE WHEN COALESCE(value->>'name','') IN ('', 'Catarsis Studio', 'Balance Studio')
-                                  THEN 'BMB Studio' ELSE value->>'name' END,
+                     'name', CASE WHEN COALESCE(value->>'name','') IN ('', 'Catarsis Studio', 'Balance Studio', 'BMB Studio')
+                                  THEN 'Casa Shé' ELSE value->>'name' END,
                      'address', CASE WHEN COALESCE(value->>'address','') = ''
-                                  THEN 'Calle Primero de Mayo 1, Diamante, 54763 Cuautitlán Izcalli, Méx.' ELSE value->>'address' END,
-                     'phone', CASE WHEN COALESCE(value->>'phone','') = ''
-                                  THEN '5543860391' ELSE value->>'phone' END,
+                                  THEN 'Alfonso Reyes 131, Condesa, CDMX' ELSE value->>'address' END,
+                     'phone', CASE WHEN COALESCE(value->>'phone','') = '5543860391'
+                                  THEN '' ELSE COALESCE(value->>'phone','') END,
                      'email', CASE WHEN COALESCE(value->>'email','') = ''
-                                  THEN 'hola@bmbstudio.mx' ELSE value->>'email' END,
+                                       OR LOWER(value->>'email') IN ('hola@bmbstudio.mx','hola@balanceroom.mx')
+                                  THEN 'casashecondesa@gmail.com' ELSE value->>'email' END,
+                     'website', CASE WHEN COALESCE(value->>'website','') = ''
+                                          OR LOWER(value->>'website') LIKE '%bmbstudio%'
+                                          OR LOWER(value->>'website') LIKE '%balanceroom%'
+                                     THEN 'https://casashe.mx' ELSE value->>'website' END,
+                     'description', CASE WHEN COALESCE(value->>'description','') = ''
+                                        THEN 'Wellness para mujeres en la Condesa, CDMX.' ELSE value->>'description' END,
                      'social_media', (COALESCE(value->'social_media','{}'::jsonb)
                         || jsonb_build_object(
                              'instagram', CASE WHEN COALESCE(value->'social_media'->>'instagram','') = ''
-                                              THEN '@bmbstudio' ELSE value->'social_media'->>'instagram' END,
-                             'whatsapp', CASE WHEN COALESCE(value->'social_media'->>'whatsapp','') = ''
-                                              THEN '5543860391' ELSE value->'social_media'->>'whatsapp' END,
+                                                   OR LOWER(value->'social_media'->>'instagram') IN ('@bmbstudio','@balanceroom')
+                                              THEN '@casashe.mx' ELSE value->'social_media'->>'instagram' END,
+                             'whatsapp', CASE WHEN COALESCE(value->'social_media'->>'whatsapp','') = '5543860391'
+                                              THEN '' ELSE COALESCE(value->'social_media'->>'whatsapp','') END,
                              'facebook', COALESCE(value->'social_media'->>'facebook','')
                            ))
                    ),
@@ -3365,53 +3367,51 @@ async function runStartupMigrations(): Promise<void> {
              VALUES ('bank_info', $1::jsonb, 'Datos bancarios para transferencias')
              ON CONFLICT (key) DO NOTHING`,
             [JSON.stringify({
-                bank_name: 'Mercado Pago',
-                account_holder: 'Karla Ivonne Pérez García',
+                bank_name: '(pendiente)',
+                account_holder: 'Casa Shé',
                 account_number: '',
-                clabe: '722969020755786887',
+                clabe: '(pendiente)',
                 reference_instructions: 'Usa tu nombre completo como referencia',
             })]
         );
-        // Corregir SOLO si sigue siendo el placeholder stale de la base clonada.
+        // Corregir solo placeholders o los datos bancarios conocidos del proyecto anterior.
         await query(
             `UPDATE system_settings SET value = $1::jsonb, updated_at = NOW()
              WHERE key = 'bank_info'
                AND (
-                    value->>'bank_name' IN ('', 'Balance Studio', 'BBVA')
+                    value->>'bank_name' IN ('', 'Balance Studio', 'BBVA', 'Mercado Pago')
                  OR value->>'clabe' LIKE '012%'
+                 OR value->>'clabe' = '722969020755786887'
                  OR value->>'account_holder' = 'Balance Studio S.A. de C.V.'
+                 OR value->>'account_holder' = 'Karla Ivonne Pérez García'
                )`,
             [JSON.stringify({
-                bank_name: 'Mercado Pago',
-                account_holder: 'Karla Ivonne Pérez García',
+                bank_name: '(pendiente)',
+                account_holder: 'Casa Shé',
                 account_number: '',
-                clabe: '722969020755786887',
+                clabe: '(pendiente)',
                 reference_instructions: 'Usa tu nombre completo como referencia',
             })]
         );
 
         // El cache de settings es in-memory y está vacío en el arranque (corre antes
         // de aceptar tráfico), así que no hay nada que invalidar aquí.
-        console.log('Settings: studio_info/bank_info reales asegurados (idempotente).');
+        console.log('Settings: defaults seguros de Casa Shé asegurados.');
     } catch (e) {
         console.error('Error asegurando settings reales (studio_info/bank_info):', e);
     }
 
-    // Ensure admin@balanceroom.mx is the admin account
+    // Las cuentas administrativas heredadas no deben reactivarse en Casa Shé.
     try {
-        const adminHash = '$2b$10$ELPrfYdYroo/URqPraoj9eWP7KfYNGZfEbFpYq8uYLN.tnfdQY15S';
         await query(
-            `INSERT INTO users (email, password_hash, display_name, phone, role, is_active)
-             VALUES ('admin@balanceroom.mx', $1, 'Admin', '0000000000', 'admin', true)
-             ON CONFLICT (email) DO UPDATE
-               SET password_hash = $1, role = 'admin', is_active = true`,
-            [adminHash]
+            `UPDATE users SET is_active = false, updated_at = NOW()
+             WHERE LOWER(email) IN ('admin@balanceroom.mx', 'admin@bmbstudio.mx', 'bmbstudio@admin.com', 'coach@balanceroom.mx')`
         );
         // Demote saidromero19@gmail.com to client if it was accidentally made admin
         await query(
             `UPDATE users SET role = 'client' WHERE email = 'saidromero19@gmail.com' AND role = 'admin'`
         );
-        console.log('Admin account admin@balanceroom.mx ensured.');
+        console.log('Cuentas de sistema heredadas desactivadas.');
     } catch (e) {
         console.error('Error ensuring admin account:', e);
     }
@@ -3700,6 +3700,61 @@ async function runStartupMigrations(): Promise<void> {
             console.log(`Horario oficial Casa Shé ${CASA_SHE_OFFICIAL_SCHEDULE_VERSION}: 54 plantillas guardadas.`);
         }
     } catch (e) { console.error('Horario oficial Casa Shé migration error:', e); }
+
+    // Limpieza final de identidad heredada. Es selectiva e idempotente: solo toca
+    // valores exactos del proyecto anterior y perfiles sin clases futuras.
+    try {
+        await query(
+            `UPDATE system_settings
+                SET value = $1::jsonb, updated_at = NOW()
+              WHERE key = 'onboarding_recommendation_rules'
+                AND (value::text ILIKE '%Aeroyoga%' OR value::text ILIKE '%Telas%')`,
+            [JSON.stringify(ONBOARDING_DEFAULT_RULES)]
+        );
+
+        await query(
+            `UPDATE onboarding_responses r
+                SET recommended_disciplines = COALESCE(
+                      (SELECT jsonb_agg(item)
+                         FROM jsonb_array_elements(COALESCE(r.recommended_disciplines, '[]'::jsonb)) item
+                        WHERE item->>'name' NOT IN ('Aeroyoga', 'Telas')),
+                      '[]'::jsonb
+                    ),
+                    recommended_experience = CASE
+                      WHEN r.recommended_experience->>'name' IN ('Aeroyoga', 'Telas')
+                      THEN NULL
+                      ELSE r.recommended_experience
+                    END,
+                    updated_at = NOW()
+              WHERE COALESCE(r.recommended_disciplines, '[]'::jsonb)::text ILIKE '%Aeroyoga%'
+                 OR COALESCE(r.recommended_disciplines, '[]'::jsonb)::text ILIKE '%Telas%'
+                 OR COALESCE(r.recommended_experience, '{}'::jsonb)::text ILIKE '%Aeroyoga%'
+                 OR COALESCE(r.recommended_experience, '{}'::jsonb)::text ILIKE '%Telas%'`
+        );
+
+        const legacyCoachNames = [
+            'Indie', 'Vero', 'Vane', 'Frida', 'Aranza', 'Jess', 'Fer', 'Pao',
+            'Estrella', 'Jaqui', 'Karla', 'Jessi Tavira', 'Aaron Domínguez', 'Sofi Maes', 'Ricardo',
+        ];
+        await query(
+            `UPDATE instructors i
+                SET is_active = false, visible_public = false, updated_at = NOW()
+              WHERE i.display_name = ANY($1::text[])
+                AND i.display_name <> ALL($2::text[])
+                AND NOT EXISTS (
+                  SELECT 1
+                    FROM classes c
+                   WHERE c.instructor_id = i.id
+                     AND c.date >= CURRENT_DATE
+                     AND c.status <> 'cancelled'
+                )`,
+            [legacyCoachNames, [...CASA_SHE_OFFICIAL_INSTRUCTORS]]
+        );
+
+        console.log('Casa Shé: identidad heredada, recomendaciones y coaches inactivos depurados.');
+    } catch (e) {
+        console.error('Casa Shé legacy identity cleanup error:', e);
+    }
 
     // Migration 104: user_benefits — tabla de beneficios canjeados (recompensas de lealtad)
     try {

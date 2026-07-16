@@ -34,9 +34,9 @@ interface Props {
 }
 
 const CATEGORY_LABEL: Record<Exclude<Category, "all">, string> = {
-  reformer: "Reformer",
-  hot: "Hot Pilates",
-  pole: "Pole",
+  reformer: "Salsa",
+  hot: "Clases",
+  pole: "Clases",
   barre: "Barre",
   sculpt: "Sculpt",
   yoga: "Yoga",

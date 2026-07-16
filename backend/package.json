@@ -1,7 +1,7 @@
 {
     "name": "casa-she-backend",
     "version": "1.0.0",
-    "description": "Backend API for Balance Studio Pilates management system",
+    "description": "Backend API for Casa Shé wellness studio",
     "main": "dist/index.js",
     "type": "module",
     "scripts": {

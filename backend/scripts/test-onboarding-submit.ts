@@ -16,13 +16,14 @@ async function main() {
     );
 
     const cts = (await c.query(`SELECT id, name FROM class_types WHERE name = ANY($1::text[])`,
-      [['Pilates Mat', 'Yoga', 'Aeroyoga', 'Telas', 'Taller']])).rows;
+      [['Pilates Mat', 'Barre', 'Sculpt', 'Yoga', 'Yoga Ashtanga', 'Yoga Vinyasa', 'Flex', 'Salsa']])).rows;
     const plans = (await c.query(`SELECT id, name, price FROM plans WHERE name = ANY($1::text[])`,
       [['Clase de prueba', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Membresía 360']])).rows;
-    assert.ok(cts.length >= 4, 'faltan class_types sembrados (corre el server una vez contra esta BD)');
+    assert.ok(cts.length >= 5, 'faltan class_types de Casa Shé (corre el server una vez contra esta BD)');
 
     const catalog: OnboardingCatalog = { disciplines: {}, plans: {} };
     for (const r of cts) catalog.disciplines[r.name] = { id: r.id };
+    catalog.disciplines.Yoga ??= catalog.disciplines['Yoga Vinyasa'] ?? catalog.disciplines['Yoga Ashtanga'];
     for (const r of plans) catalog.plans[r.name] = { id: r.id, price: Number(r.price) };
 
     const answers: OnboardingAnswers = { goal: 'tonificar', level: 'principiante', body_focus: ['core'], intensity: 'equilibrado', frequency: '1x', health: ['ninguna'] };

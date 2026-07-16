@@ -158,12 +158,12 @@ router.get('/bank-info', authenticate, async (req: Request, res: Response) => {
         );
         
         if (!setting || !setting.value) {
-            // Return default bank info (datos reales del estudio).
+            // No inventar datos bancarios: el admin debe capturar los oficiales.
             return res.json({
-                bank_name: 'Mercado Pago',
-                account_holder: 'Karla Ivonne Pérez García',
+                bank_name: '(pendiente)',
+                account_holder: 'Casa Shé',
                 account_number: '',
-                clabe: '722969020755786887',
+                clabe: '(pendiente)',
                 reference_instructions: 'Usa tu nombre completo como referencia'
             });
         }

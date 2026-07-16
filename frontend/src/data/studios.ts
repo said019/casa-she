@@ -64,18 +64,18 @@ export interface StudioInfo {
 }
 
 const studioDirectory: Record<string, StudioInfo> = {
-  bmb: {
-    slug: 'bmb',
+  casashe: {
+    slug: 'casashe',
     name: 'Casa Shé',
     tagline: 'Pilates Mat, Barre, Sculpt, Yoga, Flex y Salsa — en Condesa, CDMX.',
     description:
-      'Estudio de wellness para mujeres con clases en grupos pequeños y atención personalizada. Membresías por créditos: Mat, Multiclases y Mixtas.',
+      'Estudio de wellness para mujeres con clases en grupos pequeños y atención personalizada. Pilates Mat, Barre, Sculpt, Yoga, Flex y Salsa.',
     addressLine: 'Alfonso Reyes 131, Condesa',
     city: 'Ciudad de México',
     state: 'CDMX',
     postalCode: '06140',
     phone: '',
-    whatsapp: '5543860391', // TODO: confirmar WhatsApp oficial
+    whatsapp: '',
     email: 'casashecondesa@gmail.com',
     instagram: '@casashe.mx',
     mapUrl: 'https://maps.app.goo.gl/PUQqpiDKyzuHGkCL9',
@@ -90,27 +90,18 @@ const studioDirectory: Record<string, StudioInfo> = {
     ],
     classTypes: [
       {
-        name: 'Pilates Reformer',
+        name: 'Pilates Mat',
         description:
-          'La clase estrella: pilates en máquina reformer. Fuerza, control y postura con resistencia guiada para trabajar todo el cuerpo de forma segura.',
-        level: 'all',
-        durationMinutes: 50,
-        maxCapacity: 8,
-        icon: 'sparkles',
-      },
-      {
-        name: 'Yoga',
-        description:
-          'Movimiento consciente, respiración y movilidad para entrar en calma sin perder fuerza.',
+          'Trabajo en colchoneta para fortalecer core, postura y control con movimientos precisos.',
         level: 'all',
         durationMinutes: 50,
         maxCapacity: 12,
-        icon: 'leaf',
+        icon: 'sparkles',
       },
       {
         name: 'Barre',
         description:
-          'Ballet, pilates y pulsos finos para alargar, tonificar y mejorar postura.',
+          'Ballet, pilates y pulsos controlados para fortalecer piernas, core y postura.',
         level: 'all',
         durationMinutes: 50,
         maxCapacity: 12,
@@ -119,29 +110,20 @@ const studioDirectory: Record<string, StudioInfo> = {
       {
         name: 'Sculpt',
         description:
-          'Entrenamiento de cuerpo completo con resistencia: fuerza, tono y energía en una sesión retadora.',
+          'Entrenamiento de cuerpo completo con resistencia para ganar fuerza y definición.',
         level: 'all',
         durationMinutes: 50,
         maxCapacity: 12,
         icon: 'waves',
       },
       {
-        name: 'Hot Pilates',
+        name: 'Yoga',
         description:
-          'Pilates con intensidad y calor: estabilidad, fuerza y mucho sudor.',
+          'Respiración, movilidad y secuencias conscientes para desarrollar fuerza, flexibilidad y calma.',
         level: 'all',
-        durationMinutes: 50,
-        maxCapacity: 12,
-        icon: 'flame',
-      },
-      {
-        name: 'Pole Fitness',
-        description:
-          'Fuerza, flexibilidad y confianza trabajando en barra. Divertido y retador.',
-        level: 'all',
-        durationMinutes: 50,
-        maxCapacity: 10,
-        icon: 'sparkles',
+        durationMinutes: 60,
+        maxCapacity: 7,
+        icon: 'leaf',
       },
       {
         name: 'Flex',
@@ -153,26 +135,26 @@ const studioDirectory: Record<string, StudioInfo> = {
         icon: 'leaf',
       },
       {
-        name: 'Funcional',
+        name: 'Salsa',
         description:
-          'Entrenamiento funcional de cuerpo completo o por zonas (lower / upper / full body) para fuerza y resistencia.',
+          'Ritmo, coordinación y energía en una clase para disfrutar el movimiento.',
         level: 'all',
-        durationMinutes: 50,
-        maxCapacity: 12,
+        durationMinutes: 60,
+        maxCapacity: 6,
         icon: 'target',
       },
     ],
     bank: {
-      name: 'Mercado Pago',
+      name: '(pendiente)',
       account: '',
-      clabe: '722969020755786887',
-      beneficiary: 'Karla Ivonne Pérez García',
+      clabe: '(pendiente)',
+      beneficiary: 'Casa Shé',
     },
     businessHours: [
-      { label: 'Mañana', hours: 'Reformer desde las 7:10' },
-      { label: 'Tarde', hours: 'Clases desde las 17:10' },
+      { label: 'Mañana', hours: 'Clases desde las 7:00' },
+      { label: 'Tarde', hours: 'Clases desde las 17:00' },
       { label: 'Sede', hours: 'Condesa, CDMX' },
-      { label: 'Cancelación', hours: 'Hasta 12 horas antes' },
+      { label: 'Cancelación', hours: 'Hasta 5 horas antes' },
     ],
     palette: {
       background: '40 44% 91%',
@@ -212,7 +194,7 @@ const formatSlugName = (slug: string) =>
 
 export const getStudioBySlug = (slug?: string): StudioInfo => {
   if (!slug) {
-    return studioDirectory.bmb;
+    return studioDirectory.casashe;
   }
 
   const normalized = slug.toLowerCase();
@@ -221,7 +203,7 @@ export const getStudioBySlug = (slug?: string): StudioInfo => {
   }
 
   return {
-    ...studioDirectory.bmb,
+    ...studioDirectory.casashe,
     slug: normalized,
     name: formatSlugName(normalized),
   };

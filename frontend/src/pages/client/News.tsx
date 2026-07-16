@@ -13,8 +13,8 @@ const newsItems = [
   },
   {
     id: '2',
-    title: 'Nueva clase: Hot Pilates',
-    description: 'Todos los miércoles a las 7:00am.',
+    title: 'Nueva clase: Flex & Flow',
+    description: 'Consulta los horarios disponibles en el calendario.',
     date: '7 Ene',
   },
   {

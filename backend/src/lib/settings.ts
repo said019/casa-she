@@ -120,10 +120,10 @@ const DEFAULTS: SettingsMap = {
         send_points_earned: true,
     },
     bank_info: {
-        bank_name: 'Mercado Pago',
-        account_holder: 'Karla Ivonne Pérez García',
+        bank_name: '(pendiente)',
+        account_holder: 'Casa Shé',
         account_number: '',
-        clabe: '722969020755786887',
+        clabe: '(pendiente)',
         reference_instructions: 'Usa tu nombre completo como referencia',
     },
     general_settings: {
