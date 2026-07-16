@@ -55,17 +55,19 @@ interface MembershipData {
 
 type PlanType = 'basico' | 'premium' | 'ilimitado' | 'intro';
 
-// Casa Shé wallet palette.
-// Warm gold: #A48550, olive: #81836F, sand: #D3C39F, cream: #F6F6EA, dark chocolate: #322A1E.
+// Identidad oficial de Casa Shé. El plan cambia el contenido, no la marca del pase:
+// avena #F6F0E4, verde Casa #2A4E36 y arcilla #AE4836.
+const CASA_SHE_PASS_STYLE = {
+    backgroundColor: 'rgb(246, 240, 228)',
+    foregroundColor: 'rgb(42, 78, 54)',
+    labelColor: 'rgb(174, 72, 54)',
+};
 
-// Paleta Casa Shé (dorado golden-hour). Progresión por tier:
-//   intro/básico → crema (claro, amable) · premium → dorado · ilimitado → dorado profundo.
-// crema #ECE1CE, dorado #CE9B25, dorado profundo #AD6C20, tinta #2A2118, papel #FCFAF5.
-const PLAN_STYLES: Record<PlanType, { badge: string; backgroundColor: string; foregroundColor: string; labelColor: string; stripPrefix: string; }> = {
-    basico: { badge: 'MEMBER', backgroundColor: 'rgb(236, 225, 206)', foregroundColor: 'rgb(42, 33, 24)', labelColor: 'rgb(173, 108, 32)', stripPrefix: 'hero' },
-    intro: { badge: 'INTRO', backgroundColor: 'rgb(236, 225, 206)', foregroundColor: 'rgb(42, 33, 24)', labelColor: 'rgb(173, 108, 32)', stripPrefix: 'hero' },
-    premium: { badge: 'PREMIUM', backgroundColor: 'rgb(206, 155, 37)', foregroundColor: 'rgb(42, 33, 24)', labelColor: 'rgb(94, 62, 18)', stripPrefix: 'hero' },
-    ilimitado: { badge: 'UNLIMITED', backgroundColor: 'rgb(173, 108, 32)', foregroundColor: 'rgb(252, 250, 245)', labelColor: 'rgb(241, 231, 210)', stripPrefix: 'hero' },
+const PLAN_STYLES: Record<PlanType, typeof CASA_SHE_PASS_STYLE> = {
+    basico: CASA_SHE_PASS_STYLE,
+    intro: CASA_SHE_PASS_STYLE,
+    premium: CASA_SHE_PASS_STYLE,
+    ilimitado: CASA_SHE_PASS_STYLE,
 };
 
 const WALLET_ELIGIBLE_STATUSES = new Set([
@@ -377,13 +379,18 @@ function buildTempModelDir(m: MembershipData, style: typeof PLAN_STYLES.basico, 
         authenticationToken: computePassAuthToken(m.id),
         organizationName: APPLE_ORG_NAME,
         description: 'Membresía ' + m.plan_name + ' · Casa Shé',
-        logoText: 'Casa Shé',
         storeCard: {
-            headerFields: [{ key: 'plan_badge', label: 'PLAN', value: m.plan_name.toUpperCase() }],
-            primaryFields: [],
+            headerFields: [{ key: 'plan_badge', label: 'MEMBRESÍA', value: m.plan_name.toUpperCase() }],
+            primaryFields: [
+                {
+                    key: 'classes',
+                    label: 'CLASES DISPONIBLES',
+                    value: formatClassesRemaining(m.classes_remaining),
+                    changeMessage: 'Casa Shé: ahora tienes %@ clases disponibles',
+                },
+            ],
             secondaryFields: [
                 { key: 'member_name', label: 'NOMBRE', value: m.user_name },
-                { key: 'classes', label: 'CLASES', value: formatClassesRemaining(m.classes_remaining), changeMessage: 'Casa Shé: %@ clases disponibles 🧘' },
                 { key: 'valid_until', label: 'VENCE', value: formatDate(endDate) }
             ],
             auxiliaryFields: [
@@ -407,6 +414,7 @@ function buildTempModelDir(m: MembershipData, style: typeof PLAN_STYLES.basico, 
         backgroundColor: style.backgroundColor,
         foregroundColor: style.foregroundColor,
         labelColor: style.labelColor,
+        suppressStripShine: true,
         barcodes: [{ format: 'PKBarcodeFormatQR', message: m.id, messageEncoding: 'iso-8859-1' }],
         expirationDate: hasFutureEndDate ? new Date(endDate!.getTime() + 86400000).toISOString() : undefined,
         // relevantDate makes the pass appear on lock screen near the time
@@ -442,19 +450,13 @@ function buildTempModelDir(m: MembershipData, style: typeof PLAN_STYLES.basico, 
         if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dir, img));
     }
 
-    const stripsDir = path.join(assetsDir, 'strips');
-    const stripLevel = m.classes_remaining === null || m.classes_remaining === -1
-        ? 6
-        : Math.min(6, Math.max(0, Math.floor((m.classes_remaining / 10) * 6)));
-    const stripBase = `strip-${style.stripPrefix}-${stripLevel}`;
     const stripFiles = [
-        { src: path.join(stripsDir, `${stripBase}.png`), fallback: path.join(assetsDir, 'strip.png'), dest: 'strip.png' },
-        { src: path.join(stripsDir, `${stripBase}@2x.png`), fallback: path.join(assetsDir, 'strip@2x.png'), dest: 'strip@2x.png' },
-        { src: path.join(stripsDir, `${stripBase}@3x.png`), fallback: path.join(assetsDir, 'strip@3x.png'), dest: 'strip@3x.png' },
+        { src: path.join(assetsDir, 'strip.png'), dest: 'strip.png' },
+        { src: path.join(assetsDir, 'strip@2x.png'), dest: 'strip@2x.png' },
+        { src: path.join(assetsDir, 'strip@3x.png'), dest: 'strip@3x.png' },
     ];
     for (const file of stripFiles) {
-        const src = fs.existsSync(file.src) ? file.src : file.fallback;
-        if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dir, file.dest));
+        if (fs.existsSync(file.src)) fs.copyFileSync(file.src, path.join(dir, file.dest));
     }
 
     console.log('[APPLE] Modelo: ' + dir);
