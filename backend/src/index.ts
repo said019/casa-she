@@ -1155,7 +1155,11 @@ async function runStartupMigrations(): Promise<void> {
     // Gateado con system_settings para correr una sola vez y no pisar ediciones manuales del admin.
     try {
         const done = await queryOne<{ k: string }>(`SELECT key AS k FROM system_settings WHERE key='migration_052_reformer_formats'`);
-        if (!done) {
+        const casaShe = await queryOne<{ id: string }>(`SELECT id FROM facilities WHERE name='Casa Shé — Condesa' LIMIT 1`);
+        if (casaShe && !done) {
+            await query(`INSERT INTO system_settings (key, value) VALUES ('migration_052_reformer_formats', 'true'::jsonb) ON CONFLICT (key) DO NOTHING`);
+            console.log('Migration 052: neutralizada para Casa Shé.');
+        } else if (!done) {
             // 1) Rename: Pilates Reformer -> Reformer Classic (preserva id y FKs).
             await query(`UPDATE class_types SET name='Reformer Classic', updated_at=NOW() WHERE name='Pilates Reformer'`);
             // 2) Crear los 3 formatos nuevos (idempotente por nombre).
@@ -1621,6 +1625,10 @@ async function runStartupMigrations(): Promise<void> {
     // recepción) materializa las clases reservables. Nota: el class_type 'Pilates Reformer' del seed
     // ya fue renombrado por la Mig 052, por eso aquí se usan los nombres actuales.
     try {
+        const casaShe = await queryOne<{ id: string }>(`SELECT id FROM facilities WHERE name='Casa Shé — Condesa' LIMIT 1`);
+        if (casaShe) {
+            console.log('Migration 070: neutralizada para Casa Shé.');
+        } else {
         const tepa = await queryOne<{ id: string }>(`SELECT id FROM facilities WHERE name ILIKE 'BMB Studio Tepa'`);
         const sm = await queryOne<{ id: string }>(`SELECT id FROM facilities WHERE name ILIKE 'BMB Studio San Miguel'`);
         const classic = await queryOne<{ id: string }>(`SELECT id FROM class_types WHERE name = 'Reformer Classic'`);
@@ -1661,6 +1669,7 @@ async function runStartupMigrations(): Promise<void> {
                 added += r.length;
             }
             console.log(`Migration 070: slots Reformer sáb/dom — agregados: ${added}, ya existían: ${5 - added}.`);
+        }
         }
     } catch (e) { console.error('Migration 070 error:', e); }
 
@@ -2782,7 +2791,11 @@ async function runStartupMigrations(): Promise<void> {
     // cupo. Guarda NOT EXISTS para no duplicar. Run-once. (clase b57d8937 = Hot Sculpt 21-jun SM.)
     try {
         const done = await queryOne<{ x: number }>(`SELECT 1 AS x FROM system_settings WHERE key='migration_094_yessica_booking'`);
-        if (!done) {
+        const casaShe = await queryOne<{ id: string }>(`SELECT id FROM facilities WHERE name='Casa Shé — Condesa' LIMIT 1`);
+        if (casaShe && !done) {
+            await query(`INSERT INTO system_settings (key, value) VALUES ('migration_094_yessica_booking', '"skipped-casa-she"'::jsonb) ON CONFLICT (key) DO NOTHING`);
+            console.log('Migration 094: reserva heredada neutralizada para Casa Shé.');
+        } else if (!done) {
             const ins = await query(
                 `INSERT INTO bookings (class_id, user_id, status, is_migration)
                  SELECT 'b57d8937-496f-4e07-88d9-1d89d2f0244d', '63b28b2d-ed7c-49b1-ba18-937e328af8fe', 'confirmed', true
@@ -2843,8 +2856,8 @@ async function runStartupMigrations(): Promise<void> {
                 await query(
                     `INSERT INTO plans (name, description, price, currency, duration_days,
                         class_limit, reformer_credits, multi_credits, is_active, is_internal, color, sort_order)
-                     SELECT $1, $2, 0, 'MXN', 365, 24, 12, 12, true, true, $3, 900
-                      WHERE NOT EXISTS (SELECT 1 FROM plans WHERE name = $1)`,
+                     SELECT $1::varchar, $2::text, 0, 'MXN', 365, 24, 12, 12, true, true, $3::varchar, 900
+                      WHERE NOT EXISTS (SELECT 1 FROM plans WHERE name = $1::varchar)`,
                     [name, `Plan interno de plataforma (${name}). Control de alumnos; sin precio y no visible para clientes.`, color]
                 );
             }
@@ -3182,7 +3195,10 @@ async function runStartupMigrations(): Promise<void> {
             for (const [name, grp, single, price, ord] of EXTRAS) {
                 await query(
                     `INSERT INTO bar_extras (name, group_label, is_single, price_mxn, sort_order)
-                     SELECT $1,$2,$3,$4,$5 WHERE NOT EXISTS (SELECT 1 FROM bar_extras WHERE name=$1 AND group_label=$2)`,
+                     SELECT $1::varchar,$2::varchar,$3::boolean,$4::numeric,$5::integer
+                     WHERE NOT EXISTS (
+                       SELECT 1 FROM bar_extras WHERE name=$1::varchar AND group_label=$2::varchar
+                     )`,
                     [name, grp, single, price, ord]);
             }
             await query(`INSERT INTO system_settings (key, value) VALUES ('bar_extras_seeded','true'::jsonb) ON CONFLICT (key) DO NOTHING`);
@@ -3789,14 +3805,14 @@ async function runStartupMigrations(): Promise<void> {
     try {
         await query(`
             INSERT INTO loyalty_rewards (name, description, points_required, points_cost, reward_type, reward_value, is_active)
-            SELECT v.name, v.desc, v.pts, v.pts, v.rtype, v.rval::jsonb, true
+            SELECT v.name, v.reward_description, v.pts, v.pts, v.rtype, v.rval::jsonb, true
             FROM (VALUES
                 ('Clase de Yoga gratis',       '1 clase de Yoga sin costo',                       100, 'free_class',       '{"class_type":"Yoga Ashtanga"}'),
                 ('10% descuento en barra',      '10% de descuento en tu pedido de la Fuel Bar',     200, 'bar_discount',     '{"discount_type":"percentage","amount":10}'),
                 ('Clase de Flex gratis',        '1 clase de Flex sin costo',                       300, 'free_class',       '{"class_type":"Flex"}'),
                 ('10% descuento en ropa',       '10% de descuento en productos de la tienda',      400, 'product_discount', '{"discount_type":"percentage","amount":10}'),
                 ('1 bebida gratis',             '1 bebida sin costo en la Fuel Bar',               500, 'free_drink',       '{"quantity":1}')
-            ) AS v(name, desc, pts, rtype, rval)
+            ) AS v(name, reward_description, pts, rtype, rval)
             WHERE NOT EXISTS (SELECT 1 FROM loyalty_rewards lr WHERE lr.name = v.name)
         `);
         console.log('Migration 105: catálogo de recompensas sembrado.');
