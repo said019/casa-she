@@ -97,6 +97,16 @@ function getPlanCardMeta(name: string): PlanCardMeta | undefined {
   return PLAN_CARDS.find((c) => c.match(n))?.meta;
 }
 
+function isCasaSheMembership(plan: Plan) {
+  const name = plan.name.toLowerCase();
+  return (
+    name.includes('membresía 360') ||
+    name.includes('membresia 360') ||
+    name.includes('membresía black') ||
+    name.includes('membresia black')
+  );
+}
+
 function getRewardPoints(classLimit: number | null) {
   const points: Record<number, number> = { 4: 30, 8: 60, 12: 100, 24: 160 };
   return classLimit ? points[classLimit] : null;
@@ -448,6 +458,8 @@ export default function Checkout() {
                       const meta = getPlanCardMeta(plan.name);
                       const isSelected = selectedPlanId === plan.id;
                       const featured = index === 0 && isIntroClass(plan);
+                      const membership = isCasaSheMembership(plan);
+                      const darkCard = featured || membership;
                       const price = Number(plan.price);
                       return (
                         <motion.button
@@ -460,13 +472,17 @@ export default function Checkout() {
                           transition={{ type: 'spring', stiffness: 100, damping: 20, delay: index * 0.055 }}
                           whileHover={reduceMotion ? undefined : { y: -3 }}
                           whileTap={reduceMotion ? undefined : { scale: 0.985 }}
-                          className={`group relative overflow-hidden rounded-[1.75rem] border p-6 text-left shadow-[0_24px_72px_-62px_rgba(42,33,24,0.58)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A4E36] sm:p-7 ${
-                            featured ? 'lg:col-span-2 border-[#2A4E36] bg-[#2A4E36] text-[#F6F0E4]' : 'border-[#2A4E36]/18 bg-[#FBF7EE]/72 text-[#2E1B22]'
+                          className={`group relative overflow-hidden rounded-[1.75rem] border p-6 text-left shadow-[0_24px_72px_-62px_rgba(42,33,24,0.58)] focus-visible:outline-none focus-visible:ring-2 sm:p-7 ${
+                            featured
+                              ? 'lg:col-span-2 border-[#2A4E36] bg-[#2A4E36] text-[#F6F0E4] focus-visible:ring-[#E1CCA0]'
+                              : membership
+                                ? 'border-[#AE4836] bg-[#AE4836] text-[#F6F0E4] shadow-[0_28px_84px_-60px_rgba(122,45,31,0.68)] focus-visible:ring-[#E1CCA0]'
+                                : 'border-[#2A4E36]/18 bg-[#FBF7EE]/72 text-[#2E1B22] focus-visible:ring-[#2A4E36]'
                           } ${
-                            isSelected ? 'ring-2 ring-[#AE4836]' : ''
+                            isSelected ? `ring-2 ${darkCard ? 'ring-[#E1CCA0]' : 'ring-[#AE4836]'}` : ''
                           }`}
                         >
-                          <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: featured ? '#E1CCA0' : meta?.color ?? '#2A4E36' }} />
+                          <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: darkCard ? '#E1CCA0' : meta?.color ?? '#2A4E36' }} />
                           {featured && !reduceMotion && (
                             <motion.span
                               aria-hidden="true"
@@ -498,7 +514,7 @@ export default function Checkout() {
                                   </span>
                                 )}
                                 {isSelected && (
-                                  <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] ${featured ? 'bg-[#F6F0E4] text-[#2A4E36]' : 'bg-[#DDE4D5] text-[#2A4E36]'}`}>
+                                  <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] ${darkCard ? `bg-[#F6F0E4] ${membership ? 'text-[#913A2B]' : 'text-[#2A4E36]'}` : 'bg-[#DDE4D5] text-[#2A4E36]'}`}>
                                     <CheckCircle2 className="h-3.5 w-3.5" />
                                     Elegido
                                   </span>
@@ -513,7 +529,7 @@ export default function Checkout() {
                               </p>
                             </div>
 
-                            <div className={`border-t pt-5 ${featured ? 'border-[#F6F0E4]/22' : 'border-[#2A4E36]/16'}`}>
+                            <div className={`border-t pt-5 ${darkCard ? 'border-[#F6F0E4]/22' : 'border-[#2A4E36]/16'}`}>
                               <dl className="grid grid-cols-2 gap-4 text-sm">
                                 <div>
                                   <dt className="text-[9px] font-semibold uppercase tracking-[0.2em] opacity-[0.48]">Incluye</dt>
@@ -532,7 +548,7 @@ export default function Checkout() {
                                   )}
                                   <span className="text-4xl font-medium">{formatPrice(price)}</span>
                                 </div>
-                                <span className={`shrink-0 rounded-full px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.2em] ${featured ? 'bg-[#F6F0E4] text-[#2A4E36]' : 'bg-[#2A4E36] text-[#F6F0E4]'}`}>
+                                <span className={`shrink-0 rounded-full px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.2em] ${darkCard ? `bg-[#F6F0E4] ${membership ? 'text-[#913A2B]' : 'text-[#2A4E36]'}` : 'bg-[#2A4E36] text-[#F6F0E4]'}`}>
                                   {isSelected ? 'Continuar' : 'Comprar'}
                                 </span>
                               </div>
