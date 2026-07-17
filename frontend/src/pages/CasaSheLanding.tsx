@@ -282,6 +282,26 @@ function Hero() {
       />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(18,33,22,0.18)_0%,transparent_38%,rgba(18,33,22,0.68)_100%)]" />
 
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.65, delay: 0.18, ease: [0.23, 1, 0.32, 1] }}
+        className="absolute inset-x-5 top-[44%] z-10 flex justify-center xl:hidden"
+      >
+        <Link
+          to="/login"
+          aria-label="¿Ya eres usuaria recurrente? Inicia sesión"
+          className={`${body} inline-flex min-h-14 flex-col items-center justify-center rounded-full border border-[#F6F0E4]/70 bg-[#F6F0E4]/90 px-8 py-3 text-center text-[#2A4E36] shadow-[0_18px_44px_-28px_rgba(18,33,22,0.8)] backdrop-blur-md transition-transform active:scale-[0.98]`}
+        >
+          <span className="text-[9px] uppercase tracking-[0.22em] opacity-65">
+            ¿Ya eres usuaria recurrente?
+          </span>
+          <span className="mt-0.5 text-[12px] uppercase tracking-[0.2em]">
+            Inicia sesión
+          </span>
+        </Link>
+      </motion.div>
+
       <div className="relative flex min-h-[100dvh] items-end justify-center px-5 pb-14 pt-28 sm:px-8 sm:pb-16 lg:px-12 lg:pb-20">
         <motion.div
           initial={reduce ? false : { opacity: 0, y: 18 }}
