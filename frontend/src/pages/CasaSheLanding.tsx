@@ -273,54 +273,36 @@ function Hero() {
   return (
     <section id="inicio" className="relative min-h-[100dvh] overflow-hidden" style={{ backgroundColor: DEEP }}>
       <img
-        src="/casashe/hero.png"
-        alt="Salón de movimiento de Casa Shé"
-        className="absolute inset-0 h-full w-full object-cover object-center"
+        src="/casashe/studio-barre-hero.webp"
+        alt="Salón de Barre de Casa Shé en Condesa"
+        className="absolute inset-0 h-full w-full object-cover object-[center_48%]"
         loading="eager"
         decoding="async"
       />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(18,33,22,0.87)_0%,rgba(18,33,22,0.58)_42%,rgba(18,33,22,0.12)_78%),linear-gradient(0deg,rgba(18,33,22,0.62)_0%,transparent_42%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(18,33,22,0.18)_0%,transparent_38%,rgba(18,33,22,0.68)_100%)]" />
 
-      <div className="relative flex min-h-[100dvh] items-end px-5 pb-9 pt-28 sm:px-8 sm:pb-12 lg:px-12 lg:pb-14">
-        <div className="mx-auto w-full max-w-[1400px]" style={{ color: CREAM }}>
-          <motion.div
-            initial={reduce ? false : { opacity: 0, y: 22 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.75, ease: [0.23, 1, 0.32, 1] }}
-            className="max-w-[760px]"
-          >
-            <p className={`${body} text-[11px] uppercase tracking-[0.36em] text-white/72 sm:text-[12px]`}>
-              Wellness hub · Condesa, CDMX
-            </p>
-            <h1 className={`${display} mt-5 max-w-[12ch] text-[clamp(3.4rem,8vw,7.5rem)] font-light leading-[0.88] tracking-[-0.035em]`}>
-              Una casa para volver a ti.
-            </h1>
-            <p className={`${body} mt-6 max-w-[54ch] text-base leading-relaxed text-white/82 sm:text-lg`}>
-              Movimiento, nutrición y cuidado en comunidad. Pilates Mat, Barre, Sculpt, Yoga, Flex y Salsa en un espacio hecho para escucharte.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                to="/register"
-                className={`${body} inline-flex min-h-12 items-center justify-center rounded-full px-8 text-[12px] uppercase tracking-[0.22em] transition-transform active:scale-[0.98]`}
-                style={{ backgroundColor: CREAM, color: GREEN }}
-              >
-                Reservar una clase
-              </Link>
-              <a
-                href="#paquetes"
-                className={`${body} inline-flex min-h-12 items-center justify-center rounded-full border border-white/45 px-8 text-[12px] uppercase tracking-[0.22em] text-white transition-colors hover:bg-white/10 active:scale-[0.98]`}
-              >
-                Ver paquetes
-              </a>
-            </div>
-          </motion.div>
-
-          <div className={`${body} mt-12 grid gap-3 border-t border-white/30 pt-4 text-[10px] uppercase tracking-[0.2em] text-white/68 sm:grid-cols-3 sm:text-[11px]`}>
-            <span>Grupos pequeños</span>
-            <span className="sm:text-center">Alfonso Reyes 131</span>
-            <span className="sm:text-right">La comunidad es la medicina</span>
+      <div className="relative flex min-h-[100dvh] items-end justify-center px-5 pb-14 pt-28 sm:px-8 sm:pb-16 lg:px-12 lg:pb-20">
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.75, ease: [0.23, 1, 0.32, 1] }}
+          className="flex w-full max-w-[48rem] flex-col items-center text-center"
+          style={{ color: CREAM }}
+        >
+          <h1 className={`${display} text-[clamp(2.35rem,5.6vw,4.7rem)] font-light leading-[0.95] tracking-[-0.025em]`}>
+            <Link
+              to="/register"
+              className="inline-block transition-opacity duration-300 hover:opacity-80 focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-8 focus-visible:outline-[#F6F0E4] active:scale-[0.98]"
+            >
+              Reserva tu clase de Barre
+            </Link>
+          </h1>
+          <div aria-hidden="true" className="mt-6 flex w-full max-w-[24rem] items-center gap-3 opacity-80">
+            <span className="h-px flex-1 bg-[#F6F0E4]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-[#F6F0E4]" />
+            <span className="h-px flex-1 bg-[#F6F0E4]" />
           </div>
-        </div>
+        </motion.div>
       </div>
     </section>
   );
