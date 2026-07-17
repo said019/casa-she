@@ -33,7 +33,7 @@ const mxn = (n: number) => "$" + Number(n).toLocaleString("es-MX");
 
 // Color por tipo de plan (igual que en el /app, derivado de planPresentation).
 const TYPE_COLOR: Record<PackageType, string> = {
-  membership: "#2A4E36",
+  membership: "#AE4836",
   sample: "#AE4836",
   individual: "#2A4E36",
   mixto: "#DBB0B3",

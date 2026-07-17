@@ -3578,6 +3578,11 @@ async function runStartupMigrations(): Promise<void> {
             ) AS v(name, credits, price, days, sort)
             WHERE NOT EXISTS (SELECT 1 FROM plans p WHERE p.name = v.name)`);
 
+        // La paleta oficial identifica las dos membresías mensuales en terracota.
+        // Solo completa colores vacíos para respetar cambios posteriores desde admin.
+        await query(`UPDATE plans SET color = '#AE4836'
+            WHERE name IN ('Membresía 360', 'Membresía Black') AND color IS NULL`);
+
         // (b.2) Planes de Salsa — bucket reformer reutilizado como "Salsa" (créditos solo-salsa; multi=0).
         await query(`INSERT INTO plans (name, reformer_credits, multi_credits, price, duration_days, is_active, sort_order)
             SELECT v.name, v.credits, 0, v.price, v.days, true, v.sort

@@ -36,7 +36,7 @@ const CARD_BASE =
   'bg-[#FBF7EE] text-[#2E1B22] shadow-[0_24px_80px_-68px_rgba(42,33,24,.55)]';
 
 export const packagePresentations: Record<PackageType, PackagePresentation> = {
-  // Membresías mensuales (360 / Black) — Verde Casa
+  // Membresías mensuales (360 / SHÉ Black) — Terracota Casa Shé
   membership: {
     type: 'membership',
     title: 'Membresías',
@@ -47,14 +47,14 @@ export const packagePresentations: Record<PackageType, PackagePresentation> = {
     bestFor: 'Ideal si vienes seguido y quieres lo más completo.',
     rule: 'Se renueva cada mes.',
     accentLabel: 'mensual',
-    surface: 'bg-[#2A4E36]',
-    panel: 'bg-[#E9EFE4] text-[#2E1B22] ring-[#2A4E36]/20',
-    card: `${CARD_BASE} ring-[#2A4E36]/15 hover:ring-[#2A4E36]/40`,
-    chip: 'bg-[#2A4E36] text-[#F6F0E4]',
-    badge: 'bg-[#DDE4D5] text-[#2A4E36] ring-[#2A4E36]/20',
-    cta: 'bg-[#2A4E36] text-[#F6F0E4] hover:bg-[#16261A]',
-    selected: 'ring-2 ring-[#2A4E36]/55 shadow-[0_22px_74px_-56px_rgba(42,78,54,.82)]',
-    dot: 'bg-[#2A4E36]',
+    surface: 'bg-[#AE4836]',
+    panel: 'bg-[#F4E6E1] text-[#2E1B22] ring-[#AE4836]/20',
+    card: `${CARD_BASE} ring-[#AE4836]/15 hover:ring-[#AE4836]/40`,
+    chip: 'bg-[#AE4836] text-[#F6F0E4]',
+    badge: 'bg-[#F1DED8] text-[#AE4836] ring-[#AE4836]/20',
+    cta: 'bg-[#AE4836] text-[#F6F0E4] hover:bg-[#934434]',
+    selected: 'ring-2 ring-[#AE4836]/50 shadow-[0_22px_74px_-56px_rgba(174,72,54,.72)]',
+    dot: 'bg-[#AE4836]',
     text: 'text-[#6B554D]',
   },
   // Paquetes de créditos (5 / 8 / 12) — Musgo
