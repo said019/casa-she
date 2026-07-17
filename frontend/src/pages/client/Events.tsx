@@ -171,6 +171,7 @@ export default function ClientEvents() {
   });
 
   const hasActiveMembership = membership?.status === 'active';
+  const hasWorkshopPass = (membership?.workshops_remaining ?? 0) > 0;
 
   // Fetch bank info when user has a pending registration
   const isPendingPayment = selectedEvent?.myRegistration?.status === 'pending';
@@ -193,6 +194,7 @@ export default function ClientEvents() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['client-events'] });
+      queryClient.invalidateQueries({ queryKey: ['my-membership'] });
       setRegisterDialogOpen(false);
       toast({
         title: data.isFree ? '¡Registro confirmado!' : 'Registro exitoso',
@@ -218,6 +220,7 @@ export default function ClientEvents() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['client-events'] });
+      queryClient.invalidateQueries({ queryKey: ['my-membership'] });
       toast({ title: 'Registro cancelado' });
       setSelectedEvent(null);
     },
@@ -323,7 +326,10 @@ export default function ClientEvents() {
   if (selectedEvent) {
     const ev = selectedEvent;
     const color = typeColors[ev.type] || '#8B5CF6';
-    const isFree = ev.price === 0;
+    const workshopIncluded = ev.type === 'workshop' && (
+      hasWorkshopPass || (ev.myRegistration?.status === 'confirmed' && ev.myRegistration.amount === 0)
+    );
+    const isFree = ev.price === 0 || workshopIncluded;
     const isFull = ev.registered >= ev.capacity;
     const occupancy = Math.round((ev.registered / ev.capacity) * 100);
     const isRegistered = ev.myRegistration && ev.myRegistration.status !== 'cancelled';
@@ -368,7 +374,9 @@ export default function ClientEvents() {
                     <p className="text-sm text-muted-foreground">{typeLabels[ev.type]}</p>
                   </div>
                   {isFree ? (
-                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-sm">Gratis</Badge>
+                    <Badge className="border-[#AE4836]/20 bg-[#AE4836]/10 text-sm text-[#AE4836]">
+                      {workshopIncluded ? 'Incluido en tu membresía' : 'Gratis'}
+                    </Badge>
                   ) : (
                     <div className="text-right">
                       <p className="text-xl font-bold" style={{ color }}>
@@ -859,7 +867,9 @@ export default function ClientEvents() {
               <DialogHeader>
                 <DialogTitle>Confirmar inscripción</DialogTitle>
                 <DialogDescription>
-                  {isFree
+                  {workshopIncluded
+                    ? `Usaremos uno de tus talleres incluidos para confirmar tu lugar en "${ev.title}".`
+                    : isFree
                     ? `¿Quieres registrarte en "${ev.title}"?`
                     : `Tu inscripción a "${ev.title}" quedará pendiente hasta confirmar el pago.`}
                 </DialogDescription>
@@ -995,7 +1005,8 @@ export default function ClientEvents() {
             <div className="grid sm:grid-cols-2 gap-4">
               {filtered.map((ev) => {
                 const color = typeColors[ev.type] || '#8B5CF6';
-                const isFree = ev.price === 0;
+                const workshopIncluded = ev.type === 'workshop' && hasWorkshopPass;
+                const isFree = ev.price === 0 || workshopIncluded;
                 const isFull = ev.registered >= ev.capacity;
                 const occupancy = Math.round((ev.registered / ev.capacity) * 100);
                 const isRegistered = ev.myRegistration && ev.myRegistration.status !== 'cancelled';
@@ -1030,8 +1041,8 @@ export default function ClientEvents() {
                           </div>
                         </div>
                         {isFree ? (
-                          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 shrink-0">
-                            Gratis
+                          <Badge className="shrink-0 border-[#AE4836]/20 bg-[#AE4836]/10 text-[#AE4836]">
+                            {workshopIncluded ? 'Incluido' : 'Gratis'}
                           </Badge>
                         ) : (
                           <span className="text-lg font-bold shrink-0" style={{ color }}>

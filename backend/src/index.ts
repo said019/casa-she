@@ -3574,7 +3574,7 @@ async function runStartupMigrations(): Promise<void> {
             FROM (VALUES
               ('Clase de prueba',1,150,7,1),('Drop-in',1,280,30,2),('Paquete 5',5,1300,30,3),
               ('Paquete 8',8,2000,30,4),('Paquete 12',12,2880,30,5),
-              ('Membresía 360',16,3600,30,6),('Membresía Black',24,4200,30,7)
+              ('Membresía 360',NULL,3800,30,6),('Membresía Black',NULL,4200,30,7)
             ) AS v(name, credits, price, days, sort)
             WHERE NOT EXISTS (SELECT 1 FROM plans p WHERE p.name = v.name)`);
 
@@ -3805,6 +3805,151 @@ async function runStartupMigrations(): Promise<void> {
         await query(`ALTER TABLE user_benefits ADD COLUMN IF NOT EXISTS used_by UUID REFERENCES users(id) ON DELETE SET NULL`);
         console.log('Migration 106: user_benefits.used_by column ready.');
     } catch (e) { console.error('Migration 106 error:', e); }
+
+    // Casa Shé: inclusiones reales de membresía (servicios + talleres).
+    // Cada inclusión se materializa como un beneficio consumible ligado a la
+    // membresía que lo originó; el trigger cubre tarjeta, transferencia, caja y
+    // activaciones manuales sin duplicar beneficios al reintentar.
+    try {
+        await query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS included_services INTEGER NOT NULL DEFAULT 0`);
+        await query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS included_workshops INTEGER NOT NULL DEFAULT 0`);
+        await query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS service_options JSONB NOT NULL DEFAULT '[]'::jsonb`);
+        await query(`ALTER TABLE user_benefits ADD COLUMN IF NOT EXISTS source_membership_id UUID REFERENCES memberships(id) ON DELETE CASCADE`);
+        await query(`ALTER TABLE user_benefits ADD COLUMN IF NOT EXISTS source_slot INTEGER`);
+        await query(`ALTER TABLE user_benefits ADD COLUMN IF NOT EXISTS used_on_event_registration_id UUID REFERENCES event_registrations(id) ON DELETE SET NULL`);
+        await query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_benefits_membership_slot
+            ON user_benefits(source_membership_id, benefit_type, source_slot)
+            WHERE source_membership_id IS NOT NULL`);
+
+        const configured = await query(`SELECT 1 FROM migration_flags WHERE name = 'casashe_membership_inclusions_v1'`);
+        if (!configured.length) {
+            const serviceOptions = JSON.stringify(['Nutrición', 'Cosmiatría', 'Fisioterapia']);
+            await query(`UPDATE plans SET
+                    price = 3800,
+                    duration_days = 30,
+                    class_limit = NULL,
+                    reformer_credits = 0,
+                    multi_credits = NULL,
+                    included_services = 1,
+                    included_workshops = 0,
+                    service_options = $1::jsonb,
+                    color = '#AE4836',
+                    features = $2::jsonb
+                WHERE name = 'Membresía 360'`, [serviceOptions, JSON.stringify([
+                    'Clases ilimitadas',
+                    '1 servicio a elegir: Nutrición, Cosmiatría o Fisioterapia',
+                    'Vigencia de 1 mes',
+                ])]);
+            await query(`UPDATE plans SET
+                    price = 4200,
+                    duration_days = 30,
+                    class_limit = NULL,
+                    reformer_credits = 0,
+                    multi_credits = NULL,
+                    included_services = 2,
+                    included_workshops = 1,
+                    service_options = $1::jsonb,
+                    color = '#AE4836',
+                    features = $2::jsonb
+                WHERE name = 'Membresía Black'`, [serviceOptions, JSON.stringify([
+                    'Clases ilimitadas',
+                    '2 servicios a elegir: Nutrición, Cosmiatría o Fisioterapia',
+                    '1 taller incluido',
+                    'Vigencia de 1 mes',
+                ])]);
+        }
+
+        await query(`
+            CREATE OR REPLACE FUNCTION sync_membership_included_benefits()
+            RETURNS TRIGGER AS $$
+            DECLARE
+                plan_row RECORD;
+                slot_number INTEGER;
+                benefit_expiration TIMESTAMPTZ;
+            BEGIN
+                IF NEW.status = 'active' THEN
+                    SELECT name, included_services, included_workshops, service_options
+                      INTO plan_row
+                      FROM plans
+                     WHERE id = NEW.plan_id;
+
+                    benefit_expiration := COALESCE(
+                        NEW.end_date::date + INTERVAL '1 day' - INTERVAL '1 second',
+                        NOW() + INTERVAL '30 days'
+                    );
+
+                    UPDATE user_benefits
+                       SET status = 'cancelled'
+                     WHERE source_membership_id = NEW.id
+                       AND status = 'active'
+                       AND (
+                            (benefit_type = 'membership_service' AND source_slot > COALESCE(plan_row.included_services, 0))
+                         OR (benefit_type = 'workshop_pass' AND source_slot > COALESCE(plan_row.included_workshops, 0))
+                       );
+
+                    FOR slot_number IN 1..COALESCE(plan_row.included_services, 0) LOOP
+                        INSERT INTO user_benefits (
+                            user_id, benefit_type, benefit_value, status, expires_at,
+                            source_membership_id, source_slot
+                        ) VALUES (
+                            NEW.user_id,
+                            'membership_service',
+                            jsonb_build_object(
+                                'options', COALESCE(plan_row.service_options, '[]'::jsonb),
+                                'plan_name', plan_row.name,
+                                'slot', slot_number
+                            ),
+                            'active', benefit_expiration, NEW.id, slot_number
+                        ) ON CONFLICT (source_membership_id, benefit_type, source_slot)
+                          WHERE source_membership_id IS NOT NULL
+                          DO UPDATE SET
+                              expires_at = EXCLUDED.expires_at,
+                              benefit_value = CASE WHEN user_benefits.status = 'used' THEN user_benefits.benefit_value ELSE EXCLUDED.benefit_value END,
+                              status = CASE WHEN user_benefits.status = 'cancelled' THEN 'active' ELSE user_benefits.status END;
+                    END LOOP;
+
+                    FOR slot_number IN 1..COALESCE(plan_row.included_workshops, 0) LOOP
+                        INSERT INTO user_benefits (
+                            user_id, benefit_type, benefit_value, status, expires_at,
+                            source_membership_id, source_slot
+                        ) VALUES (
+                            NEW.user_id,
+                            'workshop_pass',
+                            jsonb_build_object('plan_name', plan_row.name, 'slot', slot_number),
+                            'active', benefit_expiration, NEW.id, slot_number
+                        ) ON CONFLICT (source_membership_id, benefit_type, source_slot)
+                          WHERE source_membership_id IS NOT NULL
+                          DO UPDATE SET
+                              expires_at = EXCLUDED.expires_at,
+                              benefit_value = CASE WHEN user_benefits.status = 'used' THEN user_benefits.benefit_value ELSE EXCLUDED.benefit_value END,
+                              status = CASE WHEN user_benefits.status = 'cancelled' THEN 'active' ELSE user_benefits.status END;
+                    END LOOP;
+
+                    UPDATE user_benefits
+                       SET expires_at = benefit_expiration
+                     WHERE source_membership_id = NEW.id AND status = 'active';
+                ELSIF NEW.status IN ('cancelled', 'expired') THEN
+                    UPDATE user_benefits
+                       SET status = CASE WHEN NEW.status = 'expired' THEN 'expired' ELSE 'cancelled' END
+                     WHERE source_membership_id = NEW.id AND status = 'active';
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        `);
+        await query(`DROP TRIGGER IF EXISTS trg_sync_membership_included_benefits ON memberships`);
+        await query(`CREATE TRIGGER trg_sync_membership_included_benefits
+            AFTER INSERT OR UPDATE OF status, end_date, plan_id ON memberships
+            FOR EACH ROW EXECUTE FUNCTION sync_membership_included_benefits()`);
+
+        // Backfill idempotente para membresías oficiales que ya estaban activas.
+        await query(`UPDATE memberships m SET end_date = m.end_date
+            FROM plans p
+            WHERE m.plan_id = p.id AND m.status = 'active'
+              AND p.name IN ('Membresía 360', 'Membresía Black')`);
+        await query(`INSERT INTO migration_flags (name) VALUES ('casashe_membership_inclusions_v1') ON CONFLICT DO NOTHING`);
+        console.log('Casa Shé: inclusiones de servicios y talleres configuradas.');
+    } catch (e) { console.error('Casa Shé membership inclusions migration error:', e); }
 
     // Migration 105: seed del catálogo de recompensas Casa Shé
     try {

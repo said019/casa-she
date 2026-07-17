@@ -6,6 +6,8 @@ export const BENEFIT_TYPE = {
   product_discount: 'product_discount',
   free_drink: 'free_drink',
   discount_package: 'discount_package',
+  membership_service: 'membership_service',
+  workshop_pass: 'workshop_pass',
 } as const;
 
 export type BenefitType = (typeof BENEFIT_TYPE)[keyof typeof BENEFIT_TYPE];
@@ -43,7 +45,19 @@ export interface FreeDrinkValue {
   quantity: number;
 }
 
-export type BenefitValue = FreeClassValue | DiscountValue | FreeDrinkValue;
+export interface MembershipServiceValue {
+  options: string[];
+  selected_service?: string;
+  plan_name?: string;
+  slot?: number;
+}
+
+export interface WorkshopPassValue {
+  plan_name?: string;
+  slot?: number;
+}
+
+export type BenefitValue = FreeClassValue | DiscountValue | FreeDrinkValue | MembershipServiceValue | WorkshopPassValue;
 
 export interface UserBenefit {
   id: string;
@@ -81,6 +95,16 @@ const schemasByType: Record<string, z.ZodType<any>> = {
   product_discount: DiscountValueSchema,
   discount_package: DiscountValueSchema,
   free_drink: FreeDrinkValueSchema,
+  membership_service: z.object({
+    options: z.array(z.string().min(1)).min(1),
+    selected_service: z.string().min(1).optional(),
+    plan_name: z.string().optional(),
+    slot: z.number().int().positive().optional(),
+  }),
+  workshop_pass: z.object({
+    plan_name: z.string().optional(),
+    slot: z.number().int().positive().optional(),
+  }),
 };
 
 function parseIfString(raw: unknown): unknown {

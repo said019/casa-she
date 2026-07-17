@@ -17,6 +17,11 @@ export interface ClientMembership {
   // Cupo del PLAN por categoría: >0 = N créditos, null = ilimitado, 0 = la categoría no aplica.
   reformer_credits?: number | null;
   multi_credits?: number | null;
+  included_services?: number;
+  included_workshops?: number;
+  service_options?: string[];
+  services_remaining?: number;
+  workshops_remaining?: number;
   payment_method?: 'cash' | 'transfer' | 'card' | 'online' | null;
   payment_reference?: string | null;
   // Totales agregados de TODAS las membresías activas vigentes hoy (devueltos por /me).

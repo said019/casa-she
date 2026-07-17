@@ -53,6 +53,9 @@ interface Plan {
   package_type?: 'individual' | 'mixto' | 'sample';
   requires_studio_selection?: boolean;
   features?: string[];
+  included_services?: number;
+  included_workshops?: number;
+  service_options?: string[];
 }
 
 interface BankInfo {
@@ -77,8 +80,8 @@ function isMembershipFeePlan(plan: Plan) {
 type PlanCardMeta = { title: string; color: string; tagline: string; was?: string; hint: string; oferta?: boolean };
 const SALSA_TAGLINE = 'Ritmo, cuerpo y comunidad. Baila y reconéctate.';
 const PLAN_CARDS: { match: (n: string) => boolean; meta: PlanCardMeta }[] = [
-  { match: (n) => n.includes('black'), meta: { title: 'Membresía SHÉ Black', color: '#AE4836', tagline: 'Nuestra membresía más completa. Bienestar integral para volver a ti.', was: '$4,800', hint: '24 créditos · acceso total', oferta: true } },
-  { match: (n) => n.includes('360'), meta: { title: 'Membresía 360', color: '#AE4836', tagline: 'Tu bienestar integral empieza aquí. Movimiento, balance y comunidad en un solo lugar.', was: '$3,800', hint: '16 créditos al mes', oferta: true } },
+  { match: (n) => n.includes('black'), meta: { title: 'Membresía SHÉ Black', color: '#AE4836', tagline: 'Nuestra membresía más completa. Bienestar integral para volver a ti.', hint: 'Clases ilimitadas · 2 servicios · 1 taller' } },
+  { match: (n) => n.includes('360'), meta: { title: 'Membresía 360', color: '#AE4836', tagline: 'Tu bienestar integral empieza aquí. Movimiento, balance y comunidad en un solo lugar.', hint: 'Clases ilimitadas · 1 servicio' } },
   { match: (n) => n.includes('12'), meta: { title: 'Paquete 12 clases', color: '#AE4836', tagline: 'Constancia que se siente. Más sesiones para sostener tu práctica.', hint: '12 créditos · vigencia 1 mes' } },
   { match: (n) => n.includes('8'), meta: { title: 'Paquete 8 clases', color: '#8F7F36', tagline: 'Tu práctica, a tu ritmo. El balance ideal entre flexibilidad y constancia.', hint: '8 créditos · vigencia 1 mes' } },
   { match: (n) => n.includes('5'), meta: { title: 'Paquete 5 clases', color: '#6E4B34', tagline: 'Ideal para empezar. Una forma amable de volver a ti.', hint: '5 créditos · vigencia 1 mes' } },

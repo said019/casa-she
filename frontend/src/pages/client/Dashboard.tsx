@@ -31,6 +31,8 @@ import {
   Play,
   Leaf,
   Coffee,
+  HeartHandshake,
+  Ticket,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PendingReviewsList } from '@/components/reviews/PendingReviewsList';
@@ -391,6 +393,22 @@ export default function ClientDashboard() {
                           {membership.end_date ? `Vence ${format(membershipEndDate!, 'dd MMM yyyy', { locale: es })}` : 'Sin vencimiento'}
                         </span>
                       </div>
+                      {((membership.services_remaining ?? 0) > 0 || (membership.workshops_remaining ?? 0) > 0) && (
+                        <div className="flex flex-wrap gap-2 border-t border-[#2E1B22]/10 pt-4">
+                          {(membership.services_remaining ?? 0) > 0 && (
+                            <span className="inline-flex items-center gap-2 rounded-full bg-[#AE4836]/10 px-3 py-1.5 text-xs font-semibold text-[#AE4836]">
+                              <HeartHandshake className="h-3.5 w-3.5" />
+                              {membership.services_remaining} servicio{membership.services_remaining === 1 ? '' : 's'}
+                            </span>
+                          )}
+                          {(membership.workshops_remaining ?? 0) > 0 && (
+                            <span className="inline-flex items-center gap-2 rounded-full bg-[#AE4836]/10 px-3 py-1.5 text-xs font-semibold text-[#AE4836]">
+                              <Ticket className="h-3.5 w-3.5" />
+                              {membership.workshops_remaining} taller{membership.workshops_remaining === 1 ? '' : 'es'}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="rounded-[1rem] border border-[#D6D5C2]/70 bg-[#F6F0E4]/58 p-4 text-sm text-[#6B554D]">

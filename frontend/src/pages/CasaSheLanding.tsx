@@ -39,8 +39,8 @@ const STUDIO_CLASSES = "Pilates Mat · Barre · Sculpt · Yoga · Flex";
 // El precio real se obtiene del API (/plans). Solo se muestra la tarjeta si el plan
 // está activo en la DB. planName debe coincidir exactamente con plans.name.
 const CARDS: Card[] = [
-  { title: "MEMBRESÍA SHÉ BLACK", planName: "Membresía Black", color: "#AE4836", tagline: "Nuestra membresía más completa para sostener una práctica constante y volver a ti.", hint: "24 créditos · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Membresía" },
-  { title: "MEMBRESÍA 360", planName: "Membresía 360", color: "#AE4836", tagline: "Movimiento, balance y comunidad en una membresía diseñada para acompañar tu mes.", hint: "16 créditos · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Membresía" },
+  { title: "MEMBRESÍA SHÉ BLACK", planName: "Membresía Black", color: "#AE4836", tagline: "Nuestra membresía más completa para sostener una práctica constante y volver a ti.", hint: "Clases ilimitadas · 2 servicios · 1 taller · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Membresía" },
+  { title: "MEMBRESÍA 360", planName: "Membresía 360", color: "#AE4836", tagline: "Movimiento, balance y comunidad en una membresía diseñada para acompañar tu mes.", hint: "Clases ilimitadas · 1 servicio · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Membresía" },
   { title: "PAQUETE 12 CLASES", planName: "Paquete 12", color: "#AE4836", tagline: "Constancia que se siente. Más sesiones para sostener tu práctica.", hint: "12 créditos · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Paquete" },
   { title: "PAQUETE 8 CLASES", planName: "Paquete 8", color: "#8F7F36", tagline: "El balance ideal entre flexibilidad y constancia, a tu ritmo.", hint: "8 créditos · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Paquete" },
   { title: "PAQUETE 5 CLASES", planName: "Paquete 5", color: "#6E4B34", tagline: "Una forma amable de empezar y encontrar tus clases favoritas.", hint: "5 créditos · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Paquete" },

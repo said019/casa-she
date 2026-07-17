@@ -71,7 +71,8 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
         m.payment_method, m.payment_reference,
         p.name as plan_name, p.price as plan_price, p.currency as plan_currency,
         p.duration_days as plan_duration_days, p.class_limit,
-        p.reformer_credits, p.multi_credits, p.color as plan_color
+        p.reformer_credits, p.multi_credits, p.color as plan_color,
+        p.included_services, p.included_workshops, p.service_options
       FROM memberships m
       JOIN plans p ON m.plan_id = p.id
       WHERE m.user_id = $1
@@ -116,6 +117,18 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
             ? membership.classes_remaining
             : legacyRemaining(membership.reformer_remaining, membership.multi_remaining);
 
+        const includedBenefits = await queryOne<{
+            services_remaining: number;
+            workshops_remaining: number;
+        }>(`
+            SELECT
+                COUNT(*) FILTER (WHERE benefit_type = 'membership_service')::int AS services_remaining,
+                COUNT(*) FILTER (WHERE benefit_type = 'workshop_pass')::int AS workshops_remaining
+            FROM user_benefits
+            WHERE user_id = $1 AND status = 'active' AND expires_at > NOW()
+              AND benefit_type IN ('membership_service', 'workshop_pass')
+        `, [userId]);
+
         res.json({
             ...membership,
             classes_remaining: primaryCredits,
@@ -125,6 +138,8 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
             total_multi_available: totalMulti,
             total_classes_available: legacyRemaining(totalReformer, totalMulti),
             has_multiple_memberships: allActive.length > 1,
+            services_remaining: includedBenefits?.services_remaining ?? 0,
+            workshops_remaining: includedBenefits?.workshops_remaining ?? 0,
         });
     } catch (error) {
         console.error('Get membership error:', error);
@@ -147,7 +162,8 @@ router.get('/my', authenticate, async (req: Request, res: Response) => {
         m.id, m.status, m.start_date, m.end_date, m.classes_remaining,
         m.reformer_remaining, m.multi_remaining,
         p.name as plan_name, p.price as plan_price, p.currency as plan_currency,
-        p.class_limit, p.reformer_credits, p.multi_credits, p.color as plan_color
+        p.class_limit, p.reformer_credits, p.multi_credits, p.color as plan_color,
+        p.included_services, p.included_workshops, p.service_options
       FROM memberships m
       JOIN plans p ON m.plan_id = p.id
       WHERE m.user_id = $1 AND m.status IN ('active', 'pending_payment')

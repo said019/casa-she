@@ -14,7 +14,7 @@ const CATALOG: OnboardingCatalog = {
   plans: {
     'Clase de prueba': { id: 'pl-prueba', price: 150 }, 'Paquete 5': { id: 'pl-5', price: 1300 },
     'Paquete 8': { id: 'pl-8', price: 2000 }, 'Paquete 12': { id: 'pl-12', price: 2880 },
-    'Membresía 360': { id: 'pl-360', price: 3600 },
+    'Membresía 360': { id: 'pl-360', price: 3800 },
   },
 };
 

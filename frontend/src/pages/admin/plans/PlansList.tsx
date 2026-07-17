@@ -58,6 +58,9 @@ const planSchema = z.object({
         .preprocess((v) => (v === '' || v === null || v === undefined ? null : Number(v)),
             z.number().int().nonnegative().nullable())
         .optional(),
+    includedServices: z.coerce.number().int().nonnegative('No puede ser negativo').default(0),
+    includedWorkshops: z.coerce.number().int().nonnegative('No puede ser negativo').default(0),
+    serviceOptions: z.string().optional(),
     features: z.string().optional(),
     isActive: z.boolean(),
     // Plan interno: no visible para clientes (solo admin/recepción lo asignan). color = pastilla en reservas.
@@ -79,6 +82,9 @@ const defaultForm: PlanForm = {
     classLimit: null,
     reformerCredits: null,
     multiCredits: null,
+    includedServices: 0,
+    includedWorkshops: 0,
+    serviceOptions: 'Nutrición\nCosmiatría\nFisioterapia',
     features: '',
     isActive: true,
     isInternal: false,
@@ -203,6 +209,11 @@ export default function PlansList() {
             classLimit: data.classLimit ?? null,
             reformerCredits: data.reformerCredits ?? null,
             multiCredits: data.multiCredits ?? null,
+            includedServices: data.includedServices,
+            includedWorkshops: data.includedWorkshops,
+            serviceOptions: data.serviceOptions
+                ? data.serviceOptions.split('\n').map((option) => option.trim()).filter(Boolean)
+                : [],
             features: featuresArray,
             isActive: data.isActive,
             isInternal: data.isInternal,
@@ -238,6 +249,11 @@ export default function PlansList() {
                 classLimit: editingPlan.class_limit ?? null,
                 reformerCredits: (editingPlan as any).reformer_credits ?? null,
                 multiCredits: (editingPlan as any).multi_credits ?? null,
+                includedServices: editingPlan.included_services ?? 0,
+                includedWorkshops: editingPlan.included_workshops ?? 0,
+                serviceOptions: Array.isArray(editingPlan.service_options)
+                    ? editingPlan.service_options.join('\n')
+                    : '',
                 features: parseFeatures(editingPlan.features).join('\n'),
                 isActive: !!editingPlan.is_active,
                 isInternal: !!(editingPlan as any).is_internal,
@@ -279,6 +295,7 @@ export default function PlansList() {
                                     <TableHead>Precio</TableHead>
                                     <TableHead>Vigencia</TableHead>
                                     <TableHead>Clases</TableHead>
+                                    <TableHead>Incluye</TableHead>
                                     <TableHead>Estado</TableHead>
                                     <TableHead className="text-right">Acciones</TableHead>
                                 </TableRow>
@@ -286,13 +303,13 @@ export default function PlansList() {
                             <TableBody>
                                 {isLoading ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-8">
+                                        <TableCell colSpan={7} className="text-center py-8">
                                             <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
                                         </TableCell>
                                     </TableRow>
                                 ) : !plans || plans.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                                             No hay paquetes configurados
                                         </TableCell>
                                     </TableRow>
@@ -315,6 +332,17 @@ export default function PlansList() {
                                                     {plan.class_limit === null || plan.class_limit === undefined
                                                         ? 'Ilimitadas'
                                                         : plan.class_limit}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="space-y-0.5 text-xs text-muted-foreground">
+                                                        {(plan.included_services ?? 0) > 0 && (
+                                                            <div>{plan.included_services} servicio{plan.included_services === 1 ? '' : 's'}</div>
+                                                        )}
+                                                        {(plan.included_workshops ?? 0) > 0 && (
+                                                            <div>{plan.included_workshops} taller{plan.included_workshops === 1 ? '' : 'es'}</div>
+                                                        )}
+                                                        {(plan.included_services ?? 0) === 0 && (plan.included_workshops ?? 0) === 0 && '—'}
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="flex flex-wrap items-center gap-1.5">
@@ -448,6 +476,34 @@ export default function PlansList() {
                                     El motor de reservas usa <strong>estas dos bolsas</strong>. <strong>Vacío = ilimitado</strong>, <strong>0 = no incluye</strong> esa categoría.
                                     Ej: solo Clases → Salsa 0, Clases 8 · solo Salsa → Salsa 4, Clases 0 · Todo → ambas vacías.
                                 </p>
+
+                                <div className="rounded-[1rem] border border-[#AE4836]/20 bg-[#AE4836]/[0.05] p-4">
+                                    <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#AE4836]">
+                                        Beneficios incluidos
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="includedServices">Servicios por membresía</Label>
+                                            <Input id="includedServices" type="number" min="0" {...register('includedServices')} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="includedWorkshops">Talleres incluidos</Label>
+                                            <Input id="includedWorkshops" type="number" min="0" {...register('includedWorkshops')} />
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 space-y-2">
+                                        <Label htmlFor="serviceOptions">Servicios disponibles (uno por línea)</Label>
+                                        <Textarea
+                                            id="serviceOptions"
+                                            {...register('serviceOptions')}
+                                            rows={3}
+                                            placeholder={'Nutrición\nCosmiatría\nFisioterapia'}
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            Al activar el plan se crean beneficios consumibles con la misma fecha de vencimiento.
+                                        </p>
+                                    </div>
+                                </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="features">Características (una por línea)</Label>

@@ -17,7 +17,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import api, { getErrorMessage } from '@/lib/api';
-import { ArrowLeft, Gift, Loader2, Star, Sparkles, BadgePercent, CalendarPlus, Package, Award } from 'lucide-react';
+import { ArrowLeft, Gift, Loader2, Star, Sparkles, BadgePercent, CalendarPlus, Package, Award, HeartHandshake, Ticket } from 'lucide-react';
 
 interface LoyaltyReward {
   id: string;
@@ -37,6 +37,13 @@ interface WalletPassResponse {
 interface RedeemResponse {
   message?: string;
   newBalance: number;
+}
+
+interface MembershipBenefit {
+  id: string;
+  type: 'membership_service' | 'workshop_pass' | string;
+  value: { options?: string[]; plan_name?: string };
+  expiresAt: string;
 }
 
 const rewardTypeLabels: Record<string, string> = {
@@ -106,6 +113,15 @@ export default function WalletRewards() {
     queryKey: ['loyalty-rewards'],
     queryFn: async () => (await api.get('/loyalty/rewards')).data,
   });
+
+  const { data: membershipBenefits = [], isLoading: membershipBenefitsLoading } = useQuery<MembershipBenefit[]>({
+    queryKey: ['my-benefits'],
+    queryFn: async () => (await api.get('/loyalty/my-benefits')).data,
+  });
+
+  const includedBenefits = membershipBenefits.filter(
+    (benefit) => benefit.type === 'membership_service' || benefit.type === 'workshop_pass'
+  );
 
   const pointsBalance = wallet?.pointsBalance ?? 0;
   const activeRewards = (rewards || []).filter((reward) => reward.is_active);
@@ -182,6 +198,44 @@ export default function WalletRewards() {
             </div>
           </div>
           </section>
+
+          {(membershipBenefitsLoading || includedBenefits.length > 0) && (
+            <section className="rounded-[1.75rem] border border-[#AE4836]/20 bg-[#AE4836]/[0.05] p-5 sm:p-6">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#AE4836]">Incluidos en tu plan</p>
+                <h2 className="mt-1 text-xl font-semibold text-balance-dark">Beneficios disponibles</h2>
+              </div>
+              {membershipBenefitsLoading ? (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <Skeleton className="h-28 rounded-[1rem]" />
+                  <Skeleton className="h-28 rounded-[1rem]" />
+                </div>
+              ) : (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {includedBenefits.map((benefit) => {
+                    const service = benefit.type === 'membership_service';
+                    const Icon = service ? HeartHandshake : Ticket;
+                    return (
+                      <div key={benefit.id} className="rounded-[1rem] border border-[#AE4836]/15 bg-[#FBF7EE]/75 p-4">
+                        <div className="flex items-center gap-2 text-[#AE4836]">
+                          <Icon className="h-4 w-4" />
+                          <span className="text-sm font-semibold">{service ? 'Servicio a elegir' : 'Taller incluido'}</span>
+                        </div>
+                        <p className="mt-2 text-xs leading-relaxed text-balance-dark/62">
+                          {service
+                            ? (benefit.value?.options ?? []).join(' · ')
+                            : 'Se aplica automáticamente al inscribirte a un taller.'}
+                        </p>
+                        <p className="mt-3 text-[10px] uppercase tracking-[0.14em] text-balance-dark/45">
+                          Vence {new Date(benefit.expiresAt).toLocaleDateString('es-MX')}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          )}
 
           {walletIsError && (
             <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
