@@ -215,7 +215,7 @@ export default function Register() {
                             <Input
                                 id="dateOfBirth"
                                 type="date"
-                                className={fieldClass}
+                                className={`${fieldClass} auth-date-field`}
                                 {...register('dateOfBirth')}
                                 disabled={isLoading}
                             />
