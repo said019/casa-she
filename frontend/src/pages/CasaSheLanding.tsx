@@ -398,6 +398,7 @@ function Paquetes() {
           {visible.map((c, index) => {
             const plan = planByName[c.planName];
             const featured = index === 0 && isIntroClass(plan);
+            const membership = c.kind === "Membresía";
             return (
               <motion.article
                 key={c.title}
@@ -408,10 +409,12 @@ function Paquetes() {
                 whileHover={reduceMotion ? undefined : { y: -3 }}
                 className={`relative overflow-hidden rounded-[1.75rem] border p-6 sm:p-7 ${featured
                   ? "lg:col-span-2 border-[#2A4E36] bg-[#2A4E36] text-[#F6F0E4] shadow-[0_30px_90px_-68px_rgba(22,38,26,0.72)]"
-                  : "border-[#2A4E36]/20 bg-white/45 text-[#2A4E36] shadow-[0_24px_72px_-62px_rgba(42,78,54,0.46)]"
+                  : membership
+                    ? "border-[#AE4836] bg-[#AE4836] text-[#F6F0E4] shadow-[0_28px_84px_-60px_rgba(122,45,31,0.68)]"
+                    : "border-[#2A4E36]/20 bg-white/45 text-[#2A4E36] shadow-[0_24px_72px_-62px_rgba(42,78,54,0.46)]"
                 }`}
               >
-                <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: featured ? "#E1CCA0" : c.color }} />
+                <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: featured || membership ? "#E1CCA0" : c.color }} />
                 {featured && !reduceMotion && (
                   <motion.span
                     aria-hidden="true"
@@ -446,7 +449,7 @@ function Paquetes() {
                     </p>
                   </div>
 
-                  <div className={`border-t pt-5 ${featured ? "border-[#F6F0E4]/22" : "border-[#2A4E36]/18"}`}>
+                  <div className={`border-t pt-5 ${featured || membership ? "border-[#F6F0E4]/22" : "border-[#2A4E36]/18"}`}>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="col-span-2 sm:col-span-1">
                         <p className={`${body} text-[9px] uppercase tracking-[0.26em] opacity-50`}>Incluye</p>
@@ -465,7 +468,12 @@ function Paquetes() {
                       </div>
                       <Link
                         to={`/register?plan=${plan.id}`}
-                        className={`${body} inline-flex min-h-11 items-center justify-center rounded-full px-7 text-[11px] uppercase tracking-[0.22em] transition-transform active:scale-[0.98] ${featured ? "bg-[#F6F0E4] text-[#2A4E36]" : "bg-[#2A4E36] text-[#F6F0E4]"}`}
+                        className={`${body} inline-flex min-h-11 items-center justify-center rounded-full px-7 text-[11px] uppercase tracking-[0.22em] transition-transform active:scale-[0.98] ${featured
+                          ? "bg-[#F6F0E4] text-[#2A4E36]"
+                          : membership
+                            ? "bg-[#F6F0E4] text-[#913A2B]"
+                            : "bg-[#2A4E36] text-[#F6F0E4]"
+                        }`}
                       >
                         Elegir esta opción
                       </Link>
