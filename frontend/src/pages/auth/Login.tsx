@@ -47,6 +47,7 @@ export default function Login() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const returnUrl = searchParams.get('returnUrl');
+    const isPurchaseFlow = returnUrl?.startsWith('/app/checkout') === true;
     const { login, isLoading, error, clearError, isAuthenticated, user } = useAuthStore();
 
     const {
@@ -91,7 +92,9 @@ export default function Login() {
     return (
         <AuthShell
             title="Entra a casa"
-            subtitle="Reserva clases y revisa tus créditos."
+            subtitle={isPurchaseFlow
+                ? 'Inicia sesión para continuar con el paquete que elegiste.'
+                : 'Reserva clases y revisa tus créditos.'}
             footer={
                 <>
                     ¿No tienes cuenta?{' '}

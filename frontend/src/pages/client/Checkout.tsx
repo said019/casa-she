@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -122,6 +122,7 @@ export default function Checkout() {
   const queryClient = useQueryClient();
 
   const preselectedPlanId = searchParams.get('plan');
+  const preselectionApplied = useRef(false);
 
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(preselectedPlanId);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<OrderPaymentMethod>('bank_transfer');
@@ -158,6 +159,17 @@ export default function Checkout() {
       return res.data.filter((p: Plan) => p.is_active && !p.is_internal).sort((a: Plan, b: Plan) => (a.sort_order || 0) - (b.sort_order || 0));
     },
   });
+
+  // Cuando la clienta llega desde una tarjeta del index, el plan ya viene
+  // elegido. En cuanto se valida contra el catálogo activo, avanza directo al
+  // método de pago sin obligarla a seleccionar la misma tarjeta otra vez.
+  useEffect(() => {
+    if (!preselectionApplied.current && preselectedPlanId && plans?.some((plan) => plan.id === preselectedPlanId)) {
+      preselectionApplied.current = true;
+      setSelectedPlanId(preselectedPlanId);
+      setStep('payment');
+    }
+  }, [preselectedPlanId, plans]);
 
   // Fetch user membership status 
   // We need to know if they have an active "membership_fee" plan

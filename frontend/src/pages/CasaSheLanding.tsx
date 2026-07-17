@@ -6,6 +6,7 @@ import api from "@/lib/api";
 import { CasaShePattern } from "@/components/CasaShePattern";
 import { CoachSheet } from "@/components/CoachSheet";
 import { isIntroClass, sortCatalogPlans } from "@/lib/planPresentation";
+import { useAuthStore } from "@/stores/authStore";
 
 /**
  * Landing público de Casa Shé — réplica fiel de https://casashe.mx/
@@ -331,6 +332,7 @@ function Hero() {
 
 function Paquetes() {
   const reduceMotion = useReducedMotion();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { data: apiPlans = [], isLoading, isError, refetch } = useQuery<{ id: string; name: string; price: number; is_active: boolean; sort_order?: number | null }[]>({
     queryKey: ["landing-plans"],
     queryFn: async () => (await api.get("/plans")).data,
@@ -399,6 +401,10 @@ function Paquetes() {
             const plan = planByName[c.planName];
             const featured = index === 0 && isIntroClass(plan);
             const membership = c.kind === "Membresía";
+            const checkoutUrl = `/app/checkout?plan=${encodeURIComponent(plan.id)}`;
+            const purchaseUrl = isAuthenticated
+              ? checkoutUrl
+              : `/login?returnUrl=${encodeURIComponent(checkoutUrl)}`;
             return (
               <motion.article
                 key={c.title}
@@ -467,7 +473,7 @@ function Paquetes() {
                         <p className={`${display} mt-1 text-4xl leading-none sm:text-5xl`}>{fmt(plan.price)}</p>
                       </div>
                       <Link
-                        to={`/register?plan=${plan.id}`}
+                        to={purchaseUrl}
                         className={`${body} inline-flex min-h-11 items-center justify-center rounded-full px-7 text-[11px] uppercase tracking-[0.22em] transition-transform active:scale-[0.98] ${featured
                           ? "bg-[#F6F0E4] text-[#2A4E36]"
                           : membership

@@ -1,5 +1,5 @@
 import { ReactNode, useEffect } from 'react';
-import { useNavigate, Outlet } from 'react-router-dom';
+import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import type { UserRole } from '@/types/auth';
 import { Loader2 } from 'lucide-react';
@@ -26,6 +26,7 @@ function isElevatedUser(user: ReturnType<typeof useAuthStore.getState>['user']):
 
 export function AuthGuard({ children, requiredRoles, redirectTo = '/login', allowElevated = false }: AuthGuardProps) {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user, isAuthenticated, isLoading, checkAuth } = useAuthStore();
 
     // Check auth on mount
@@ -39,9 +40,11 @@ export function AuthGuard({ children, requiredRoles, redirectTo = '/login', allo
 
         // Not authenticated. Las páginas /coach/* mandan al login de coach, no al de cliente.
         if (!isAuthenticated) {
-            const dest = redirectTo === '/login' && window.location.pathname.startsWith('/coach')
+            const dest = redirectTo === '/login' && location.pathname.startsWith('/coach')
                 ? '/coach/login'
-                : redirectTo;
+                : redirectTo === '/login'
+                    ? `/login?returnUrl=${encodeURIComponent(`${location.pathname}${location.search}`)}`
+                    : redirectTo;
             navigate(dest, { replace: true });
             return;
         }
@@ -62,7 +65,7 @@ export function AuthGuard({ children, requiredRoles, redirectTo = '/login', allo
                 navigate('/app', { replace: true });
             }
         }
-    }, [isLoading, isAuthenticated, user, requiredRoles, allowElevated, navigate, redirectTo]);
+    }, [isLoading, isAuthenticated, user, requiredRoles, allowElevated, navigate, redirectTo, location.pathname, location.search]);
 
     // Show loading while checking auth
     if (isLoading) {
