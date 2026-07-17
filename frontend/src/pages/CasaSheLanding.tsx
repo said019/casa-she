@@ -249,10 +249,11 @@ function Navbar() {
           ))}
           <Link
             to="/login"
-            className="rounded-full border px-5 py-2 text-[12px] tracking-[0.2em] transition-colors"
+            aria-label="¿Ya eres clienta? Inicia sesión"
+            className="rounded-full border px-5 py-2 text-[11px] tracking-[0.16em] transition-colors"
             style={{ borderColor: scrolled ? GREEN : CREAM, color: scrolled ? GREEN : CREAM }}
           >
-            ENTRAR
+            ¿YA ERES CLIENTA? INICIA SESIÓN
           </Link>
         </nav>
         <Link
@@ -260,7 +261,7 @@ function Navbar() {
           className={`${body} text-[12px] uppercase tracking-[0.2em] xl:hidden`}
           style={{ color: scrolled ? GREEN : CREAM }}
         >
-          Entrar
+          Iniciar sesión
         </Link>
       </div>
     </header>
@@ -274,7 +275,7 @@ function Hero() {
     <section id="inicio" className="relative min-h-[100dvh] overflow-hidden" style={{ backgroundColor: DEEP }}>
       <img
         src="/casashe/studio-barre-hero.webp"
-        alt="Salón de Barre de Casa Shé en Condesa"
+        alt="Salón de movimiento de Casa Shé en Condesa"
         className="absolute inset-0 h-full w-full object-cover object-[center_48%]"
         loading="eager"
         decoding="async"
@@ -294,7 +295,7 @@ function Hero() {
               to="/register"
               className="inline-block transition-opacity duration-300 hover:opacity-80 focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-8 focus-visible:outline-[#F6F0E4] active:scale-[0.98]"
             >
-              Reserva tu clase de Barre
+              Reserva tu clase
             </Link>
           </h1>
           <div aria-hidden="true" className="mt-6 flex w-full max-w-[24rem] items-center gap-3 opacity-80">
