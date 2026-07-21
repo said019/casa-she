@@ -51,6 +51,7 @@ import onboardingRoutes from './routes/onboarding.js';
 import referralsRoutes from './routes/referrals.js';
 import pushRoutes from './routes/push.js';
 import adminPushRoutes from './routes/admin-push.js';
+import partnersRouter from './routes/partners.js';
 import stripeWebhook from './routes/stripe-webhook.js';
 import mercadopagoWebhook from './routes/mercadopago-webhook.js';
 import { validateStripeConfig } from './lib/stripe.js';
@@ -3882,6 +3883,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/reception', receptionDashboardRoutes);
 app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/partners', partnersRouter);
 
 // 404 handler
 app.use((req, res) => {

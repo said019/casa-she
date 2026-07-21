@@ -7,7 +7,7 @@
  */
 
 /** Nombre que aparece como instructor en FitPass cuando la clase no tiene coach. */
-export const GYM_DEFAULT_COACH = process.env.GYM_DEFAULT_COACH || 'Hundred Studio';
+export const GYM_DEFAULT_COACH = process.env.GYM_DEFAULT_COACH || 'Casa Shé';
 
 /** Responsable por defecto al publicar eventos en TotalPass. */
 export const GYM_TEAM_NAME = process.env.GYM_TEAM_NAME || 'Casa Shé';
