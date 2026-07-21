@@ -3680,6 +3680,19 @@ async function runStartupMigrations(): Promise<void> {
         console.log('  ✅ Migration 108: platform_credentials');
     } catch (e) { console.error('Migration 108 error:', e); }
 
+    // ---- Migration 109: TotalPass — columnas de canal en bookings ----
+    try {
+        await query(`ALTER TABLE bookings
+            ADD COLUMN IF NOT EXISTS channel VARCHAR(20) NOT NULL DEFAULT 'app',
+            ADD COLUMN IF NOT EXISTS external_ref VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS partner_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+            ADD COLUMN IF NOT EXISTS checked_in_method VARCHAR(20) NOT NULL DEFAULT 'manual'`);
+        await query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_channel_external_ref
+            ON bookings(channel, external_ref) WHERE external_ref IS NOT NULL`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_bookings_channel_status ON bookings(channel, status)`);
+        console.log('  ✅ Migration 109: bookings channel columns');
+    } catch (e) { console.error('Migration 109 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();
