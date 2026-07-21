@@ -3687,6 +3687,12 @@ async function runStartupMigrations(): Promise<void> {
             ADD COLUMN IF NOT EXISTS external_ref VARCHAR(255),
             ADD COLUMN IF NOT EXISTS partner_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
             ADD COLUMN IF NOT EXISTS checked_in_method VARCHAR(20) NOT NULL DEFAULT 'manual'`);
+        // CHECK del canal (idempotente): consistente con las otras tablas de canal.
+        await query(`DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'bookings_channel_check') THEN
+                ALTER TABLE bookings ADD CONSTRAINT bookings_channel_check CHECK (channel IN ('app','totalpass','wellhub','fitpass'));
+            END IF;
+        END $$;`);
         await query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_channel_external_ref
             ON bookings(channel, external_ref) WHERE external_ref IS NOT NULL`);
         await query(`CREATE INDEX IF NOT EXISTS idx_bookings_channel_status ON bookings(channel, status)`);
