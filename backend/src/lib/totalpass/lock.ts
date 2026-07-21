@@ -25,6 +25,11 @@ import { pool } from '../../config/database.js';
  */
 export async function withPgAdvisoryLock<T>(key: number, fn: () => Promise<T>): Promise<T | null> {
     const client = await pool.connect();
+    // Si el unlock falla, la sesión física seguiría teniendo el advisory lock; en ese
+    // caso hay que DESCARTAR la conexión (no reciclarla al pool) para que el lock muera
+    // con ella. `client.release(err)` con un error descarta el cliente; `release()` normal
+    // lo devuelve limpio al pool para reutilizarse.
+    let unlockErr: Error | null = null;
     try {
         const lockResult = await client.query<{ pg_try_advisory_lock: boolean }>(
             'SELECT pg_try_advisory_lock($1) AS pg_try_advisory_lock',
@@ -37,12 +42,13 @@ export async function withPgAdvisoryLock<T>(key: number, fn: () => Promise<T>): 
             return await fn();
         } finally {
             await client.query('SELECT pg_advisory_unlock($1)', [key]).catch((err) => {
-                // No relanzar: el resultado de fn() ya es lo importante. Un unlock fallido
-                // libera solo al cerrarse la conexión (release), que sí ocurre en el finally externo.
+                // No relanzar: el resultado de fn() ya es lo importante. Pero marcamos el
+                // fallo para descartar la conexión abajo y no dejar el lock atascado.
+                unlockErr = err instanceof Error ? err : new Error(String(err));
                 console.error(`[withPgAdvisoryLock] no se pudo liberar el lock ${key}:`, err);
             });
         }
     } finally {
-        client.release();
+        client.release(unlockErr ?? undefined);
     }
 }
