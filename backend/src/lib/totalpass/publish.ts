@@ -14,6 +14,9 @@
  *    trim simétrico al guardado de TP.
  *  - slots = channelCapCeiling (techo del canal), NUNCA la cuota cruda del tipo.
  *  - Throttle de 140ms entre llamadas; un 429 aborta la corrida.
+ *  - Salvaguarda spec §6: el place autenticado debe ser Casa Shé
+ *    (placeNameMatchesCasaShe, match tolerante) o se aborta el publish de esa
+ *    clase — defensa en profundidad si las llaves apuntaran a otro estudio.
  */
 import { query, queryOne } from '../../config/database.js';
 import { GYM_DEFAULT_COACH } from '../gym-config.js';
@@ -44,6 +47,30 @@ export interface TpClassRow {
 export interface TpClassTypeRow {
     name: string;
     duration_minutes: number | null;
+}
+
+/**
+ * Normaliza un nombre para comparación tolerante: minúsculas y sin acentos/diacríticos.
+ * Función PURA, base de `placeNameMatchesCasaShe`.
+ */
+function normalizeForMatch(value: string): string {
+    return value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+/**
+ * Salvaguarda spec §6 (revisión final, Fix 2): true si el nombre del place que
+ * devuelve TotalPass corresponde a Casa Shé. Comparación tolerante — normaliza a
+ * minúsculas sin acentos y acepta que el nombre CONTENGA "casa she" (p.ej.
+ * "Casa She Studio", "CASA SHE"), no solo que coincida exacto. Defensa en
+ * profundidad para no publicar clases en el place equivocado si las llaves de
+ * `platform_credentials` llegaran a apuntar a otro estudio.
+ */
+export function placeNameMatchesCasaShe(name: string): boolean {
+    return normalizeForMatch(name).includes('casa she');
 }
 
 /**
@@ -212,6 +239,14 @@ export async function publishTotalPassClass(classId: string): Promise<TpClassPub
     try {
         // 5) planId del place autenticado (sin hardcodear)
         const place = await client.getPlace();
+
+        // 5b) Salvaguarda spec §6 (Fix 2, revisión final): si las llaves apuntan a otro
+        // estudio, el place devuelto NO es Casa Shé — abortamos antes de crear nada en TP.
+        const placeName = String(place?.name ?? '').trim();
+        if (!placeNameMatchesCasaShe(placeName)) {
+            return { ok: false, action: 'error', detail: `place inesperado: ${placeName}` };
+        }
+
         const planId = totalPassPlanId(place);
         if (!planId) return { ok: false, action: 'error', detail: 'TotalPass no devolvió un planId para el place' };
 

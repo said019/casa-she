@@ -9,8 +9,23 @@
  * vencimiento aproximado (23h, un margen conservador bajo las 24h reales del
  * JWT) para que el estado sea auditable sin depender de la memoria del proceso.
  */
-import { query } from '../../config/database.js';
+import { query, queryOne } from '../../config/database.js';
 import { totalPassOfficialFromDb } from './client.js';
+
+/**
+ * true si el canal TotalPass está habilitado (`platform_credentials.is_enabled`).
+ * Gate de activación segura para los crons (Fix Task 17 — revisión final): tener
+ * credenciales cargadas NO basta para que los jobs automáticos peguen a la API real;
+ * `is_enabled` solo se pone en true tras un "Probar conexión" exitoso desde el panel
+ * (POST /partners/totalpass/test). Si la query falla, se asume deshabilitado
+ * (fail-closed) para no arriesgar una activación accidental.
+ */
+export async function isTotalpassEnabled(): Promise<boolean> {
+    const row = await queryOne<{ is_enabled: boolean }>(
+        `SELECT is_enabled FROM platform_credentials WHERE channel = 'totalpass'`,
+    ).catch(() => null);
+    return row?.is_enabled === true;
+}
 
 /** Fuerza la renovación del JWT de TotalPass y la persiste en `platform_credentials`. */
 export async function renewTotalPassToken(): Promise<void> {

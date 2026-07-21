@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { formatTpCancelDeadlinePanel, TP_CANCEL_HOURS } from '../src/lib/totalpass/cancel-format.js';
-import { buildIndividualInput } from '../src/lib/totalpass/publish.js';
+import { buildIndividualInput, placeNameMatchesCasaShe } from '../src/lib/totalpass/publish.js';
 
 // ── (a) formatTpCancelDeadlinePanel: parte pura DST-aware ─────────────────────
 // Clase 19:00 hora CDMX − 4h = 15:00 = 03:00 PM, mismo día, formato panel.
@@ -50,5 +50,12 @@ assert.equal(fallback.duration, 50, 'duración default 50 cuando el tipo no la t
 assert.ok(fallback.responsible.length > 0, 'responsible default no vacío (GYM_DEFAULT_COACH)');
 assert.equal(fallback.startTime, '08:30 AM', 'startTime 08:30 => 08:30 AM');
 assert.equal(fallback.externalReference, 'c2', 'externalReference = classId (fallback)');
+
+// ── (c) placeNameMatchesCasaShe: salvaguarda spec §6 (Fix 2) ─────────────────
+assert.equal(placeNameMatchesCasaShe('Casa Shé'), true, 'acepta nombre exacto con acento');
+assert.equal(placeNameMatchesCasaShe('CASA SHE'), true, 'acepta mayúsculas sin acento');
+assert.equal(placeNameMatchesCasaShe('Casa She Studio'), true, 'acepta que el nombre CONTENGA casa she');
+assert.equal(placeNameMatchesCasaShe('Otro Studio'), false, 'rechaza un place distinto');
+assert.equal(placeNameMatchesCasaShe(''), false, 'rechaza nombre vacío');
 
 console.log('test-totalpass-publish: OK');

@@ -23,7 +23,7 @@ import {
 import { writeInAppNotification } from '../lib/in-app-notifications.js';
 import { getLoyaltyConfig, type DbClient } from '../lib/loyalty.js';
 import { totalPassOfficialFromDb } from '../lib/totalpass/client.js';
-import { renewTotalPassToken } from '../lib/totalpass/token.js';
+import { renewTotalPassToken, isTotalpassEnabled } from '../lib/totalpass/token.js';
 import { publishTotalPassIndividualClasses } from '../lib/totalpass/publish.js';
 import { reconcileTotalpassPool } from '../lib/totalpass/pool.js';
 import { syncTotalPassReservations } from '../lib/totalpass/source.js';
@@ -756,6 +756,14 @@ export async function expireBenefits(): Promise<void> {
 // Los 4 jobs son INERTES sin credenciales cargadas en `platform_credentials`
 // (canal 'totalpass'): revisan `totalPassOfficialFromDb()` primero y
 // simplemente regresan si es null, sin loguear error ni romper el arranque.
+// Además, revisión final de integración (Fix 1): tener credenciales cargadas
+// NO alcanza para que corran solos — también exigen `is_enabled = true` vía
+// `isTotalpassEnabled()`. Ese flag solo lo pone en true un "Probar conexión"
+// exitoso desde el panel (POST /partners/totalpass/test), así que encender
+// `ENABLE_CRON_JOBS` global con llaves ya cargadas pero sin probar la conexión
+// deja los 4 jobs inertes (no saltan el dry-run que exige el spec). El trigger
+// manual `POST /api/partners/totalpass/run/:job` NO tiene este segundo gate a
+// propósito: debe poder correr en dry-run aunque `is_enabled` siga en false.
 // Los 3 que pegan a la API oficial (import/pool/publish) van envueltos en
 // `withPgAdvisoryLock` con una llave propia por job para que dos corridas del
 // mismo job nunca se solapen (cron + trigger manual, o un tick lento que
@@ -767,6 +775,7 @@ async function totalpassTokenJob(): Promise<void> {
     const jobName = 'TOTALPASS_TOKEN';
     try {
         if (!(await totalPassOfficialFromDb())) return; // sin credenciales — inerte
+        if (!(await isTotalpassEnabled())) return; // is_enabled=false — inerte hasta "Probar conexión" exitoso
         await renewTotalPassToken();
         await recordJobExecution(jobName, true);
     } catch (error) {
@@ -780,6 +789,7 @@ async function totalpassPublishJob(): Promise<void> {
     const jobName = 'TOTALPASS_PUBLISH';
     try {
         if (!(await totalPassOfficialFromDb())) return; // sin credenciales — inerte
+        if (!(await isTotalpassEnabled())) return; // is_enabled=false — inerte hasta "Probar conexión" exitoso
         const result = await withPgAdvisoryLock(471003, () =>
             publishTotalPassIndividualClasses(localDateStr(), addDaysToDateStr(localDateStr(), 21)),
         );
@@ -800,6 +810,7 @@ async function totalpassPoolJob(): Promise<void> {
     const jobName = 'TOTALPASS_POOL';
     try {
         if (!(await totalPassOfficialFromDb())) return; // sin credenciales — inerte
+        if (!(await isTotalpassEnabled())) return; // is_enabled=false — inerte hasta "Probar conexión" exitoso
         const result = await withPgAdvisoryLock(471002, () => reconcileTotalpassPool());
         if (result === null) {
             logJob(jobName, 'lock ocupado (otra corrida en curso) — se omite este tick');
@@ -818,6 +829,7 @@ async function totalpassImportJob(): Promise<void> {
     const jobName = 'TOTALPASS_IMPORT';
     try {
         if (!(await totalPassOfficialFromDb())) return; // sin credenciales — inerte
+        if (!(await isTotalpassEnabled())) return; // is_enabled=false — inerte hasta "Probar conexión" exitoso
         const result = await withPgAdvisoryLock(471001, () => syncTotalPassReservations());
         if (result === null) {
             logJob(jobName, 'lock ocupado (otra corrida en curso) — se omite este tick');
