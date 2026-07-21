@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { channelCapAvailable, channelCapCeiling, buildPoolSnapshot } from '../src/lib/totalpass/caps.js';
+import { channelCapAvailable, channelCapCeiling, buildPoolSnapshot, validateCap } from '../src/lib/totalpass/caps.js';
 
 // cap null = canal apagado -> 0 disponible
 assert.equal(channelCapAvailable(8, 0, 0, null), 0);
@@ -19,4 +19,11 @@ const s = buildPoolSnapshot({ capacity: 8, total: 2, totalpass: 2 }, 3);
 assert.equal(s.physicalFree, 6);
 assert.equal(s.tpAvailable, 1);
 assert.equal(s.tpCeiling, 3);
+
+// validateCap
+assert.equal(validateCap(3, 1, 8), null);
+assert.equal(validateCap(0, 0, 8), null);
+assert.equal(validateCap(1, 2, 8), 'CAP_BELOW_BOOKED');
+assert.equal(validateCap(9, 0, 8), 'CAP_EXCEEDS_CAPACITY');
+
 console.log('test-totalpass-caps: OK');

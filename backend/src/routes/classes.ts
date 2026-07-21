@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { optionalAuth } from '../middleware/auth.js';
 import { capacityError } from '../lib/schedule.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
+import { setTotalpassCap } from '../lib/totalpass/caps.js';
 
 const router = Router();
 
@@ -827,6 +828,23 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
     } catch (error) {
         console.error('Update class error:', error);
         res.status(500).json({ error: 'Error al actualizar clase' });
+    }
+});
+
+// PUT /api/classes/:id/channels — setear lugares de TotalPass para una clase
+router.put('/:id/channels', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
+    try {
+        const { totalpass } = req.body ?? {};
+        const n = Number(totalpass);
+        if (!Number.isInteger(n) || n < 0) return res.status(400).json({ error: 'totalpass debe ser un entero >= 0' });
+        const result = await setTotalpassCap(req.params.id, n);
+        res.json({ ok: true, totalpass: result });
+    } catch (e: any) {
+        if (e.code === 'CLASS_NOT_FOUND') return res.status(404).json({ error: 'Clase no encontrada' });
+        if (e.code === 'CAP_BELOW_BOOKED') return res.status(409).json({ error: `Ya hay ${e.booked} reservas TotalPass; no puedes bajar de ahí` });
+        if (e.code === 'CAP_EXCEEDS_CAPACITY') return res.status(400).json({ error: 'Los lugares TP no pueden exceder la capacidad de la clase' });
+        console.error('setTotalpassCap error:', e);
+        res.status(500).json({ error: 'Error al guardar lugares TotalPass' });
     }
 });
 
