@@ -86,6 +86,35 @@ export default function TotalPassSettings() {
     },
   });
 
+  // ── Triggers manuales (Fase 7): publicar / importar / reconciliar sin crons ──
+  const [runResult, setRunResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const jobLabel = (job: string) =>
+    job === 'publish' ? 'Publicación' : job === 'import' ? 'Importación' : 'Reconciliación de cupo';
+
+  const runJob = useMutation({
+    mutationFn: async (job: 'publish' | 'import' | 'pool') =>
+      (await api.post(`/partners/totalpass/run/${job}`)).data as {
+        ok: boolean; job: string; summary?: unknown; locked?: boolean; message?: string;
+      },
+    onSuccess: (res) => {
+      const label = jobLabel(res.job);
+      if (res.locked) {
+        setRunResult({ ok: false, message: res.message || 'Ya hay una corrida en curso; intenta de nuevo.' });
+        toast({ title: `${label} ocupada`, description: res.message, variant: 'destructive' });
+        return;
+      }
+      const summaryText = JSON.stringify(res.summary ?? {});
+      setRunResult({ ok: true, message: `${label} lista · ${summaryText}` });
+      qc.invalidateQueries({ queryKey: ['totalpass-credentials'] });
+      toast({ title: `${label} lista`, description: summaryText });
+    },
+    onError: (err: any) => {
+      const message = err?.response?.data?.error || 'No se pudo ejecutar la acción.';
+      setRunResult({ ok: false, message });
+      toast({ title: 'Error', description: message, variant: 'destructive' });
+    },
+  });
+
   return (
     <AuthGuard requiredRoles={['admin', 'super_admin']}>
       <AdminLayout>
@@ -211,6 +240,53 @@ export default function TotalPassSettings() {
                 <p className={testResult.ok ? 'text-sm text-green-700' : 'text-sm text-destructive'}>
                   {testResult.message}
                   {testResult.ok && testResult.planId ? ` · Plan ID: ${testResult.planId}` : ''}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ── Card: Acciones (triggers manuales, sin encender crons) ──────── */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-heading" style={{ color: '#2A4E36' }}>Acciones</CardTitle>
+              <CardDescription>
+                Ejecuta la sincronización a mano, sin encender los crons. <b>Publicar</b> sube a TotalPass las clases con cupo TP; <b>Importar</b> trae las reservas de socios al calendario; <b>Reconciliar cupo</b> ajusta los lugares en TotalPass.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => runJob.mutate('publish')}
+                  disabled={runJob.isPending || !data?.is_enabled}
+                >
+                  {runJob.isPending && runJob.variables === 'publish' ? 'Publicando...' : 'Publicar ahora'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => runJob.mutate('import')}
+                  disabled={runJob.isPending || !data?.is_enabled}
+                >
+                  {runJob.isPending && runJob.variables === 'import' ? 'Importando...' : 'Importar reservas'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => runJob.mutate('pool')}
+                  disabled={runJob.isPending || !data?.is_enabled}
+                >
+                  {runJob.isPending && runJob.variables === 'pool' ? 'Reconciliando...' : 'Reconciliar cupo'}
+                </Button>
+              </div>
+
+              {!data?.is_enabled && (
+                <p className="text-xs text-muted-foreground">
+                  Primero prueba la conexión (arriba) para habilitar estas acciones.
+                </p>
+              )}
+
+              {runResult && (
+                <p className={runResult.ok ? 'text-sm text-green-700 break-words' : 'text-sm text-destructive break-words'}>
+                  {runResult.message}
                 </p>
               )}
             </CardContent>
