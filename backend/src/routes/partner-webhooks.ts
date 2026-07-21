@@ -17,11 +17,26 @@
  */
 import { Router, Request, Response } from 'express';
 import { createHash } from 'crypto';
+import rateLimit from 'express-rate-limit';
 import { query } from '../config/database.js';
 import { localDateStr, localDateTimeUtc } from '../lib/mx-time.js';
 import { totalPassOfficialFromDb } from '../lib/totalpass/client.js';
 
 const router = Router();
+
+// Este endpoint es público (sin auth de sesión — ver comentario más abajo) y está
+// exento del limiter GLOBAL de index.ts (ese es para frenar fuerza bruta/abuso de
+// la API normal, no reintentos legítimos de webhooks). Pero sigue siendo una ruta
+// pública que inserta en `processed_events` por request y puede disparar un fetch
+// saliente a TotalPass — necesita SU PROPIO límite, laxo pero no cero, mismo estilo
+// que `apiLimiter`/`authLimiter` en index.ts.
+const totalPassCheckinLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Demasiadas solicitudes. Intenta de nuevo en un momento.' },
+});
 
 // ── Guard anti-SSRF ──────────────────────────────────────────────────────────
 
@@ -255,14 +270,21 @@ function extractCheckinUserInfo(payload: any): { name: string | null; document: 
 
 /** POST directo al endpoint de confirmación: el token de la URL ES la auth
  *  (sin headers, body vacío). Timeout corto — la ventana de confirmación de TP
- *  es chica, no vale la pena esperar de más. */
+ *  es chica, no vale la pena esperar de más.
+ *
+ *  `redirect: 'manual'` es anti-SSRF: el host ya pasó `isAllowedTpConfirmationHost`,
+ *  pero un 3xx DE ESE HOST podría apuntar a un host arbitrario fuera de la
+ *  allowlist. Con 'manual' fetch NO sigue el redirect — lo devuelve tal cual
+ *  (Node/undici expone el status real del 3xx, no una respuesta opaca). Cualquier
+ *  3xx se trata como FALLO de confirmación, igual que un status no-2xx. */
 async function confirmCheckinEndpoint(url: string): Promise<{ ok: boolean; status: number; text: string }> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     try {
-        const response = await fetch(url, { method: 'POST', signal: controller.signal });
+        const response = await fetch(url, { method: 'POST', signal: controller.signal, redirect: 'manual' });
         const text = await response.text().catch(() => '');
-        return { ok: response.ok, status: response.status, text };
+        const isRedirect = response.status >= 300 && response.status < 400;
+        return { ok: response.ok && !isRedirect, status: response.status, text };
     } finally {
         clearTimeout(timeout);
     }
@@ -319,7 +341,7 @@ async function findCandidateBookingsForCheckin(): Promise<TpBookingCandidate[]> 
 // ruta NO pasa por ningún middleware de auth (fail-closed rechazaría siempre
 // por falta de firma). La seguridad es el guard anti-SSRF de arriba: solo se
 // llama al `endpoint` si su host es un host TotalPass conocido.
-router.post('/totalpass/checkin', async (req: Request, res: Response) => {
+router.post('/totalpass/checkin', totalPassCheckinLimiter, async (req: Request, res: Response) => {
     const payload = req.body ?? {};
     const rawEndpoint = extractConfirmationEndpoint(payload);
     const token = extractConfirmationToken(rawEndpoint);
@@ -416,9 +438,11 @@ router.post('/totalpass/checkin', async (req: Request, res: Response) => {
         return res.status(200).json({ ok: true, confirmed: confirmation.ok, matched: Boolean(matchedBooking) });
     } catch (error: any) {
         // Red de seguridad: cualquier excepción no prevista se loguea (nunca 500 mudo).
+        // El mensaje real SOLO va al log del servidor — el caller no está autenticado,
+        // así que el JSON de respuesta lleva un mensaje genérico (nada de detalles internos).
         console.error('[tp-checkin] error inesperado procesando check-in:', error);
         await finalizeProcessedEvent(eventId, 500).catch(() => { /* best-effort */ });
-        return res.status(500).json({ ok: false, error: error?.message || 'Error procesando check-in de TotalPass' });
+        return res.status(500).json({ ok: false, error: 'internal_error' });
     }
 });
 
