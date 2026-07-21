@@ -51,6 +51,8 @@ import onboardingRoutes from './routes/onboarding.js';
 import referralsRoutes from './routes/referrals.js';
 import pushRoutes from './routes/push.js';
 import adminPushRoutes from './routes/admin-push.js';
+import partnersRouter from './routes/partners.js';
+import partnerWebhooksRouter from './routes/partner-webhooks.js';
 import stripeWebhook from './routes/stripe-webhook.js';
 import mercadopagoWebhook from './routes/mercadopago-webhook.js';
 import { validateStripeConfig } from './lib/stripe.js';
@@ -98,6 +100,7 @@ const apiLimiter = rateLimit({
         req.path === '/api/health' ||
         req.path.startsWith('/api/stripe/webhook') ||
         req.path.startsWith('/webhooks/mercadopago') ||
+        req.path.startsWith('/webhooks/totalpass') ||
         req.path.startsWith('/api/evolution/webhook'),
     message: { error: 'Demasiadas solicitudes. Intenta de nuevo en un momento.' },
 });
@@ -2838,6 +2841,16 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Migration 096: payment_method enum extendido con \'gratis\'.');
     } catch (e: any) { console.error('Migration 096 error:', e.message); }
 
+    // Migration: método de pago 'plataforma' para las membresías internas de plataforma
+    // (Totalpass / Wellhub / Fitpass). El import de reservas de TotalPass (Fase 5) crea la
+    // membresía interna con payment_method='plataforma'; sin este valor el INSERT truena y
+    // hace ROLLBACK de cada reserva. ADD VALUE no puede ir en transacción → query suelto e
+    // idempotente (IF NOT EXISTS).
+    try {
+        await query(`ALTER TYPE payment_method ADD VALUE IF NOT EXISTS 'plataforma'`);
+        console.log('Migration: payment_method enum extendido con \'plataforma\'.');
+    } catch (e: any) { console.error('Migration payment_method plataforma error:', e.message); }
+
     // Migración: planes INTERNOS de plataformas (Totalpass / Wellhub / Fitpass) para llevar control
     // de los alumnos que vienen de esas plataformas. Sin precio, NO visibles para clientes
     // (is_internal=true → solo admin y recepción los ven/asignan), créditos ilimitados para que
@@ -3986,6 +3999,176 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Migration 107b: ux_memberships_order_id ready.');
     } catch (e) { console.error('Migration 107b error (¿duplicados preexistentes de order_id? limpiar manualmente):', e); }
 
+    // ---- Migration 108: TotalPass — tabla de credenciales de plataforma (TP-only, oficial) ----
+    try {
+        await query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
+        await query(`
+            CREATE TABLE IF NOT EXISTS platform_credentials (
+                channel VARCHAR(20) PRIMARY KEY CHECK (channel IN ('totalpass','wellhub','fitpass')),
+                is_enabled BOOLEAN NOT NULL DEFAULT false,
+                partner_api_key TEXT,
+                place_api_key TEXT,
+                unit_id VARCHAR(100),
+                booking_base_url TEXT,
+                access_token TEXT,
+                token_expires_at TIMESTAMPTZ,
+                place_name TEXT,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_by UUID REFERENCES users(id)
+            )`);
+        await query(`INSERT INTO platform_credentials (channel) VALUES ('totalpass') ON CONFLICT (channel) DO NOTHING`);
+        console.log('  ✅ Migration 108: platform_credentials');
+    } catch (e) { console.error('Migration 108 error:', e); }
+
+    // ---- Migration 109: TotalPass — columnas de canal en bookings ----
+    try {
+        await query(`ALTER TABLE bookings
+            ADD COLUMN IF NOT EXISTS channel VARCHAR(20) NOT NULL DEFAULT 'app',
+            ADD COLUMN IF NOT EXISTS external_ref VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS partner_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+            ADD COLUMN IF NOT EXISTS checked_in_method VARCHAR(20) NOT NULL DEFAULT 'manual'`);
+        // CHECK del canal (idempotente): consistente con las otras tablas de canal.
+        await query(`DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'bookings_channel_check') THEN
+                ALTER TABLE bookings ADD CONSTRAINT bookings_channel_check CHECK (channel IN ('app','totalpass','wellhub','fitpass'));
+            END IF;
+        END $$;`);
+        await query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_channel_external_ref
+            ON bookings(channel, external_ref) WHERE external_ref IS NOT NULL`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_bookings_channel_status ON bookings(channel, status)`);
+        console.log('  ✅ Migration 109: bookings channel columns');
+    } catch (e) { console.error('Migration 109 error:', e); }
+
+    // ---- Migration 110: TotalPass — default de lugares por tipo de clase ----
+    try {
+        await query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS totalpass_default_spots INTEGER NOT NULL DEFAULT 0`);
+        console.log('  ✅ Migration 110: class_types.totalpass_default_spots');
+    } catch (e) { console.error('Migration 110 error:', e); }
+
+    // ---- Migration 111: TotalPass — channel_inventory + triggers ----
+    try {
+        await query(`
+            CREATE TABLE IF NOT EXISTS channel_inventory (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+                channel VARCHAR(20) NOT NULL CHECK (channel IN ('totalpass','wellhub','fitpass')),
+                max_spots INTEGER NOT NULL DEFAULT 0,
+                booked_spots INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT channel_inventory_unique UNIQUE (class_id, channel),
+                CONSTRAINT channel_inventory_max_non_negative CHECK (max_spots >= 0),
+                CONSTRAINT channel_inventory_booked_non_negative CHECK (booked_spots >= 0)
+            )`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_channel_inventory_class ON channel_inventory(class_id)`);
+        // Siembra automática desde el default por tipo
+        await query(`
+            CREATE OR REPLACE FUNCTION ensure_channel_inventory_for_class() RETURNS TRIGGER AS $$
+            DECLARE tp_default INTEGER;
+            BEGIN
+                SELECT COALESCE(totalpass_default_spots, 0) INTO tp_default FROM class_types WHERE id = NEW.class_type_id;
+                IF tp_default > 0 THEN
+                    INSERT INTO channel_inventory (class_id, channel, max_spots)
+                    VALUES (NEW.id, 'totalpass', tp_default)
+                    ON CONFLICT (class_id, channel) DO NOTHING;
+                END IF;
+                RETURN NEW;
+            END; $$ LANGUAGE plpgsql`);
+        await query(`DROP TRIGGER IF EXISTS trg_ensure_channel_inventory ON classes`);
+        await query(`CREATE TRIGGER trg_ensure_channel_inventory AFTER INSERT ON classes
+            FOR EACH ROW EXECUTE FUNCTION ensure_channel_inventory_for_class()`);
+        // Mantiene booked_spots del canal
+        await query(`
+            CREATE OR REPLACE FUNCTION update_partner_inventory_count() RETURNS TRIGGER AS $$
+            BEGIN
+                IF (TG_OP = 'INSERT') THEN
+                    IF NEW.channel IN ('totalpass','wellhub','fitpass') AND NEW.status IN ('confirmed','checked_in') THEN
+                        UPDATE channel_inventory SET booked_spots = booked_spots + 1, updated_at = NOW()
+                            WHERE class_id = NEW.class_id AND channel = NEW.channel;
+                    END IF;
+                ELSIF (TG_OP = 'DELETE') THEN
+                    IF OLD.channel IN ('totalpass','wellhub','fitpass') AND OLD.status IN ('confirmed','checked_in') THEN
+                        UPDATE channel_inventory SET booked_spots = GREATEST(booked_spots - 1, 0), updated_at = NOW()
+                            WHERE class_id = OLD.class_id AND channel = OLD.channel;
+                    END IF;
+                ELSIF (TG_OP = 'UPDATE') THEN
+                    IF OLD.status IN ('confirmed','checked_in') AND NEW.status NOT IN ('confirmed','checked_in')
+                       AND NEW.channel IN ('totalpass','wellhub','fitpass') THEN
+                        UPDATE channel_inventory SET booked_spots = GREATEST(booked_spots - 1, 0), updated_at = NOW()
+                            WHERE class_id = NEW.class_id AND channel = NEW.channel;
+                    ELSIF OLD.status NOT IN ('confirmed','checked_in') AND NEW.status IN ('confirmed','checked_in')
+                       AND NEW.channel IN ('totalpass','wellhub','fitpass') THEN
+                        UPDATE channel_inventory SET booked_spots = booked_spots + 1, updated_at = NOW()
+                            WHERE class_id = NEW.class_id AND channel = NEW.channel;
+                    END IF;
+                END IF;
+                RETURN NULL;
+            END; $$ LANGUAGE plpgsql`);
+        await query(`DROP TRIGGER IF EXISTS trg_update_partner_inventory ON bookings`);
+        await query(`CREATE TRIGGER trg_update_partner_inventory AFTER INSERT OR UPDATE OR DELETE ON bookings
+            FOR EACH ROW EXECUTE FUNCTION update_partner_inventory_count()`);
+        console.log('  ✅ Migration 111: channel_inventory + triggers');
+    } catch (e) { console.error('Migration 111 error:', e); }
+
+    // ---- Migration 112: TotalPass — mapeo clase↔evento TP ----
+    try {
+        await query(`
+            CREATE TABLE IF NOT EXISTS partner_class_mappings (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+                channel VARCHAR(20) NOT NULL CHECK (channel IN ('totalpass','wellhub','fitpass')),
+                external_class_id VARCHAR(255),
+                external_slot_id VARCHAR(255),
+                external_event_id VARCHAR(255),
+                external_occurrence_id VARCHAR(255),
+                sync_enabled BOOLEAN NOT NULL DEFAULT true,
+                sync_status VARCHAR(20) NOT NULL DEFAULT 'pending'
+                    CHECK (sync_status IN ('pending','synced','failed','skipped','published','error','not_configured')),
+                sync_error TEXT,
+                last_synced_at TIMESTAMPTZ,
+                metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT partner_class_mappings_unique UNIQUE (class_id, channel)
+            )`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_pcm_class ON partner_class_mappings(class_id)`);
+        console.log('  ✅ Migration 112: partner_class_mappings');
+    } catch (e) { console.error('Migration 112 error:', e); }
+
+    // ---- Migration 113: TotalPass — checkins + processed_events ----
+    try {
+        await query(`
+            CREATE TABLE IF NOT EXISTS checkins (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+                class_id UUID REFERENCES classes(id) ON DELETE SET NULL,
+                channel VARCHAR(20) NOT NULL CHECK (channel IN ('app','totalpass','wellhub','fitpass')),
+                external_ref VARCHAR(255),
+                platform_event_id VARCHAR(200),
+                status VARCHAR(20) NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending','confirmed','expired','cancelled','failed')),
+                validation_method VARCHAR(30) NOT NULL DEFAULT 'automated',
+                validated_at TIMESTAMPTZ,
+                payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+                platform_response JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )`);
+        await query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_checkins_platform_event_unique
+            ON checkins(platform_event_id) WHERE platform_event_id IS NOT NULL`);
+        await query(`
+            CREATE TABLE IF NOT EXISTS processed_events (
+                event_id VARCHAR(200) PRIMARY KEY,
+                channel VARCHAR(20) NOT NULL,
+                event_type VARCHAR(50) NOT NULL,
+                processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                response_status INTEGER,
+                payload_hash VARCHAR(128)
+            )`);
+        console.log('  ✅ Migration 113: checkins + processed_events');
+    } catch (e) { console.error('Migration 113 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();
@@ -4039,6 +4222,10 @@ app.use('/api/search', searchRoutes);
 app.use('/api/reception', receptionDashboardRoutes);
 app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/partners', partnersRouter);
+// TotalPass — Fase 6: check-in de socios por webhook oficial (SIN auth de
+// sesión; TP no manda secreto/firma, la seguridad es el guard anti-SSRF interno).
+app.use('/webhooks', partnerWebhooksRouter);
 
 // 404 handler
 app.use((req, res) => {

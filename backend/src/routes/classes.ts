@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { optionalAuth } from '../middleware/auth.js';
 import { capacityError } from '../lib/schedule.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
+import { setTotalpassCap } from '../lib/totalpass/caps.js';
 
 const router = Router();
 
@@ -73,11 +74,13 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
         ct.name as class_type_name, ct.color as class_type_color, ct.category,
         i.display_name as instructor_name, i.user_id as instructor_user_id,
         i.photo_url as instructor_photo,
-        f.name as facility_name
+        f.name as facility_name,
+        ci.max_spots AS totalpass_spots
       FROM classes c
       JOIN class_types ct ON c.class_type_id = ct.id
       JOIN instructors i ON c.instructor_id = i.id
       LEFT JOIN facilities f ON c.facility_id = f.id
+      LEFT JOIN channel_inventory ci ON ci.class_id = c.id AND ci.channel = 'totalpass'
       WHERE c.date >= $1 AND c.date <= $2
     `;
         let paramCount = 3;
@@ -827,6 +830,55 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
     } catch (error) {
         console.error('Update class error:', error);
         res.status(500).json({ error: 'Error al actualizar clase' });
+    }
+});
+
+// PUT /api/classes/:id/channels — setear lugares de TotalPass para una clase.
+// Admin + TODA la recepción (con scope de sucursal, igual que close-bookings).
+router.put('/:id/channels', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
+    try {
+        const { totalpass } = req.body ?? {};
+        const n = Number(totalpass);
+        if (!Number.isInteger(n) || n < 0) return res.status(400).json({ error: 'totalpass debe ser un entero >= 0' });
+
+        const cls = await queryOne<{ id: string; facility_id: string | null }>(
+            `SELECT id, facility_id FROM classes WHERE id = $1`,
+            [req.params.id]
+        );
+        if (!cls) return res.status(404).json({ error: 'Clase no encontrada' });
+
+        // Scope de sucursal para recepción (admin/master ven todo).
+        if (req.user?.role === 'reception') {
+            const scope = await resolveRequestFacility(req.user, null);
+            if (scope.kind === 'error') return res.status(scope.status).json({ error: scope.message });
+            if (scope.kind === 'facility' && cls.facility_id !== scope.facilityId) {
+                return res.status(403).json({ error: 'Esa clase no es de tu sucursal asignada.' });
+            }
+        }
+
+        const result = await setTotalpassCap(req.params.id, n);
+
+        try {
+            await logAction(query, {
+                adminUserId: req.user!.userId,
+                actionType: 'class_totalpass_cap_updated',
+                entityType: 'class',
+                entityId: req.params.id,
+                description: `Cupo TotalPass actualizado a ${result.max_spots} lugares`,
+                newData: { classId: req.params.id, totalpass: result.max_spots },
+                req,
+            });
+        } catch (auditErr) {
+            console.error('[channels] audit failed (no bloquea):', auditErr);
+        }
+
+        res.json({ ok: true, totalpass: result });
+    } catch (e: any) {
+        if (e.code === 'CLASS_NOT_FOUND') return res.status(404).json({ error: 'Clase no encontrada' });
+        if (e.code === 'CAP_BELOW_BOOKED') return res.status(409).json({ error: `Ya hay ${e.booked} reservas TotalPass; no puedes bajar de ahí` });
+        if (e.code === 'CAP_EXCEEDS_CAPACITY') return res.status(400).json({ error: 'Los lugares TP no pueden exceder la capacidad de la clase' });
+        console.error('setTotalpassCap error:', e);
+        res.status(500).json({ error: 'Error al guardar lugares TotalPass' });
     }
 });
 

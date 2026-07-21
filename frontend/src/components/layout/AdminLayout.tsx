@@ -180,6 +180,7 @@ const sidebarItems: SidebarItem[] = [
             { href: '/admin/settings/whatsapp', label: 'WhatsApp' },
             { href: '/admin/settings/closed-days', label: 'Días cerrados' },
             { href: '/admin/settings/onboarding', label: 'Perfilador' },
+            { href: '/admin/settings/totalpass', label: 'TotalPass' },
         ],
     },
 ];

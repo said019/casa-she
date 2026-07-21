@@ -104,6 +104,7 @@ const editClassSchema = z.object({
     startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
     endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
     maxCapacity: z.coerce.number().int().positive(),
+    totalpassSpots: z.coerce.number().int().min(0).optional(),
 });
 
 type GenerateForm = z.infer<typeof generateSchema>;
@@ -355,9 +356,9 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     });
 
     const editMutation = useMutation({
-        mutationFn: async (data: EditClassForm & { id: string }) => {
-            const { id, ...rest } = data;
-            return await api.put(`/classes/${id}`, {
+        mutationFn: async (data: EditClassForm & { id: string; originalTotalpassSpots?: number; originalMaxCapacity?: number }) => {
+            const { id, originalTotalpassSpots, originalMaxCapacity, ...rest } = data;
+            const res = await api.put(`/classes/${id}`, {
                 classTypeId: rest.classTypeId,
                 instructorId: rest.instructorId,
                 facilityId: rest.facilityId || null,
@@ -366,9 +367,27 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                 endTime: rest.endTime,
                 maxCapacity: rest.maxCapacity,
             });
+
+            // El PUT a /channels se dispara si el cupo TP cambió, o si la capacidad bajó
+            // (con cupo TP > 0 vigente) para que el backend revalide CAP_EXCEEDS_CAPACITY.
+            const newTotalpassSpots = rest.totalpassSpots ?? 0;
+            const totalpassChanged = newTotalpassSpots !== (originalTotalpassSpots ?? 0);
+            const capacityDecreased = originalMaxCapacity != null && rest.maxCapacity < originalMaxCapacity;
+            const shouldSyncChannels = totalpassChanged || (capacityDecreased && newTotalpassSpots > 0);
+
+            if (shouldSyncChannels) {
+                try {
+                    await api.put(`/classes/${id}/channels`, { totalpass: newTotalpassSpots });
+                } catch (channelsError) {
+                    // La clase (PUT #1) ya se guardó; solo falló la sincronización del cupo TotalPass.
+                    // Etiquetamos el error para distinguirlo en onError sin perder el error original.
+                    throw Object.assign(new Error('CHANNELS_UPDATE_FAILED'), { classSaved: true, channelsError });
+                }
+            }
+
+            return res;
         },
         onSuccess: (res: any) => {
-            queryClient.invalidateQueries({ queryKey: ['classes'] });
             const warning = res?.data?.payrollWarning;
             if (warning) {
                 toast({ variant: 'destructive', title: 'Clase actualizada — revisa la nómina', description: warning });
@@ -379,7 +398,20 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
             setIsEditOpen(false);
             setSelectedClass(null);
         },
-        onError: (err) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) }),
+        onError: (err: any) => {
+            if (err?.classSaved) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Cupo de TotalPass no actualizado',
+                    description: `La clase se guardó, pero no se pudo actualizar el cupo de TotalPass: ${getErrorMessage(err.channelsError)}`,
+                });
+                return;
+            }
+            toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) });
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['classes'] });
+        },
     });
 
     // Fechas FUTURAS de la misma recurrencia (para el selector de "fechas específicas").
@@ -572,6 +604,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
             startTime: selectedClass.start_time,
             endTime: selectedClass.end_time,
             maxCapacity: selectedClass.max_capacity,
+            totalpassSpots: selectedClass.totalpass_spots ?? 0,
         });
         setIsEditOpen(true);
     };
@@ -1549,7 +1582,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                 <DialogTitle>Editar Clase</DialogTitle>
                                 <DialogDescription>Modifica los detalles de la clase.</DialogDescription>
                             </DialogHeader>
-                            <form onSubmit={editForm.handleSubmit(d => selectedClass && editMutation.mutate({ ...d, id: selectedClass.id }))} className="space-y-4">
+                            <form onSubmit={editForm.handleSubmit(d => selectedClass && editMutation.mutate({ ...d, id: selectedClass.id, originalTotalpassSpots: selectedClass.totalpass_spots ?? 0, originalMaxCapacity: selectedClass.max_capacity }))} className="space-y-4">
                                 <div className="space-y-2">
                                     <Label>Fecha</Label>
                                     <Popover>
@@ -1651,6 +1684,12 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                 <div className="space-y-2">
                                     <Label>Capacidad</Label>
                                     <Input type="number" {...editForm.register('maxCapacity')} />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Lugares TotalPass</Label>
+                                    <Input type="number" min={0} {...editForm.register('totalpassSpots', { valueAsNumber: true })} />
+                                    <p className="text-xs text-muted-foreground">0 = clase no ofrecida en TotalPass</p>
                                 </div>
 
                                 <DialogFooter>
