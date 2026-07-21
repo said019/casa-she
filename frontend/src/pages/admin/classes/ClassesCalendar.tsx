@@ -57,7 +57,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/components/ui/use-toast';
 import {
     Loader2, ChevronLeft, ChevronRight, Calendar as CalendarIcon,
-    Plus, Repeat, Users, Trash2, Check, Edit, Phone, Clock, MapPin, Sparkles, X, RotateCcw, Lock, Unlock,
+    Plus, Minus, Repeat, Users, Trash2, Check, Edit, Phone, Clock, MapPin, Sparkles, X, RotateCcw, Lock, Unlock,
     RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -484,6 +484,19 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         },
         onError: (err: any) => {
             toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) });
+        },
+    });
+
+    // Cupo de TotalPass de la clase (lugares reservados al canal TotalPass).
+    const setTotalpassSpotsMutation = useMutation({
+        mutationFn: async (n: number) => (await api.put(`/classes/${selectedClass!.id}/channels`, { totalpass: n })).data,
+        onSuccess: (_, n) => {
+            queryClient.invalidateQueries({ queryKey: ['classes'] });
+            setSelectedClass((prev) => prev ? { ...prev, totalpass_spots: n } : prev);
+            toast({ title: 'Cupo TotalPass actualizado', description: `${n} lugar${n === 1 ? '' : 'es'} para TotalPass.` });
+        },
+        onError: (err: any) => {
+            toast({ variant: 'destructive', title: 'Error', description: err?.response?.data?.error || getErrorMessage(err) });
         },
     });
 
@@ -1147,6 +1160,66 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                         >
                                             <Trash2 className="mr-2 h-4 w-4" /> Cancelar Clase
                                         </Button>
+                                    </div>
+                                )}
+
+                                {/* Cupo de TotalPass */}
+                                {selectedClass?.status !== 'cancelled' && (
+                                    <div className="rounded-xl border border-balance-sand/55 bg-balance-cream/45 p-3">
+                                        <div className="mb-2 flex items-center gap-2">
+                                            <span
+                                                className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white"
+                                                style={{ backgroundColor: '#2A4E36' }}
+                                            >
+                                                TotalPass
+                                            </span>
+                                            <p className="text-sm font-semibold">Lugares para TotalPass</p>
+                                        </div>
+                                        <div className="flex items-center justify-center gap-4">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-9 w-9 shrink-0 rounded-full"
+                                                disabled={
+                                                    setTotalpassSpotsMutation.isPending ||
+                                                    (selectedClass?.totalpass_spots ?? 0) <= 0
+                                                }
+                                                onClick={() => {
+                                                    if (!selectedClass) return;
+                                                    const next = Math.max(0, (selectedClass.totalpass_spots ?? 0) - 1);
+                                                    setTotalpassSpotsMutation.mutate(next);
+                                                }}
+                                            >
+                                                <Minus className="h-4 w-4" />
+                                            </Button>
+                                            <span className="w-10 text-center text-2xl font-bold tabular-nums text-balance-dark">
+                                                {selectedClass?.totalpass_spots ?? 0}
+                                            </span>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-9 w-9 shrink-0 rounded-full"
+                                                disabled={
+                                                    setTotalpassSpotsMutation.isPending ||
+                                                    (selectedClass?.totalpass_spots ?? 0) >= (selectedClass?.max_capacity ?? 0)
+                                                }
+                                                onClick={() => {
+                                                    if (!selectedClass) return;
+                                                    const next = Math.min(
+                                                        selectedClass.max_capacity ?? 0,
+                                                        (selectedClass.totalpass_spots ?? 0) + 1
+                                                    );
+                                                    setTotalpassSpotsMutation.mutate(next);
+                                                }}
+                                            >
+                                                <Plus className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                        <p className="mt-1.5 text-center text-[11px] text-muted-foreground">
+                                            de {selectedClass?.max_capacity ?? 0} · 0 = no se ofrece en TotalPass
+                                        </p>
                                     </div>
                                 )}
 
