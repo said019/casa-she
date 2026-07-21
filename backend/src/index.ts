@@ -3699,6 +3699,71 @@ async function runStartupMigrations(): Promise<void> {
         console.log('  ✅ Migration 110: class_types.totalpass_default_spots');
     } catch (e) { console.error('Migration 110 error:', e); }
 
+    // ---- Migration 111: TotalPass — channel_inventory + triggers ----
+    try {
+        await query(`
+            CREATE TABLE IF NOT EXISTS channel_inventory (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+                channel VARCHAR(20) NOT NULL CHECK (channel IN ('totalpass','wellhub','fitpass')),
+                max_spots INTEGER NOT NULL DEFAULT 0,
+                booked_spots INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT channel_inventory_unique UNIQUE (class_id, channel),
+                CONSTRAINT channel_inventory_max_non_negative CHECK (max_spots >= 0),
+                CONSTRAINT channel_inventory_booked_non_negative CHECK (booked_spots >= 0)
+            )`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_channel_inventory_class ON channel_inventory(class_id)`);
+        // Siembra automática desde el default por tipo
+        await query(`
+            CREATE OR REPLACE FUNCTION ensure_channel_inventory_for_class() RETURNS TRIGGER AS $$
+            DECLARE tp_default INTEGER;
+            BEGIN
+                SELECT COALESCE(totalpass_default_spots, 0) INTO tp_default FROM class_types WHERE id = NEW.class_type_id;
+                IF tp_default > 0 THEN
+                    INSERT INTO channel_inventory (class_id, channel, max_spots)
+                    VALUES (NEW.id, 'totalpass', tp_default)
+                    ON CONFLICT (class_id, channel) DO NOTHING;
+                END IF;
+                RETURN NEW;
+            END; $$ LANGUAGE plpgsql`);
+        await query(`DROP TRIGGER IF EXISTS trg_ensure_channel_inventory ON classes`);
+        await query(`CREATE TRIGGER trg_ensure_channel_inventory AFTER INSERT ON classes
+            FOR EACH ROW EXECUTE FUNCTION ensure_channel_inventory_for_class()`);
+        // Mantiene booked_spots del canal
+        await query(`
+            CREATE OR REPLACE FUNCTION update_partner_inventory_count() RETURNS TRIGGER AS $$
+            BEGIN
+                IF (TG_OP = 'INSERT') THEN
+                    IF NEW.channel IN ('totalpass','wellhub','fitpass') AND NEW.status IN ('confirmed','checked_in') THEN
+                        UPDATE channel_inventory SET booked_spots = booked_spots + 1, updated_at = NOW()
+                            WHERE class_id = NEW.class_id AND channel = NEW.channel;
+                    END IF;
+                ELSIF (TG_OP = 'DELETE') THEN
+                    IF OLD.channel IN ('totalpass','wellhub','fitpass') AND OLD.status IN ('confirmed','checked_in') THEN
+                        UPDATE channel_inventory SET booked_spots = GREATEST(booked_spots - 1, 0), updated_at = NOW()
+                            WHERE class_id = OLD.class_id AND channel = OLD.channel;
+                    END IF;
+                ELSIF (TG_OP = 'UPDATE') THEN
+                    IF OLD.status IN ('confirmed','checked_in') AND NEW.status NOT IN ('confirmed','checked_in')
+                       AND NEW.channel IN ('totalpass','wellhub','fitpass') THEN
+                        UPDATE channel_inventory SET booked_spots = GREATEST(booked_spots - 1, 0), updated_at = NOW()
+                            WHERE class_id = NEW.class_id AND channel = NEW.channel;
+                    ELSIF OLD.status NOT IN ('confirmed','checked_in') AND NEW.status IN ('confirmed','checked_in')
+                       AND NEW.channel IN ('totalpass','wellhub','fitpass') THEN
+                        UPDATE channel_inventory SET booked_spots = booked_spots + 1, updated_at = NOW()
+                            WHERE class_id = NEW.class_id AND channel = NEW.channel;
+                    END IF;
+                END IF;
+                RETURN NULL;
+            END; $$ LANGUAGE plpgsql`);
+        await query(`DROP TRIGGER IF EXISTS trg_update_partner_inventory ON bookings`);
+        await query(`CREATE TRIGGER trg_update_partner_inventory AFTER INSERT OR UPDATE OR DELETE ON bookings
+            FOR EACH ROW EXECUTE FUNCTION update_partner_inventory_count()`);
+        console.log('  ✅ Migration 111: channel_inventory + triggers');
+    } catch (e) { console.error('Migration 111 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();
