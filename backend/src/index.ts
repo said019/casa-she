@@ -3789,6 +3789,40 @@ async function runStartupMigrations(): Promise<void> {
         console.log('  ✅ Migration 112: partner_class_mappings');
     } catch (e) { console.error('Migration 112 error:', e); }
 
+    // ---- Migration 113: TotalPass — checkins + processed_events ----
+    try {
+        await query(`
+            CREATE TABLE IF NOT EXISTS checkins (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+                class_id UUID REFERENCES classes(id) ON DELETE SET NULL,
+                channel VARCHAR(20) NOT NULL CHECK (channel IN ('app','totalpass','wellhub','fitpass')),
+                external_ref VARCHAR(255),
+                platform_event_id VARCHAR(200),
+                status VARCHAR(20) NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending','confirmed','expired','cancelled','failed')),
+                validation_method VARCHAR(30) NOT NULL DEFAULT 'automated',
+                validated_at TIMESTAMPTZ,
+                payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+                platform_response JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )`);
+        await query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_checkins_platform_event_unique
+            ON checkins(platform_event_id) WHERE platform_event_id IS NOT NULL`);
+        await query(`
+            CREATE TABLE IF NOT EXISTS processed_events (
+                event_id VARCHAR(200) PRIMARY KEY,
+                channel VARCHAR(20) NOT NULL,
+                event_type VARCHAR(50) NOT NULL,
+                processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                response_status INTEGER,
+                payload_hash VARCHAR(128)
+            )`);
+        console.log('  ✅ Migration 113: checkins + processed_events');
+    } catch (e) { console.error('Migration 113 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();
