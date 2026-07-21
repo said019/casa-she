@@ -74,11 +74,13 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
         ct.name as class_type_name, ct.color as class_type_color, ct.category,
         i.display_name as instructor_name, i.user_id as instructor_user_id,
         i.photo_url as instructor_photo,
-        f.name as facility_name
+        f.name as facility_name,
+        ci.max_spots AS totalpass_spots
       FROM classes c
       JOIN class_types ct ON c.class_type_id = ct.id
       JOIN instructors i ON c.instructor_id = i.id
       LEFT JOIN facilities f ON c.facility_id = f.id
+      LEFT JOIN channel_inventory ci ON ci.class_id = c.id AND ci.channel = 'totalpass'
       WHERE c.date >= $1 AND c.date <= $2
     `;
         let paramCount = 3;

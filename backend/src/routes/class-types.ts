@@ -32,9 +32,9 @@ router.get('/', async (req: Request, res: Response) => {
         const { all } = req.query;
 
         let queryStr = `
-      SELECT 
+      SELECT
         id, name, description, level, duration_minutes,
-        max_capacity, icon, color, category, is_active
+        max_capacity, icon, color, category, is_active, totalpass_default_spots
       FROM class_types
     `;
 
