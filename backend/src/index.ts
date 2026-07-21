@@ -3659,6 +3659,27 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Migration 107b: ux_memberships_order_id ready.');
     } catch (e) { console.error('Migration 107b error (¿duplicados preexistentes de order_id? limpiar manualmente):', e); }
 
+    // ---- Migration 108: TotalPass — tabla de credenciales de plataforma (TP-only, oficial) ----
+    try {
+        await query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
+        await query(`
+            CREATE TABLE IF NOT EXISTS platform_credentials (
+                channel VARCHAR(20) PRIMARY KEY CHECK (channel IN ('totalpass','wellhub','fitpass')),
+                is_enabled BOOLEAN NOT NULL DEFAULT false,
+                partner_api_key TEXT,
+                place_api_key TEXT,
+                unit_id VARCHAR(100),
+                booking_base_url TEXT,
+                access_token TEXT,
+                token_expires_at TIMESTAMPTZ,
+                place_name TEXT,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_by UUID REFERENCES users(id)
+            )`);
+        await query(`INSERT INTO platform_credentials (channel) VALUES ('totalpass') ON CONFLICT (channel) DO NOTHING`);
+        console.log('  ✅ Migration 108: platform_credentials');
+    } catch (e) { console.error('Migration 108 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();
