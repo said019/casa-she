@@ -3764,6 +3764,31 @@ async function runStartupMigrations(): Promise<void> {
         console.log('  ✅ Migration 111: channel_inventory + triggers');
     } catch (e) { console.error('Migration 111 error:', e); }
 
+    // ---- Migration 112: TotalPass — mapeo clase↔evento TP ----
+    try {
+        await query(`
+            CREATE TABLE IF NOT EXISTS partner_class_mappings (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+                channel VARCHAR(20) NOT NULL CHECK (channel IN ('totalpass','wellhub','fitpass')),
+                external_class_id VARCHAR(255),
+                external_slot_id VARCHAR(255),
+                external_event_id VARCHAR(255),
+                external_occurrence_id VARCHAR(255),
+                sync_enabled BOOLEAN NOT NULL DEFAULT true,
+                sync_status VARCHAR(20) NOT NULL DEFAULT 'pending'
+                    CHECK (sync_status IN ('pending','synced','failed','skipped','published','error','not_configured')),
+                sync_error TEXT,
+                last_synced_at TIMESTAMPTZ,
+                metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT partner_class_mappings_unique UNIQUE (class_id, channel)
+            )`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_pcm_class ON partner_class_mappings(class_id)`);
+        console.log('  ✅ Migration 112: partner_class_mappings');
+    } catch (e) { console.error('Migration 112 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();
