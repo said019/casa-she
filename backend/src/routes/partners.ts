@@ -8,6 +8,7 @@ import { query, queryOne } from '../config/database.js';
 import { logAction } from '../lib/audit.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { totalPassOfficialFromDb, totalPassPlanId } from '../lib/totalpass/client.js';
+import { registerTotalPassCheckinWebhook } from './partner-webhooks.js';
 
 const router = Router();
 
@@ -155,6 +156,36 @@ router.post('/totalpass/test', authenticate, requireRole('admin', 'super_admin')
     } catch (error) {
         console.error('POST /partners/totalpass/test error:', error);
         res.status(500).json({ error: 'Error al probar la conexión con TotalPass' });
+    }
+});
+
+// ============================================
+// POST /api/partners/totalpass/webhook/register — registra el webhook de
+// CHECKIN ante TotalPass (Fase 6, Task 16). Requiere PUBLIC_BASE_URL/APP_URL
+// (la URL pública del backend) y credenciales ya guardadas.
+// ============================================
+router.post('/totalpass/webhook/register', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
+    try {
+        const { webhookId, raw } = await registerTotalPassCheckinWebhook();
+
+        try {
+            await logAction(query, {
+                adminUserId: req.user!.userId,
+                actionType: 'totalpass_webhook_registered',
+                entityType: 'platform_credentials',
+                entityId: 'totalpass',
+                description: `Webhook de check-in TotalPass registrado (id: ${webhookId ?? 'desconocido'})`,
+                newData: { webhookId },
+                req,
+            });
+        } catch (auditErr) {
+            console.error('[partners/totalpass/webhook/register] audit failed (no bloquea):', auditErr);
+        }
+
+        res.json({ ok: true, webhookId, raw });
+    } catch (error: any) {
+        console.error('POST /partners/totalpass/webhook/register error:', error);
+        res.status(502).json({ error: error?.message || 'Error al registrar el webhook de TotalPass' });
     }
 });
 

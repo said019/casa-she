@@ -52,6 +52,7 @@ import referralsRoutes from './routes/referrals.js';
 import pushRoutes from './routes/push.js';
 import adminPushRoutes from './routes/admin-push.js';
 import partnersRouter from './routes/partners.js';
+import partnerWebhooksRouter from './routes/partner-webhooks.js';
 import stripeWebhook from './routes/stripe-webhook.js';
 import mercadopagoWebhook from './routes/mercadopago-webhook.js';
 import { validateStripeConfig } from './lib/stripe.js';
@@ -92,6 +93,7 @@ const apiLimiter = rateLimit({
         req.path === '/api/health' ||
         req.path.startsWith('/api/stripe/webhook') ||
         req.path.startsWith('/webhooks/mercadopago') ||
+        req.path.startsWith('/webhooks/totalpass') ||
         req.path.startsWith('/api/evolution/webhook'),
     message: { error: 'Demasiadas solicitudes. Intenta de nuevo en un momento.' },
 });
@@ -3894,6 +3896,9 @@ app.use('/api/reception', receptionDashboardRoutes);
 app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/partners', partnersRouter);
+// TotalPass — Fase 6: check-in de socios por webhook oficial (SIN auth de
+// sesión; TP no manda secreto/firma, la seguridad es el guard anti-SSRF interno).
+app.use('/webhooks', partnerWebhooksRouter);
 
 // 404 handler
 app.use((req, res) => {
