@@ -103,6 +103,7 @@ const editClassSchema = z.object({
     startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
     endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
     maxCapacity: z.coerce.number().int().positive(),
+    totalpassSpots: z.coerce.number().int().min(0).optional(),
 });
 
 type GenerateForm = z.infer<typeof generateSchema>;
@@ -344,9 +345,9 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     });
 
     const editMutation = useMutation({
-        mutationFn: async (data: EditClassForm & { id: string }) => {
-            const { id, ...rest } = data;
-            return await api.put(`/classes/${id}`, {
+        mutationFn: async (data: EditClassForm & { id: string; originalTotalpassSpots?: number }) => {
+            const { id, originalTotalpassSpots, ...rest } = data;
+            const res = await api.put(`/classes/${id}`, {
                 classTypeId: rest.classTypeId,
                 instructorId: rest.instructorId,
                 facilityId: rest.facilityId || null,
@@ -355,6 +356,13 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                 endTime: rest.endTime,
                 maxCapacity: rest.maxCapacity,
             });
+
+            const newTotalpassSpots = rest.totalpassSpots ?? 0;
+            if (newTotalpassSpots !== (originalTotalpassSpots ?? 0)) {
+                await api.put(`/classes/${id}/channels`, { totalpass: newTotalpassSpots });
+            }
+
+            return res;
         },
         onSuccess: (res: any) => {
             queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -561,6 +569,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
             startTime: selectedClass.start_time,
             endTime: selectedClass.end_time,
             maxCapacity: selectedClass.max_capacity,
+            totalpassSpots: selectedClass.totalpass_spots ?? 0,
         });
         setIsEditOpen(true);
     };
@@ -1419,7 +1428,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                 <DialogTitle>Editar Clase</DialogTitle>
                                 <DialogDescription>Modifica los detalles de la clase.</DialogDescription>
                             </DialogHeader>
-                            <form onSubmit={editForm.handleSubmit(d => selectedClass && editMutation.mutate({ ...d, id: selectedClass.id }))} className="space-y-4">
+                            <form onSubmit={editForm.handleSubmit(d => selectedClass && editMutation.mutate({ ...d, id: selectedClass.id, originalTotalpassSpots: selectedClass.totalpass_spots ?? 0 }))} className="space-y-4">
                                 <div className="space-y-2">
                                     <Label>Fecha</Label>
                                     <Popover>
@@ -1521,6 +1530,12 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                 <div className="space-y-2">
                                     <Label>Capacidad</Label>
                                     <Input type="number" {...editForm.register('maxCapacity')} />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Lugares TotalPass</Label>
+                                    <Input type="number" min={0} {...editForm.register('totalpassSpots', { valueAsNumber: true })} />
+                                    <p className="text-xs text-muted-foreground">0 = clase no ofrecida en TotalPass</p>
                                 </div>
 
                                 <DialogFooter>

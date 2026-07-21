@@ -31,6 +31,7 @@ export interface ClassType {
     color: string | null;
     is_active: boolean;
     created_at: string;
+    totalpass_default_spots?: number | null;
 }
 
 export interface Schedule {
@@ -73,4 +74,5 @@ export interface Class {
     free_label?: string | null;
     booking_closed?: boolean;
     category?: string;
+    totalpass_spots?: number | null;
 }

@@ -57,6 +57,7 @@ const classTypeSchema = z.object({
     // Bolsa de crédito de la que descuenta la reserva: 'multi' = Clases, 'reformer' = Salsa.
     category: z.enum(['reformer', 'multi']).default('multi'),
     isActive: z.boolean().default(true),
+    totalpass_default_spots: z.coerce.number().int().min(0).optional().default(0),
 });
 
 type ClassTypeForm = z.infer<typeof classTypeSchema>;
@@ -76,6 +77,7 @@ export default function ClassTypesList() {
             color: '#7E8579',
             category: 'multi',
             isActive: true,
+            totalpass_default_spots: 0,
         },
     });
     const selectedColor = watch('color');
@@ -150,6 +152,7 @@ export default function ClassTypesList() {
         setValue('color', item.color || '#7E8579');
         setValue('category', ((item as any).category === 'reformer' ? 'reformer' : 'multi'));
         setValue('isActive', item.is_active);
+        setValue('totalpass_default_spots', item.totalpass_default_spots ?? 0);
         setIsDialogOpen(true);
     };
 
@@ -311,6 +314,14 @@ export default function ClassTypesList() {
                                         <Label htmlFor="capacity">Cupo por clase</Label>
                                         <Input type="number" id="capacity" {...register('maxCapacity')} />
                                     </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="totalpassDefaultSpots">Lugares TotalPass por defecto</Label>
+                                    <Input type="number" id="totalpassDefaultSpots" min={0} {...register('totalpass_default_spots')} />
+                                    <p className="text-xs text-muted-foreground">
+                                        Cupo TotalPass sugerido al crear clases de esta disciplina. 0 = no ofrecida en TotalPass por defecto.
+                                    </p>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
