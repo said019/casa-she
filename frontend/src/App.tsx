@@ -89,6 +89,7 @@ import ClosedDays from "./pages/admin/settings/ClosedDays";
 import WhatsAppSettings from "./pages/admin/settings/WhatsAppSettings";
 import AdminOnboardingRules from "./pages/admin/settings/OnboardingRules";
 import BarSettings from "./pages/admin/settings/BarSettings";
+import TotalPassSettings from "./pages/admin/settings/TotalPassSettings";
 import BarExtras from "./pages/admin/settings/BarExtras";
 import BarQueue from "./pages/admin/bar/BarQueue";
 
@@ -327,6 +328,7 @@ const App = () => (
             <Route path="/admin/settings/closed-days" element={<ClosedDays />} />
             <Route path="/admin/settings/whatsapp" element={<WhatsAppSettings />} />
             <Route path="/admin/settings/onboarding" element={<AdminOnboardingRules />} />
+            <Route path="/admin/settings/totalpass" element={<TotalPassSettings />} />
             <Route path="/admin/settings/bar" element={<BarSettings />} />
             <Route path="/admin/settings/bar/extras" element={<BarExtras />} />
             <Route path="/admin/bar/queue" element={<BarQueue />} />
