@@ -212,6 +212,7 @@ export async function importTotalPassReservations(rows: TotalPassImportRow[]): P
                     AND c.date = $2::date
                     AND c.start_time::text LIKE $3
                     AND c.status <> 'cancelled'
+                  ORDER BY c.created_at ASC
                   LIMIT 1`,
                 [row.classTitle, row.date, `${row.startTime}%`],
             );
@@ -236,13 +237,20 @@ export async function importTotalPassReservations(rows: TotalPassImportRow[]): P
             try {
                 await client.query('BEGIN');
 
-                const locked = await client.query<{ max_capacity: number; current_bookings: number }>(
-                    `SELECT max_capacity, current_bookings FROM classes WHERE id = $1 FOR UPDATE`,
+                const locked = await client.query<{ max_capacity: number; current_bookings: number; status: string }>(
+                    `SELECT max_capacity, current_bookings, status FROM classes WHERE id = $1 FOR UPDATE`,
                     [cls.id],
                 );
                 const capRow = locked.rows[0];
                 if (!capRow) {
                     // La clase desapareció entre el match y el lock (raro): se salta.
+                    await client.query('ROLLBACK');
+                    summary.skippedNoClass++;
+                    continue;
+                }
+                if (capRow.status === 'cancelled') {
+                    // TOCTOU: la clase se canceló entre el match y el lock. No se
+                    // inserta una reserva sobre una clase ya cancelada.
                     await client.query('ROLLBACK');
                     summary.skippedNoClass++;
                     continue;
@@ -263,13 +271,20 @@ export async function importTotalPassReservations(rows: TotalPassImportRow[]): P
 
                 const membershipId = await ensureInternalMembership(client, userId, plan);
 
+                // Identidad TP en partner_metadata: la Fase 6 (check-in) la usará
+                // para matchear al socio que se presenta físicamente.
+                const partnerMetadata = JSON.stringify({
+                    tp_document: row.documentNumber || null,
+                    tp_email: row.email || null,
+                    tp_name: row.displayName || null,
+                });
                 const inserted = await client.query<{ id: string }>(
                     `INSERT INTO bookings
-                         (class_id, user_id, membership_id, status, channel, external_ref, booked_by)
-                     VALUES ($1, $2, $3, 'confirmed', 'totalpass', $4, NULL)
+                         (class_id, user_id, membership_id, status, channel, external_ref, booked_by, partner_metadata)
+                     VALUES ($1, $2, $3, 'confirmed', 'totalpass', $4, NULL, $5::jsonb)
                      ON CONFLICT (channel, external_ref) WHERE external_ref IS NOT NULL DO NOTHING
                      RETURNING id`,
-                    [cls.id, userId, membershipId, row.sourceRef],
+                    [cls.id, userId, membershipId, row.sourceRef, partnerMetadata],
                 );
 
                 await client.query('COMMIT');
