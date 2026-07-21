@@ -43,8 +43,8 @@ export async function getChannelCaps(classId: string): Promise<{ totalpass: numb
 
 // Fija (o apaga con 0) el cupo TotalPass de una clase. UPSERT sobre channel_inventory.
 export async function setTotalpassCap(classId: string, maxSpots: number): Promise<{ max_spots: number; booked_spots: number }> {
-  const cls = await queryOne<{ max_capacity: number; status: string }>(
-    `SELECT max_capacity, status FROM classes WHERE id = $1`, [classId]);
+  const cls = await queryOne<{ max_capacity: number }>(
+    `SELECT max_capacity FROM classes WHERE id = $1`, [classId]);
   if (!cls) throw Object.assign(new Error('Clase no encontrada'), { code: 'CLASS_NOT_FOUND' });
   const inv = await queryOne<{ booked_spots: number }>(
     `SELECT booked_spots FROM channel_inventory WHERE class_id = $1 AND channel = 'totalpass'`, [classId]);

@@ -831,13 +831,45 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
     }
 });
 
-// PUT /api/classes/:id/channels — setear lugares de TotalPass para una clase
+// PUT /api/classes/:id/channels — setear lugares de TotalPass para una clase.
+// Admin + TODA la recepción (con scope de sucursal, igual que close-bookings).
 router.put('/:id/channels', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
     try {
         const { totalpass } = req.body ?? {};
         const n = Number(totalpass);
         if (!Number.isInteger(n) || n < 0) return res.status(400).json({ error: 'totalpass debe ser un entero >= 0' });
+
+        const cls = await queryOne<{ id: string; facility_id: string | null }>(
+            `SELECT id, facility_id FROM classes WHERE id = $1`,
+            [req.params.id]
+        );
+        if (!cls) return res.status(404).json({ error: 'Clase no encontrada' });
+
+        // Scope de sucursal para recepción (admin/master ven todo).
+        if (req.user?.role === 'reception') {
+            const scope = await resolveRequestFacility(req.user, null);
+            if (scope.kind === 'error') return res.status(scope.status).json({ error: scope.message });
+            if (scope.kind === 'facility' && cls.facility_id !== scope.facilityId) {
+                return res.status(403).json({ error: 'Esa clase no es de tu sucursal asignada.' });
+            }
+        }
+
         const result = await setTotalpassCap(req.params.id, n);
+
+        try {
+            await logAction(query, {
+                adminUserId: req.user!.userId,
+                actionType: 'class_totalpass_cap_updated',
+                entityType: 'class',
+                entityId: req.params.id,
+                description: `Cupo TotalPass actualizado a ${result.max_spots} lugares`,
+                newData: { classId: req.params.id, totalpass: result.max_spots },
+                req,
+            });
+        } catch (auditErr) {
+            console.error('[channels] audit failed (no bloquea):', auditErr);
+        }
+
         res.json({ ok: true, totalpass: result });
     } catch (e: any) {
         if (e.code === 'CLASS_NOT_FOUND') return res.status(404).json({ error: 'Clase no encontrada' });
