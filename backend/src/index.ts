@@ -2819,6 +2819,16 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Migration 096: payment_method enum extendido con \'gratis\'.');
     } catch (e: any) { console.error('Migration 096 error:', e.message); }
 
+    // Migration: método de pago 'plataforma' para las membresías internas de plataforma
+    // (Totalpass / Wellhub / Fitpass). El import de reservas de TotalPass (Fase 5) crea la
+    // membresía interna con payment_method='plataforma'; sin este valor el INSERT truena y
+    // hace ROLLBACK de cada reserva. ADD VALUE no puede ir en transacción → query suelto e
+    // idempotente (IF NOT EXISTS).
+    try {
+        await query(`ALTER TYPE payment_method ADD VALUE IF NOT EXISTS 'plataforma'`);
+        console.log('Migration: payment_method enum extendido con \'plataforma\'.');
+    } catch (e: any) { console.error('Migration payment_method plataforma error:', e.message); }
+
     // Migración: planes INTERNOS de plataformas (Totalpass / Wellhub / Fitpass) para llevar control
     // de los alumnos que vienen de esas plataformas. Sin precio, NO visibles para clientes
     // (is_internal=true → solo admin y recepción los ven/asignan), créditos ilimitados para que
