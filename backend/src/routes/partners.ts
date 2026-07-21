@@ -9,6 +9,12 @@ import { logAction } from '../lib/audit.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { totalPassOfficialFromDb, totalPassPlanId } from '../lib/totalpass/client.js';
 import { registerTotalPassCheckinWebhook } from './partner-webhooks.js';
+import { withPgAdvisoryLock } from '../lib/totalpass/lock.js';
+import { publishTotalPassIndividualClasses } from '../lib/totalpass/publish.js';
+import { reconcileTotalpassPool } from '../lib/totalpass/pool.js';
+import { syncTotalPassReservations } from '../lib/totalpass/source.js';
+import { renewTotalPassToken } from '../lib/totalpass/token.js';
+import { localDateStr, addDaysToDateStr } from '../lib/mx-time.js';
 
 const router = Router();
 
@@ -186,6 +192,79 @@ router.post('/totalpass/webhook/register', authenticate, requireRole('admin', 's
     } catch (error: any) {
         console.error('POST /partners/totalpass/webhook/register error:', error);
         res.status(502).json({ error: error?.message || 'Error al registrar el webhook de TotalPass' });
+    }
+});
+
+// ============================================
+// POST /api/partners/totalpass/run/:job — trigger manual de los jobs de
+// TotalPass (Fase 7, Task 17), para probar sin esperar al cron.
+// job ∈ {publish, pool, import, renew}; cualquier otro valor → 400.
+//
+// publish/pool/import corren bajo el MISMO advisory lock que su cron
+// homólogo (471003/471002/471001 — ver lib/totalpass/lock.ts) para que un
+// trigger manual nunca se solape con una corrida de cron en curso (ni al
+// revés): si el lock está ocupado, responde con `locked: true` en vez de
+// correr encima. `renew` no usa lock (es idempotente: solo pide y persiste
+// un token nuevo).
+// ============================================
+router.post('/totalpass/run/:job', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
+    const { job } = req.params;
+    try {
+        let summary: unknown;
+
+        switch (job) {
+            case 'publish':
+                summary = await withPgAdvisoryLock(471003, () =>
+                    publishTotalPassIndividualClasses(localDateStr(), addDaysToDateStr(localDateStr(), 21)),
+                );
+                break;
+            case 'pool':
+                summary = await withPgAdvisoryLock(471002, () => reconcileTotalpassPool());
+                break;
+            case 'import':
+                summary = await withPgAdvisoryLock(471001, () => syncTotalPassReservations());
+                break;
+            case 'renew': {
+                const client = await totalPassOfficialFromDb();
+                if (!client) {
+                    summary = { skipped: 'no-client' };
+                } else {
+                    await renewTotalPassToken();
+                    summary = { ok: true };
+                }
+                break;
+            }
+            default:
+                return res.status(400).json({ error: `job desconocido: ${job}. Usa publish, pool, import o renew.` });
+        }
+
+        if (summary === null) {
+            return res.json({
+                ok: false,
+                job,
+                locked: true,
+                message: 'Ya hay una corrida de este job en curso (advisory lock ocupado); intenta de nuevo en unos segundos.',
+            });
+        }
+
+        try {
+            await logAction(query, {
+                adminUserId: req.user!.userId,
+                actionType: 'totalpass_job_triggered',
+                entityType: 'platform_credentials',
+                entityId: 'totalpass',
+                description: `Trigger manual TotalPass: ${job}`,
+                newData: { job, summary },
+                req,
+            });
+        } catch (auditErr) {
+            console.error('[partners/totalpass/run] audit failed (no bloquea):', auditErr);
+        }
+
+        res.json({ ok: true, job, summary });
+    } catch (error: any) {
+        console.error(`POST /partners/totalpass/run/${job} error:`, error);
+        res.status(500).json({ error: error?.message || `Error al ejecutar el job ${job}` });
     }
 });
 

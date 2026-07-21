@@ -22,6 +22,13 @@ import {
 } from '../lib/whatsapp.js';
 import { writeInAppNotification } from '../lib/in-app-notifications.js';
 import { getLoyaltyConfig, type DbClient } from '../lib/loyalty.js';
+import { totalPassOfficialFromDb } from '../lib/totalpass/client.js';
+import { renewTotalPassToken } from '../lib/totalpass/token.js';
+import { publishTotalPassIndividualClasses } from '../lib/totalpass/publish.js';
+import { reconcileTotalpassPool } from '../lib/totalpass/pool.js';
+import { syncTotalPassReservations } from '../lib/totalpass/source.js';
+import { withPgAdvisoryLock } from '../lib/totalpass/lock.js';
+import { localDateStr, addDaysToDateStr } from '../lib/mx-time.js';
 
 // ============================================
 // TIPOS
@@ -744,6 +751,87 @@ export async function expireBenefits(): Promise<void> {
 }
 
 // ============================================
+// JOBS DE TOTALPASS (Fase 7, Task 17)
+//
+// Los 4 jobs son INERTES sin credenciales cargadas en `platform_credentials`
+// (canal 'totalpass'): revisan `totalPassOfficialFromDb()` primero y
+// simplemente regresan si es null, sin loguear error ni romper el arranque.
+// Los 3 que pegan a la API oficial (import/pool/publish) van envueltos en
+// `withPgAdvisoryLock` con una llave propia por job para que dos corridas del
+// mismo job nunca se solapen (cron + trigger manual, o un tick lento que
+// alcanza al siguiente). Si el lock ya está tomado, el job cede ese tick.
+// ============================================
+
+/** 00:15 — fuerza la renovación del JWT y lo persiste para diagnóstico. */
+async function totalpassTokenJob(): Promise<void> {
+    const jobName = 'TOTALPASS_TOKEN';
+    try {
+        if (!(await totalPassOfficialFromDb())) return; // sin credenciales — inerte
+        await renewTotalPassToken();
+        await recordJobExecution(jobName, true);
+    } catch (error) {
+        logError(jobName, error);
+        await recordJobExecution(jobName, false, String(error));
+    }
+}
+
+/** 00:20 — publica como eventos individuales en TP las clases de los próximos 21 días. */
+async function totalpassPublishJob(): Promise<void> {
+    const jobName = 'TOTALPASS_PUBLISH';
+    try {
+        if (!(await totalPassOfficialFromDb())) return; // sin credenciales — inerte
+        const result = await withPgAdvisoryLock(471003, () =>
+            publishTotalPassIndividualClasses(localDateStr(), addDaysToDateStr(localDateStr(), 21)),
+        );
+        if (result === null) {
+            logJob(jobName, 'lock ocupado (otra corrida en curso) — se omite este tick');
+            return;
+        }
+        logJob(jobName, `planned=${result.planned} created=${result.created} alreadyInTp=${result.alreadyInTp} skippedTooSoon=${result.skippedTooSoon} failed=${result.failed}${result.skipped ? ` skipped=${result.skipped}` : ''}`);
+        await recordJobExecution(jobName, true, JSON.stringify(result));
+    } catch (error) {
+        logError(jobName, error);
+        await recordJobExecution(jobName, false, String(error));
+    }
+}
+
+/** :05/:15/.../:55 — empuja el cupo (slots) a TP cuando cambió. */
+async function totalpassPoolJob(): Promise<void> {
+    const jobName = 'TOTALPASS_POOL';
+    try {
+        if (!(await totalPassOfficialFromDb())) return; // sin credenciales — inerte
+        const result = await withPgAdvisoryLock(471002, () => reconcileTotalpassPool());
+        if (result === null) {
+            logJob(jobName, 'lock ocupado (otra corrida en curso) — se omite este tick');
+            return;
+        }
+        logJob(jobName, `classesTp=${result.classesTp} changed=${result.changed} unchanged=${result.unchanged} failed=${result.failed}${result.skipped ? ` skipped=${result.skipped}` : ''}`);
+        await recordJobExecution(jobName, true, JSON.stringify(result));
+    } catch (error) {
+        logError(jobName, error);
+        await recordJobExecution(jobName, false, String(error));
+    }
+}
+
+/** Cada 5 min — importa reservas de socios TP y reconcilia cancelaciones. */
+async function totalpassImportJob(): Promise<void> {
+    const jobName = 'TOTALPASS_IMPORT';
+    try {
+        if (!(await totalPassOfficialFromDb())) return; // sin credenciales — inerte
+        const result = await withPgAdvisoryLock(471001, () => syncTotalPassReservations());
+        if (result === null) {
+            logJob(jobName, 'lock ocupado (otra corrida en curso) — se omite este tick');
+            return;
+        }
+        logJob(jobName, `fetched=${result.fetched} imported=${result.imported} alreadyExisted=${result.alreadyExisted} skippedNoClass=${result.skippedNoClass} overbooked=${result.overbooked} failed=${result.failed}${result.cancelled ? ` cancelled=${result.cancelled}` : ''}${result.skipped ? ` skipped=${result.skipped}` : ''}`);
+        await recordJobExecution(jobName, true, JSON.stringify(result));
+    } catch (error) {
+        logError(jobName, error);
+        await recordJobExecution(jobName, false, String(error));
+    }
+}
+
+// ============================================
 // INICIALIZACIÓN
 // ============================================
 
@@ -937,6 +1025,26 @@ export function initializeCronJobs(): void {
     // cron.schedule('15,45 * * * *', () => { void sendClassReminders(2, '2h'); }, { timezone: 'America/Mexico_City' });
     console.log('  ⏸️  CLASS_REMINDERS desactivados (transición Fitune)');
 
+    // ============================================
+    // TOTALPASS (Fase 7, Task 17) — inertes sin credenciales cargadas.
+    // ============================================
+
+    // 00:15 - Renovar token JWT de TotalPass
+    cron.schedule('15 0 * * *', () => { void totalpassTokenJob(); }, { timezone: 'America/Mexico_City' });
+    console.log('  ✅ TOTALPASS_TOKEN - Diario 00:15 AM');
+
+    // 00:20 - Publicar clases individuales de los próximos 21 días
+    cron.schedule('20 0 * * *', () => { void totalpassPublishJob(); }, { timezone: 'America/Mexico_City' });
+    console.log('  ✅ TOTALPASS_PUBLISH - Diario 00:20 AM');
+
+    // Cada 10 min (:05,:15,...,:55) - Reconciliar cupo (pool) con TotalPass
+    cron.schedule('5,15,25,35,45,55 * * * *', () => { void totalpassPoolJob(); }, { timezone: 'America/Mexico_City' });
+    console.log('  ✅ TOTALPASS_POOL - Cada 10 min');
+
+    // Cada 5 min - Importar reservas de socios TotalPass
+    cron.schedule('*/5 * * * *', () => { void totalpassImportJob(); }, { timezone: 'America/Mexico_City' });
+    console.log('  ✅ TOTALPASS_IMPORT - Cada 5 min');
+
     console.log('\n⏰ Cron Jobs inicializados correctamente\n');
 }
 
@@ -959,6 +1067,10 @@ export const cronJobs = {
     expireBenefits,
     remind24h: () => sendClassReminders(24, '24h'),
     remind2h: () => sendClassReminders(2, '2h'),
+    totalpassToken: totalpassTokenJob,
+    totalpassPublish: totalpassPublishJob,
+    totalpassPool: totalpassPoolJob,
+    totalpassImport: totalpassImportJob,
 };
 
 export default initializeCronJobs;
