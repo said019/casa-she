@@ -3693,6 +3693,12 @@ async function runStartupMigrations(): Promise<void> {
         console.log('  ✅ Migration 109: bookings channel columns');
     } catch (e) { console.error('Migration 109 error:', e); }
 
+    // ---- Migration 110: TotalPass — default de lugares por tipo de clase ----
+    try {
+        await query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS totalpass_default_spots INTEGER NOT NULL DEFAULT 0`);
+        console.log('  ✅ Migration 110: class_types.totalpass_default_spots');
+    } catch (e) { console.error('Migration 110 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();

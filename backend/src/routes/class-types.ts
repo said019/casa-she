@@ -18,6 +18,7 @@ const ClassTypeSchema = z.object({
     // Determina de qué bucket de la membresía descuenta la reserva.
     category: z.enum(['reformer', 'multi']).default('multi'),
     isActive: z.boolean().default(true),
+    totalpass_default_spots: z.coerce.number().int().min(0).optional().default(0),
 });
 
 // Update schema
@@ -69,8 +70,8 @@ router.post('/', authenticate, requireRole('admin'), async (req: Request, res: R
         const newType = await queryOne(
             `INSERT INTO class_types (
         name, description, level, duration_minutes,
-        max_capacity, icon, color, category, is_active
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        max_capacity, icon, color, category, is_active, totalpass_default_spots
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *`,
             [
                 data.name,
@@ -82,6 +83,7 @@ router.post('/', authenticate, requireRole('admin'), async (req: Request, res: R
                 data.color || '#333333',
                 data.category,
                 data.isActive,
+                data.totalpass_default_spots ?? 0,
             ]
         );
 
@@ -153,6 +155,10 @@ router.put('/:id', authenticate, requireRole('admin'), async (req: Request, res:
         if (data.isActive !== undefined) {
             updates.push(`is_active = $${paramCount++}`);
             values.push(data.isActive);
+        }
+        if (data.totalpass_default_spots !== undefined) {
+            updates.push(`totalpass_default_spots = $${paramCount++}`);
+            values.push(data.totalpass_default_spots);
         }
 
         if (updates.length > 0) {
