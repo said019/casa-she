@@ -34,9 +34,9 @@ interface Props {
 }
 
 const CATEGORY_LABEL: Record<Exclude<Category, "all">, string> = {
-  reformer: "Reformer",
-  hot: "Hot Pilates",
-  pole: "Pole",
+  reformer: "Salsa",
+  hot: "Clases",
+  pole: "Clases",
   barre: "Barre",
   sculpt: "Sculpt",
   yoga: "Yoga",
@@ -69,14 +69,14 @@ export function FilterPills({
   ];
 
   return (
-    <div className="border-y border-bmb-ink/20 py-3">
+    <div className="mt-5 border-y border-bmb-ink/16 py-4">
       {/* ───────── Móvil: dropdowns compactos (no se amontona) ───────── */}
       <div className="grid grid-cols-2 gap-2 lg:hidden">
         <FilterSelect label="Tipo" value={category} onChange={(v) => onCategoryChange(v as Category)} options={categoryOptions} />
         <FilterSelect label="Coach" value={instructor} onChange={onInstructorChange} options={instructorOptions} />
         <FilterSelect label="Horario" value={timeOfDay} onChange={(v) => onTimeOfDayChange(v as TimeOfDay)} options={TIME_OPTIONS} />
         <div className="col-span-2 mt-0.5 flex items-center justify-between">
-          <span className="editorial-caption-sm text-bmb-ink/55">{resultCount} {resultCount === 1 ? "clase" : "clases"}</span>
+          <span className="editorial-caption-sm text-bmb-ink/70">{resultCount} {resultCount === 1 ? "clase" : "clases"}</span>
           {activeFilters && (
             <button type="button" onClick={onClear} className="editorial-caption-sm text-bmb-gold underline-offset-2 hover:underline">
               Limpiar filtros
@@ -88,7 +88,7 @@ export function FilterPills({
       {/* ───────── Escritorio: pills (Tipo) + dropdowns (Coach/Horario) ───────── */}
       <div className="hidden lg:flex lg:flex-wrap lg:items-end lg:gap-x-6 lg:gap-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="editorial-caption text-bmb-ink/55">Tipo</span>
+          <span className="editorial-caption text-bmb-ink/70">Tipo</span>
           <PillButton active={category === "all"} color={VERDE} onClick={() => onCategoryChange("all")}>Todas</PillButton>
           {categories.map((c) => (
             <PillButton key={c} active={category === c} color={categoryColor(c)} dot onClick={() => onCategoryChange(c)}>
@@ -99,7 +99,7 @@ export function FilterPills({
         <FilterSelect label="Coach" value={instructor} onChange={onInstructorChange} options={instructorOptions} className="min-w-[170px]" />
         <FilterSelect label="Horario" value={timeOfDay} onChange={(v) => onTimeOfDayChange(v as TimeOfDay)} options={TIME_OPTIONS} className="min-w-[130px]" />
         <div className="ml-auto flex items-center gap-3 pb-1">
-          <span className="editorial-caption-sm whitespace-nowrap text-bmb-ink/55">{resultCount} {resultCount === 1 ? "clase" : "clases"}</span>
+          <span className="editorial-caption-sm whitespace-nowrap text-bmb-ink/70">{resultCount} {resultCount === 1 ? "clase" : "clases"}</span>
           {activeFilters && (
             <button type="button" onClick={onClear} className="editorial-caption-sm whitespace-nowrap text-bmb-gold underline-offset-2 hover:underline">
               Limpiar
@@ -122,11 +122,11 @@ function FilterSelect({
 }) {
   return (
     <label className={`flex flex-col gap-1 ${className}`}>
-      <span className="editorial-caption-sm text-bmb-ink/55">{label}</span>
+      <span className="editorial-caption-sm text-bmb-ink/70">{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full appearance-none rounded-none border border-bmb-ink/25 bg-bmb-paper bg-[length:9px] bg-[right_0.7rem_center] bg-no-repeat py-2 pl-2.5 pr-7 font-heading italic text-[13px] text-bmb-ink focus:border-bmb-gold focus:outline-none"
+        className="min-h-11 w-full appearance-none rounded-[0.9rem] border border-bmb-ink/18 bg-bmb-paper bg-[length:9px] bg-[right_0.8rem_center] bg-no-repeat py-2 pl-3 pr-8 font-heading italic text-[14px] text-bmb-ink outline-none transition-colors focus:border-bmb-gold focus:ring-2 focus:ring-bmb-gold/15"
         style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6' fill='none' stroke='%23322A1E' stroke-width='1.5'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E\")" }}
       >
         {options.map(([val, lbl]) => (

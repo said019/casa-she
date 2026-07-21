@@ -35,8 +35,9 @@ import { useFacilityScopeStore } from '@/stores/facilityScopeStore';
 import { useFacilityScope } from '@/hooks/useFacilityScope';
 import {
   getMembershipPaymentMethods,
-  GRATIS_REASON_MIN_LENGTH,
 } from '@/lib/membershipPaymentMethods';
+import { ManualPriceAdjustmentFields } from '@/components/payments/ManualPriceAdjustmentFields';
+import { calculateManualDiscount, MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH, type ManualDiscountType } from '@/lib/manualDiscount';
 import {
   Tabs,
   TabsList,
@@ -533,6 +534,9 @@ function MembresiaTab() {
   const [planId, setPlanId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [gratisReason, setGratisReason] = useState('');
+  const [discountEnabled, setDiscountEnabled] = useState(false);
+  const [discountType, setDiscountType] = useState<ManualDiscountType>('percentage');
+  const [discountValue, setDiscountValue] = useState('');
   // Inicio de la membresía (default hoy). Permite cobrar hoy pero arrancar otro día.
   const [startDate, setStartDate] = useState(formatDateForInput());
 
@@ -557,7 +561,11 @@ function MembresiaTab() {
       plan_id: planId,
       payment_method: paymentMethod,
       ...(startDate ? { start_date: startDate } : {}),
-      ...(isGratis ? { reason: gratisReason.trim() } : {}),
+      ...((isGratis || discountEnabled) ? { reason: gratisReason.trim() } : {}),
+      ...(!isGratis && discountEnabled ? {
+        discount_type: discountType,
+        discount_value: Number(discountValue),
+      } : {}),
       ...(confirm ? { confirm: true } : {}),
     };
   }
@@ -576,6 +584,8 @@ function MembresiaTab() {
       setPlanId('');
       setPaymentMethod('');
       setGratisReason('');
+      setDiscountEnabled(false);
+      setDiscountValue('');
     },
     onError: (e) => {
       const code = getApiErrorCode(e);
@@ -627,6 +637,9 @@ function MembresiaTab() {
       setSelectedClient(null);
       setPlanId('');
       setPaymentMethod('');
+      setGratisReason('');
+      setDiscountEnabled(false);
+      setDiscountValue('');
       setDobleMembresia(null);
     },
     onError: (e) => {
@@ -635,11 +648,20 @@ function MembresiaTab() {
     },
   });
 
+  const selectedPlan = plans.find((plan) => plan.id === planId);
+  const membershipAdjustment = calculateManualDiscount(
+    selectedPlan?.price ?? 0,
+    discountEnabled && !isGratis,
+    discountType,
+    discountValue,
+  );
+  const adjustmentNeedsComment = isGratis || discountEnabled;
   const canSell =
     !!selectedClient &&
     !!planId &&
     !!paymentMethod &&
-    (!isGratis || gratisReason.trim().length >= GRATIS_REASON_MIN_LENGTH);
+    (!discountEnabled || membershipAdjustment.valid) &&
+    (!adjustmentNeedsComment || gratisReason.trim().length >= MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH);
 
   return (
     <div className="space-y-6">
@@ -746,13 +768,13 @@ function MembresiaTab() {
                 </div>
                 {plan.reformer_credits != null && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Créditos Reformer</span>
+                    <span className="text-muted-foreground">Créditos Salsa</span>
                     <span>{plan.reformer_credits}</span>
                   </div>
                 )}
                 {plan.multi_credits != null && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Créditos Multi</span>
+                    <span className="text-muted-foreground">Créditos de clases</span>
                     <span>{plan.multi_credits}</span>
                   </div>
                 )}
@@ -794,23 +816,19 @@ function MembresiaTab() {
             </Select>
           </div>
 
-          {isGratis && (
-            <div className="space-y-2">
-              <Label htmlFor="pos-gratis-reason">
-                Motivo (obligatorio) <span className="text-destructive">*</span>
-              </Label>
-              <Textarea
-                id="pos-gratis-reason"
-                value={gratisReason}
-                onChange={(e) => setGratisReason(e.target.value)}
-                placeholder="Ej. Cortesía por promoción / cambio de paquete"
-                rows={2}
-              />
-              <p className="text-xs text-muted-foreground">
-                La cortesía gratis se registra en $0 y queda en bitácora (mínimo {GRATIS_REASON_MIN_LENGTH} caracteres).
-              </p>
-            </div>
-          )}
+          <ManualPriceAdjustmentFields
+            idPrefix="reception-membership"
+            listPrice={selectedPlan?.price ?? 0}
+            isGratis={isGratis}
+            discountEnabled={discountEnabled}
+            discountType={discountType}
+            discountValue={discountValue}
+            comment={gratisReason}
+            onDiscountEnabledChange={setDiscountEnabled}
+            onDiscountTypeChange={setDiscountType}
+            onDiscountValueChange={setDiscountValue}
+            onCommentChange={setGratisReason}
+          />
         </CardContent>
       </Card>
 
@@ -838,6 +856,9 @@ function ProductoTab() {
   // Cortesía (Gratis $0): el backend fuerza total=$0, payment_method='gratis' y exige motivo.
   const [gratis, setGratis] = useState(false);
   const [gratisReason, setGratisReason] = useState('');
+  const [discountEnabled, setDiscountEnabled] = useState(false);
+  const [discountType, setDiscountType] = useState<ManualDiscountType>('percentage');
+  const [discountValue, setDiscountValue] = useState('');
   // Cliente (opcional) a quien se vende — sirve para devoluciones/garantía.
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
@@ -888,6 +909,12 @@ function ProductoTab() {
   };
 
   const cartTotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+  const productAdjustment = calculateManualDiscount(
+    cartTotal,
+    discountEnabled && !gratis,
+    discountType,
+    discountValue,
+  );
 
   // Snapshot del carrito para el reintento automático (control A).
   // Incluye gratis + motivo para que el reintento respete la cortesía.
@@ -897,6 +924,9 @@ function ProductoTab() {
     clientId: string | null;
     gratis: boolean;
     gratisReason: string;
+    discountAmount: number;
+    discountType: ManualDiscountType;
+    discountValue: number;
   } | null>(null);
 
   function buildSalePayload(
@@ -905,6 +935,9 @@ function ProductoTab() {
     clientId: string | null,
     isGratis: boolean,
     reason: string,
+    discountAmount: number,
+    appliedDiscountType: ManualDiscountType,
+    appliedDiscountValue: number,
   ) {
     return {
       items: cartSnapshot.map((i) => ({
@@ -915,7 +948,15 @@ function ProductoTab() {
       // En cortesía el backend ignora/forza el método; mandamos los flags de gratis.
       ...(isGratis
         ? { gratis: true as const, notes: reason.trim() }
-        : { paymentMethod: pm }),
+        : {
+            paymentMethod: pm,
+            discount: discountAmount,
+            ...(discountAmount > 0 ? {
+              notes: reason.trim(),
+              discountType: appliedDiscountType,
+              discountValue: appliedDiscountValue,
+            } : {}),
+          }),
       userId: clientId || undefined,
     };
   }
@@ -926,9 +967,21 @@ function ProductoTab() {
     clientId: string | null,
     isGratis: boolean,
     reason: string,
+    discountAmount: number,
+    appliedDiscountType: ManualDiscountType,
+    appliedDiscountValue: number,
   ) {
     return api
-      .post('/sales', buildSalePayload(cartSnapshot, pm, clientId, isGratis, reason))
+      .post('/sales', buildSalePayload(
+        cartSnapshot,
+        pm,
+        clientId,
+        isGratis,
+        reason,
+        discountAmount,
+        appliedDiscountType,
+        appliedDiscountValue,
+      ))
       .then((r) => r.data);
   }
 
@@ -941,8 +994,20 @@ function ProductoTab() {
         clientId: selectedClient?.id ?? null,
         gratis,
         gratisReason,
+        discountAmount: productAdjustment.discountAmount,
+        discountType,
+        discountValue: Number(discountValue),
       };
-      return executeSale(cart, paymentMethod, selectedClient?.id ?? null, gratis, gratisReason);
+      return executeSale(
+        cart,
+        paymentMethod,
+        selectedClient?.id ?? null,
+        gratis,
+        gratisReason,
+        productAdjustment.discountAmount,
+        discountType,
+        Number(discountValue),
+      );
     },
     onSuccess: (data) => {
       toast.success('Venta registrada correctamente');
@@ -957,6 +1022,9 @@ function ProductoTab() {
       setPaymentMethod('');
       setGratis(false);
       setGratisReason('');
+      setDiscountEnabled(false);
+      setDiscountType('percentage');
+      setDiscountValue('');
       setSelectedClient(null);
       pendingCartRef.current = null;
     },
@@ -993,9 +1061,21 @@ function ProductoTab() {
           clientId: savedClientId,
           gratis: savedGratis,
           gratisReason: savedReason,
+          discountAmount: savedDiscountAmount,
+          discountType: savedDiscountType,
+          discountValue: savedDiscountValue,
         } = pendingCartRef.current;
         try {
-          const data = await executeSale(savedCart, savedPm, savedClientId, savedGratis, savedReason);
+          const data = await executeSale(
+            savedCart,
+            savedPm,
+            savedClientId,
+            savedGratis,
+            savedReason,
+            savedDiscountAmount,
+            savedDiscountType,
+            savedDiscountValue,
+          );
           toast.success('Venta registrada correctamente');
           setLastSale({
             id: data.id,
@@ -1007,6 +1087,9 @@ function ProductoTab() {
           setPaymentMethod('');
           setGratis(false);
           setGratisReason('');
+          setDiscountEnabled(false);
+          setDiscountType('percentage');
+          setDiscountValue('');
           setSelectedClient(null);
         } catch (retryErr) {
           toast.error(getErrorMessage(retryErr));
@@ -1021,8 +1104,11 @@ function ProductoTab() {
     }
   }
 
-  const canSell =
-    cart.length > 0 && (gratis ? gratisReason.trim().length > 0 : !!paymentMethod);
+  const productNeedsComment = gratis || discountEnabled;
+  const canSell = cart.length > 0 &&
+    (gratis || !!paymentMethod) &&
+    (!discountEnabled || productAdjustment.valid) &&
+    (!productNeedsComment || gratisReason.trim().length >= MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -1190,23 +1276,7 @@ function ProductoTab() {
                 />
               </div>
 
-              {gratis ? (
-                <div className="space-y-2">
-                  <Label htmlFor="pos-gratis-reason">
-                    Motivo (obligatorio) <span className="text-destructive">*</span>
-                  </Label>
-                  <Textarea
-                    id="pos-gratis-reason"
-                    value={gratisReason}
-                    onChange={(e) => setGratisReason(e.target.value)}
-                    placeholder="Ej. cortesía a coach / promoción / cliente frecuente"
-                    rows={2}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    El total se registrará en $0 y quedará en bitácora.
-                  </p>
-                </div>
-              ) : (
+              {!gratis && (
                 <div className="space-y-2">
                   <Label>Método de pago</Label>
                   <Select value={paymentMethod} onValueChange={setPaymentMethod}>
@@ -1222,6 +1292,20 @@ function ProductoTab() {
                 </div>
               )}
 
+              <ManualPriceAdjustmentFields
+                idPrefix="reception-products"
+                listPrice={cartTotal}
+                isGratis={gratis}
+                discountEnabled={discountEnabled}
+                discountType={discountType}
+                discountValue={discountValue}
+                comment={gratisReason}
+                onDiscountEnabledChange={setDiscountEnabled}
+                onDiscountTypeChange={setDiscountType}
+                onDiscountValueChange={setDiscountValue}
+                onCommentChange={setGratisReason}
+              />
+
               <Button
                 className="w-full"
                 size="lg"
@@ -1229,7 +1313,7 @@ function ProductoTab() {
                 disabled={sellMutation.isPending || !canSell}
               >
                 {sellMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {gratis ? `Registrar cortesía (${mxn.format(0)})` : `Cobrar ${mxn.format(cartTotal)}`}
+                {gratis ? `Registrar cortesía (${mxn.format(0)})` : `Cobrar ${mxn.format(productAdjustment.total)}`}
               </Button>
 
               {/* Control C: cancelar última venta, visible junto al cobrar */}

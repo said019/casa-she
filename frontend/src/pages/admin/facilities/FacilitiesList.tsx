@@ -46,8 +46,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, Plus, MoreHorizontal, Pencil, Trash2, Building2, Users, MapPin } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Loader2, Plus, MoreHorizontal, Pencil, Trash2, Building2, Users } from 'lucide-react';
 
 // Type for Facility
 interface Facility {
@@ -310,12 +309,6 @@ export default function FacilitiesList() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                                        <DropdownMenuItem asChild>
-                                                            <Link to={`/admin/facilities/${facility.id}/layout`}>
-                                                                <MapPin className="h-4 w-4 mr-2" />
-                                                                Ver / editar mapa
-                                                            </Link>
-                                                        </DropdownMenuItem>
                                                         <DropdownMenuItem onClick={() => handleEdit(facility)}>
                                                             <Pencil className="h-4 w-4 mr-2" />
                                                             Editar datos
@@ -371,7 +364,7 @@ export default function FacilitiesList() {
                                     <Textarea
                                         id="description"
                                         {...register('description')}
-                                        placeholder="Sala principal con equipos reformer..."
+                                        placeholder="Sala principal para clases y movimiento..."
                                         rows={2}
                                     />
                                 </div>
@@ -397,7 +390,7 @@ export default function FacilitiesList() {
                                     <Input
                                         id="equipment"
                                         {...register('equipment')}
-                                        placeholder="Reformer, Mat, Props, Barril..."
+                                        placeholder="Mats, barras, ligas, props..."
                                     />
                                     <p className="text-xs text-muted-foreground">
                                         Separa los elementos con comas

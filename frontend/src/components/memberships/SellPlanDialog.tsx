@@ -4,7 +4,6 @@ import api, { getErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -14,9 +13,11 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useIsElevated } from '@/hooks/useIsElevated';
-import { getMembershipPaymentMethods, GRATIS_REASON_MIN_LENGTH } from '@/lib/membershipPaymentMethods';
+import { getMembershipPaymentMethods } from '@/lib/membershipPaymentMethods';
 import { formatDateForInput, addDaysForInput } from '@/lib/date';
 import { planClassLabel } from '@/lib/credits';
+import { ManualPriceAdjustmentFields } from '@/components/payments/ManualPriceAdjustmentFields';
+import { calculateManualDiscount, MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH, type ManualDiscountType } from '@/lib/manualDiscount';
 
 interface Plan {
     id: string;
@@ -44,6 +45,9 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
     const [selectedPlanId, setSelectedPlanId] = useState('');
     const [paymentMethod, setPaymentMethod] = useState<string>('cash');
     const [assignReason, setAssignReason] = useState('');
+    const [discountEnabled, setDiscountEnabled] = useState(false);
+    const [discountType, setDiscountType] = useState<ManualDiscountType>('percentage');
+    const [discountValue, setDiscountValue] = useState('');
     const [assignStartDate, setAssignStartDate] = useState(formatDateForInput());
     const [assignEndDate, setAssignEndDate] = useState('');
     const isGratis = paymentMethod === 'gratis';
@@ -59,6 +63,9 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
             setSelectedPlanId('');
             setPaymentMethod('cash');
             setAssignReason('');
+            setDiscountEnabled(false);
+            setDiscountType('percentage');
+            setDiscountValue('');
             setAssignStartDate(formatDateForInput());
             setAssignEndDate('');
         }
@@ -67,6 +74,10 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
     // Vencimiento = inicio + duración del plan, SIEMPRE automático (no editable a mano).
     // Si quieren otra vigencia, que cambien el plan. Se recalcula al cambiar inicio o plan.
     const selectedPlan = plans?.find((p) => p.id === selectedPlanId);
+    const adjustment = calculateManualDiscount(selectedPlan?.price ?? 0, discountEnabled && !isGratis, discountType, discountValue);
+    const adjustmentNeedsComment = isGratis || discountEnabled;
+    const adjustmentValid = (!discountEnabled || adjustment.valid) &&
+        (!adjustmentNeedsComment || assignReason.trim().length >= MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH);
     useEffect(() => {
         if (selectedPlan?.duration_days && assignStartDate) {
             setAssignEndDate(addDaysForInput(assignStartDate, selectedPlan.duration_days));
@@ -83,7 +94,11 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
             paymentMethod,
             startDate: assignStartDate || undefined,
             endDate: assignEndDate || undefined,
-            reason: isGratis ? assignReason.trim() : undefined,
+            reason: adjustmentNeedsComment ? assignReason.trim() : undefined,
+            ...(!isGratis && discountEnabled ? {
+                discountType,
+                discountValue: Number(discountValue),
+            } : {}),
         }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -123,7 +138,7 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
                         </Select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-2">
                             <Label htmlFor="sell-start">Inicio</Label>
                             <Input id="sell-start" type="date" value={assignStartDate}
@@ -150,19 +165,19 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
                         </Select>
                     </div>
 
-                    {isGratis && (
-                        <div className="space-y-2">
-                            <Label htmlFor="sell-gratis-reason">
-                                Motivo (obligatorio) <span className="text-destructive">*</span>
-                            </Label>
-                            <Textarea id="sell-gratis-reason" value={assignReason} rows={2}
-                                onChange={(e) => setAssignReason(e.target.value)}
-                                placeholder="Ej. Cortesía por promoción / compensación" />
-                            <p className="text-xs text-muted-foreground">
-                                Se registra en $0 y queda en bitácora (mínimo {GRATIS_REASON_MIN_LENGTH} caracteres).
-                            </p>
-                        </div>
-                    )}
+                    <ManualPriceAdjustmentFields
+                        idPrefix="sell-plan"
+                        listPrice={selectedPlan?.price ?? 0}
+                        isGratis={isGratis}
+                        discountEnabled={discountEnabled}
+                        discountType={discountType}
+                        discountValue={discountValue}
+                        comment={assignReason}
+                        onDiscountEnabledChange={setDiscountEnabled}
+                        onDiscountTypeChange={setDiscountType}
+                        onDiscountValueChange={setDiscountValue}
+                        onCommentChange={setAssignReason}
+                    />
 
                     {selectedPlan && (
                         <div className="p-3 bg-muted rounded-md text-sm">
@@ -184,7 +199,7 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
                         disabled={
                             !selectedPlanId ||
                             assignMutation.isPending ||
-                            (isGratis && assignReason.trim().length < GRATIS_REASON_MIN_LENGTH)
+                            !adjustmentValid
                         }
                     >
                         {assignMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

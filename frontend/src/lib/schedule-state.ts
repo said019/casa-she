@@ -45,9 +45,10 @@ export function getCellStatus(cls: ScheduleClass, now: Date): CellStatus {
 
 export function classifyCategory(name: string): ScheduleClass["category"] {
   const n = name.toLowerCase();
+  if (n.includes("salsa")) return "reformer";
   if (n.includes("pole")) return "pole";
   if (n.includes("hot")) return "hot";
-  if (n.includes("yoga") || n.includes("stretch")) return "yoga";
+  if (n.includes("yoga") || n.includes("stretch") || n.includes("flex") || n.includes("flow") || n.includes("navakarana")) return "yoga";
   if (n.includes("barre")) return "barre";
   if (n.includes("sculpt")) return "sculpt";
   if (n.includes("reformer") || n.includes("jumpboard")) return "reformer";

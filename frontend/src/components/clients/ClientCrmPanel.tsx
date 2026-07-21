@@ -50,7 +50,7 @@ export function ClientCrmPanel({
   const isElevated = useIsElevated();
   // Mono-sede (Condesa): ya no se elige WhatsApp por sucursal; el backend usa el
   // único número. Se conserva la key por defecto por compatibilidad del payload.
-  const [waKey] = useState<'san-miguel' | 'tepa'>('san-miguel');
+  const waKey = 'casa-she';
 
   const resendCredentials = useMutation({
     mutationFn: async () =>

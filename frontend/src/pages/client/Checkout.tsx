@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { motion, useReducedMotion } from 'framer-motion';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { ClientLayout } from '@/components/layout/ClientLayout';
-import { CasaSheMark } from '@/components/CasaSheLogo';
-import { CasaShePattern } from '@/components/CasaShePattern';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,10 +18,8 @@ import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import {
   getClassesLabel,
-  getPackagePresentation,
-  getPackageType,
-  packageOrder,
-  packagePresentations,
+  isIntroClass,
+  sortCatalogPlans,
 } from '@/lib/planPresentation';
 import type { OrderPaymentMethod, CreateOrderRequest, Order } from '@/types/order';
 import {
@@ -38,7 +35,6 @@ import {
   Loader2,
   Copy,
   Check,
-  Star,
 } from 'lucide-react';
 
 interface Plan {
@@ -57,6 +53,9 @@ interface Plan {
   package_type?: 'individual' | 'mixto' | 'sample';
   requires_studio_selection?: boolean;
   features?: string[];
+  included_services?: number;
+  included_workshops?: number;
+  service_options?: string[];
 }
 
 interface BankInfo {
@@ -76,27 +75,36 @@ function isMembershipFeePlan(plan: Plan) {
   );
 }
 
-// Tarjetas de marca del index ("Nuestros Paquetes"): panel generado (nítido,
-// vectorial — NO imagen raster), precio anterior, detalle y orden. Se mapea cada
-// plan de la BD por su nombre. Mismos colores/taglines que CasaSheLanding.
-type PlanCardMeta = { title: string; color: string; artTitle: string; tagline: string; light?: boolean; was?: string; hint: string; oferta?: boolean; order: number };
+// Contenido editorial para el catálogo. Las tarjetas son informativas y no
+// dependen de imágenes; el precio y la disponibilidad siempre vienen de la BD.
+type PlanCardMeta = { title: string; color: string; tagline: string; was?: string; hint: string; oferta?: boolean };
 const SALSA_TAGLINE = 'Ritmo, cuerpo y comunidad. Baila y reconéctate.';
 const PLAN_CARDS: { match: (n: string) => boolean; meta: PlanCardMeta }[] = [
-  { match: (n) => n.includes('black'), meta: { title: 'Membresía She Black', color: '#2E1B22', artTitle: 'Membresía She Black', tagline: 'Nuestra membresía más completa. Bienestar integral para volver a ti.', was: '$4,800', hint: '24 créditos · acceso total', oferta: true, order: 1 } },
-  { match: (n) => n.includes('360'), meta: { title: 'Membresía 360', color: '#2A4E36', artTitle: 'Membresía 360', tagline: 'Tu bienestar integral empieza aquí. Movimiento, balance y comunidad en un solo lugar.', was: '$3,800', hint: '16 créditos al mes', oferta: true, order: 2 } },
-  { match: (n) => n.includes('12'), meta: { title: 'Paquete 12 clases', color: '#AE4836', artTitle: 'Paquete 12 clases', tagline: 'Constancia que se siente. Más sesiones para sostener tu práctica.', hint: '12 créditos · vigencia 1 mes', order: 3 } },
-  { match: (n) => n.includes('8'), meta: { title: 'Paquete 8 clases', color: '#8F7F36', artTitle: 'Paquete 8 clases', tagline: 'Tu práctica, a tu ritmo. El balance ideal entre flexibilidad y constancia.', hint: '8 créditos · vigencia 1 mes', order: 4 } },
-  { match: (n) => n.includes('5'), meta: { title: 'Paquete 5 clases', color: '#6E4B34', artTitle: 'Paquete 5 clases', tagline: 'Ideal para empezar. Una forma amable de volver a ti.', hint: '5 créditos · vigencia 1 mes', order: 5 } },
-  { match: (n) => n.includes('drop') || n.includes('suelta'), meta: { title: 'Clase suelta', color: '#D6D5C2', light: true, artTitle: 'Clase suelta', tagline: 'Muévete cuando lo necesites. Flexibilidad para acompañar tu día.', was: '$300', hint: '1 clase drop-in', oferta: true, order: 6 } },
-  { match: (n) => n.includes('prueba') || n.includes('muestra'), meta: { title: 'Clase muestra', color: '#E7E0CE', light: true, artTitle: 'Clase muestra', tagline: 'Ven a sentirlo. Tu primer encuentro con Casa Shé.', hint: 'Tu primera vez en casa', order: 7 } },
+  { match: (n) => n.includes('black'), meta: { title: 'Membresía SHÉ Black', color: '#AE4836', tagline: 'Nuestra membresía más completa. Bienestar integral para volver a ti.', hint: 'Clases ilimitadas · 2 servicios · 1 taller' } },
+  { match: (n) => n.includes('360'), meta: { title: 'Membresía 360', color: '#AE4836', tagline: 'Tu bienestar integral empieza aquí. Movimiento, balance y comunidad en un solo lugar.', hint: 'Clases ilimitadas · 1 servicio' } },
+  { match: (n) => n.includes('12'), meta: { title: 'Paquete 12 clases', color: '#AE4836', tagline: 'Constancia que se siente. Más sesiones para sostener tu práctica.', hint: '12 créditos · vigencia 1 mes' } },
+  { match: (n) => n.includes('8'), meta: { title: 'Paquete 8 clases', color: '#8F7F36', tagline: 'Tu práctica, a tu ritmo. El balance ideal entre flexibilidad y constancia.', hint: '8 créditos · vigencia 1 mes' } },
+  { match: (n) => n.includes('5'), meta: { title: 'Paquete 5 clases', color: '#6E4B34', tagline: 'Ideal para empezar. Una forma amable de volver a ti.', hint: '5 créditos · vigencia 1 mes' } },
+  { match: (n) => n.includes('drop') || n.includes('suelta'), meta: { title: 'Clase suelta', color: '#8A7B3F', tagline: 'Muévete cuando lo necesites. Flexibilidad para acompañar tu día.', was: '$300', hint: '1 clase drop-in', oferta: true } },
+  { match: (n) => n.includes('prueba') || n.includes('muestra'), meta: { title: 'Clase muestra', color: '#AE4836', tagline: 'Ven a sentirlo. Tu primer encuentro con Casa Shé.', hint: 'Tu primera vez en casa' } },
   // Salsa (bucket de créditos independiente). La regla específica (4 clases) va antes de la genérica.
-  { match: (n) => n.includes('salsa') && (n.includes('4') || n.includes('paquete')), meta: { title: 'Salsa · 4 clases', color: '#2E1B22', artTitle: 'Salsa', tagline: SALSA_TAGLINE, hint: '4 clases de Salsa · vigencia 1 mes', order: 9 } },
-  { match: (n) => n.includes('salsa'), meta: { title: 'Salsa · 1 clase', color: '#2E1B22', artTitle: 'Salsa', tagline: SALSA_TAGLINE, hint: '1 clase de Salsa', order: 8 } },
+  { match: (n) => n.includes('salsa') && (n.includes('4') || n.includes('paquete')), meta: { title: 'Salsa · 4 clases', color: '#2E1B22', tagline: SALSA_TAGLINE, hint: '4 clases de Salsa · vigencia 1 mes' } },
+  { match: (n) => n.includes('salsa'), meta: { title: 'Salsa · 1 clase', color: '#2E1B22', tagline: SALSA_TAGLINE, hint: '1 clase de Salsa' } },
 ];
 
 function getPlanCardMeta(name: string): PlanCardMeta | undefined {
   const n = name.toLowerCase();
   return PLAN_CARDS.find((c) => c.match(n))?.meta;
+}
+
+function isCasaSheMembership(plan: Plan) {
+  const name = plan.name.toLowerCase();
+  return (
+    name.includes('membresía 360') ||
+    name.includes('membresia 360') ||
+    name.includes('membresía black') ||
+    name.includes('membresia black')
+  );
 }
 
 function getRewardPoints(classLimit: number | null) {
@@ -111,22 +119,20 @@ function getPlanAccessLabel(plan: Plan) {
   return 'Acceso';
 }
 
-function sortPlansByUse(planA: Plan, planB: Plan) {
-  const classA = planA.class_limit ?? (planA.is_unlimited ? 999 : 0);
-  const classB = planB.class_limit ?? (planB.is_unlimited ? 999 : 0);
-
-  if (classA !== classB) return classA - classB;
-  if (Number(planA.price) !== Number(planB.price)) return Number(planA.price) - Number(planB.price);
-  return (planA.sort_order || 0) - (planB.sort_order || 0);
+function getPlanAppliesLabel(plan: Plan) {
+  if (plan.name.toLowerCase().includes('salsa')) return 'Salsa';
+  return 'Pilates Mat · Barre · Sculpt · Yoga · Flex';
 }
 
 export default function Checkout() {
+  const reduceMotion = useReducedMotion();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const preselectedPlanId = searchParams.get('plan');
+  const preselectionApplied = useRef(false);
 
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(preselectedPlanId);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<OrderPaymentMethod>('bank_transfer');
@@ -163,6 +169,17 @@ export default function Checkout() {
       return res.data.filter((p: Plan) => p.is_active && !p.is_internal).sort((a: Plan, b: Plan) => (a.sort_order || 0) - (b.sort_order || 0));
     },
   });
+
+  // Cuando la clienta llega desde una tarjeta del index, el plan ya viene
+  // elegido. En cuanto se valida contra el catálogo activo, avanza directo al
+  // método de pago sin obligarla a seleccionar la misma tarjeta otra vez.
+  useEffect(() => {
+    if (!preselectionApplied.current && preselectedPlanId && plans?.some((plan) => plan.id === preselectedPlanId)) {
+      preselectionApplied.current = true;
+      setSelectedPlanId(preselectedPlanId);
+      setStep('payment');
+    }
+  }, [preselectedPlanId, plans]);
 
   // Fetch user membership status 
   // We need to know if they have an active "membership_fee" plan
@@ -268,12 +285,6 @@ export default function Checkout() {
     if (isMembershipFeePlan(plan) && hasActiveMembershipFee) return false;
     return true;
   });
-  const groupedPlans = packageOrder
-    .map((type) => ({
-      ...packagePresentations[type],
-      plans: visiblePlans.filter((plan) => getPackageType(plan) === type).sort(sortPlansByUse),
-    }))
-    .filter((group) => group.plans.length > 0);
   const needsStudio = !!selectedPlan?.requires_studio_selection;
 
   const handlePlanSelect = (planId: string) => {
@@ -434,97 +445,116 @@ export default function Checkout() {
           {step === 'plan' && (
             <div>
               {plansLoading ? (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                   {[0, 1, 2].map((i) => (
-                    <Skeleton key={i} className="h-[26rem] w-full rounded-2xl" />
+                    <Skeleton key={i} className={`h-[22rem] w-full rounded-[1.75rem] ${i === 0 ? 'lg:col-span-2' : ''}`} />
                   ))}
                 </div>
               ) : visiblePlans.length > 0 ? (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                   {[...visiblePlans]
-                    .sort((a, b) => (getPlanCardMeta(a.name)?.order ?? 99) - (getPlanCardMeta(b.name)?.order ?? 99))
-                    .map((plan) => {
+                    .sort(sortCatalogPlans)
+                    .map((plan, index) => {
                       const meta = getPlanCardMeta(plan.name);
                       const isSelected = selectedPlanId === plan.id;
+                      const featured = index === 0 && isIntroClass(plan);
+                      const membership = isCasaSheMembership(plan);
+                      const darkCard = featured || membership;
                       const price = Number(plan.price);
                       return (
-                        <button
+                        <motion.button
                           key={plan.id}
                           type="button"
                           aria-pressed={isSelected}
                           onClick={() => handlePlanSelect(plan.id)}
-                          className={`group flex flex-col overflow-hidden rounded-2xl bg-white/60 text-left ring-1 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2A4E36] active:scale-[0.99] ${
-                            isSelected ? 'ring-2 ring-[#2A4E36]' : 'ring-[#2A4E36]/10'
+                          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+                          animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+                          transition={{ type: 'spring', stiffness: 100, damping: 20, delay: index * 0.055 }}
+                          whileHover={reduceMotion ? undefined : { y: -3 }}
+                          whileTap={reduceMotion ? undefined : { scale: 0.985 }}
+                          className={`group relative overflow-hidden rounded-[1.75rem] border p-6 text-left shadow-[0_24px_72px_-62px_rgba(42,33,24,0.58)] focus-visible:outline-none focus-visible:ring-2 sm:p-7 ${
+                            featured
+                              ? 'lg:col-span-2 border-[#2A4E36] bg-[#2A4E36] text-[#F6F0E4] focus-visible:ring-[#E1CCA0]'
+                              : membership
+                                ? 'border-[#AE4836] bg-[#AE4836] text-[#F6F0E4] shadow-[0_28px_84px_-60px_rgba(122,45,31,0.68)] focus-visible:ring-[#E1CCA0]'
+                                : 'border-[#2A4E36]/18 bg-[#FBF7EE]/72 text-[#2E1B22] focus-visible:ring-[#2A4E36]'
+                          } ${
+                            isSelected ? `ring-2 ${darkCard ? 'ring-[#E1CCA0]' : 'ring-[#AE4836]'}` : ''
                           }`}
                         >
-                          <div className="relative aspect-square overflow-hidden">
-                            {meta ? (
-                              <div
-                                className="relative h-full w-full transition-transform duration-500 group-hover:scale-105"
-                                style={{ backgroundColor: meta.color }}
-                              >
-                                <CasaShePattern
-                                  className="absolute inset-0 h-full w-full"
-                                  color={meta.light ? 'rgba(0,0,0,0.10)' : 'rgba(0,0,0,0.22)'}
-                                />
-                                <img
-                                  src={meta.light ? '/casashe/logo-monogram.png' : '/casashe/logo-monogram-cream.png'}
-                                  alt=""
-                                  aria-hidden="true"
-                                  className="absolute left-1/2 top-6 h-12 w-12 -translate-x-1/2 object-contain"
-                                  style={{ opacity: 0.9 }}
-                                />
-                                <div className="absolute bottom-6 left-6 right-6">
-                                  <span
-                                    className="block font-heading text-[2.3rem] leading-[1.02]"
-                                    style={{ color: meta.light ? '#2A4E36' : '#F6F0E4' }}
-                                  >
-                                    {meta.artTitle}
+                          <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: darkCard ? '#E1CCA0' : meta?.color ?? '#2A4E36' }} />
+                          {featured && !reduceMotion && (
+                            <motion.span
+                              aria-hidden="true"
+                              className="absolute inset-x-0 top-0 h-1 origin-left bg-[#E1CCA0]"
+                              animate={{ scaleX: [0.18, 1, 0.18], opacity: [0.45, 1, 0.45] }}
+                              transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+                            />
+                          )}
+
+                          <div className={`grid h-full gap-8 ${featured ? 'md:grid-cols-[1.2fr_0.8fr] md:items-end' : ''}`}>
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] opacity-[0.58]">
+                                  {featured ? 'Tu primera visita' : 'Opción disponible'}
+                                </span>
+                                {featured && (
+                                  <span className="inline-flex items-center gap-2 rounded-full border border-[#F6F0E4]/30 px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.18em]">
+                                    <motion.span
+                                      className="h-1.5 w-1.5 rounded-full bg-[#E1CCA0]"
+                                      animate={reduceMotion ? undefined : { scale: [1, 1.45, 1], opacity: [0.65, 1, 0.65] }}
+                                      transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                                    />
+                                    Empieza aquí
                                   </span>
-                                  <p
-                                    className="mt-3 max-w-[26ch] font-['Baskervville'] text-[0.92rem] leading-snug"
-                                    style={{ color: meta.light ? '#2A4E36' : '#F6F0E4', opacity: 0.78 }}
-                                  >
-                                    {meta.tagline}
-                                  </p>
-                                </div>
+                                )}
+                                {meta?.oferta && !featured && (
+                                  <span className="rounded-full bg-[#AE4836] px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-[#F6F0E4]">
+                                    Precio especial
+                                  </span>
+                                )}
+                                {isSelected && (
+                                  <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] ${darkCard ? `bg-[#F6F0E4] ${membership ? 'text-[#913A2B]' : 'text-[#2A4E36]'}` : 'bg-[#DDE4D5] text-[#2A4E36]'}`}>
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    Elegido
+                                  </span>
+                                )}
                               </div>
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center bg-[#2A4E36]/10">
-                                <CasaSheMark className="h-20 w-20 opacity-40" />
-                              </div>
-                            )}
-                            {meta?.oferta && (
-                              <span
-                                className="absolute left-4 top-4 flex h-[4.2rem] w-[4.2rem] items-center justify-center rounded-full text-center font-['Baskervville'] text-[13px]"
-                                style={{ backgroundColor: '#AE4836', color: '#F6F0E4' }}
-                              >
-                                ¡Oferta!
-                              </span>
-                            )}
-                            {isSelected && (
-                              <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-[#F6F0E4] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2A4E36]">
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                Elegido
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex flex-1 flex-col items-center px-6 py-7 text-center">
-                            <h3 className="font-heading text-lg uppercase tracking-[0.14em] text-[#2A4E36]">{meta?.title ?? plan.name}</h3>
-                            <p className="mt-1 text-[13px] tracking-wide text-[#2A4E36]/55">
-                              {meta?.hint ?? `${plan.duration_days} días`}
-                            </p>
-                            <div className="mt-4 flex items-baseline justify-center gap-2 font-heading">
-                              {meta?.was && (
-                                <span className="text-lg text-[#2A4E36]/40 line-through">{meta.was}</span>
-                              )}
-                              <span className="text-4xl font-medium text-[#2A4E36]">{formatPrice(price)}</span>
+
+                              <h3 className={`mt-4 font-heading font-medium leading-[0.98] ${featured ? 'text-4xl sm:text-5xl' : 'text-3xl'}`}>
+                                {meta?.title ?? plan.name}
+                              </h3>
+                              <p className="mt-4 max-w-[48ch] text-sm leading-relaxed opacity-[0.72]">
+                                {meta?.tagline ?? plan.description ?? 'Elige esta opción para continuar con tu compra.'}
+                              </p>
                             </div>
-                            <span className="mt-6 w-full rounded-full bg-[#2A4E36] py-3 text-[12px] uppercase tracking-[0.24em] text-[#F6F0E4] transition-colors group-hover:bg-[#16261A]">
-                              {isSelected ? 'Continuar' : 'Comprar'}
-                            </span>
+
+                            <div className={`border-t pt-5 ${darkCard ? 'border-[#F6F0E4]/22' : 'border-[#2A4E36]/16'}`}>
+                              <dl className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <dt className="text-[9px] font-semibold uppercase tracking-[0.2em] opacity-[0.48]">Incluye</dt>
+                                  <dd className="mt-1 leading-snug opacity-[0.78]">{meta?.hint ?? `${plan.duration_days} días`}</dd>
+                                </div>
+                                <div>
+                                  <dt className="text-[9px] font-semibold uppercase tracking-[0.2em] opacity-[0.48]">Aplica en</dt>
+                                  <dd className="mt-1 leading-snug opacity-[0.78]">{getPlanAppliesLabel(plan)}</dd>
+                                </div>
+                              </dl>
+
+                              <div className="mt-6 flex items-end justify-between gap-4 border-t border-current/15 pt-5">
+                                <div className="font-heading">
+                                  {meta?.was && (
+                                    <span className="mr-2 text-base opacity-[0.38] line-through">{meta.was}</span>
+                                  )}
+                                  <span className="text-4xl font-medium">{formatPrice(price)}</span>
+                                </div>
+                                <span className={`shrink-0 rounded-full px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.2em] ${darkCard ? `bg-[#F6F0E4] ${membership ? 'text-[#913A2B]' : 'text-[#2A4E36]'}` : 'bg-[#2A4E36] text-[#F6F0E4]'}`}>
+                                  {isSelected ? 'Continuar' : 'Comprar'}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                        </button>
+                        </motion.button>
                       );
                     })}
                 </div>

@@ -64,7 +64,7 @@ export function ReglamentoGate({ open, onOpenChange, onAccepted }: Props) {
                     <p><strong>3. Cancelaciones.</strong> Puedes cancelar hasta <strong>5 horas antes</strong> de tu clase y tu crédito se devuelve. Después de ese tiempo, o si no asistes (no-show), <strong>pierdes el crédito</strong>.</p>
                     <p><strong>4. Vigencia de créditos.</strong> Los créditos de tus paquetes tienen una vigencia de <strong>1 mes</strong> a partir de su activación.</p>
                     <p><strong>5. Salud.</strong> Eres responsable de informar al estudio cualquier condición de salud, embarazo o lesión. Escucha a tu cuerpo; aquí no hay competencia.</p>
-                    <p><strong>6. Comunidad.</strong> Casa Shé es un espacio de respeto y cuidado entre mujeres. La comunidad es la medicina.</p>
+                    <p><strong>6. Comunidad.</strong> Casa Shé es un espacio de respeto y cuidado. La comunidad es la medicina.</p>
                     <p className="text-foreground/60">Al aceptar confirmas que leíste y estás de acuerdo con este reglamento.</p>
                 </div>
 

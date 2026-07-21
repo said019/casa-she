@@ -918,7 +918,7 @@ export default function InstructorsList() {
 
                                 <div className="space-y-2">
                                     <Label htmlFor="tagline">Frase del sitio público</Label>
-                                    <Input id="tagline" {...register('tagline')} placeholder="Reformer & fuerza · reinventa tu mejor versión ⚡" maxLength={200} />
+                                    <Input id="tagline" {...register('tagline')} placeholder="Movimiento consciente · fuerza y presencia" maxLength={200} />
                                     {errors.tagline && <p className="text-xs text-destructive">{errors.tagline.message}</p>}
                                     <p className="text-xs text-muted-foreground">
                                         Frase corta que aparece bajo el nombre en la tarjeta de “El Equipo” del sitio.
@@ -935,7 +935,7 @@ export default function InstructorsList() {
                                     <Textarea
                                         id="priorities"
                                         {...register('priorities')}
-                                        placeholder="Barre Studio&#10;Pilates Mat&#10;Hot Pilates"
+                                        placeholder="Barre&#10;Pilates Mat&#10;Yoga Vinyasa"
                                         rows={3}
                                     />
                                 </div>

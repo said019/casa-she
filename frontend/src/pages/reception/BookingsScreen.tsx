@@ -64,6 +64,8 @@ const shortFacility = (name?: string | null) =>
     (name || '').replace(/^Casa Shé\s*/i, '').trim();
 
 type CategoryFilter = 'all' | 'reformer' | 'multi';
+const categoryLabel = (category?: string | null) =>
+    category === 'reformer' ? 'Salsa' : category === 'multi' ? 'Clases' : 'Clase';
 
 // Filtra clases por categoría + instructor + tipo de clase (por nombre).
 // Si un filtro es 'all'/'' pasa todas.
@@ -81,12 +83,12 @@ function applyFilters(
     });
 }
 
-// Paleta curada — 12 tonos diferenciables, manteniendo paleta BMB (earth + algunos acentos).
+// Paleta curada — 12 tonos diferenciables dentro de la identidad Casa Shé.
 // Hash determinístico sobre el nombre del tipo para que cada class_type SIEMPRE caiga
 // en el mismo color sin que admin tenga que configurarlo.
 // Espaciados en el círculo de tono para que dos clases consecutivas no salgan muy parecidas.
 const PALETTE = [
-    '#AE4836', // gold cálido (BMB)
+    '#AE4836', // arcilla
     '#6B8E7B', // sage verdoso
     '#A8524C', // terracotta
     '#5C7286', // slate-blue
@@ -894,7 +896,7 @@ function DayView({
                                     className="text-[10px] uppercase tracking-wider font-semibold hidden md:inline shrink-0 px-2 py-0.5 rounded-sm"
                                     style={{ backgroundColor: `${color}26`, color }}
                                 >
-                                    {c.category ?? 'clase'}
+                                    {categoryLabel(c.category)}
                                 </span>
                                 <div className="text-right shrink-0 min-w-[64px]">
                                     <p className={`text-base font-semibold ${occTone}`}>{c.current_bookings}/{c.max_capacity}</p>
@@ -1190,8 +1192,8 @@ function FilterBar({
         <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5">
                 {pill('all', 'Todos')}
-                {pill('reformer', 'Reformer')}
-                {pill('multi', 'Multi')}
+                {pill('reformer', 'Salsa')}
+                {pill('multi', 'Clases')}
             </div>
             <Select value={instructorId || 'all'} onValueChange={(v) => setInstructorId(v === 'all' ? '' : v)}>
                 <SelectTrigger className="h-8 text-xs w-48">

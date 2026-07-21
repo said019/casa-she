@@ -527,9 +527,34 @@ router.post('/:id/register', authenticate, async (req: Request, res: Response) =
             }
         }
 
+        const isFull = (event.registered || 0) >= event.capacity;
+
+        // SHÉ Black incluye un taller por membresía. Se aparta el beneficio con
+        // un UPDATE atómico para que dos inscripciones simultáneas no usen el
+        // mismo pase. Si la inscripción falla, se reactiva abajo.
+        let claimedWorkshopBenefitId: string | null = null;
+        if (event.type === 'workshop' && !isFull && amount > 0) {
+            const claimed = await queryOne<{ id: string }>(`
+                UPDATE user_benefits
+                   SET status = 'used', used_at = NOW()
+                 WHERE id = (
+                    SELECT id FROM user_benefits
+                     WHERE user_id = $1
+                       AND benefit_type = 'workshop_pass'
+                       AND status = 'active'
+                       AND expires_at > NOW()
+                     ORDER BY expires_at ASC, created_at ASC
+                     FOR UPDATE SKIP LOCKED
+                     LIMIT 1
+                 )
+                 RETURNING id
+            `, [userId]);
+            claimedWorkshopBenefitId = claimed?.id ?? null;
+            if (claimedWorkshopBenefitId) amount = 0;
+        }
+
         // Determine status
         const isFree = amount === 0;
-        const isFull = (event.registered || 0) >= event.capacity;
 
         let status: string;
         let waitlistPosition: number | null = null;
@@ -556,32 +581,47 @@ router.post('/:id/register', authenticate, async (req: Request, res: Response) =
 
         // If re-registering after cancel, update existing row
         let registration;
-        if (existing && existing.status === 'cancelled') {
-            registration = await queryOne(
-                `UPDATE event_registrations
-                 SET name = $1, email = $2, phone = $3, status = $4,
-                     amount = $5, payment_method = $6, payment_reference = $7,
-                     waitlist_position = $8, paid_at = $9, updated_at = NOW()
-                 WHERE id = $10 RETURNING *`,
-                [
-                    data.name, data.email, data.phone, status,
-                    amount, selectedPaymentMethod, data.payment_reference || null,
-                    waitlistPosition, isFree ? new Date() : null, existing.id,
-                ]
-            );
-        } else {
-            registration = await queryOne(
-                `INSERT INTO event_registrations (
-                    event_id, user_id, name, email, phone, status,
-                    amount, payment_method, payment_reference, waitlist_position, paid_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-                RETURNING *`,
-                [
-                    eventId, userId, data.name, data.email, data.phone, status,
-                    amount, selectedPaymentMethod,
-                    data.payment_reference || null, waitlistPosition, isFree ? new Date() : null,
-                ]
-            );
+        try {
+            if (existing && existing.status === 'cancelled') {
+                registration = await queryOne(
+                    `UPDATE event_registrations
+                     SET name = $1, email = $2, phone = $3, status = $4,
+                         amount = $5, payment_method = $6, payment_reference = $7,
+                         waitlist_position = $8, paid_at = $9, updated_at = NOW()
+                     WHERE id = $10 RETURNING *`,
+                    [
+                        data.name, data.email, data.phone, status,
+                        amount, selectedPaymentMethod, data.payment_reference || null,
+                        waitlistPosition, isFree ? new Date() : null, existing.id,
+                    ]
+                );
+            } else {
+                registration = await queryOne(
+                    `INSERT INTO event_registrations (
+                        event_id, user_id, name, email, phone, status,
+                        amount, payment_method, payment_reference, waitlist_position, paid_at
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                    RETURNING *`,
+                    [
+                        eventId, userId, data.name, data.email, data.phone, status,
+                        amount, selectedPaymentMethod,
+                        data.payment_reference || null, waitlistPosition, isFree ? new Date() : null,
+                    ]
+                );
+            }
+        } catch (registrationError) {
+            if (claimedWorkshopBenefitId) {
+                await query(`UPDATE user_benefits
+                    SET status = 'active', used_at = NULL
+                    WHERE id = $1 AND status = 'used' AND expires_at > NOW()`, [claimedWorkshopBenefitId]);
+            }
+            throw registrationError;
+        }
+
+        if (claimedWorkshopBenefitId && registration?.id) {
+            await query(`UPDATE user_benefits
+                SET used_on_event_registration_id = $1
+                WHERE id = $2`, [registration.id, claimedWorkshopBenefitId]);
         }
 
         // For free events (auto-confirmed), update wallet passes
@@ -607,6 +647,7 @@ router.post('/:id/register', authenticate, async (req: Request, res: Response) =
             status: registration.status,
             amount: parseFloat(registration.amount) || 0,
             isFree,
+            membershipWorkshopIncluded: !!claimedWorkshopBenefitId,
             waitlistPosition: registration.waitlist_position,
             message: isFull
                 ? `Te agregamos a la lista de espera (posición ${waitlistPosition})`
@@ -659,6 +700,15 @@ router.delete('/:id/register', authenticate, async (req: Request, res: Response)
         if (!registration) {
             return res.status(404).json({ error: 'No se encontró tu registro en este evento' });
         }
+
+        // Si el registro usó el taller incluido y el beneficio aún no venció,
+        // devolverlo para que pueda aplicarse a otro taller.
+        await query(`UPDATE user_benefits
+            SET status = 'active', used_at = NULL, used_by = NULL,
+                used_on_event_registration_id = NULL
+            WHERE used_on_event_registration_id = $1
+              AND benefit_type = 'workshop_pass'
+              AND status = 'used' AND expires_at > NOW()`, [registration.id]);
 
         res.json({ message: 'Registro cancelado exitosamente' });
     } catch (error) {
@@ -814,6 +864,11 @@ router.put('/:eventId/registrations/:regId', authenticate, requireRole('admin', 
             return res.status(400).json({ error: 'Estado inválido' });
         }
 
+        const previousRegistration = await queryOne<{ status: string }>(
+            `SELECT status FROM event_registrations WHERE id = $1 AND event_id = $2`,
+            [req.params.regId, req.params.eventId]
+        );
+
         const updates: string[] = [`status = $1`];
         const values: any[] = [status];
         let idx = 2;
@@ -838,6 +893,36 @@ router.put('/:eventId/registrations/:regId', authenticate, requireRole('admin', 
 
         if (!reg) {
             return res.status(404).json({ error: 'Registro no encontrado' });
+        }
+
+        // Una promoción desde lista de espera puede usar el taller incluido. Un
+        // registro pendiente normal no: podría corresponder a un pago que la
+        // administración está confirmando y no debemos convertirlo en cortesía.
+        if (status === 'confirmed' && previousRegistration?.status === 'waitlist' && reg.user_id && Number(reg.amount) > 0) {
+            const eventForBenefit = await queryOne<{ type: string }>(
+                `SELECT type FROM events WHERE id = $1`, [req.params.eventId]
+            );
+            if (eventForBenefit?.type === 'workshop') {
+                const claimed = await queryOne<{ id: string }>(`
+                    UPDATE user_benefits
+                       SET status = 'used', used_at = NOW(), used_on_event_registration_id = $2
+                     WHERE id = (
+                        SELECT id FROM user_benefits
+                         WHERE user_id = $1 AND benefit_type = 'workshop_pass'
+                           AND status = 'active' AND expires_at > NOW()
+                         ORDER BY expires_at ASC, created_at ASC
+                         FOR UPDATE SKIP LOCKED LIMIT 1
+                     )
+                     RETURNING id
+                `, [reg.user_id, reg.id]);
+                if (claimed) {
+                    await query(`UPDATE event_registrations
+                        SET amount = 0, payment_method = NULL, paid_at = NOW(), updated_at = NOW()
+                        WHERE id = $1`, [reg.id]);
+                    reg.amount = 0;
+                    reg.payment_method = null;
+                }
+            }
         }
 
         // If confirmed, update wallet passes to show event info

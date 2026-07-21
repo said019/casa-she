@@ -39,17 +39,18 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, Search, CheckCircle2, XCircle, Plus } from 'lucide-react';
+import { AlertTriangle, Loader2, Search, CheckCircle2, XCircle, Plus } from 'lucide-react';
 import { MembershipActivationDialog, ActivationForm } from '@/components/memberships/MembershipActivationDialog';
 import { EditValidityDialog } from '@/components/memberships/EditValidityDialog';
 import { useIsElevated } from '@/hooks/useIsElevated';
 import {
     getMembershipPaymentMethods,
-    GRATIS_REASON_MIN_LENGTH,
 } from '@/lib/membershipPaymentMethods';
 import { formatDateForInput, addDaysForInput } from '@/lib/date';
 import { creditLabel } from '@/lib/credits';
 import { getPaymentMethodLabel } from '@/lib/paymentLabels';
+import { ManualPriceAdjustmentFields } from '@/components/payments/ManualPriceAdjustmentFields';
+import { calculateManualDiscount, MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH, type ManualDiscountType } from '@/lib/manualDiscount';
 
 // Trazabilidad de adquisición: convierte el campo `acquisition` (calculado en backend)
 // en un título + subtítulo legibles para la columna "Adquisición".
@@ -91,6 +92,8 @@ const assignSchema = z.object({
     paymentMethod: z.enum(['cash', 'transfer', 'card', 'gratis']).optional(),
     // Motivo obligatorio cuando paymentMethod === 'gratis' (lo valida el botón / backend).
     reason: z.string().optional(),
+    discountType: z.enum(['percentage', 'fixed']).optional(),
+    discountValue: z.coerce.number().min(0).optional(),
     startDate: z.string().optional(),
     endDate: z.string().optional(),
 });
@@ -117,6 +120,7 @@ export default function MembershipsList({
     const [cancellationMembership, setCancellationMembership] = useState<Membership | null>(null);
     const [cancelReason, setCancelReason] = useState('');
     const [cancelRefund, setCancelRefund] = useState(true);
+    const [externalRefundConfirmed, setExternalRefundConfirmed] = useState(false);
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const isElevated = useIsElevated();
@@ -133,9 +137,12 @@ export default function MembershipsList({
     const watchedPlanId = watch('planId');
     const watchedPaymentMethod = watch('paymentMethod');
     const watchedReason = watch('reason');
+    const watchedDiscountType = watch('discountType') ?? 'percentage';
+    const watchedDiscountValue = watch('discountValue') ?? 0;
     const watchedStartDate = watch('startDate');
     const watchedEndDate = watch('endDate');
     const isGratisAssign = watchedPaymentMethod === 'gratis';
+    const [assignDiscountEnabled, setAssignDiscountEnabled] = useState(false);
     const [endDateTouched, setEndDateTouched] = useState(false);
 
     // Fetch Memberships
@@ -197,12 +204,13 @@ export default function MembershipsList({
             queryClient.invalidateQueries({ queryKey: ['memberships'] });
             const refundInfo = data?.refund;
             const description = refundInfo?.applied
-                ? `Reembolsados ${refundInfo.payments_refunded.length} pago(s) y revertidos ${refundInfo.points_reversed} puntos.`
+                ? `Registrados como reembolsados ${refundInfo.payments_refunded.length} pago(s) y revertidos ${refundInfo.points_reversed} puntos.`
                 : 'La membresía ha sido cancelada.';
             toast({ title: 'Membresía cancelada', description });
             setCancellationMembership(null);
             setCancelReason('');
             setCancelRefund(true);
+            setExternalRefundConfirmed(false);
         },
         onError: (error) => {
             toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(error) });
@@ -218,6 +226,7 @@ export default function MembershipsList({
             toast({ title: 'Membresía asignada', description: 'La membresía se ha creado exitosamente.' });
             setIsAssignDialogOpen(false);
             reset({ status: 'active', startDate: formatDateForInput() });
+            setAssignDiscountEnabled(false);
             setEndDateTouched(false);
         },
         onError: (error) => {
@@ -232,6 +241,15 @@ export default function MembershipsList({
 
     // Vencimiento sugerido = inicio + duración del plan (mientras no se edite a mano).
     const assignPlan = plans?.find((p) => p.id === watchedPlanId);
+    const assignAdjustment = calculateManualDiscount(
+        assignPlan?.price ?? 0,
+        assignDiscountEnabled && !isGratisAssign,
+        watchedDiscountType as ManualDiscountType,
+        watchedDiscountValue,
+    );
+    const assignNeedsComment = isGratisAssign || assignDiscountEnabled;
+    const assignAdjustmentValid = (!assignDiscountEnabled || assignAdjustment.valid) &&
+        (!assignNeedsComment || (watchedReason ?? '').trim().length >= MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH);
     useEffect(() => {
         if (endDateTouched) return;
         if (assignPlan?.duration_days && watchedStartDate) {
@@ -240,9 +258,12 @@ export default function MembershipsList({
     }, [assignPlan?.duration_days, watchedStartDate, endDateTouched, setValue]);
 
     const onSubmitAssign = (data: AssignForm) => {
-        // No mandes reason si no es gratis (evita ruido en la bitácora).
         const payload: AssignForm = { ...data };
-        if (payload.paymentMethod !== 'gratis') delete payload.reason;
+        if (!assignDiscountEnabled || isGratisAssign) {
+            delete payload.discountType;
+            delete payload.discountValue;
+        }
+        if (!assignNeedsComment) delete payload.reason;
         assignMutation.mutate(payload);
     };
 
@@ -261,6 +282,7 @@ export default function MembershipsList({
                         </div>
                         <Button onClick={() => {
                             reset({ status: 'active', startDate: formatDateForInput() });
+                            setAssignDiscountEnabled(false);
                             setEndDateTouched(false);
                             setIsAssignDialogOpen(true);
                         }}>
@@ -382,8 +404,11 @@ export default function MembershipsList({
                                                             onClick={() => {
                                                                 setCancelReason('');
                                                                 setCancelRefund(true);
+                                                                setExternalRefundConfirmed(false);
                                                                 setCancellationMembership(m);
                                                             }}
+                                                            aria-label={`Cancelar membresía de ${m.user_name ?? 'usuario'}`}
+                                                            title="Cancelar membresía"
                                                         >
                                                             <XCircle className="h-4 w-4" />
                                                         </Button>
@@ -442,7 +467,10 @@ export default function MembershipsList({
 
                                 <div className="space-y-2">
                                     <Label>Estado Inicial</Label>
-                                    <Select onValueChange={(val: any) => setValue('status', val)} defaultValue="active">
+                                    <Select
+                                        onValueChange={(val) => setValue('status', val as AssignForm['status'])}
+                                        defaultValue="active"
+                                    >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Seleccionar estado" />
                                         </SelectTrigger>
@@ -454,7 +482,7 @@ export default function MembershipsList({
                                     </Select>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <div className="space-y-2">
                                         <Label htmlFor="assign-start">Inicio</Label>
                                         <Input id="assign-start" type="date" {...register('startDate')} />
@@ -486,22 +514,19 @@ export default function MembershipsList({
                                     </Select>
                                 </div>
 
-                                {isGratisAssign && (
-                                    <div className="space-y-2">
-                                        <Label htmlFor="assign-gratis-reason">
-                                            Motivo (obligatorio) <span className="text-destructive">*</span>
-                                        </Label>
-                                        <Textarea
-                                            id="assign-gratis-reason"
-                                            placeholder="Ej. Cortesía por promoción / compensación"
-                                            rows={2}
-                                            {...register('reason')}
-                                        />
-                                        <p className="text-xs text-muted-foreground">
-                                            Se registra en $0 y queda en bitácora (mínimo {GRATIS_REASON_MIN_LENGTH} caracteres).
-                                        </p>
-                                    </div>
-                                )}
+                                <ManualPriceAdjustmentFields
+                                    idPrefix="assign-membership"
+                                    listPrice={assignPlan?.price ?? 0}
+                                    isGratis={isGratisAssign}
+                                    discountEnabled={assignDiscountEnabled}
+                                    discountType={watchedDiscountType as ManualDiscountType}
+                                    discountValue={String(watchedDiscountValue || '')}
+                                    comment={watchedReason ?? ''}
+                                    onDiscountEnabledChange={setAssignDiscountEnabled}
+                                    onDiscountTypeChange={(value) => setValue('discountType', value)}
+                                    onDiscountValueChange={(value) => setValue('discountValue', Number(value) || 0)}
+                                    onCommentChange={(value) => setValue('reason', value)}
+                                />
 
                                 <DialogFooter>
                                     <Button type="button" variant="ghost" onClick={() => setIsAssignDialogOpen(false)}>
@@ -511,7 +536,7 @@ export default function MembershipsList({
                                         type="submit"
                                         disabled={
                                             isSubmitting ||
-                                            (isGratisAssign && (watchedReason ?? '').trim().length < GRATIS_REASON_MIN_LENGTH)
+                                            !assignAdjustmentValid
                                         }
                                     >
                                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -535,7 +560,10 @@ export default function MembershipsList({
                     <Dialog
                         open={Boolean(cancellationMembership)}
                         onOpenChange={(nextOpen) => {
-                            if (!nextOpen && !cancelMutation.isPending) setCancellationMembership(null);
+                            if (!nextOpen && !cancelMutation.isPending) {
+                                setCancellationMembership(null);
+                                setExternalRefundConfirmed(false);
+                            }
                         }}
                     >
                         <DialogContent>
@@ -563,23 +591,52 @@ export default function MembershipsList({
                                     <Checkbox
                                         id="cancel-refund"
                                         checked={cancelRefund}
-                                        onCheckedChange={(v) => setCancelRefund(v === true)}
+                                        onCheckedChange={(v) => {
+                                            const checked = v === true;
+                                            setCancelRefund(checked);
+                                            if (!checked) setExternalRefundConfirmed(false);
+                                        }}
                                     />
                                     <div className="space-y-1">
                                         <Label htmlFor="cancel-refund" className="cursor-pointer">
-                                            Devolver el dinero al usuario
+                                            Registrar reembolso en Casa Shé
                                         </Label>
                                         <p className="text-xs text-muted-foreground">
-                                            Marca los pagos asociados como reembolsados y revierte los puntos otorgados.
-                                            Deja sin marcar si el dinero se queda en el estudio.
+                                            Marca los pagos asociados como reembolsados y revierte los puntos otorgados en el sistema.
                                         </p>
                                     </div>
                                 </div>
+                                {cancelRefund && (
+                                    <div className="space-y-3 rounded-xl border border-warning/35 bg-warning/10 p-4">
+                                        <div className="flex items-start gap-2">
+                                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+                                            <div>
+                                                <p className="text-sm font-semibold">Esta acción no envía dinero</p>
+                                                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                                                    Devuelve primero el pago por Mercado Pago, terminal, transferencia o efectivo. Después registra aquí el resultado.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-3 border-t border-warning/25 pt-3">
+                                            <Checkbox
+                                                id="external-refund-confirmed"
+                                                checked={externalRefundConfirmed}
+                                                onCheckedChange={(value) => setExternalRefundConfirmed(value === true)}
+                                            />
+                                            <Label htmlFor="external-refund-confirmed" className="cursor-pointer text-xs leading-relaxed">
+                                                Confirmo que el dinero ya fue devuelto por el método correspondiente.
+                                            </Label>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <DialogFooter>
                                 <Button
                                     variant="ghost"
-                                    onClick={() => setCancellationMembership(null)}
+                                    onClick={() => {
+                                        setCancellationMembership(null);
+                                        setExternalRefundConfirmed(false);
+                                    }}
                                     disabled={cancelMutation.isPending}
                                 >
                                     Volver
@@ -594,10 +651,10 @@ export default function MembershipsList({
                                             refund: cancelRefund,
                                         });
                                     }}
-                                    disabled={cancelMutation.isPending}
+                                    disabled={cancelMutation.isPending || (cancelRefund && !externalRefundConfirmed)}
                                 >
                                     {cancelMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Cancelar membresía
+                                    {cancelRefund ? 'Cancelar y registrar reembolso' : 'Cancelar sin reembolso'}
                                 </Button>
                             </DialogFooter>
                         </DialogContent>

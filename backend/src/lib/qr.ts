@@ -7,6 +7,8 @@ export const POS_MARKABLE_TYPES: ReadonlySet<string> = new Set([
   'product',
   'product_discount',
   'discount',
+  'membership_service',
+  'workshop_pass',
 ]);
 
 const QrPayloadSchema = z.object({

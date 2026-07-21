@@ -52,12 +52,17 @@ export interface Plan {
     // BMB usa estos dos en lugar de class_limit. null = ilimitado en ese bucket.
     reformer_credits?: number | null;
     multi_credits?: number | null;
+    included_services?: number;
+    included_workshops?: number;
+    service_options?: string[];
     features: string[];
     is_active: boolean;
     sort_order: number;
     created_at?: string;
     package_type?: 'individual' | 'mixto' | 'sample';
     requires_studio_selection?: boolean;
+    is_internal?: boolean;
+    color?: string | null;
 }
 
 // Membership interface

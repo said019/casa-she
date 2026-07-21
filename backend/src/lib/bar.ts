@@ -59,6 +59,12 @@ export function canBarTransition(from: BarStatus, to: BarStatus, actor: 'staff' 
   return (STAFF[from] ?? []).includes(to);
 }
 
+// Las órdenes de tarjeta existen antes de que Mercado Pago confirme el cobro.
+// Mientras no estén pagadas no deben llegar a la cola ni avanzar en preparación.
+export function isCardPaymentPending(paymentMethod: string, paymentStatus: string | null | undefined): boolean {
+  return paymentMethod === 'card' && paymentStatus !== 'paid';
+}
+
 // Puntos necesarios para cubrir un total, a la tasa dada (MXN por punto). Redondea hacia arriba.
 export function pointsForTotal(totalMxn: number, redemptionRate: number): number {
   if (!(redemptionRate > 0)) return Infinity;

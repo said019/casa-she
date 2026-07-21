@@ -17,7 +17,7 @@ import { instanceByKey, instanceForFacility } from '../lib/whatsapp-instances.js
 import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { awardWelcomeBonus } from '../lib/loyalty.js';
 import { notifyPointsEarnedExternal } from '../lib/notifications.js';
-import { uploadBufferToGoogleDrive, driveImageUrl, isGoogleDriveConfigured } from '../lib/googleDrive.js';
+import { ImageStorageError, subirImagen } from '../lib/imageStorage.js';
 import { isValidTag } from '../lib/clientTags.js';
 import { findOrCreateGuest } from '../lib/guestUser.js';
 
@@ -797,10 +797,7 @@ router.post('/:id/resend-credentials', requireRole('admin', 'super_admin', 'rece
             [passwordHash, id]
         );
 
-        // ¿Con qué WhatsApp (sucursal) se manda el reenvío?
-        //  - admin/super_admin/recepción master: eligen vía body.whatsappKey ('san-miguel' | 'tepa').
-        //  - recepción normal: por el WhatsApp de SU sucursal (automático).
-        //  - sin elección / sin sucursal: el principal (San Miguel).
+        // Casa Shé usa una sola instancia; whatsappKey se conserva por compatibilidad.
         let waInstance: string | undefined;
         const whatsappKey = typeof req.body?.whatsappKey === 'string' ? req.body.whatsappKey : null;
         if (whatsappKey && isElevated(req.user)) {
@@ -1386,29 +1383,21 @@ router.post('/:id/photo', photoUpload.single('photo'), async (req: Request, res:
             return res.status(400).json({ error: 'El archivo debe ser una imagen' });
         }
 
-        let photoUrl: string | null = null;
-
-        if (isGoogleDriveConfigured) {
-            try {
-                const uploaded = await uploadBufferToGoogleDrive(
-                    file.buffer,
-                    `profile-${id}.jpg`,
-                    file.mimetype,
-                );
-                photoUrl = driveImageUrl(uploaded.fileId, 1600);
-            } catch (err) {
-                console.warn('[photo] Drive upload failed, falling back to base64 DB:', err);
-            }
-        }
-
-        if (!photoUrl) {
-            // Base64 fallback: imagen ya viene optimizada desde el cliente
-            if (file.size > 2 * 1024 * 1024) {
+        let photoUrl: string;
+        try {
+            photoUrl = await subirImagen(
+                file.buffer,
+                file.mimetype,
+                `profile-${id}`,
+                { maxBase64Bytes: 2 * 1024 * 1024 },
+            );
+        } catch (error) {
+            if (error instanceof ImageStorageError && error.code === 'BASE64_TOO_LARGE') {
                 return res.status(413).json({
                     error: 'Imagen demasiado grande para almacenamiento local (máx 2MB)',
                 });
             }
-            photoUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+            throw error;
         }
 
         const user = await queryOne<User>(

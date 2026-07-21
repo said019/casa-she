@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 // ──────────────────────────────────────────────────────────────
@@ -76,6 +77,8 @@ const TYPE_LABELS: Record<string, string> = {
   free_class: 'Clase gratis',
   membership_extension: 'Extensión de membresía',
   discount_package: 'Paquete descuento',
+  membership_service: 'Servicio de membresía',
+  workshop_pass: 'Taller incluido',
 };
 
 const isUuid = /^[0-9a-f-]{36}$/i;
@@ -87,6 +90,7 @@ export default function ScanScreen() {
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanPaused, setScanPaused] = useState(false);
+  const [selectedServices, setSelectedServices] = useState<Record<string, string>>({});
 
   // ── Lookup (QR o userId) ──────────────────────────────────────
   const lookup = useMutation({
@@ -133,7 +137,8 @@ export default function ScanScreen() {
 
   // ── Marcar beneficio como usado ───────────────────────────────
   const useBenefit = useMutation({
-    mutationFn: async (id: string) => (await api.post(`/loyalty/benefits/${id}/use`)).data,
+    mutationFn: async ({ id, selectedService }: { id: string; selectedService?: string }) =>
+      (await api.post(`/loyalty/benefits/${id}/use`, { selectedService })).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['staff-benefits', ficha?.userId] }),
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -171,6 +176,7 @@ export default function ScanScreen() {
     setError(null);
     setScanPaused(false);
     setScanning(false);
+    setSelectedServices({});
   };
 
   // ──────────────────────────────────────────────────────────────
@@ -368,18 +374,34 @@ export default function ScanScreen() {
                 {b.type === 'free_class' && (
                   <p className="text-xs text-muted-foreground italic">Se aplica al reservar la clase.</p>
                 )}
+                {b.type === 'membership_service' && Array.isArray(b.value?.options) && (
+                  <Select
+                    value={selectedServices[b.id] || ''}
+                    onValueChange={(value) => setSelectedServices((current) => ({ ...current, [b.id]: value }))}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Selecciona el servicio utilizado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {b.value.options.map((option: string) => (
+                        <SelectItem key={option} value={option}>{option}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 {b.type !== 'free_class' && b.markableNow && (
                   <Button
                     size="sm"
                     variant="outline"
                     className="gap-1 h-7 text-xs"
-                    disabled={useBenefit.isPending}
+                    disabled={useBenefit.isPending || (b.type === 'membership_service' && !selectedServices[b.id])}
                     onClick={() => {
-                      if (!window.confirm('¿Marcar este beneficio como usado? Esta acción no se puede deshacer.')) return;
-                      useBenefit.mutate(b.id);
+                      const detail = b.type === 'membership_service' ? ` (${selectedServices[b.id]})` : '';
+                      if (!window.confirm(`¿Marcar este beneficio${detail} como usado? Esta acción no se puede deshacer.`)) return;
+                      useBenefit.mutate({ id: b.id, selectedService: selectedServices[b.id] });
                     }}
                   >
-                    {useBenefit.isPending && useBenefit.variables === b.id ? (
+                    {useBenefit.isPending && useBenefit.variables?.id === b.id ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
                     ) : null}
                     Marcar usado

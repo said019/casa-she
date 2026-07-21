@@ -5,23 +5,33 @@ import { authenticate, requireRole } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/requirePermission.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { logAction } from '../lib/audit.js';
+import { manualDiscountNote, resolveManualPriceAdjustment } from '../lib/manual-price-adjustment.js';
 
 const router = Router();
 
 // POST /api/sales - Create a POS sale
 router.post('/', authenticate, requirePermission('vender'), async (req: Request, res: Response) => {
     try {
-        const { userId, items, paymentMethod, notes, discount, gratis } = req.body;
+        const { userId, items, paymentMethod, notes, discount, discountType, discountValue, gratis } = req.body;
         const isGratis = gratis === true;
         const sellerId = req.user?.userId;
 
         if (!items || items.length === 0) {
             return res.status(400).json({ error: 'La venta debe tener al menos un producto' });
         }
+        if (!isGratis && !['cash', 'card', 'transfer'].includes(paymentMethod)) {
+            return res.status(400).json({ error: 'Método de pago inválido' });
+        }
         // Cortesía (gratis): la venta va en $0 y el MOTIVO es obligatorio (accountability).
         // Disponible para CUALQUIER nivel de staff con permiso 'vender'.
-        if (isGratis && !(typeof notes === 'string' && notes.trim())) {
-            return res.status(400).json({ error: 'El motivo es obligatorio para registrar una cortesía (gratis).' });
+        const adjustmentReason = typeof notes === 'string' ? notes.trim() : '';
+        if (isGratis && adjustmentReason.length < 5) {
+            return res.status(400).json({ error: 'El comentario es obligatorio para registrar una cortesía (mínimo 5 caracteres).' });
+        }
+        const hasStructuredDiscount = discountType !== undefined || discountValue !== undefined;
+        const requestedDiscount = Number(hasStructuredDiscount ? discountValue : discount) || 0;
+        if (!isGratis && requestedDiscount > 0 && adjustmentReason.length < 5) {
+            return res.status(400).json({ error: 'El comentario del descuento es obligatorio (mínimo 5 caracteres).' });
         }
 
         // Require an open cash shift before accepting a sale
@@ -73,20 +83,49 @@ router.post('/', authenticate, requirePermission('vender'), async (req: Request,
                 resolvedItems.push({ productId: item.productId, name: product.rows[0].name, quantity, unitPrice, lineTotal });
             }
 
-            // Cortesía: descuento = subtotal completo → total $0, método 'gratis'. Si no, descuento
-            // acotado normal (ni negativo ni mayor al subtotal).
+            // Los clientes nuevos mandan tipo + valor, y el backend recalcula desde el catálogo.
+            // `discount` se conserva como compatibilidad temporal con versiones anteriores del POS.
+            const structuredAdjustment = hasStructuredDiscount
+                ? resolveManualPriceAdjustment({
+                    listPrice: subtotal,
+                    discountType,
+                    discountValue,
+                    reason: adjustmentReason,
+                })
+                : null;
+            if (structuredAdjustment && !structuredAdjustment.ok) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: structuredAdjustment.error });
+            }
+            if (isGratis && structuredAdjustment?.ok && structuredAdjustment.applied) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: 'Una cortesía gratis no puede combinarse con otro descuento.' });
+            }
+
+            // Cortesía: descuento = subtotal completo → total $0, método 'gratis'.
             const discountAmount = isGratis
                 ? subtotal
-                : Math.round(Math.max(0, Math.min(Number(discount) || 0, subtotal)) * 100) / 100;
+                : structuredAdjustment?.ok
+                    ? structuredAdjustment.discountAmount
+                    : Math.round(Math.max(0, Math.min(Number(discount) || 0, subtotal)) * 100) / 100;
+            if (!isGratis && subtotal > 0 && discountAmount >= subtotal) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: 'Para dejar el total en $0, usa Gratis (cortesía).' });
+            }
             const total = isGratis ? 0 : Math.round((subtotal - discountAmount) * 100) / 100;
             const method = isGratis ? 'gratis' : paymentMethod;
+            const saleNotes = isGratis
+                ? adjustmentReason
+                : structuredAdjustment?.ok && structuredAdjustment.applied
+                    ? manualDiscountNote(structuredAdjustment)
+                    : (notes || null);
 
             // Create sale
             const sale = await client.query(`
                 INSERT INTO sales (user_id, seller_id, subtotal, discount, total, payment_method, notes, facility_id, shift_id, status)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'completed')
                 RETURNING *
-            `, [userId || null, sellerId, subtotal, discountAmount, total, method, notes || null, facilityId, (openShift as any).id]);
+            `, [userId || null, sellerId, subtotal, discountAmount, total, method, saleNotes, facilityId, (openShift as any).id]);
 
             const saleId = sale.rows[0].id;
 
@@ -105,6 +144,30 @@ router.post('/', authenticate, requirePermission('vender'), async (req: Request,
             }
 
             await client.query('COMMIT');
+
+            await logAction(query, {
+                adminUserId: sellerId!,
+                actionType: 'sale_created',
+                entityType: 'sale',
+                entityId: saleId,
+                description: isGratis
+                    ? `Cortesía de productos. Comentario: ${adjustmentReason}`
+                    : discountAmount > 0
+                        ? `Venta con descuento manual de $${discountAmount.toFixed(2)}. Comentario: ${adjustmentReason}`
+                        : 'Venta POS registrada',
+                newData: {
+                    subtotal,
+                    discount: discountAmount,
+                    total,
+                    payment_method: method,
+                    ...(adjustmentReason ? { comment: adjustmentReason } : {}),
+                    ...(structuredAdjustment?.ok && structuredAdjustment.applied ? {
+                        discount_type: structuredAdjustment.discountType,
+                        discount_value: structuredAdjustment.discountValue,
+                    } : {}),
+                },
+                req,
+            });
 
             res.status(201).json(sale.rows[0]);
         } catch (err) {

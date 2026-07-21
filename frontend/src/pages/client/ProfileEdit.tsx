@@ -12,10 +12,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarCropDialog } from '@/components/profile/AvatarCropDialog';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuthStore } from '@/stores/authStore';
 import api, { getErrorMessage } from '@/lib/api';
-import { optimizeImage } from '@/lib/imageOptimization';
 import type { UpdateProfileData, User } from '@/types/auth';
 import { Link } from 'react-router-dom';
 import { Camera, Loader2 } from 'lucide-react';
@@ -45,6 +45,7 @@ export default function ProfileEdit() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoToCrop, setPhotoToCrop] = useState<File | null>(null);
 
   const { data, isLoading } = useQuery<ProfileResponse>({
     queryKey: ['profile', authUser?.id],
@@ -106,9 +107,8 @@ export default function ProfileEdit() {
 
   const photoMutation = useMutation({
     mutationFn: async (file: File) => {
-      const optimized = await optimizeImage(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.9 });
       const formData = new FormData();
-      formData.append('photo', optimized, 'profile.jpg');
+      formData.append('photo', file, 'profile.jpg');
       const { data } = await api.post(`/users/${authUser?.id}/photo`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -138,9 +138,20 @@ export default function ProfileEdit() {
       toast({ variant: 'destructive', title: 'Imagen muy grande', description: 'Máximo 10MB.' });
       return;
     }
+    setPhotoToCrop(file);
+  };
+
+  const handleCroppedPhoto = (file: File) => {
+    setPhotoToCrop(null);
     setPhotoPreview(URL.createObjectURL(file));
     photoMutation.mutate(file);
   };
+
+  useEffect(() => {
+    return () => {
+      if (photoPreview) URL.revokeObjectURL(photoPreview);
+    };
+  }, [photoPreview]);
 
   const currentPhoto = photoPreview || data?.user?.photo_url || authUser?.photo_url || undefined;
   const initials = (data?.user?.display_name || authUser?.display_name || '?')
@@ -182,6 +193,12 @@ export default function ProfileEdit() {
     <AuthGuard requiredRoles={['client']}>
       <ClientLayout>
         <div className="space-y-6">
+          <AvatarCropDialog
+            file={photoToCrop}
+            onCancel={() => setPhotoToCrop(null)}
+            onConfirm={handleCroppedPhoto}
+          />
+
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl font-heading font-bold">Editar perfil</h1>

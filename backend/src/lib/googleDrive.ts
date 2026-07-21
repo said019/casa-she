@@ -1,9 +1,12 @@
 import path from 'path';
 
 export const isGoogleDriveConfigured = Boolean(
-    process.env.GOOGLE_CLIENT_ID
-    && process.env.GOOGLE_CLIENT_SECRET
-    && process.env.GOOGLE_REFRESH_TOKEN
+    process.env.GOOGLE_CLIENT_ID?.trim()
+    && process.env.GOOGLE_CLIENT_SECRET?.trim()
+    && process.env.GOOGLE_REFRESH_TOKEN?.trim()
+    // Never fall back to the account's Drive root.  Image storage is only
+    // considered configured when its dedicated destination folder is set.
+    && process.env.GOOGLE_DRIVE_FOLDER_ID?.trim()
 );
 
 function toSlug(value: string): string {
@@ -68,7 +71,36 @@ export async function makeGoogleDriveFilePublic(fileId: string, accessToken: str
 
     if (!response.ok) {
         const text = await response.text();
-        console.warn('Unable to make Google Drive file public:', text);
+        throw new Error(`Google Drive public permission error (${response.status}): ${text.slice(0, 300) || response.statusText}`);
+    }
+}
+
+/**
+ * Payment proofs are private files. A public parent folder would make the
+ * file accessible through inherited access even when the file itself never
+ * receives an `anyone` permission, so reject that storage target first.
+ */
+export async function requirePrivateGoogleDriveFolder(folderId: string, accessToken: string): Promise<void> {
+    const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(folderId)}?fields=permissions(type,role)`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    const rawText = await response.text();
+    let data: { permissions?: Array<{ type?: string; role?: string }> } = {};
+    try {
+        data = JSON.parse(rawText);
+    } catch {
+        /* response wasn't JSON */
+    }
+
+    if (!response.ok) {
+        throw new Error(`Google Drive folder privacy check error (${response.status}): ${rawText.slice(0, 300) || response.statusText}`);
+    }
+    if (!Array.isArray(data.permissions)) {
+        throw new Error('Google Drive folder privacy check error: response did not include permissions');
+    }
+    if (data.permissions?.some((permission) => permission.type === 'anyone')) {
+        throw new Error('Google Drive folder for private uploads must not grant access to anyone');
     }
 }
 
@@ -79,11 +111,20 @@ export interface DriveUploadResult {
     durationSeconds: number;
 }
 
+/**
+ * Upload defaults to public-reader access so existing rendered media keeps
+ * working. Callers handling sensitive files must opt out explicitly.
+ */
+export interface GoogleDriveUploadOptions {
+    makePublic?: boolean;
+}
+
 export async function uploadBufferToGoogleDrive(
     buffer: Buffer,
     originalName: string,
     mimeType: string,
     folderId?: string | null,
+    options: GoogleDriveUploadOptions = {},
 ): Promise<DriveUploadResult> {
     const accessToken = await getGoogleDriveAccessToken();
     const ext = path.extname(originalName) || '';
@@ -93,6 +134,10 @@ export async function uploadBufferToGoogleDrive(
     const metadata: { name: string; parents?: string[] } = { name: fileName };
     const parentFolderId = folderId || process.env.GOOGLE_DRIVE_FOLDER_ID;
     if (parentFolderId) metadata.parents = [parentFolderId];
+
+    if (options.makePublic === false && parentFolderId) {
+        await requirePrivateGoogleDriveFolder(parentFolderId, accessToken);
+    }
 
     const boundary = `catarsis_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const metadataPart = Buffer.from(
@@ -128,7 +173,9 @@ export async function uploadBufferToGoogleDrive(
         throw new Error(`Google Drive upload error: ${uploadData.error?.message || uploadResponse.statusText}`);
     }
 
-    await makeGoogleDriveFilePublic(uploadData.id, accessToken);
+    if (options.makePublic !== false) {
+        await makeGoogleDriveFilePublic(uploadData.id, accessToken);
+    }
 
     const durationMillis = Number(uploadData.videoMediaMetadata?.durationMillis || 0);
 
@@ -138,6 +185,19 @@ export async function uploadBufferToGoogleDrive(
         thumbnailUrl: uploadData.thumbnailLink || `https://drive.google.com/thumbnail?id=${uploadData.id}&sz=w640`,
         durationSeconds: Number.isFinite(durationMillis) && durationMillis > 0 ? Math.round(durationMillis / 1000) : 0,
     };
+}
+
+/**
+ * Reads a file through the Drive API using the server's OAuth credentials.
+ * Callers must validate/authorize the requested file ID before calling this;
+ * this helper deliberately never follows a user-provided URL.
+ */
+export async function downloadGoogleDriveFile(fileId: string): Promise<Response> {
+    const accessToken = await getGoogleDriveAccessToken();
+    return fetch(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
 }
 
 export function driveImageUrl(fileId: string, width = 512): string {

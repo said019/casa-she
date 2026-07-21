@@ -33,12 +33,17 @@ import { useHasPermission } from '@/hooks/useHasPermission';
 import {
     getMembershipPaymentMethods,
     PAYMENT_METHOD_LABELS,
-    GRATIS_REASON_MIN_LENGTH,
 } from '@/lib/membershipPaymentMethods';
 import { formatDateForInput, addDaysForInput } from '@/lib/date';
 import { creditCells } from '@/lib/credits';
 import { EditValidityDialog } from '@/components/memberships/EditValidityDialog';
 import ClientBitacora from '@/components/bitacora/ClientBitacora';
+import { ManualPriceAdjustmentFields } from '@/components/payments/ManualPriceAdjustmentFields';
+import {
+    calculateManualDiscount,
+    MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH,
+    type ManualDiscountType,
+} from '@/lib/manualDiscount';
 
 const mxn = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
 
@@ -178,6 +183,9 @@ function SellPlanDialog({ clientId, onDone }: { clientId: string; onDone: () => 
     const [planId, setPlanId] = useState('');
     const [paymentMethod, setPaymentMethod] = useState<string>('cash');
     const [gratisReason, setGratisReason] = useState('');
+    const [discountEnabled, setDiscountEnabled] = useState(false);
+    const [discountType, setDiscountType] = useState<ManualDiscountType>('percentage');
+    const [discountValue, setDiscountValue] = useState('');
     const [startDate, setStartDate] = useState(formatDateForInput());
     const [endDate, setEndDate] = useState('');
     const [endDateTouched, setEndDateTouched] = useState(false);
@@ -190,6 +198,13 @@ function SellPlanDialog({ clientId, onDone }: { clientId: string; onDone: () => 
 
     const plan = plans.find((p) => p.id === planId);
     const isGratis = paymentMethod === 'gratis';
+    const adjustment = calculateManualDiscount(
+        Number(plan?.price ?? 0),
+        discountEnabled && !isGratis,
+        discountType,
+        discountValue,
+    );
+    const adjustmentNeedsComment = isGratis || discountEnabled;
 
     // Vencimiento sugerido = inicio + duración del plan (mientras el usuario no lo edite).
     useEffect(() => {
@@ -203,6 +218,9 @@ function SellPlanDialog({ clientId, onDone }: { clientId: string; onDone: () => 
         setPlanId('');
         setPaymentMethod('cash');
         setGratisReason('');
+        setDiscountEnabled(false);
+        setDiscountType('percentage');
+        setDiscountValue('');
         setStartDate(formatDateForInput());
         setEndDate('');
         setEndDateTouched(false);
@@ -216,7 +234,11 @@ function SellPlanDialog({ clientId, onDone }: { clientId: string; onDone: () => 
             paymentMethod,
             startDate,
             ...(endDate ? { endDate } : {}),
-            ...(isGratis ? { reason: gratisReason.trim() } : {}),
+            ...(adjustmentNeedsComment ? { reason: gratisReason.trim() } : {}),
+            ...(!isGratis && discountEnabled ? {
+                discountType,
+                discountValue: Number(discountValue),
+            } : {}),
         }),
         onSuccess: () => {
             toast.success('Membresía asignada');
@@ -230,7 +252,9 @@ function SellPlanDialog({ clientId, onDone }: { clientId: string; onDone: () => 
     const canAssign =
         !!planId &&
         !!startDate &&
-        (!isGratis || gratisReason.trim().length >= GRATIS_REASON_MIN_LENGTH);
+        (!discountEnabled || adjustment.valid) &&
+        (!adjustmentNeedsComment ||
+            gratisReason.trim().length >= MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH);
 
     return (
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
@@ -261,12 +285,12 @@ function SellPlanDialog({ clientId, onDone }: { clientId: string; onDone: () => 
                         </Select>
                         {plan && (
                             <p className="text-xs text-muted-foreground mt-1">
-                                {plan.reformer_credits ?? 0} reformer · {plan.multi_credits ?? 0} multi
+                                {plan.reformer_credits ?? 0} salsa · {plan.multi_credits ?? 0} clases
                                 {plan.class_limit ? ` · ${plan.class_limit} clases` : ''}
                             </p>
                         )}
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1">
                             <Label>Inicio</Label>
                             <Input
@@ -299,23 +323,19 @@ function SellPlanDialog({ clientId, onDone }: { clientId: string; onDone: () => 
                             </SelectContent>
                         </Select>
                     </div>
-                    {isGratis && (
-                        <div className="space-y-1">
-                            <Label htmlFor="sp-gratis-reason">
-                                Motivo (obligatorio) <span className="text-destructive">*</span>
-                            </Label>
-                            <Textarea
-                                id="sp-gratis-reason"
-                                value={gratisReason}
-                                onChange={(e) => setGratisReason(e.target.value)}
-                                placeholder="Ej. Cortesía por promoción / compensación"
-                                rows={2}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Se registra en $0 y queda en bitácora (mínimo {GRATIS_REASON_MIN_LENGTH} caracteres).
-                            </p>
-                        </div>
-                    )}
+                    <ManualPriceAdjustmentFields
+                        idPrefix="client-sell-plan"
+                        listPrice={Number(plan?.price ?? 0)}
+                        isGratis={isGratis}
+                        discountEnabled={discountEnabled}
+                        discountType={discountType}
+                        discountValue={discountValue}
+                        comment={gratisReason}
+                        onDiscountEnabledChange={setDiscountEnabled}
+                        onDiscountTypeChange={setDiscountType}
+                        onDiscountValueChange={setDiscountValue}
+                        onCommentChange={setGratisReason}
+                    />
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
@@ -503,7 +523,7 @@ function AdjustCreditsDialog({ membership, onDone }: { membership: ClientMembers
                             <SelectContent>
                                 {availableBuckets.map((b) => (
                                     <SelectItem key={b} value={b}>
-                                        {b === 'reformer_remaining' ? 'Reformer' : b === 'multi_remaining' ? 'Multi' : 'Clases (sin categoría)'}
+                                        {b === 'reformer_remaining' ? 'Salsa' : b === 'multi_remaining' ? 'Clases' : 'Clases (sin categoría)'}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -645,9 +665,7 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
     const elevated = useIsElevated();
     const [editingInfo, setEditingInfo] = useState(false);
     const [form, setForm] = useState({ displayName: '', email: '', phone: '' });
-    // Admin/master eligen con qué WhatsApp (sucursal) se mandan las credenciales.
-    // Recepción normal no ve selector: el backend usa el WhatsApp de su sucursal.
-    const [waKey, setWaKey] = useState<'san-miguel' | 'tepa'>('san-miguel');
+    const waKey = 'casa-she';
 
     const { data: memberships = [] } = useQuery<ClientMembership[]>({
         queryKey: ['client-memberships', client?.id],

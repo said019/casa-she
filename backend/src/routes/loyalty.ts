@@ -782,9 +782,27 @@ router.post('/benefits/:id/use', authenticate, requireRole('admin', 'super_admin
             try { await client.query('ROLLBACK'); } catch { /* ignore */ }
             return res.status(409).json({ error: 'Aplica este beneficio al reservar la clase; no se puede marcar usado suelto.' });
         }
+
+        let nextBenefitValue = b.benefit_value;
+        if (b.benefit_type === 'membership_service') {
+            const options = Array.isArray(b.benefit_value?.options) ? b.benefit_value.options : [];
+            const selectedService = typeof req.body?.selectedService === 'string'
+                ? req.body.selectedService.trim()
+                : '';
+            if (!selectedService || !options.includes(selectedService)) {
+                try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+                return res.status(400).json({
+                    error: 'Selecciona el servicio utilizado.',
+                    options,
+                });
+            }
+            nextBenefitValue = { ...b.benefit_value, selected_service: selectedService };
+        }
         await client.query(
-            `UPDATE user_benefits SET status = 'used', used_at = NOW(), used_by = $2 WHERE id = $1`,
-            [b.id, req.user?.userId ?? null]
+            `UPDATE user_benefits
+                SET status = 'used', used_at = NOW(), used_by = $2, benefit_value = $3::jsonb
+              WHERE id = $1`,
+            [b.id, req.user?.userId ?? null, JSON.stringify(nextBenefitValue)]
         );
         await client.query('COMMIT');
         return res.json({ id: b.id, status: 'used', usedBy: req.user?.userId ?? null });

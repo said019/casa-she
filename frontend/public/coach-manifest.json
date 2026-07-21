@@ -1,7 +1,7 @@
 {
-  "name": "BMB Coach",
-  "short_name": "BMB Coach",
-  "description": "Portal de coaches de BMB Studio — agenda, perfil y clases.",
+  "name": "Casa Shé Coaches",
+  "short_name": "Casa Shé",
+  "description": "Portal de coaches de Casa Shé — agenda, perfil y clases.",
   "id": "/coach",
   "start_url": "/coach",
   "scope": "/coach",

@@ -20,6 +20,7 @@ interface BarOrderData {
   status: 'pending' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
   payment_method: string;
   payment_status?: string;
+  mp_checkout_url?: string | null;
   items: OrderItem[];
   created_at: string;
 }
@@ -140,11 +141,16 @@ export default function FuelBarOrder() {
   const isPending = order.status === 'pending';
   const isDone = isDelivered || isCancelled;
 
-  const step = statusStep(order.status);
+  const isCardPaymentPending = order.payment_method === 'card' && order.payment_status !== 'paid';
+  const isCardPaymentFailed = isCardPaymentPending && order.payment_status === 'failed';
+  const step = isCardPaymentPending ? -1 : statusStep(order.status);
   const firstItem = order.items?.[0];
   const itemNames = (order.items ?? []).map((i) => i.product_name).join(' · ');
 
   const isReceptionUnpaid = order.payment_method === 'reception' && order.payment_status !== 'paid';
+  const statusLabel = isCardPaymentPending
+    ? (isCardPaymentFailed ? 'Pago no completado' : 'Pago pendiente')
+    : STATUS_LABEL[order.status];
 
   return (
     <AuthGuard>
@@ -228,7 +234,7 @@ export default function FuelBarOrder() {
 
               {/* Status text */}
               <h2 className="font-heading text-[38px] leading-[1.02] text-[#2A4E36]">
-                {STATUS_LABEL[order.status]}
+                {statusLabel}
               </h2>
               <p className="mt-[10px] text-[14px] italic leading-[1.5] text-[#2A4E36]/58">
                 {isReady ? (
@@ -237,6 +243,10 @@ export default function FuelBarOrder() {
                     <br />
                     Muestra este código al recogerla
                   </>
+                ) : isCardPaymentPending ? (
+                  isCardPaymentFailed
+                    ? 'No se confirmó el pago. Puedes intentarlo de nuevo o cancelar el pedido.'
+                    : 'Tu pedido llegará a la barra cuando se confirme el pago con tarjeta.'
                 ) : isPending ? (
                   'Tu pedido está en la cola. Prepárate para recoger.'
                 ) : (
@@ -267,6 +277,14 @@ export default function FuelBarOrder() {
                 </div>
               )}
 
+              {isCardPaymentPending && (
+                <div className="mt-6 rounded-[14px] border border-amber-300/70 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+                  <span className="font-semibold">Aún no se ha cobrado tu tarjeta</span>
+                  <br />
+                  <span className="opacity-75">No enviamos este pedido a preparación hasta recibir la confirmación del pago.</span>
+                </div>
+              )}
+
               {/* Cancel button (pending only) */}
               <div className="mt-8 flex flex-col items-center gap-3">
                 <button
@@ -275,6 +293,14 @@ export default function FuelBarOrder() {
                 >
                   Pedir otra cosa
                 </button>
+                {isCardPaymentPending && order.mp_checkout_url && (
+                  <button
+                    onClick={() => { window.location.href = order.mp_checkout_url!; }}
+                    className="rounded-full bg-[#C89B25] px-6 py-3 text-sm text-white transition-colors hover:bg-[#aa8117]"
+                  >
+                    Continuar pago
+                  </button>
+                )}
                 {isPending && (
                   <button
                     onClick={cancel}

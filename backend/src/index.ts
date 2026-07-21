@@ -66,6 +66,13 @@ import { PHONE_BY_EMAIL, DOB_BY_EMAIL } from './data/fitune-contact-backfill.js'
 import { FITUNE_INACTIVE_EMAILS } from './data/fitune-inactive-members.js';
 import { REAL_START_BY_EMAIL } from './data/fitune-start-dates.js';
 import { CREDIT_FIXES } from './data/fitune-credit-fixes.js';
+import {
+    CASA_SHE_OFFICIAL_CLASS_TYPES,
+    CASA_SHE_OFFICIAL_FACILITY,
+    CASA_SHE_OFFICIAL_INSTRUCTORS,
+    CASA_SHE_OFFICIAL_SCHEDULE_VERSION,
+    buildCasaSheOfficialScheduleRows,
+} from './data/casa-she-official-schedule.js';
 import initializeCronJobs from './services/cron-jobs.js';
 
 // Load environment variables
@@ -1151,7 +1158,11 @@ async function runStartupMigrations(): Promise<void> {
     // Gateado con system_settings para correr una sola vez y no pisar ediciones manuales del admin.
     try {
         const done = await queryOne<{ k: string }>(`SELECT key AS k FROM system_settings WHERE key='migration_052_reformer_formats'`);
-        if (!done) {
+        const casaShe = await queryOne<{ id: string }>(`SELECT id FROM facilities WHERE name='Casa Shé — Condesa' LIMIT 1`);
+        if (casaShe && !done) {
+            await query(`INSERT INTO system_settings (key, value) VALUES ('migration_052_reformer_formats', 'true'::jsonb) ON CONFLICT (key) DO NOTHING`);
+            console.log('Migration 052: neutralizada para Casa Shé.');
+        } else if (!done) {
             // 1) Rename: Pilates Reformer -> Reformer Classic (preserva id y FKs).
             await query(`UPDATE class_types SET name='Reformer Classic', updated_at=NOW() WHERE name='Pilates Reformer'`);
             // 2) Crear los 3 formatos nuevos (idempotente por nombre).
@@ -1617,6 +1628,10 @@ async function runStartupMigrations(): Promise<void> {
     // recepción) materializa las clases reservables. Nota: el class_type 'Pilates Reformer' del seed
     // ya fue renombrado por la Mig 052, por eso aquí se usan los nombres actuales.
     try {
+        const casaShe = await queryOne<{ id: string }>(`SELECT id FROM facilities WHERE name='Casa Shé — Condesa' LIMIT 1`);
+        if (casaShe) {
+            console.log('Migration 070: neutralizada para Casa Shé.');
+        } else {
         const tepa = await queryOne<{ id: string }>(`SELECT id FROM facilities WHERE name ILIKE 'BMB Studio Tepa'`);
         const sm = await queryOne<{ id: string }>(`SELECT id FROM facilities WHERE name ILIKE 'BMB Studio San Miguel'`);
         const classic = await queryOne<{ id: string }>(`SELECT id FROM class_types WHERE name = 'Reformer Classic'`);
@@ -1657,6 +1672,7 @@ async function runStartupMigrations(): Promise<void> {
                 added += r.length;
             }
             console.log(`Migration 070: slots Reformer sáb/dom — agregados: ${added}, ya existían: ${5 - added}.`);
+        }
         }
     } catch (e) { console.error('Migration 070 error:', e); }
 
@@ -2778,7 +2794,11 @@ async function runStartupMigrations(): Promise<void> {
     // cupo. Guarda NOT EXISTS para no duplicar. Run-once. (clase b57d8937 = Hot Sculpt 21-jun SM.)
     try {
         const done = await queryOne<{ x: number }>(`SELECT 1 AS x FROM system_settings WHERE key='migration_094_yessica_booking'`);
-        if (!done) {
+        const casaShe = await queryOne<{ id: string }>(`SELECT id FROM facilities WHERE name='Casa Shé — Condesa' LIMIT 1`);
+        if (casaShe && !done) {
+            await query(`INSERT INTO system_settings (key, value) VALUES ('migration_094_yessica_booking', '"skipped-casa-she"'::jsonb) ON CONFLICT (key) DO NOTHING`);
+            console.log('Migration 094: reserva heredada neutralizada para Casa Shé.');
+        } else if (!done) {
             const ins = await query(
                 `INSERT INTO bookings (class_id, user_id, status, is_migration)
                  SELECT 'b57d8937-496f-4e07-88d9-1d89d2f0244d', '63b28b2d-ed7c-49b1-ba18-937e328af8fe', 'confirmed', true
@@ -2849,8 +2869,8 @@ async function runStartupMigrations(): Promise<void> {
                 await query(
                     `INSERT INTO plans (name, description, price, currency, duration_days,
                         class_limit, reformer_credits, multi_credits, is_active, is_internal, color, sort_order)
-                     SELECT $1, $2, 0, 'MXN', 365, 24, 12, 12, true, true, $3, 900
-                      WHERE NOT EXISTS (SELECT 1 FROM plans WHERE name = $1)`,
+                     SELECT $1::varchar, $2::text, 0, 'MXN', 365, 24, 12, 12, true, true, $3::varchar, 900
+                      WHERE NOT EXISTS (SELECT 1 FROM plans WHERE name = $1::varchar)`,
                     [name, `Plan interno de plataforma (${name}). Control de alumnos; sin precio y no visible para clientes.`, color]
                 );
             }
@@ -3188,7 +3208,10 @@ async function runStartupMigrations(): Promise<void> {
             for (const [name, grp, single, price, ord] of EXTRAS) {
                 await query(
                     `INSERT INTO bar_extras (name, group_label, is_single, price_mxn, sort_order)
-                     SELECT $1,$2,$3,$4,$5 WHERE NOT EXISTS (SELECT 1 FROM bar_extras WHERE name=$1 AND group_label=$2)`,
+                     SELECT $1::varchar,$2::varchar,$3::boolean,$4::numeric,$5::integer
+                     WHERE NOT EXISTS (
+                       SELECT 1 FROM bar_extras WHERE name=$1::varchar AND group_label=$2::varchar
+                     )`,
                     [name, grp, single, price, ord]);
             }
             await query(`INSERT INTO system_settings (key, value) VALUES ('bar_extras_seeded','true'::jsonb) ON CONFLICT (key) DO NOTHING`);
@@ -3316,13 +3339,8 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Migration 095: referral codes discount zeroed.');
     } catch (e) { console.error('Migration 095 error:', e); }
 
-    // Settings reales del estudio (idempotente). Corrige los placeholders stale de
-    // la base clonada SIN pisar valores ya personalizados por el admin.
-    //   - studio_info: rellena por-clave SOLO cuando está vacía o sigue siendo un
-    //     placeholder conocido ('Catarsis Studio' / 'Balance Studio'); merge sobre el JSON.
-    //   - bank_info: corrige al banco real SOLO si sigue siendo el placeholder
-    //     stale (Balance Studio / BBVA / CLABE '012...'); si ya tiene Mercado Pago
-    //     u otro valor real, NO lo toca.
+    // Defaults seguros de Casa Shé. Solo completan vacíos o reemplazan valores heredados
+    // conocidos; nunca inventan teléfono, WhatsApp ni datos bancarios.
     try {
         // 1) Si la fila no existe, sembrar los valores reales directamente.
         await query(
@@ -3330,34 +3348,41 @@ async function runStartupMigrations(): Promise<void> {
              VALUES ('studio_info', $1::jsonb, 'Información del estudio')
              ON CONFLICT (key) DO NOTHING`,
             [JSON.stringify({
-                name: 'BMB Studio',
-                address: 'Calle Primero de Mayo 1, Diamante, 54763 Cuautitlán Izcalli, Méx.',
-                phone: '5543860391',
-                email: 'hola@bmbstudio.mx',
-                website: '',
-                description: '',
-                social_media: { instagram: '@bmbstudio', facebook: '', whatsapp: '5543860391' },
+                name: 'Casa Shé',
+                address: 'Alfonso Reyes 131, Condesa, CDMX',
+                phone: '',
+                email: 'casashecondesa@gmail.com',
+                website: 'https://casashe.mx',
+                description: 'Wellness para mujeres en la Condesa, CDMX.',
+                social_media: { instagram: '@casashe.mx', facebook: '', whatsapp: '' },
             })]
         );
-        // 2) Si la fila existe, merge por-clave SOLO sobre vacíos/null/placeholders stale.
-        //    jsonb_set/COALESCE evita pisar lo que el admin ya personalizó.
+        // Si la fila existe, completar únicamente campos vacíos y valores de marca heredados.
         await query(
             `UPDATE system_settings SET value = value
                 || jsonb_build_object(
-                     'name', CASE WHEN COALESCE(value->>'name','') IN ('', 'Catarsis Studio', 'Balance Studio')
-                                  THEN 'BMB Studio' ELSE value->>'name' END,
+                     'name', CASE WHEN COALESCE(value->>'name','') IN ('', 'Catarsis Studio', 'Balance Studio', 'BMB Studio')
+                                  THEN 'Casa Shé' ELSE value->>'name' END,
                      'address', CASE WHEN COALESCE(value->>'address','') = ''
-                                  THEN 'Calle Primero de Mayo 1, Diamante, 54763 Cuautitlán Izcalli, Méx.' ELSE value->>'address' END,
-                     'phone', CASE WHEN COALESCE(value->>'phone','') = ''
-                                  THEN '5543860391' ELSE value->>'phone' END,
+                                  THEN 'Alfonso Reyes 131, Condesa, CDMX' ELSE value->>'address' END,
+                     'phone', CASE WHEN COALESCE(value->>'phone','') = '5543860391'
+                                  THEN '' ELSE COALESCE(value->>'phone','') END,
                      'email', CASE WHEN COALESCE(value->>'email','') = ''
-                                  THEN 'hola@bmbstudio.mx' ELSE value->>'email' END,
+                                       OR LOWER(value->>'email') IN ('hola@bmbstudio.mx','hola@balanceroom.mx')
+                                  THEN 'casashecondesa@gmail.com' ELSE value->>'email' END,
+                     'website', CASE WHEN COALESCE(value->>'website','') = ''
+                                          OR LOWER(value->>'website') LIKE '%bmbstudio%'
+                                          OR LOWER(value->>'website') LIKE '%balanceroom%'
+                                     THEN 'https://casashe.mx' ELSE value->>'website' END,
+                     'description', CASE WHEN COALESCE(value->>'description','') = ''
+                                        THEN 'Wellness para mujeres en la Condesa, CDMX.' ELSE value->>'description' END,
                      'social_media', (COALESCE(value->'social_media','{}'::jsonb)
                         || jsonb_build_object(
                              'instagram', CASE WHEN COALESCE(value->'social_media'->>'instagram','') = ''
-                                              THEN '@bmbstudio' ELSE value->'social_media'->>'instagram' END,
-                             'whatsapp', CASE WHEN COALESCE(value->'social_media'->>'whatsapp','') = ''
-                                              THEN '5543860391' ELSE value->'social_media'->>'whatsapp' END,
+                                                   OR LOWER(value->'social_media'->>'instagram') IN ('@bmbstudio','@balanceroom')
+                                              THEN '@casashe.mx' ELSE value->'social_media'->>'instagram' END,
+                             'whatsapp', CASE WHEN COALESCE(value->'social_media'->>'whatsapp','') = '5543860391'
+                                              THEN '' ELSE COALESCE(value->'social_media'->>'whatsapp','') END,
                              'facebook', COALESCE(value->'social_media'->>'facebook','')
                            ))
                    ),
@@ -3371,53 +3396,51 @@ async function runStartupMigrations(): Promise<void> {
              VALUES ('bank_info', $1::jsonb, 'Datos bancarios para transferencias')
              ON CONFLICT (key) DO NOTHING`,
             [JSON.stringify({
-                bank_name: 'Mercado Pago',
-                account_holder: 'Karla Ivonne Pérez García',
+                bank_name: '(pendiente)',
+                account_holder: 'Casa Shé',
                 account_number: '',
-                clabe: '722969020755786887',
+                clabe: '(pendiente)',
                 reference_instructions: 'Usa tu nombre completo como referencia',
             })]
         );
-        // Corregir SOLO si sigue siendo el placeholder stale de la base clonada.
+        // Corregir solo placeholders o los datos bancarios conocidos del proyecto anterior.
         await query(
             `UPDATE system_settings SET value = $1::jsonb, updated_at = NOW()
              WHERE key = 'bank_info'
                AND (
-                    value->>'bank_name' IN ('', 'Balance Studio', 'BBVA')
+                    value->>'bank_name' IN ('', 'Balance Studio', 'BBVA', 'Mercado Pago')
                  OR value->>'clabe' LIKE '012%'
+                 OR value->>'clabe' = '722969020755786887'
                  OR value->>'account_holder' = 'Balance Studio S.A. de C.V.'
+                 OR value->>'account_holder' = 'Karla Ivonne Pérez García'
                )`,
             [JSON.stringify({
-                bank_name: 'Mercado Pago',
-                account_holder: 'Karla Ivonne Pérez García',
+                bank_name: '(pendiente)',
+                account_holder: 'Casa Shé',
                 account_number: '',
-                clabe: '722969020755786887',
+                clabe: '(pendiente)',
                 reference_instructions: 'Usa tu nombre completo como referencia',
             })]
         );
 
         // El cache de settings es in-memory y está vacío en el arranque (corre antes
         // de aceptar tráfico), así que no hay nada que invalidar aquí.
-        console.log('Settings: studio_info/bank_info reales asegurados (idempotente).');
+        console.log('Settings: defaults seguros de Casa Shé asegurados.');
     } catch (e) {
         console.error('Error asegurando settings reales (studio_info/bank_info):', e);
     }
 
-    // Ensure admin@balanceroom.mx is the admin account
+    // Las cuentas administrativas heredadas no deben reactivarse en Casa Shé.
     try {
-        const adminHash = '$2b$10$ELPrfYdYroo/URqPraoj9eWP7KfYNGZfEbFpYq8uYLN.tnfdQY15S';
         await query(
-            `INSERT INTO users (email, password_hash, display_name, phone, role, is_active)
-             VALUES ('admin@balanceroom.mx', $1, 'Admin', '0000000000', 'admin', true)
-             ON CONFLICT (email) DO UPDATE
-               SET password_hash = $1, role = 'admin', is_active = true`,
-            [adminHash]
+            `UPDATE users SET is_active = false, updated_at = NOW()
+             WHERE LOWER(email) IN ('admin@balanceroom.mx', 'admin@bmbstudio.mx', 'bmbstudio@admin.com', 'coach@balanceroom.mx')`
         );
         // Demote saidromero19@gmail.com to client if it was accidentally made admin
         await query(
             `UPDATE users SET role = 'client' WHERE email = 'saidromero19@gmail.com' AND role = 'admin'`
         );
-        console.log('Admin account admin@balanceroom.mx ensured.');
+        console.log('Cuentas de sistema heredadas desactivadas.');
     } catch (e) {
         console.error('Error ensuring admin account:', e);
     }
@@ -3465,8 +3488,16 @@ async function runStartupMigrations(): Promise<void> {
     // === Onboarding Perfilador (Fase 2) ===
     try {
       await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed_at TIMESTAMPTZ`);
-      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_required BOOLEAN NOT NULL DEFAULT true`);
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_required BOOLEAN NOT NULL DEFAULT false`);
+      await query(`ALTER TABLE users ALTER COLUMN onboarding_required SET DEFAULT false`);
       await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_invite_dismissed_at TIMESTAMPTZ`);
+
+      // El perfilador dejó de ser parte obligatoria del registro. Libera también a
+      // las cuentas creadas con el default anterior para que entren y reserven directo.
+      await query(`UPDATE users
+                      SET onboarding_required = false
+                    WHERE onboarding_required = true
+                      AND onboarding_completed_at IS NULL`);
 
       await query(`CREATE TABLE IF NOT EXISTS onboarding_responses (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -3532,7 +3563,7 @@ async function runStartupMigrations(): Promise<void> {
     // ===========================================================================
     try {
         const CS_PLANS = ['Clase de prueba', 'Drop-in', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Membresía 360', 'Membresía Black', 'Salsa · 1 clase', 'Salsa · 4 clases'];
-        const CS_TYPES = ['Pilates Mat', 'Barre', 'Sculpt', 'Yoga Ashtanga', 'Yoga Vinyasa', 'Flex', 'Salsa'];
+        const CS_TYPES = CASA_SHE_OFFICIAL_CLASS_TYPES.map((type) => type.name);
 
         // Reglamento obligatorio: marca de aceptación por usuaria (NULL = no aceptado aún).
         await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reglamento_accepted_at TIMESTAMPTZ`);
@@ -3556,9 +3587,14 @@ async function runStartupMigrations(): Promise<void> {
             FROM (VALUES
               ('Clase de prueba',1,150,7,1),('Drop-in',1,280,30,2),('Paquete 5',5,1300,30,3),
               ('Paquete 8',8,2000,30,4),('Paquete 12',12,2880,30,5),
-              ('Membresía 360',16,3600,30,6),('Membresía Black',24,4200,30,7)
+              ('Membresía 360',NULL,3800,30,6),('Membresía Black',NULL,4200,30,7)
             ) AS v(name, credits, price, days, sort)
             WHERE NOT EXISTS (SELECT 1 FROM plans p WHERE p.name = v.name)`);
+
+        // La paleta oficial identifica las dos membresías mensuales en terracota.
+        // Solo completa colores vacíos para respetar cambios posteriores desde admin.
+        await query(`UPDATE plans SET color = '#AE4836'
+            WHERE name IN ('Membresía 360', 'Membresía Black') AND color IS NULL`);
 
         // (b.2) Planes de Salsa — bucket reformer reutilizado como "Salsa" (créditos solo-salsa; multi=0).
         await query(`INSERT INTO plans (name, reformer_credits, multi_credits, price, duration_days, is_active, sort_order)
@@ -3608,6 +3644,152 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Casa Shé v1: catálogo, sede única y estado activo asegurados en cada arranque.');
     } catch (e) { console.error('Casa Shé v1 seed error:', e); }
 
+    // Horario oficial Casa Shé 1.8 (PDF del 13-jul-2026): 54 plantillas semanales.
+    // Se ejecuta una sola vez para que los cambios posteriores del admin no se reviertan
+    // en cada deploy. Las clases con fecha se sincronizan mediante el script operativo
+    // sync-casa-she-official-schedule.ts, que aborta si encuentra reservas activas.
+    try {
+        const marker = `casa_she_official_schedule_${CASA_SHE_OFFICIAL_SCHEDULE_VERSION}`;
+        const done = await queryOne<{ x: number }>(
+            `SELECT 1 AS x FROM system_settings WHERE key = $1`,
+            [marker]
+        );
+        if (!done) {
+            for (const name of CASA_SHE_OFFICIAL_INSTRUCTORS) {
+                const slug = name.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '');
+                const email = `${slug}@casashe.instructor.local`;
+                await query(
+                    `INSERT INTO users (email, display_name, role, phone, is_active)
+                     SELECT $1::varchar, $2::varchar, 'instructor', '0000000000', true
+                     WHERE NOT EXISTS (SELECT 1 FROM instructors WHERE display_name = $2::varchar)
+                       AND NOT EXISTS (SELECT 1 FROM users WHERE email = $1::varchar)`,
+                    [email, name]
+                );
+                await query(
+                    `INSERT INTO instructors (user_id, display_name, email, is_active, visible_public)
+                     SELECT u.id, $1::varchar, u.email, true, false
+                     FROM users u
+                     WHERE u.email = $2::varchar
+                       AND NOT EXISTS (SELECT 1 FROM instructors WHERE display_name = $1::varchar)`,
+                    [name, email]
+                );
+                await query(
+                    `UPDATE instructors SET is_active = true, updated_at = NOW()
+                     WHERE display_name = $1::varchar`,
+                    [name]
+                );
+            }
+
+            for (const type of CASA_SHE_OFFICIAL_CLASS_TYPES) {
+                await query(
+                    `INSERT INTO class_types
+                       (name, category, level, duration_minutes, max_capacity, color, spot_icon, is_active)
+                     SELECT $1::varchar, $2::class_category, 'all'::class_level, $3, $4, $5::varchar, $6::varchar, true
+                     WHERE NOT EXISTS (SELECT 1 FROM class_types WHERE name = $1::varchar)`,
+                    [type.name, type.category, type.durationMinutes, type.maxCapacity, type.color, type.spotIcon]
+                );
+                await query(
+                    `UPDATE class_types SET is_active = true, updated_at = NOW()
+                     WHERE name = $1::varchar`,
+                    [type.name]
+                );
+            }
+
+            const facility = await queryOne<{ id: string }>(
+                `SELECT id FROM facilities WHERE name = $1 LIMIT 1`,
+                [CASA_SHE_OFFICIAL_FACILITY]
+            );
+            if (!facility) throw new Error(`No existe la sede ${CASA_SHE_OFFICIAL_FACILITY}`);
+
+            // El PDF pasa a ser la fuente completa de verdad de las plantillas de esta sede.
+            await query(`DELETE FROM schedules WHERE facility_id = $1`, [facility.id]);
+            for (const row of buildCasaSheOfficialScheduleRows()) {
+                const classType = await queryOne<{ id: string }>(
+                    `SELECT id FROM class_types WHERE name = $1 AND category = $2 ORDER BY created_at NULLS FIRST LIMIT 1`,
+                    [row.classType, row.category]
+                );
+                const instructor = await queryOne<{ id: string }>(
+                    `SELECT id FROM instructors WHERE display_name = $1 ORDER BY created_at NULLS FIRST LIMIT 1`,
+                    [row.instructor]
+                );
+                if (!classType || !instructor) {
+                    throw new Error(`Referencia faltante en horario oficial: ${row.classType} / ${row.instructor}`);
+                }
+                await query(
+                    `INSERT INTO schedules
+                       (class_type_id, instructor_id, facility_id, day_of_week, start_time,
+                        end_time, max_capacity, is_recurring, is_active)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, true, true)`,
+                    [classType.id, instructor.id, facility.id, row.dayOfWeek, row.startTime,
+                     row.endTime, row.maxCapacity]
+                );
+            }
+
+            await query(
+                `INSERT INTO system_settings (key, value, description)
+                 VALUES ($1, $2::jsonb, 'Horario oficial Casa Shé 1.8 importado desde PDF')
+                 ON CONFLICT (key) DO NOTHING`,
+                [marker, JSON.stringify({ status: 'done', slots: 54, source: 'HORARIOS CASA SHE 1.8.pdf' })]
+            );
+            console.log(`Horario oficial Casa Shé ${CASA_SHE_OFFICIAL_SCHEDULE_VERSION}: 54 plantillas guardadas.`);
+        }
+    } catch (e) { console.error('Horario oficial Casa Shé migration error:', e); }
+
+    // Limpieza final de identidad heredada. Es selectiva e idempotente: solo toca
+    // valores exactos del proyecto anterior y perfiles sin clases futuras.
+    try {
+        await query(
+            `UPDATE system_settings
+                SET value = $1::jsonb, updated_at = NOW()
+              WHERE key = 'onboarding_recommendation_rules'
+                AND (value::text ILIKE '%Aeroyoga%' OR value::text ILIKE '%Telas%')`,
+            [JSON.stringify(ONBOARDING_DEFAULT_RULES)]
+        );
+
+        await query(
+            `UPDATE onboarding_responses r
+                SET recommended_disciplines = COALESCE(
+                      (SELECT jsonb_agg(item)
+                         FROM jsonb_array_elements(COALESCE(r.recommended_disciplines, '[]'::jsonb)) item
+                        WHERE item->>'name' NOT IN ('Aeroyoga', 'Telas')),
+                      '[]'::jsonb
+                    ),
+                    recommended_experience = CASE
+                      WHEN r.recommended_experience->>'name' IN ('Aeroyoga', 'Telas')
+                      THEN NULL
+                      ELSE r.recommended_experience
+                    END,
+                    updated_at = NOW()
+              WHERE COALESCE(r.recommended_disciplines, '[]'::jsonb)::text ILIKE '%Aeroyoga%'
+                 OR COALESCE(r.recommended_disciplines, '[]'::jsonb)::text ILIKE '%Telas%'
+                 OR COALESCE(r.recommended_experience, '{}'::jsonb)::text ILIKE '%Aeroyoga%'
+                 OR COALESCE(r.recommended_experience, '{}'::jsonb)::text ILIKE '%Telas%'`
+        );
+
+        const legacyCoachNames = [
+            'Indie', 'Vero', 'Vane', 'Frida', 'Aranza', 'Jess', 'Fer', 'Pao',
+            'Estrella', 'Jaqui', 'Karla', 'Jessi Tavira', 'Aaron Domínguez', 'Sofi Maes', 'Ricardo',
+        ];
+        await query(
+            `UPDATE instructors i
+                SET is_active = false, visible_public = false, updated_at = NOW()
+              WHERE i.display_name = ANY($1::text[])
+                AND i.display_name <> ALL($2::text[])
+                AND NOT EXISTS (
+                  SELECT 1
+                    FROM classes c
+                   WHERE c.instructor_id = i.id
+                     AND c.date >= CURRENT_DATE
+                     AND c.status <> 'cancelled'
+                )`,
+            [legacyCoachNames, [...CASA_SHE_OFFICIAL_INSTRUCTORS]]
+        );
+
+        console.log('Casa Shé: identidad heredada, recomendaciones y coaches inactivos depurados.');
+    } catch (e) {
+        console.error('Casa Shé legacy identity cleanup error:', e);
+    }
+
     // Migration 104: user_benefits — tabla de beneficios canjeados (recompensas de lealtad)
     try {
         await query(`CREATE TABLE IF NOT EXISTS user_benefits (
@@ -3637,18 +3819,163 @@ async function runStartupMigrations(): Promise<void> {
         console.log('Migration 106: user_benefits.used_by column ready.');
     } catch (e) { console.error('Migration 106 error:', e); }
 
+    // Casa Shé: inclusiones reales de membresía (servicios + talleres).
+    // Cada inclusión se materializa como un beneficio consumible ligado a la
+    // membresía que lo originó; el trigger cubre tarjeta, transferencia, caja y
+    // activaciones manuales sin duplicar beneficios al reintentar.
+    try {
+        await query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS included_services INTEGER NOT NULL DEFAULT 0`);
+        await query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS included_workshops INTEGER NOT NULL DEFAULT 0`);
+        await query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS service_options JSONB NOT NULL DEFAULT '[]'::jsonb`);
+        await query(`ALTER TABLE user_benefits ADD COLUMN IF NOT EXISTS source_membership_id UUID REFERENCES memberships(id) ON DELETE CASCADE`);
+        await query(`ALTER TABLE user_benefits ADD COLUMN IF NOT EXISTS source_slot INTEGER`);
+        await query(`ALTER TABLE user_benefits ADD COLUMN IF NOT EXISTS used_on_event_registration_id UUID REFERENCES event_registrations(id) ON DELETE SET NULL`);
+        await query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_benefits_membership_slot
+            ON user_benefits(source_membership_id, benefit_type, source_slot)
+            WHERE source_membership_id IS NOT NULL`);
+
+        const configured = await query(`SELECT 1 FROM migration_flags WHERE name = 'casashe_membership_inclusions_v1'`);
+        if (!configured.length) {
+            const serviceOptions = JSON.stringify(['Nutrición', 'Cosmiatría', 'Fisioterapia']);
+            await query(`UPDATE plans SET
+                    price = 3800,
+                    duration_days = 30,
+                    class_limit = NULL,
+                    reformer_credits = 0,
+                    multi_credits = NULL,
+                    included_services = 1,
+                    included_workshops = 0,
+                    service_options = $1::jsonb,
+                    color = '#AE4836',
+                    features = $2::jsonb
+                WHERE name = 'Membresía 360'`, [serviceOptions, JSON.stringify([
+                    'Clases ilimitadas',
+                    '1 servicio a elegir: Nutrición, Cosmiatría o Fisioterapia',
+                    'Vigencia de 1 mes',
+                ])]);
+            await query(`UPDATE plans SET
+                    price = 4200,
+                    duration_days = 30,
+                    class_limit = NULL,
+                    reformer_credits = 0,
+                    multi_credits = NULL,
+                    included_services = 2,
+                    included_workshops = 1,
+                    service_options = $1::jsonb,
+                    color = '#AE4836',
+                    features = $2::jsonb
+                WHERE name = 'Membresía Black'`, [serviceOptions, JSON.stringify([
+                    'Clases ilimitadas',
+                    '2 servicios a elegir: Nutrición, Cosmiatría o Fisioterapia',
+                    '1 taller incluido',
+                    'Vigencia de 1 mes',
+                ])]);
+        }
+
+        await query(`
+            CREATE OR REPLACE FUNCTION sync_membership_included_benefits()
+            RETURNS TRIGGER AS $$
+            DECLARE
+                plan_row RECORD;
+                slot_number INTEGER;
+                benefit_expiration TIMESTAMPTZ;
+            BEGIN
+                IF NEW.status = 'active' THEN
+                    SELECT name, included_services, included_workshops, service_options
+                      INTO plan_row
+                      FROM plans
+                     WHERE id = NEW.plan_id;
+
+                    benefit_expiration := COALESCE(
+                        NEW.end_date::date + INTERVAL '1 day' - INTERVAL '1 second',
+                        NOW() + INTERVAL '30 days'
+                    );
+
+                    UPDATE user_benefits
+                       SET status = 'cancelled'
+                     WHERE source_membership_id = NEW.id
+                       AND status = 'active'
+                       AND (
+                            (benefit_type = 'membership_service' AND source_slot > COALESCE(plan_row.included_services, 0))
+                         OR (benefit_type = 'workshop_pass' AND source_slot > COALESCE(plan_row.included_workshops, 0))
+                       );
+
+                    FOR slot_number IN 1..COALESCE(plan_row.included_services, 0) LOOP
+                        INSERT INTO user_benefits (
+                            user_id, benefit_type, benefit_value, status, expires_at,
+                            source_membership_id, source_slot
+                        ) VALUES (
+                            NEW.user_id,
+                            'membership_service',
+                            jsonb_build_object(
+                                'options', COALESCE(plan_row.service_options, '[]'::jsonb),
+                                'plan_name', plan_row.name,
+                                'slot', slot_number
+                            ),
+                            'active', benefit_expiration, NEW.id, slot_number
+                        ) ON CONFLICT (source_membership_id, benefit_type, source_slot)
+                          WHERE source_membership_id IS NOT NULL
+                          DO UPDATE SET
+                              expires_at = EXCLUDED.expires_at,
+                              benefit_value = CASE WHEN user_benefits.status = 'used' THEN user_benefits.benefit_value ELSE EXCLUDED.benefit_value END,
+                              status = CASE WHEN user_benefits.status = 'cancelled' THEN 'active' ELSE user_benefits.status END;
+                    END LOOP;
+
+                    FOR slot_number IN 1..COALESCE(plan_row.included_workshops, 0) LOOP
+                        INSERT INTO user_benefits (
+                            user_id, benefit_type, benefit_value, status, expires_at,
+                            source_membership_id, source_slot
+                        ) VALUES (
+                            NEW.user_id,
+                            'workshop_pass',
+                            jsonb_build_object('plan_name', plan_row.name, 'slot', slot_number),
+                            'active', benefit_expiration, NEW.id, slot_number
+                        ) ON CONFLICT (source_membership_id, benefit_type, source_slot)
+                          WHERE source_membership_id IS NOT NULL
+                          DO UPDATE SET
+                              expires_at = EXCLUDED.expires_at,
+                              benefit_value = CASE WHEN user_benefits.status = 'used' THEN user_benefits.benefit_value ELSE EXCLUDED.benefit_value END,
+                              status = CASE WHEN user_benefits.status = 'cancelled' THEN 'active' ELSE user_benefits.status END;
+                    END LOOP;
+
+                    UPDATE user_benefits
+                       SET expires_at = benefit_expiration
+                     WHERE source_membership_id = NEW.id AND status = 'active';
+                ELSIF NEW.status IN ('cancelled', 'expired') THEN
+                    UPDATE user_benefits
+                       SET status = CASE WHEN NEW.status = 'expired' THEN 'expired' ELSE 'cancelled' END
+                     WHERE source_membership_id = NEW.id AND status = 'active';
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        `);
+        await query(`DROP TRIGGER IF EXISTS trg_sync_membership_included_benefits ON memberships`);
+        await query(`CREATE TRIGGER trg_sync_membership_included_benefits
+            AFTER INSERT OR UPDATE OF status, end_date, plan_id ON memberships
+            FOR EACH ROW EXECUTE FUNCTION sync_membership_included_benefits()`);
+
+        // Backfill idempotente para membresías oficiales que ya estaban activas.
+        await query(`UPDATE memberships m SET end_date = m.end_date
+            FROM plans p
+            WHERE m.plan_id = p.id AND m.status = 'active'
+              AND p.name IN ('Membresía 360', 'Membresía Black')`);
+        await query(`INSERT INTO migration_flags (name) VALUES ('casashe_membership_inclusions_v1') ON CONFLICT DO NOTHING`);
+        console.log('Casa Shé: inclusiones de servicios y talleres configuradas.');
+    } catch (e) { console.error('Casa Shé membership inclusions migration error:', e); }
+
     // Migration 105: seed del catálogo de recompensas Casa Shé
     try {
         await query(`
             INSERT INTO loyalty_rewards (name, description, points_required, points_cost, reward_type, reward_value, is_active)
-            SELECT v.name, v.desc, v.pts, v.pts, v.rtype, v.rval::jsonb, true
+            SELECT v.name, v.reward_description, v.pts, v.pts, v.rtype, v.rval::jsonb, true
             FROM (VALUES
                 ('Clase de Yoga gratis',       '1 clase de Yoga sin costo',                       100, 'free_class',       '{"class_type":"Yoga Ashtanga"}'),
                 ('10% descuento en barra',      '10% de descuento en tu pedido de la Fuel Bar',     200, 'bar_discount',     '{"discount_type":"percentage","amount":10}'),
                 ('Clase de Flex gratis',        '1 clase de Flex sin costo',                       300, 'free_class',       '{"class_type":"Flex"}'),
                 ('10% descuento en ropa',       '10% de descuento en productos de la tienda',      400, 'product_discount', '{"discount_type":"percentage","amount":10}'),
                 ('1 bebida gratis',             '1 bebida sin costo en la Fuel Bar',               500, 'free_drink',       '{"quantity":1}')
-            ) AS v(name, desc, pts, rtype, rval)
+            ) AS v(name, reward_description, pts, rtype, rval)
             WHERE NOT EXISTS (SELECT 1 FROM loyalty_rewards lr WHERE lr.name = v.name)
         `);
         console.log('Migration 105: catálogo de recompensas sembrado.');

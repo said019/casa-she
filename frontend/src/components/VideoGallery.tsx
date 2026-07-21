@@ -40,7 +40,7 @@ const fallbackVideos: VideoItem[] = [
   },
   {
     id: "yoga-sculpt",
-    title: "Hot Pilates",
+    title: "Flex & Flow",
     subtitle: "energy unleashed",
     tagline: "Fuerza · Flexibilidad · Energía",
     thumbnail: "/videos/yoga-sculpt-thumb.jpg",

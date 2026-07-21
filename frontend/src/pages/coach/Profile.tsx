@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarCropDialog } from '@/components/profile/AvatarCropDialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -236,15 +237,22 @@ export default function CoachProfile() {
 
     // ── Foto ──
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const [photoToCrop, setPhotoToCrop] = useState<File | null>(null);
     const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
+        e.target.value = '';
         if (!file) return;
         if (!file.type.startsWith('image/')) return toast({ variant: 'destructive', title: 'Solo se permiten imágenes' });
         if (file.size > 10 * 1024 * 1024) return toast({ variant: 'destructive', title: 'Máximo 10MB' });
+        setPhotoToCrop(file);
+    };
+
+    const handleCroppedPhoto = async (file: File) => {
+        setPhotoToCrop(null);
         setUploadingPhoto(true);
         try {
             const formData = new FormData();
-            formData.append('photo', file, file.name);
+            formData.append('photo', file, 'profile.jpg');
             await api.post('/instructors/me/photo', formData);
             queryClient.invalidateQueries({ queryKey: ['instructor-me'] });
             toast({ title: 'Foto actualizada' });
@@ -252,7 +260,6 @@ export default function CoachProfile() {
             toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) });
         } finally {
             setUploadingPhoto(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
 
@@ -337,6 +344,11 @@ export default function CoachProfile() {
         <AuthGuard requiredRoles={['instructor', 'admin']}>
             <CoachLayout>
                 <div className="max-w-4xl mx-auto space-y-5">
+                    <AvatarCropDialog
+                        file={photoToCrop}
+                        onCancel={() => setPhotoToCrop(null)}
+                        onConfirm={handleCroppedPhoto}
+                    />
 
                     {/* ── Hero de perfil ── */}
                     <div
@@ -492,7 +504,7 @@ export default function CoachProfile() {
                                 {[
                                     { id: 'displayName', label: 'Nombre para mostrar', placeholder: 'Tu nombre', field: 'displayName' as const },
                                     { id: 'phone', label: 'Teléfono', placeholder: '55 1234 5678', field: 'phone' as const },
-                                    { id: 'tagline', label: 'Frase del sitio público', placeholder: 'Reformer & fuerza · reinventa tu mejor versión', field: 'tagline' as const },
+                                    { id: 'tagline', label: 'Frase del sitio público', placeholder: 'Movimiento consciente · fuerza y presencia', field: 'tagline' as const },
                                 ].map(({ id, label, placeholder, field }) => (
                                     <div key={id} className="space-y-1.5">
                                         <Label htmlFor={id} className="font-body text-[10px] uppercase tracking-[2px] text-muted-foreground/70">{label}</Label>
@@ -562,7 +574,7 @@ export default function CoachProfile() {
                                             onKeyDown={(e) => {
                                                 if (e.key === 'Enter') { e.preventDefault(); const v = newSpecialty.trim(); if (v && !specialties.includes(v)) setSpecialties([...specialties, v]); setNewSpecialty(''); }
                                             }}
-                                            placeholder="Ej. Reformer, Mat, Embarazadas…"
+                                            placeholder="Ej. Pilates Mat, Barre, Yoga…"
                                             className="font-body text-sm"
                                         />
                                         <Button type="button" variant="outline" size="sm" className="px-3" onClick={() => { const v = newSpecialty.trim(); if (v && !specialties.includes(v)) setSpecialties([...specialties, v]); setNewSpecialty(''); }}>

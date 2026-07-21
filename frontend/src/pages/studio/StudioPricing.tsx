@@ -6,6 +6,7 @@ import api from '@/lib/api';
 import type { Plan } from '@/types/auth';
 import { useParams, Link } from 'react-router-dom';
 import { getStudioBySlug } from '@/data/studios';
+import { isIntroClass, sortCatalogPlans } from '@/lib/planPresentation';
 
 export default function StudioPricing() {
   const { studioSlug } = useParams();
@@ -17,9 +18,10 @@ export default function StudioPricing() {
     queryFn: async () => (await api.get('/plans')).data,
   });
 
-  // Separate welcome offer from other plans
-  const welcomeOffer = data?.find(plan => plan.name === 'Sesión Prueba');
-  const plans = data?.filter(plan => plan.name !== 'Sesión Prueba') || [];
+  // La clase muestra abre el catálogo; el resto avanza de menor a mayor precio.
+  const sortedPlans = [...(data || [])].sort(sortCatalogPlans);
+  const welcomeOffer = sortedPlans.find(isIntroClass);
+  const plans = sortedPlans.filter((plan) => plan.id !== welcomeOffer?.id);
 
   return (
     <StudioLayout>

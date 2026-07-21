@@ -132,7 +132,7 @@ type TemplateForm = z.infer<typeof templateSchema>;
 // Equipment options
 const EQUIPMENT_OPTIONS = [
     'Mat', 'Pesas ligeras', 'Pesas medianas', 'Banda elástica', 'Barra',
-    'Pelota', 'Bloque', 'Aro', 'Reformer', 'Silla'
+    'Pelota', 'Bloque', 'Aro', 'Ligas', 'Pesas'
 ];
 
 // Tag options

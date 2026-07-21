@@ -305,9 +305,9 @@ export default function Privacy() {
                     </a>
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Teléfono</p>
-                    <a href="tel:+525512345678" className="text-sm text-primary hover:underline">
-                      +52 55 1234 5678
+                    <p className="text-sm font-medium">Instagram</p>
+                    <a href="https://instagram.com/casashe.mx" className="text-sm text-primary hover:underline">
+                      @casashe.mx
                     </a>
                   </div>
                 </div>

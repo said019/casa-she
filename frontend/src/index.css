@@ -235,7 +235,7 @@
   }
 
   .admin-shell {
-    font-family: var(--font-body);
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-variant-numeric: tabular-nums;
   }
 
@@ -245,7 +245,12 @@
   .admin-shell h4,
   .admin-shell h5,
   .admin-shell h6 {
-    font-family: var(--font-body);
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  .admin-shell .font-body,
+  .admin-shell .font-heading {
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
 
   .client-app-shell {
@@ -357,6 +362,26 @@
   .flip-face {
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
+  }
+
+  /* Safari iOS aplica una altura nativa mayor a los campos de fecha. Mantiene
+     el selector del sistema, pero lo alinea con el resto del formulario. */
+  .auth-date-field {
+    display: block;
+    height: 3rem;
+    min-height: 3rem;
+    max-height: 3rem;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 1.25rem;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .auth-date-field::-webkit-date-and-time-value {
+    min-height: 1.25rem;
+    padding: 0;
+    text-align: left;
   }
 
   .admin-shell::after {

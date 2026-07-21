@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { PaymentProofImage, PaymentProofOpenButton } from '@/components/orders/PaymentProofContent';
 import type { OrderWithProofs, OrderStatus, BankInfo } from '@/types/order';
 import {
   ArrowLeft,
@@ -601,8 +602,9 @@ export default function OrderDetail() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {order.payment_proofs.map((proof, index) => {
-                  const isBase64Image = proof.file_url?.startsWith('data:image/');
-                  const isImage = isBase64Image || proof.file_type?.startsWith('image/');
+                  const mimeType = proof.file_type?.toLowerCase() || '';
+                  const isPdf = mimeType === 'application/pdf';
+                  const isImage = !isPdf && mimeType.startsWith('image/');
                   
                   return (
                     <div
@@ -625,18 +627,27 @@ export default function OrderDetail() {
                       </div>
                       
                       {/* Preview image */}
-                      {isImage && proof.file_url && (
+                      {isImage && proof.id && (
                         <div className="mt-3">
-                          <img 
-                            src={proof.file_url} 
+                          <PaymentProofImage
+                            orderId={order.id}
+                            proofId={proof.id}
                             alt="Comprobante de pago"
                             className="max-h-64 w-full rounded-lg border object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => setImagePreview(proof.file_url)}
+                            onPreview={setImagePreview}
                           />
                           <p className="text-xs text-center text-muted-foreground mt-1">
                             Click para ampliar
                           </p>
                         </div>
+                      )}
+
+                      {isPdf && proof.id && (
+                        <PaymentProofOpenButton
+                          orderId={order.id}
+                          proofId={proof.id}
+                          className="mt-3"
+                        />
                       )}
                     </div>
                   );

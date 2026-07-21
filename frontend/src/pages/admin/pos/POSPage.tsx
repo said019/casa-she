@@ -30,6 +30,8 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { ManualPriceAdjustmentFields } from '@/components/payments/ManualPriceAdjustmentFields';
+import { calculateManualDiscount, MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH, type ManualDiscountType } from '@/lib/manualDiscount';
 
 export default function POSPage() {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -46,6 +48,9 @@ export default function POSPage() {
     // Checkout state
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer' | 'gratis'>('cash');
     const [notes, setNotes] = useState('');
+    const [discountEnabled, setDiscountEnabled] = useState(false);
+    const [discountType, setDiscountType] = useState<ManualDiscountType>('percentage');
+    const [discountValue, setDiscountValue] = useState('');
     const isGratis = paymentMethod === 'gratis';
 
     const { toast } = useToast();
@@ -113,6 +118,10 @@ export default function POSPage() {
     const cartTotal = useMemo(() => {
         return cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     }, [cart]);
+    const adjustment = calculateManualDiscount(cartTotal, discountEnabled && !isGratis, discountType, discountValue);
+    const adjustmentNeedsComment = isGratis || discountEnabled;
+    const adjustmentValid = (!discountEnabled || adjustment.valid) &&
+        (!adjustmentNeedsComment || notes.trim().length >= MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH);
 
     // Checkout Mutation
     const checkoutMutation = useMutation({
@@ -126,8 +135,17 @@ export default function POSPage() {
             return await api.post('/sales', {
                 userId: selectedUser?.id,
                 items,
-                ...(isGratis ? { gratis: true, notes } : { paymentMethod, notes }),
-                discount: 0 // Implement discount logic if needed
+                ...(isGratis
+                    ? { gratis: true, notes }
+                    : {
+                        paymentMethod,
+                        discount: adjustment.discountAmount,
+                        ...(discountEnabled ? {
+                            discountType,
+                            discountValue: Number(discountValue),
+                        } : {}),
+                        ...(discountEnabled ? { notes } : {}),
+                    }),
             });
         },
         onSuccess: () => {
@@ -136,6 +154,9 @@ export default function POSPage() {
             setSelectedUser(null);
             setNotes('');
             setPaymentMethod('cash');
+            setDiscountEnabled(false);
+            setDiscountType('percentage');
+            setDiscountValue('');
             setIsCheckoutOpen(false);
             queryClient.invalidateQueries({ queryKey: ['products'] }); // Refresh stock
         },
@@ -368,7 +389,7 @@ export default function POSPage() {
                     <DialogHeader>
                         <DialogTitle>{isGratis ? 'Registrar cortesía' : 'Confirmar Venta'}</DialogTitle>
                         <DialogDescription>
-                            Total a cobrar: <span className="font-bold text-foreground">${(isGratis ? 0 : cartTotal).toFixed(2)}</span>
+                            Total a cobrar: <span className="font-bold text-foreground">${(isGratis ? 0 : adjustment.total).toFixed(2)}</span>
                             {isGratis && <span className="ml-1 text-balance-gold">(cortesía)</span>}
                         </DialogDescription>
                     </DialogHeader>
@@ -389,24 +410,26 @@ export default function POSPage() {
                             </Select>
                         </div>
 
-                        <div className="grid gap-2">
-                            <Label>{isGratis ? 'Motivo (obligatorio)' : 'Notas (Opcional)'}</Label>
-                            <Input
-                                placeholder={isGratis ? 'Por qué se regaló el producto...' : 'Referencia, comentarios...'}
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                            />
-                            {isGratis && !notes.trim() && (
-                                <p className="text-xs text-destructive">El motivo es obligatorio para registrar una cortesía.</p>
-                            )}
-                        </div>
+                        <ManualPriceAdjustmentFields
+                            idPrefix="admin-products"
+                            listPrice={cartTotal}
+                            isGratis={isGratis}
+                            discountEnabled={discountEnabled}
+                            discountType={discountType}
+                            discountValue={discountValue}
+                            comment={notes}
+                            onDiscountEnabledChange={setDiscountEnabled}
+                            onDiscountTypeChange={setDiscountType}
+                            onDiscountValueChange={setDiscountValue}
+                            onCommentChange={setNotes}
+                        />
                     </div>
 
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsCheckoutOpen(false)}>Cancelar</Button>
-                        <Button onClick={() => checkoutMutation.mutate()} disabled={checkoutMutation.isPending || (isGratis && !notes.trim())}>
+                        <Button onClick={() => checkoutMutation.mutate()} disabled={checkoutMutation.isPending || !adjustmentValid}>
                             {checkoutMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {isGratis ? 'Registrar cortesía ($0.00)' : 'Confirmar Pago'}
+                            {isGratis ? 'Registrar cortesía ($0.00)' : `Confirmar $${adjustment.total.toFixed(2)}`}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -480,4 +503,3 @@ function UserSearchDialog({ open, onOpenChange, onSelect }: any) {
         </Dialog>
     );
 }
-

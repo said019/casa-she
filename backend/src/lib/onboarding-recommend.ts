@@ -20,8 +20,8 @@ export interface OnboardingAnswers {
   health_note?: string;
 }
 
-// Disciplinas que entran al puntaje (Taller se ofrece aparte como "experiencia").
-export const SCORED_DISCIPLINES = ['Pilates Mat', 'Yoga', 'Aeroyoga', 'Telas'] as const;
+// Disciplinas vigentes de Casa Shé que entran al puntaje.
+export const SCORED_DISCIPLINES = ['Pilates Mat', 'Barre', 'Sculpt', 'Yoga', 'Flex'] as const;
 export type ScoredDiscipline = (typeof SCORED_DISCIPLINES)[number];
 
 type WeightRow = Record<ScoredDiscipline, number>;
@@ -36,36 +36,36 @@ export interface OnboardingRules {
   thirdDisciplineThreshold: number; // fracción del top para mostrar la 3ª (0.4)
 }
 
-const W = (pm: number, y: number, a: number, t: number): WeightRow => ({
-  'Pilates Mat': pm, Yoga: y, Aeroyoga: a, Telas: t,
+const W = (pm: number, barre: number, sculpt: number, yoga: number, flex: number): WeightRow => ({
+  'Pilates Mat': pm, Barre: barre, Sculpt: sculpt, Yoga: yoga, Flex: flex,
 });
 
 export const DEFAULT_RULES: OnboardingRules = {
   goal: {
-    tonificar: W(3, 0, 1, 2),
-    estres: W(0, 3, 2, 0),
-    flexibilidad: W(1, 3, 2, 1),
-    postura: W(3, 1, 2, 0),
-    probar: W(1, 1, 2, 3),
-    bienestar: W(2, 3, 1, 0),
+    tonificar: W(3, 3, 3, 0, 1),
+    estres: W(1, 0, 0, 3, 3),
+    flexibilidad: W(1, 1, 0, 3, 3),
+    postura: W(3, 3, 1, 2, 2),
+    probar: W(1, 2, 2, 1, 1),
+    bienestar: W(2, 1, 1, 3, 2),
   },
   body_focus: {
-    core: W(3, 1, 1, 1),
-    espalda: W(3, 2, 2, 0),
-    brazos: W(1, 0, 2, 3),
-    piernas: W(2, 1, 1, 1),
-    mente: W(0, 3, 1, 0),
-    todo: W(2, 2, 2, 2),
+    core: W(3, 2, 3, 1, 1),
+    espalda: W(3, 2, 1, 2, 3),
+    brazos: W(1, 2, 3, 0, 1),
+    piernas: W(2, 3, 3, 1, 2),
+    mente: W(0, 0, 0, 3, 2),
+    todo: W(2, 2, 2, 2, 2),
   },
   intensity: {
-    suave: W(1, 2, 0, -2),
-    equilibrado: W(1, 1, 1, 0),
-    retador: W(1, 0, 1, 3),
+    suave: W(2, 1, -2, 3, 3),
+    equilibrado: W(2, 2, 1, 2, 2),
+    retador: W(2, 2, 3, 1, 1),
   },
   level: {
-    principiante: W(2, 2, 0, -3),
-    intermedio: W(1, 1, 1, 0),
-    avanzada: W(0, 0, 1, 2),
+    principiante: W(3, 2, 0, 2, 2),
+    intermedio: W(2, 2, 2, 2, 2),
+    avanzada: W(1, 2, 3, 2, 2),
   },
   planByFrequency: {
     probar: 'Clase de prueba',
@@ -76,9 +76,10 @@ export const DEFAULT_RULES: OnboardingRules = {
   },
   reasons: {
     'Pilates Mat': 'Control, core y postura desde el primer día.',
-    Yoga: 'Baja el estrés y gana flexibilidad y calma.',
-    Aeroyoga: 'Descomprime tu espalda y prueba algo nuevo en el aire.',
-    Telas: 'Fuerza y reto en tela aérea para atreverte.',
+    Barre: 'Fuerza, postura y piernas con movimientos precisos.',
+    Sculpt: 'Trabajo de cuerpo completo para ganar fuerza y definición.',
+    Yoga: 'Baja el estrés y gana flexibilidad, enfoque y calma.',
+    Flex: 'Movilidad profunda para soltar tensión y ampliar tu rango.',
   },
   thirdDisciplineThreshold: 0.4,
 };
@@ -86,15 +87,17 @@ export const DEFAULT_RULES: OnboardingRules = {
 const EXCLUDED = Number.NEGATIVE_INFINITY;
 
 /**
- * Puntúa las 4 disciplinas según las respuestas, aplica overrides de seguridad,
+ * Puntúa las disciplinas según las respuestas, aplica overrides de seguridad,
  * elimina las excluidas y devuelve el resto ordenado por puntaje desc.
- * Desempate: orden del catálogo (Pilates Mat > Yoga > Aeroyoga > Telas).
+ * Desempate: orden del catálogo oficial.
  */
 export function scoreDisciplines(
   answers: OnboardingAnswers,
   rules: OnboardingRules,
 ): { name: string; score: number }[] {
-  const scores: Record<ScoredDiscipline, number> = { 'Pilates Mat': 0, Yoga: 0, Aeroyoga: 0, Telas: 0 };
+  const scores: Record<ScoredDiscipline, number> = {
+    'Pilates Mat': 0, Barre: 0, Sculpt: 0, Yoga: 0, Flex: 0,
+  };
 
   for (const d of SCORED_DISCIPLINES) {
     scores[d] += rules.goal[answers.goal][d];
@@ -107,21 +110,25 @@ export function scoreDisciplines(
 
   const health = new Set(answers.health);
 
-  // Override: principiante sin intensidad retador → Telas fuera.
+  // Una persona principiante que no busca intensidad no recibe Sculpt como primera opción.
   if (answers.level === 'principiante' && answers.intensity !== 'retador') {
-    scores.Telas = EXCLUDED;
+    scores.Sculpt = EXCLUDED;
   }
-  // Override: lesión → baja Telas/Aeroyoga, sube Pilates Mat/Yoga.
+  // Lesión/molestia: baja las opciones más intensas y prioriza control y movilidad.
   if (health.has('lesion')) {
-    if (scores.Telas !== EXCLUDED) scores.Telas -= 3;
-    if (scores.Aeroyoga !== EXCLUDED) scores.Aeroyoga -= 1;
+    if (scores.Sculpt !== EXCLUDED) scores.Sculpt -= 4;
+    scores.Barre -= 1;
     scores['Pilates Mat'] += 2;
     scores.Yoga += 1;
+    scores.Flex += 2;
   }
-  // Override: embarazo → fuera Telas y Aeroyoga (quedan Pilates Mat + Yoga).
+  // Embarazo/posparto: cualquier recomendación requiere autorización; evita Sculpt.
   if (health.has('embarazo')) {
-    scores.Telas = EXCLUDED;
-    scores.Aeroyoga = EXCLUDED;
+    scores.Sculpt = EXCLUDED;
+    scores.Barre -= 2;
+    scores['Pilates Mat'] += 2;
+    scores.Yoga += 2;
+    scores.Flex += 1;
   }
 
   const order = (name: string) => SCORED_DISCIPLINES.indexOf(name as ScoredDiscipline);
@@ -174,8 +181,8 @@ export function recommend(
     reason: rules.reasons[s.name as ScoredDiscipline] ?? '',
   }));
 
-  const experience = catalog.disciplines['Taller']
-    ? { class_type_id: catalog.disciplines['Taller'].id, name: 'Taller' }
+  const experience = catalog.disciplines.Salsa
+    ? { class_type_id: catalog.disciplines.Salsa.id, name: 'Salsa' }
     : null;
 
   const planName = rules.planByFrequency[answers.frequency];

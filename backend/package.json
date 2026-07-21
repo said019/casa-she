@@ -1,14 +1,14 @@
 {
     "name": "casa-she-backend",
     "version": "1.0.0",
-    "description": "Backend API for Balance Studio Pilates management system",
+    "description": "Backend API for Casa Shé wellness studio",
     "main": "dist/index.js",
     "type": "module",
     "scripts": {
         "dev": "tsx watch src/index.ts",
         "build": "tsc",
         "start": "node dist/index.js",
-        "test": "tsx scripts/test-membership-studio.ts && tsx scripts/test-dashboard-studio.ts && tsx scripts/test-manual-income.ts && tsx scripts/test-membership-selection.ts && tsx scripts/test-can-buy-sample.ts && tsx scripts/test-permissions.ts && tsx scripts/test-class-waitlist.ts && tsx scripts/test-orders-proof-flow.ts && tsx scripts/test-recurring-classes.ts && tsx scripts/test-attendees-booked-by.ts && tsx scripts/test-nomina-egreso.ts && tsx scripts/test-payroll-period.ts && tsx scripts/test-commission-integration.ts && tsx scripts/test-onboarding-recommend.ts && tsx scripts/test-onboarding-submit.ts && tsx scripts/test-push-prune.ts && tsx scripts/test-push-subscriptions.ts && tsx scripts/test-push-url-map.ts && tsx scripts/test-admin-broadcast-count.ts && tsx scripts/test-mercadopago.ts && tsx scripts/test-bar.ts && tsx scripts/test-bar-points-integration.ts && tsx scripts/test-loyalty-config.ts && tsx scripts/test-loyalty-crons-integration.ts && tsx scripts/test-totalpass-caps.ts && tsx scripts/test-totalpass-time.ts && tsx scripts/test-totalpass-client.ts && tsx scripts/test-totalpass-publish.ts && tsx scripts/test-totalpass-pool.ts && tsx scripts/test-totalpass-import.ts && tsx scripts/test-totalpass-checkin.ts && tsx scripts/test-totalpass-lock.ts"
+        "test": "tsx scripts/test-casa-she-official-schedule.ts && tsx scripts/test-manual-price-adjustment.ts && tsx scripts/test-membership-studio.ts && tsx scripts/test-dashboard-studio.ts && tsx scripts/test-manual-income.ts && tsx scripts/test-membership-selection.ts && tsx scripts/test-can-buy-sample.ts && tsx scripts/test-permissions.ts && tsx scripts/test-class-waitlist.ts && tsx scripts/test-orders-proof-flow.ts && tsx scripts/test-recurring-classes.ts && tsx scripts/test-attendees-booked-by.ts && tsx scripts/test-nomina-egreso.ts && tsx scripts/test-payroll-period.ts && tsx scripts/test-commission-integration.ts && tsx scripts/test-onboarding-recommend.ts && tsx scripts/test-onboarding-submit.ts && tsx scripts/test-push-prune.ts && tsx scripts/test-push-subscriptions.ts && tsx scripts/test-push-url-map.ts && tsx scripts/test-admin-broadcast-count.ts && tsx scripts/test-mercadopago.ts && tsx scripts/test-bar.ts && tsx scripts/test-bar-points-integration.ts && tsx scripts/test-loyalty-config.ts && tsx scripts/test-loyalty-crons-integration.ts && tsx scripts/test-image-storage.ts && tsx scripts/test-totalpass-caps.ts && tsx scripts/test-totalpass-time.ts && tsx scripts/test-totalpass-client.ts && tsx scripts/test-totalpass-publish.ts && tsx scripts/test-totalpass-pool.ts && tsx scripts/test-totalpass-import.ts && tsx scripts/test-totalpass-checkin.ts && tsx scripts/test-totalpass-lock.ts"
     },
     "dependencies": {
         "@types/bcryptjs": "^2.4.6",

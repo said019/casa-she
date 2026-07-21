@@ -23,7 +23,6 @@ ordenado por prioridad. Ver también el diseño y el plan en [`docs/superpowers/
 
 - [ ] **Stripe**: `STRIPE_SECRET_KEY` y `STRIPE_WEBHOOK_SECRET` (live) en `backend/.env`, y registrar el webhook `https://<api>/api/stripe/webhook` en el dashboard de Stripe.
 - [ ] **Transferencia**: CLABE, banco y titular reales (hoy placeholder). Se cargan en **Ajustes → datos bancarios** del panel.
-- [ ] **Créditos mensuales exactos** de Membresía 360 y Black (hoy 16 / 24 de placeholder). Editables en **Clases → Precios y paquetes**.
 - [ ] **Resend** (correos): `RESEND_API_KEY` + `EMAIL_FROM` con dominio verificado, y `FRONTEND_URL` del dominio real.
 - [ ] **Logo e íconos oficiales**: reemplazar el monograma SVG provisional por `casa-she-logo.png`, `favicon.ico`, `icon-192.png`, `icon-512.png`, imagen OG.
 - [ ] **Reglamento y lineamientos definitivos** por disciplina (hoy hay un reglamento base). Texto en `frontend/src/components/ReglamentoGate.tsx`.

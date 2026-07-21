@@ -46,7 +46,7 @@ cd frontend && npm install && npm run dev
 ## Catálogo y reglas Casa Shé (sembrados)
 
 - **Disciplinas:** Pilates Mat, Yoga, Aeroyoga, Telas, Taller (cupo 6–7 por clase).
-- **Precios:** Clase de prueba $150 · Drop-in $280 · Paquete 5 $1,300 · 8 $2,000 · 12 $2,880 · Membresía 360 $3,600 (16 créditos/mes) · Black $4,200 (24/mes).
+- **Precios:** Clase de prueba $150 · Drop-in $280 · Paquete 5 $1,300 · 8 $2,000 · 12 $2,880 · Membresía 360 $3,800 (clases ilimitadas + 1 servicio) · SHÉ Black $4,200 (clases ilimitadas + 2 servicios + 1 taller). Ambas membresías duran 30 días; servicios a elegir: Nutrición, Cosmiatría o Fisioterapia.
 - **Reglas:** cancelación hasta **5 h antes** (devuelve crédito; después o no-show se pierde) · créditos con **vigencia 1 mes** · **reglamento obligatorio** antes de la primera reserva · check-in con **QR**.
 - **Sede única:** "Casa Shé — Condesa".
 
@@ -63,7 +63,6 @@ El catálogo viene sembrado, pero el **horario real** se arma desde el panel:
 
 - **Stripe**: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (live) + registrar el webhook `…/api/stripe/webhook`.
 - **Transferencia**: CLABE, banco y titular reales (en Ajustes → datos bancarios; hoy es placeholder).
-- **Créditos exactos** de Membresía 360 y Black (hoy 16 / 24 de placeholder).
 - **Resend**: `RESEND_API_KEY` + `EMAIL_FROM` verificado, y dominio para `FRONTEND_URL`.
 - **Logo/íconos oficiales**: `casa-she-logo.png`, favicons e icon-192/512 (hoy hay un monograma SVG provisional).
 - **Reglamento** y **lineamientos por disciplina** (textos definitivos).

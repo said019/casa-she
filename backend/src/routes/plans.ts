@@ -25,6 +25,9 @@ const PlanSchema = z.object({
     // lo ven y lo asignan. color = pastilla para identificar en las reservas (hex #RRGGBB).
     isInternal: z.boolean().default(false),
     color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Color inválido (#RRGGBB)').nullable().optional(),
+    includedServices: z.number().int().nonnegative().default(0),
+    includedWorkshops: z.number().int().nonnegative().default(0),
+    serviceOptions: z.array(z.string().min(1)).default([]),
     sortOrder: z.number().int().default(0),
     packageType: z.enum(['individual', 'mixto', 'sample']).default('mixto'),
     requiresStudioSelection: z.boolean().default(false),
@@ -47,7 +50,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
         class_limit, reformer_credits, multi_credits,
         features, is_active, sort_order,
         package_type, requires_studio_selection,
-        is_internal, color
+        is_internal, color, included_services, included_workshops, service_options
       FROM plans
     `;
 
@@ -80,7 +83,7 @@ router.get('/:id', optionalAuth, async (req: Request, res: Response) => {
         class_limit, reformer_credits, multi_credits,
         features, is_active, sort_order,
         package_type, requires_studio_selection,
-        is_internal, color
+        is_internal, color, included_services, included_workshops, service_options
        FROM plans
        WHERE id = $1`,
             [id]
@@ -130,8 +133,9 @@ router.post('/', authenticate, requirePermission('editar_catalogo'), async (req:
             `INSERT INTO plans (
         name, description, price, currency, duration_days,
         class_limit, reformer_credits, multi_credits, features, is_active, sort_order,
-        package_type, requires_studio_selection, is_internal, color
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        package_type, requires_studio_selection, is_internal, color,
+        included_services, included_workshops, service_options
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       RETURNING *`,
             [
                 data.name,
@@ -150,6 +154,9 @@ router.post('/', authenticate, requirePermission('editar_catalogo'), async (req:
                 data.requiresStudioSelection,
                 data.isInternal,
                 data.color ?? null,
+                data.includedServices,
+                data.includedWorkshops,
+                JSON.stringify(data.serviceOptions),
             ]
         );
 
@@ -234,6 +241,18 @@ router.put('/:id', authenticate, requirePermission('editar_catalogo'), async (re
             updates.push(`color = $${paramCount++}`);
             values.push(data.color);
         }
+        if (data.includedServices !== undefined) {
+            updates.push(`included_services = $${paramCount++}`);
+            values.push(data.includedServices);
+        }
+        if (data.includedWorkshops !== undefined) {
+            updates.push(`included_workshops = $${paramCount++}`);
+            values.push(data.includedWorkshops);
+        }
+        if (data.serviceOptions !== undefined) {
+            updates.push(`service_options = $${paramCount++}`);
+            values.push(JSON.stringify(data.serviceOptions));
+        }
         if (data.sortOrder !== undefined) {
             updates.push(`sort_order = $${paramCount++}`);
             values.push(data.sortOrder);
@@ -277,6 +296,17 @@ router.put('/:id', authenticate, requirePermission('editar_catalogo'), async (re
                         req,
                     });
                 }
+            }
+
+            // Al cambiar inclusiones/opciones, resincronizar beneficios todavía
+            // activos de este plan. El trigger es idempotente y nunca revive usados.
+            if (
+                data.includedServices !== undefined ||
+                data.includedWorkshops !== undefined ||
+                data.serviceOptions !== undefined
+            ) {
+                await query(`UPDATE memberships SET end_date = end_date
+                    WHERE plan_id = $1 AND status = 'active'`, [id]);
             }
 
             return res.json(result);

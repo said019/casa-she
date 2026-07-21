@@ -22,6 +22,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, CheckCircle2, AlertCircle, DollarSign, CreditCard } from 'lucide-react';
 import api from '@/lib/api';
 import { planClassLabel } from '@/lib/credits';
+import { ManualPriceAdjustmentFields } from '@/components/payments/ManualPriceAdjustmentFields';
+import { calculateManualDiscount, MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH, type ManualDiscountType } from '@/lib/manualDiscount';
 
 interface Plan {
   id: string;
@@ -44,7 +46,7 @@ const PAYMENT_METHODS = [
   { value: 'cash', label: 'Efectivo' },
   { value: 'transfer', label: 'Transferencia' },
   { value: 'card', label: 'Tarjeta' },
-  { value: 'other', label: 'Otro' },
+  { value: 'gratis', label: 'Gratis (cortesía)' },
 ];
 
 export const PhysicalSaleForm = ({ 
@@ -66,7 +68,22 @@ export const PhysicalSaleForm = ({
     paymentMethod: 'cash',
     reference: '',
     notes: '',
+    discountEnabled: false,
+    discountType: 'percentage' as ManualDiscountType,
+    discountValue: '',
+    adjustmentComment: '',
   });
+
+  const isGratis = formData.paymentMethod === 'gratis';
+  const adjustment = calculateManualDiscount(
+    selectedPlan?.price ?? 0,
+    formData.discountEnabled && !isGratis,
+    formData.discountType,
+    formData.discountValue,
+  );
+  const adjustmentNeedsComment = isGratis || formData.discountEnabled;
+  const adjustmentValid = (!formData.discountEnabled || adjustment.valid) &&
+    (!adjustmentNeedsComment || formData.adjustmentComment.trim().length >= MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH);
 
   // Cargar planes disponibles
   useEffect(() => {
@@ -110,6 +127,11 @@ export const PhysicalSaleForm = ({
         paymentMethod: formData.paymentMethod,
         reference: formData.reference || undefined,
         notes: formData.notes || undefined,
+        reason: adjustmentNeedsComment ? formData.adjustmentComment.trim() : undefined,
+        ...(!isGratis && formData.discountEnabled ? {
+          discountType: formData.discountType,
+          discountValue: Number(formData.discountValue),
+        } : {}),
       });
 
       setSuccess(true);
@@ -215,7 +237,7 @@ export const PhysicalSaleForm = ({
           <CardTitle className="text-lg">Detalles del Pago</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="paymentDate">
                 Fecha de Pago <span className="text-red-500">*</span>
@@ -237,14 +259,15 @@ export const PhysicalSaleForm = ({
                 id="amount"
                 type="number"
                 step="0.01"
-                value={formData.amount}
-                onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) }))}
-                required
+                value={isGratis ? 0 : adjustment.total}
+                readOnly
+                className="bg-muted/40 tabular-nums"
               />
+              <p className="text-xs text-muted-foreground">Se calcula desde el precio de lista y el ajuste.</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="paymentMethod">
                 Método de Pago <span className="text-red-500">*</span>
@@ -287,15 +310,29 @@ export const PhysicalSaleForm = ({
               rows={3}
             />
           </div>
+
+          <ManualPriceAdjustmentFields
+            idPrefix="physical-sale"
+            listPrice={selectedPlan?.price ?? 0}
+            isGratis={isGratis}
+            discountEnabled={formData.discountEnabled}
+            discountType={formData.discountType}
+            discountValue={formData.discountValue}
+            comment={formData.adjustmentComment}
+            onDiscountEnabledChange={(value) => setFormData((prev) => ({ ...prev, discountEnabled: value }))}
+            onDiscountTypeChange={(value) => setFormData((prev) => ({ ...prev, discountType: value }))}
+            onDiscountValueChange={(value) => setFormData((prev) => ({ ...prev, discountValue: value }))}
+            onCommentChange={(value) => setFormData((prev) => ({ ...prev, adjustmentComment: value }))}
+          />
         </CardContent>
       </Card>
 
       {/* Botones */}
-      <div className="flex gap-3 justify-end">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={loading || !formData.planId}>
+        <Button type="submit" disabled={loading || !formData.planId || !adjustmentValid}>
           {loading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

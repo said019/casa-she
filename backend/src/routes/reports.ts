@@ -699,9 +699,9 @@ router.get('/profit-by-facility', authenticate, requireRole('admin'), async (req
             [start, end]
         );
 
-        // Sucursales BMB activas (siempre se listan, aunque estén en 0)
+        // Sedes activas de Casa Shé (siempre se listan, aunque estén en 0).
         const facs = await query(
-            `SELECT id, name FROM facilities WHERE name ILIKE 'BMB%' AND is_active = true ORDER BY name`
+            `SELECT id, name FROM facilities WHERE is_active = true ORDER BY sort_order NULLS LAST, name`
         );
 
         const revMap = new Map(revRows.map((r: any) => [r.facility_id, parseFloat(r.total) || 0]));

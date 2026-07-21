@@ -12,6 +12,7 @@ import { fetchMyMembership } from '@/lib/memberships';
 import type { ClientMembership } from '@/types/membership';
 import { categoryCredits } from '@/types/membership';
 import { Link } from 'react-router-dom';
+import { HeartHandshake, Ticket } from 'lucide-react';
 
 const statusLabel: Record<ClientMembership['status'], string> = {
   active: 'Activa',
@@ -124,6 +125,40 @@ export default function ProfileMembership() {
                     </div>
                   ) : (
                     <div className="text-sm text-muted-foreground">Clases ilimitadas activas</div>
+                  )}
+
+                  {((membership.included_services ?? 0) > 0 || (membership.included_workshops ?? 0) > 0) && (
+                    <div className="border-t border-[#AE4836]/15 pt-4">
+                      <p className="text-sm font-medium">Beneficios de tu membresía</p>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        {(membership.included_services ?? 0) > 0 && (
+                          <div className="rounded-[1rem] border border-[#AE4836]/20 bg-[#AE4836]/[0.06] p-4">
+                            <div className="flex items-center gap-2 text-[#AE4836]">
+                              <HeartHandshake className="h-4 w-4" />
+                              <span className="text-sm font-semibold">
+                                {membership.services_remaining ?? 0} servicio{(membership.services_remaining ?? 0) === 1 ? '' : 's'} disponible{(membership.services_remaining ?? 0) === 1 ? '' : 's'}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                              Elige en recepción: {(membership.service_options ?? []).join(', ') || 'consulta las opciones disponibles'}.
+                            </p>
+                          </div>
+                        )}
+                        {(membership.included_workshops ?? 0) > 0 && (
+                          <div className="rounded-[1rem] border border-[#AE4836]/20 bg-[#AE4836]/[0.06] p-4">
+                            <div className="flex items-center gap-2 text-[#AE4836]">
+                              <Ticket className="h-4 w-4" />
+                              <span className="text-sm font-semibold">
+                                {membership.workshops_remaining ?? 0} taller{(membership.workshops_remaining ?? 0) === 1 ? '' : 'es'} disponible{(membership.workshops_remaining ?? 0) === 1 ? '' : 's'}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                              Se aplica automáticamente al inscribirte a un taller vigente.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
 
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

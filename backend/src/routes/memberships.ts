@@ -13,6 +13,7 @@ import { sendWebPushToUser } from '../lib/web-push.js';
 import { hasPermission } from '../lib/permissions.js';
 import { isElevated } from '../lib/elevation.js';
 import { openShiftForUser } from '../lib/openShift.js';
+import { manualDiscountNote, resolveManualPriceAdjustment } from '../lib/manual-price-adjustment.js';
 
 const router = Router();
 
@@ -70,7 +71,8 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
         m.payment_method, m.payment_reference,
         p.name as plan_name, p.price as plan_price, p.currency as plan_currency,
         p.duration_days as plan_duration_days, p.class_limit,
-        p.reformer_credits, p.multi_credits, p.color as plan_color
+        p.reformer_credits, p.multi_credits, p.color as plan_color,
+        p.included_services, p.included_workshops, p.service_options
       FROM memberships m
       JOIN plans p ON m.plan_id = p.id
       WHERE m.user_id = $1
@@ -115,6 +117,18 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
             ? membership.classes_remaining
             : legacyRemaining(membership.reformer_remaining, membership.multi_remaining);
 
+        const includedBenefits = await queryOne<{
+            services_remaining: number;
+            workshops_remaining: number;
+        }>(`
+            SELECT
+                COUNT(*) FILTER (WHERE benefit_type = 'membership_service')::int AS services_remaining,
+                COUNT(*) FILTER (WHERE benefit_type = 'workshop_pass')::int AS workshops_remaining
+            FROM user_benefits
+            WHERE user_id = $1 AND status = 'active' AND expires_at > NOW()
+              AND benefit_type IN ('membership_service', 'workshop_pass')
+        `, [userId]);
+
         res.json({
             ...membership,
             classes_remaining: primaryCredits,
@@ -124,6 +138,8 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
             total_multi_available: totalMulti,
             total_classes_available: legacyRemaining(totalReformer, totalMulti),
             has_multiple_memberships: allActive.length > 1,
+            services_remaining: includedBenefits?.services_remaining ?? 0,
+            workshops_remaining: includedBenefits?.workshops_remaining ?? 0,
         });
     } catch (error) {
         console.error('Get membership error:', error);
@@ -146,7 +162,8 @@ router.get('/my', authenticate, async (req: Request, res: Response) => {
         m.id, m.status, m.start_date, m.end_date, m.classes_remaining,
         m.reformer_remaining, m.multi_remaining,
         p.name as plan_name, p.price as plan_price, p.currency as plan_currency,
-        p.class_limit, p.reformer_credits, p.multi_credits, p.color as plan_color
+        p.class_limit, p.reformer_credits, p.multi_credits, p.color as plan_color,
+        p.included_services, p.included_workshops, p.service_options
       FROM memberships m
       JOIN plans p ON m.plan_id = p.id
       WHERE m.user_id = $1 AND m.status IN ('active', 'pending_payment')
@@ -347,6 +364,8 @@ const AssignMembershipSchema = z.object({
     paymentMethod: z.enum(['cash', 'transfer', 'card', 'online', 'bank_transfer', 'gratis']).optional(),
     // Motivo obligatorio cuando paymentMethod === 'gratis' (cortesía $0).
     reason: z.string().optional(),
+    discountType: z.enum(['percentage', 'fixed']).optional(),
+    discountValue: z.coerce.number().min(0).optional(),
     notes: z.string().optional(),
 });
 
@@ -356,6 +375,8 @@ const ActivateMembershipSchema = z.object({
     paymentReference: z.string().max(255).optional(),
     // Motivo obligatorio cuando paymentMethod === 'gratis' (cortesía $0).
     reason: z.string().optional(),
+    discountType: z.enum(['percentage', 'fixed']).optional(),
+    discountValue: z.coerce.number().min(0).optional(),
     startDate: z.string().optional(),
     // Vencimiento explícito opcional: si no viene, se calcula start + plan.duration_days.
     endDate: dateString.optional(),
@@ -374,7 +395,7 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
             });
         }
 
-        const { userId, planId, startDate, endDate, status, paymentMethod, reason, notes } = validation.data;
+        const { userId, planId, startDate, endDate, status, paymentMethod, reason, discountType, discountValue, notes } = validation.data;
 
         // Cortesía $0 ('gratis'): solo elevados (admin/super_admin o recepción master) y motivo obligatorio.
         const isGratis = paymentMethod === 'gratis';
@@ -392,6 +413,14 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
         const plan = await queryOne('SELECT * FROM plans WHERE id = $1', [planId]);
         if (!plan) {
             return res.status(404).json({ error: 'Plan no encontrado' });
+        }
+
+        const manualAdjustment = resolveManualPriceAdjustment({
+            listPrice: Number(plan.price), discountType, discountValue, reason,
+        });
+        if (!manualAdjustment.ok) return res.status(400).json({ error: manualAdjustment.error });
+        if (isGratis && manualAdjustment.applied) {
+            return res.status(400).json({ error: 'Una cortesía gratis no puede combinarse con otro descuento.' });
         }
 
         // Calculate dates (endDate explícito sobreescribe start + duration_days)
@@ -440,6 +469,8 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
                 // Cortesía $0: amount=0 (no da puntos ni suma a caja), sin descuento founder.
                 const discount = isGratis
                     ? { amount: 0, applied: false, discountAmount: 0 }
+                    : manualAdjustment.applied
+                        ? manualAdjustment
                     : await consumeFounderFirstPackageDiscount({
                         db: client,
                         userId,
@@ -448,6 +479,8 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
                 const paymentAmount = discount.amount;
                 const paymentNotes = isGratis
                     ? [notes, `Cortesía gratis. Motivo: ${gratisReason}`].filter(Boolean).join(' | ')
+                    : manualAdjustment.applied
+                        ? [notes, manualDiscountNote(manualAdjustment)].filter(Boolean).join(' | ')
                     : discount.applied
                         ? [notes, `Descuento founder 10% aplicado (-$${discount.discountAmount})`].filter(Boolean).join(' | ')
                         : (notes || null);
@@ -531,6 +564,8 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
                 entityId: membership.id,
                 description: isGratis
                     ? `Membresía GRATIS asignada (admin). Motivo: ${gratisReason}`
+                    : manualAdjustment.applied
+                        ? `Membresía asignada con descuento manual. ${manualDiscountNote(manualAdjustment)}`
                     : 'Membresía asignada (admin)',
                 newData: {
                     plan_id: membership.plan_id,
@@ -538,6 +573,12 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
                     status: membership.status,
                     payment_method: membership.payment_method,
                     ...(isGratis ? { gratis: true, reason: gratisReason } : {}),
+                    ...(manualAdjustment.applied ? {
+                        discount_type: manualAdjustment.discountType,
+                        discount_value: manualAdjustment.discountValue,
+                        discount_amount: manualAdjustment.discountAmount,
+                        reason: manualAdjustment.reason,
+                    } : {}),
                 },
                 req,
             });
@@ -565,8 +606,11 @@ const AssignCashSchema = z.object({
     startDate: z.string().optional(), // ISO date string (yyyy-MM-dd)
     // Vencimiento explícito opcional: si no viene, se calcula start + plan.duration_days.
     endDate: dateString.optional(),
-    paymentMethod: z.enum(['cash', 'transfer', 'card']).default('cash'),
-    amountPaid: z.coerce.number().positive(),
+    paymentMethod: z.enum(['cash', 'transfer', 'card', 'gratis']).default('cash'),
+    amountPaid: z.coerce.number().min(0),
+    discountType: z.enum(['percentage', 'fixed']).optional(),
+    discountValue: z.coerce.number().min(0).optional(),
+    reason: z.string().optional(),
     notes: z.string().optional(),
 });
 
@@ -580,12 +624,34 @@ router.post('/assign-cash', authenticate, requireRole('admin'), async (req: Requ
             });
         }
 
-        const { userId, planId, startDate, endDate, paymentMethod, amountPaid, notes } = validation.data;
+        const { userId, planId, startDate, endDate, paymentMethod, amountPaid, discountType, discountValue, reason, notes } = validation.data;
 
         const plan = await queryOne('SELECT * FROM plans WHERE id = $1', [planId]);
         if (!plan) {
             return res.status(404).json({ error: 'Plan no encontrado' });
         }
+
+        const isGratis = paymentMethod === 'gratis';
+        const gratisReason = String(reason ?? '').trim();
+        if (isGratis && gratisReason.length < 5) {
+            return res.status(400).json({ error: 'El comentario es obligatorio para una membresía gratis (mínimo 5 caracteres).' });
+        }
+        const manualAdjustment = resolveManualPriceAdjustment({
+            listPrice: Number(plan.price), discountType, discountValue, reason,
+        });
+        if (!manualAdjustment.ok) return res.status(400).json({ error: manualAdjustment.error });
+        if (isGratis && manualAdjustment.applied) {
+            return res.status(400).json({ error: 'Una cortesía gratis no puede combinarse con otro descuento.' });
+        }
+        const paymentAmount = isGratis ? 0 : manualAdjustment.amount;
+        if (Math.abs(Number(amountPaid) - paymentAmount) > 0.009) {
+            return res.status(400).json({ error: 'El monto no coincide con el precio final. Registra el ajuste como descuento.' });
+        }
+        const paymentNotes = isGratis
+            ? [notes, `Cortesía gratis. Motivo: ${gratisReason}`].filter(Boolean).join(' | ')
+            : manualAdjustment.applied
+                ? [notes, manualDiscountNote(manualAdjustment)].filter(Boolean).join(' | ')
+                : (notes || null);
 
         const start = startDate ? new Date(startDate) : new Date();
         const { end, error: endErr } = computeEndDate(start, plan.duration_days, endDate);
@@ -616,7 +682,7 @@ router.post('/assign-cash', authenticate, requireRole('admin'), async (req: Requ
                     plan.reformer_credits ?? null,
                     plan.multi_credits ?? null,
                     paymentMethod,
-                    notes || null,
+                    paymentNotes,
                     cancellationLimit,
                 ]
             );
@@ -633,11 +699,11 @@ router.post('/assign-cash', authenticate, requireRole('admin'), async (req: Requ
                 [
                     userId,
                     membership.id,
-                    amountPaid,
+                    paymentAmount,
                     plan.currency,
                     paymentMethod,
                     null,
-                    notes || null,
+                    paymentNotes,
                     req.user?.userId || null,
                     shiftC?.id || null,
                     shiftC?.facility_id || null,
@@ -649,7 +715,7 @@ router.post('/assign-cash', authenticate, requireRole('admin'), async (req: Requ
                     db: client,
                     userId,
                     paymentId: payResult.rows[0].id,
-                    amount: amountPaid,
+                    amount: paymentAmount,
                     paymentMethod,
                     classLimit: plan.class_limit ?? null,
                 }).catch(e => { console.error('Loyalty points error:', e); return 0; });
@@ -690,12 +756,23 @@ router.post('/assign-cash', authenticate, requireRole('admin'), async (req: Requ
                 actionType: 'membership_activated',
                 entityType: 'membership',
                 entityId: membership.id,
-                description: 'Membresía asignada con pago en caja (admin)',
+                description: isGratis
+                    ? `Membresía GRATIS asignada en caja. Motivo: ${gratisReason}`
+                    : manualAdjustment.applied
+                        ? `Membresía asignada con descuento manual. ${manualDiscountNote(manualAdjustment)}`
+                        : 'Membresía asignada con pago en caja (admin)',
                 newData: {
                     plan_id: membership.plan_id,
                     user_id: membership.user_id,
                     status: membership.status,
                     payment_method: membership.payment_method,
+                    amount: paymentAmount,
+                    ...(manualAdjustment.applied ? {
+                        discount_type: manualAdjustment.discountType,
+                        discount_value: manualAdjustment.discountValue,
+                        discount_amount: manualAdjustment.discountAmount,
+                        reason: manualAdjustment.reason,
+                    } : {}),
                 },
                 req,
             });
@@ -731,6 +808,8 @@ router.post('/:id/activate', authenticate, requireElevated, async (req: Request,
             paymentMethod,
             paymentReference,
             reason,
+            discountType,
+            discountValue,
             startDate,
             endDate,
             notes,
@@ -768,6 +847,15 @@ router.post('/:id/activate', authenticate, requireElevated, async (req: Request,
 
         if (!membership) {
             return res.status(404).json({ error: 'Membresía no encontrada' });
+        }
+
+
+        const manualAdjustment = resolveManualPriceAdjustment({
+            listPrice: Number(membership.plan_price), discountType, discountValue, reason,
+        });
+        if (!manualAdjustment.ok) return res.status(400).json({ error: manualAdjustment.error });
+        if (isGratis && manualAdjustment.applied) {
+            return res.status(400).json({ error: 'Una cortesía gratis no puede combinarse con otro descuento.' });
         }
 
         if (membership.status === 'active') {
@@ -824,6 +912,8 @@ router.post('/:id/activate', authenticate, requireElevated, async (req: Request,
                 // Cortesía $0: amount=0 (no da puntos ni suma a caja), sin descuento founder.
                 const discount = isGratis
                     ? { amount: 0, applied: false, discountAmount: 0 }
+                    : manualAdjustment.applied
+                        ? manualAdjustment
                     : await consumeFounderFirstPackageDiscount({
                         db: client,
                         userId: membership.user_id,
@@ -832,6 +922,8 @@ router.post('/:id/activate', authenticate, requireElevated, async (req: Request,
                 const paymentAmount = discount.amount;
                 const paymentNotes = isGratis
                     ? [notes, `Cortesía gratis. Motivo: ${gratisReason}`].filter(Boolean).join(' | ')
+                    : manualAdjustment.applied
+                        ? [notes, manualDiscountNote(manualAdjustment)].filter(Boolean).join(' | ')
                     : discount.applied
                         ? [notes, `Descuento founder 10% aplicado (-$${discount.discountAmount})`].filter(Boolean).join(' | ')
                         : (notes || null);
@@ -941,6 +1033,8 @@ router.post('/:id/activate', authenticate, requireElevated, async (req: Request,
                 entityId: activated.id,
                 description: isGratis
                     ? `Membresía activada GRATIS (admin). Motivo: ${gratisReason}`
+                    : manualAdjustment.applied
+                        ? `Membresía activada con descuento manual. ${manualDiscountNote(manualAdjustment)}`
                     : 'Membresía activada (admin)',
                 newData: {
                     plan_id: activated.plan_id,
@@ -948,6 +1042,12 @@ router.post('/:id/activate', authenticate, requireElevated, async (req: Request,
                     status: activated.status,
                     payment_method: activated.payment_method,
                     ...(isGratis ? { gratis: true, reason: gratisReason } : {}),
+                    ...(manualAdjustment.applied ? {
+                        discount_type: manualAdjustment.discountType,
+                        discount_value: manualAdjustment.discountValue,
+                        discount_amount: manualAdjustment.discountAmount,
+                        reason: manualAdjustment.reason,
+                    } : {}),
                 },
                 req,
             });

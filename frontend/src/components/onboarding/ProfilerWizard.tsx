@@ -207,12 +207,6 @@ export function ProfilerWizard({ onDone }: { onDone: () => void }) {
           <p className="mt-1 font-heading text-2xl">{rec.plan.name}{rec.plan.price ? ` · $${rec.plan.price}` : ''}</p>
         </motion.div>
 
-        {rec.requires_clearance && (
-          <motion.p {...reveal(5 + rec.disciplines.length)} className="mt-3 rounded-xl p-3 font-body text-xs" style={{ backgroundColor: 'rgba(174,72,54,0.10)', color: ARCILLA }}>
-            Para tu seguridad, una instructora confirmará tu aptitud antes de tu primera clase.
-          </motion.p>
-        )}
-
         <motion.div {...reveal(6 + rec.disciplines.length)} className="mt-6 flex flex-col gap-2.5">
           <button onClick={() => { onDone(); navigate(rec.plan.plan_id ? `/app/checkout?plan=${rec.plan.plan_id}` : '/app/checkout'); }}
             className="w-full rounded-full py-3.5 font-body text-[13px] uppercase tracking-[0.16em] transition-transform active:scale-[0.985]"

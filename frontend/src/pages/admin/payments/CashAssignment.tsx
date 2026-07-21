@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -65,6 +65,9 @@ import {
   Users,
   PartyPopper
 } from 'lucide-react';
+import { ManualPriceAdjustmentFields } from '@/components/payments/ManualPriceAdjustmentFields';
+import { calculateManualDiscount, MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH, type ManualDiscountType } from '@/lib/manualDiscount';
+import { useIsElevated } from '@/hooks/useIsElevated';
 
 // ============================================================================
 // SCHEMAS
@@ -73,8 +76,11 @@ import {
 const cashAssignmentSchema = z.object({
   userId: z.string().uuid('Selecciona un usuario'),
   planId: z.string().uuid('Selecciona un plan'),
-  paymentMethod: z.enum(['cash', 'transfer', 'card']),
-  amountPaid: z.coerce.number().positive('El monto debe ser positivo'),
+  paymentMethod: z.enum(['cash', 'transfer', 'card', 'gratis']),
+  amountPaid: z.coerce.number().min(0, 'El monto no puede ser negativo'),
+  discountType: z.enum(['percentage', 'fixed']).optional(),
+  discountValue: z.coerce.number().min(0).optional(),
+  reason: z.string().optional(),
   startDate: z.date(),
   reference: z.string().optional(),
   notes: z.string().optional(),
@@ -158,6 +164,13 @@ const paymentMethodConfig = {
     bg: 'bg-purple-100',
     description: 'Pago con tarjeta (terminal física)',
   },
+  gratis: {
+    label: 'Gratis',
+    icon: Sparkles,
+    color: 'text-balance-gold',
+    bg: 'bg-balance-gold/10',
+    description: 'Cortesía sin cobro',
+  },
 };
 
 const fadeInUp = {
@@ -188,6 +201,7 @@ export default function CashAssignmentPage() {
 function CashAssignmentInner() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isElevated = useIsElevated();
 
   // State
   const [activeTab, setActiveTab] = useState<'member' | 'guest'>('member');
@@ -198,6 +212,7 @@ function CashAssignmentInner() {
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [lastAssignment, setLastAssignment] = useState<AssignmentResponse | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [discountEnabled, setDiscountEnabled] = useState(false);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -218,6 +233,9 @@ function CashAssignmentInner() {
     defaultValues: {
       paymentMethod: 'cash',
       startDate: new Date(),
+      discountType: 'percentage',
+      discountValue: 0,
+      reason: '',
     },
     mode: 'onChange',
   });
@@ -234,6 +252,24 @@ function CashAssignmentInner() {
   const paymentMethod = watch('paymentMethod');
   const startDate = watch('startDate');
   const amountPaid = watch('amountPaid');
+  const discountType = watch('discountType') ?? 'percentage';
+  const discountValue = watch('discountValue') ?? 0;
+  const adjustmentReason = watch('reason') ?? '';
+  const isGratis = paymentMethod === 'gratis';
+  const assignmentAdjustment = calculateManualDiscount(
+    selectedPlan?.price ?? 0,
+    discountEnabled && !isGratis,
+    discountType as ManualDiscountType,
+    discountValue,
+  );
+  const assignmentNeedsComment = isGratis || discountEnabled;
+  const assignmentValid = (!discountEnabled || assignmentAdjustment.valid) &&
+    (!assignmentNeedsComment || adjustmentReason.trim().length >= MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH);
+
+  useEffect(() => {
+    if (!selectedPlan) return;
+    setValue('amountPaid', isGratis ? 0 : assignmentAdjustment.total, { shouldValidate: true });
+  }, [selectedPlan, isGratis, assignmentAdjustment.total, setValue]);
 
   // ============================================================================
   // QUERIES
@@ -301,8 +337,14 @@ function CashAssignmentInner() {
   // Member assignment mutation
   const assignMutation = useMutation({
     mutationFn: async (data: CashAssignmentForm) => {
+      const payload = { ...data };
+      if (!discountEnabled || data.paymentMethod === 'gratis') {
+        delete payload.discountType;
+        delete payload.discountValue;
+      }
+      if (data.paymentMethod !== 'gratis' && !discountEnabled) delete payload.reason;
       const response = await api.post<AssignmentResponse>('/memberships/assign-cash', {
-        ...data,
+        ...payload,
         startDate: format(data.startDate, 'yyyy-MM-dd'),
       });
       return response.data;
@@ -316,6 +358,7 @@ function CashAssignmentInner() {
       reset();
       setSelectedUser(null);
       setSelectedPlan(null);
+      setDiscountEnabled(false);
     },
     onError: (error) => {
       toast({
@@ -713,8 +756,10 @@ function CashAssignmentInner() {
                             name="paymentMethod"
                             control={control}
                             render={({ field }) => (
-                              <div className="grid grid-cols-3 gap-3">
-                                {Object.entries(paymentMethodConfig).map(([key, config]) => {
+                              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                {Object.entries(paymentMethodConfig)
+                                  .filter(([key]) => key !== 'gratis' || isElevated)
+                                  .map(([key, config]) => {
                                   const Icon = config.icon;
                                   const isSelected = field.value === key;
                                   return (
@@ -743,14 +788,28 @@ function CashAssignmentInner() {
                                       </span>
                                     </button>
                                   );
-                                })}
+                                  })}
                               </div>
                             )}
                           />
                         </div>
 
+                        <ManualPriceAdjustmentFields
+                          idPrefix="cash-assignment"
+                          listPrice={selectedPlan?.price ?? 0}
+                          isGratis={isGratis}
+                          discountEnabled={discountEnabled}
+                          discountType={discountType as ManualDiscountType}
+                          discountValue={String(discountValue || '')}
+                          comment={adjustmentReason}
+                          onDiscountEnabledChange={setDiscountEnabled}
+                          onDiscountTypeChange={(value) => setValue('discountType', value)}
+                          onDiscountValueChange={(value) => setValue('discountValue', Number(value) || 0)}
+                          onCommentChange={(value) => setValue('reason', value)}
+                        />
+
                         {/* Amount & Date Row */}
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                           <div className="space-y-3">
                             <Label className="flex items-center gap-2 text-base font-semibold">
                               <DollarSign className="h-4 w-4 text-primary" />
@@ -762,7 +821,8 @@ function CashAssignmentInner() {
                                 type="number"
                                 step="0.01"
                                 {...register('amountPaid')}
-                                className="pl-8 h-12 text-lg font-semibold"
+                                readOnly
+                                className="pl-8 h-12 text-lg font-semibold bg-muted/40"
                               />
                             </div>
                             {errors.amountPaid && (
@@ -867,7 +927,7 @@ function CashAssignmentInner() {
                           type="submit"
                           size="lg"
                           className="w-full h-14 text-base font-semibold gap-2"
-                          disabled={assignMutation.isPending || !selectedUser || !selectedPlan}
+                          disabled={assignMutation.isPending || !selectedUser || !selectedPlan || !assignmentValid}
                         >
                           {assignMutation.isPending ? (
                             <>

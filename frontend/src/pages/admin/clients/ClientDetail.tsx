@@ -156,7 +156,7 @@ export default function ClientDetail() {
     // Mutation para reenviar credenciales (genera contraseña nueva)
     const isElevated = useIsElevated();
     // Mono-sede: el WhatsApp sale del único número; se conserva la key por compatibilidad.
-    const [waKey] = useState<'san-miguel' | 'tepa'>('san-miguel');
+    const waKey = 'casa-she';
     const [resendResult, setResendResult] = useState<{
         tempPassword: string;
         emailSent: boolean;
