@@ -1,22 +1,75 @@
-// Galería editorial del espacio físico — fotos reales de Casa Shé Condesa.
-// Mobile-first: en móvil es un carrusel con scroll-snap (las leyendas se ven SIEMPRE,
-// sin depender de hover); en escritorio una retícula editorial asimétrica. Paleta
-// bmb-cream/ink/gold, marcos rectos con borde fino de tinta (DESIGN.md).
+// Galería editorial de Casa Shé Condesa — fotos reales de la práctica y la comunidad.
+// Mobile-first: en móvil es una columna con las proporciones naturales de cada foto
+// (las leyendas se ven SIEMPRE, sin depender de hover); en escritorio una retícula
+// editorial asimétrica de 6 columnas. Paleta bmb-cream/ink/gold, marcos rectos con
+// borde fino de tinta (DESIGN.md).
 
 const BANNER = {
-  src: "/studio/reformers.webp",
-  alt: "Salón con espejo luna en Casa Shé Condesa",
+  src: "/casashe/galeria/bakasana.webp",
+  alt: "Bakasana sostenida en el salón de Casa Shé, luz de mañana entrando por los ventanales",
 };
 
 type Shot = { src: string; alt: string; tag: string; index: string; span: string };
 
 // `span` aplica solo en la retícula de escritorio (md+). En móvil se ignora (es flex).
+// El ritmo alterna verticales altas (retrato) con panorámicas y detalles cercanos.
 const SHOTS: Shot[] = [
-  { src: "/studio/reformers-vertical.webp", alt: "Salón y espejo luna en Casa Shé Condesa", tag: "Mat", index: "01", span: "md:col-span-2 md:row-span-2" },
-  { src: "/studio/recepcion.webp", alt: "Recepción de Casa Shé Condesa", tag: "Recepción", index: "02", span: "md:col-span-4" },
-  { src: "/studio/barre.webp", alt: "Salón con espejos en Casa Shé Condesa", tag: "Barre", index: "03", span: "md:col-span-2" },
-  { src: "/studio/ambiente.webp", alt: "Salón de Casa Shé Condesa en luz cálida de ambiente", tag: "Ambiente", index: "04", span: "md:col-span-2" },
-  { src: "/studio/salon.webp", alt: "Salón principal de Casa Shé Condesa en luz de tarde", tag: "Salón", index: "05", span: "md:col-span-6" },
+  {
+    src: "/casashe/galeria/split-espejo.webp",
+    alt: "Apertura de cadera frente al espejo luna del salón principal",
+    tag: "Flex",
+    index: "01",
+    span: "md:col-span-2 md:row-span-2",
+  },
+  {
+    src: "/casashe/galeria/sonoterapia.webp",
+    alt: "Cuencos tibetanos y armonio dispuestos para cerrar la práctica",
+    tag: "Sonoterapia",
+    index: "02",
+    span: "md:col-span-4",
+  },
+  {
+    src: "/casashe/galeria/barre-duo.webp",
+    alt: "Dos alumnos trabajando alineación en la barra",
+    tag: "Barre",
+    index: "03",
+    span: "md:col-span-2",
+  },
+  {
+    src: "/casashe/galeria/perro-boca-abajo.webp",
+    alt: "Perro boca abajo en fila sobre los tapetes verdes del salón",
+    tag: "Yoga",
+    index: "04",
+    span: "md:col-span-2",
+  },
+  {
+    src: "/casashe/galeria/comunidad.webp",
+    alt: "El grupo completo al terminar la clase, frente al espejo",
+    tag: "Comunidad",
+    index: "05",
+    span: "md:col-span-2 md:row-span-2",
+  },
+  {
+    src: "/casashe/galeria/barre-perfil.webp",
+    alt: "Trabajo de espalda en la barra, de perfil contra la cortina de lino",
+    tag: "Barre",
+    index: "06",
+    span: "md:col-span-2",
+  },
+  {
+    src: "/casashe/galeria/barra-manos.webp",
+    alt: "Manos sujetando la barra a contraluz",
+    tag: "Detalle",
+    index: "07",
+    span: "md:col-span-2",
+  },
+  {
+    src: "/casashe/galeria/barra-tatuaje.webp",
+    alt: "Brazo tatuado sosteniendo la barra durante la serie de piernas",
+    tag: "Barre",
+    index: "08",
+    span: "md:col-span-4",
+  },
 ];
 
 function Frame({ shot }: { shot: Shot }) {
@@ -28,6 +81,7 @@ function Frame({ shot }: { shot: Shot }) {
         src={shot.src}
         alt={shot.alt}
         loading="lazy"
+        decoding="async"
         className="block h-auto w-full transition-transform duration-700 ease-out group-hover:scale-[1.05] md:h-full md:object-cover"
       />
       {/* Velo inferior siempre visible para que la leyenda se lea en cualquier foto. */}
@@ -54,8 +108,8 @@ export default function StudioGallery() {
             <span className="text-bmb-gold">Condesa</span>
           </h2>
           <p className="mt-3 max-w-xl font-body text-base text-bmb-ink/70">
-            Luz cálida, espejos de luna y madera. Un espacio pensado para
-            que cada clase se sienta tuya.
+            Luz cálida, espejos de luna y madera. Grupos pequeños donde la
+            práctica se siente tuya y nadie pasa desapercibida.
           </p>
         </div>
 
@@ -65,12 +119,13 @@ export default function StudioGallery() {
             src={BANNER.src}
             alt={BANNER.alt}
             loading="lazy"
+            decoding="async"
             className="block h-[15rem] w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03] sm:h-[22rem] lg:h-[30rem]"
           />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-bmb-ink/60 via-bmb-ink/5 to-transparent" />
           <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-4 sm:p-5 lg:p-7">
             <p className="font-heading text-xl italic text-bmb-cream sm:text-2xl lg:text-3xl">
-              Pilates &amp; Yoga
+              Pilates, Barre &amp; Yoga
             </p>
             <span className="editorial-caption text-bmb-cream/70">Condesa, CDMX</span>
           </figcaption>

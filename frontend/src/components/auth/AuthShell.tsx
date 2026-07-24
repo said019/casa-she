@@ -4,6 +4,12 @@ import { motion } from 'framer-motion';
 
 const easeOut = [0.23, 1, 0.32, 1] as const;
 
+// Foto de marca compartida por escritorio y móvil: mismo archivo, dos encuadres.
+const BRAND_PHOTO = {
+    src: '/casashe/galeria/barra-tatuaje.webp',
+    alt: 'Brazo tatuado sosteniendo la barra durante la clase en Casa Shé Condesa',
+};
+
 interface AuthShellProps {
     eyebrow?: string;
     title: string;
@@ -15,7 +21,7 @@ interface AuthShellProps {
 export default function AuthShell({ eyebrow, title, subtitle, children, footer }: AuthShellProps) {
     return (
         <main className="min-h-[100dvh] bg-bmb-cream text-bmb-dark">
-            {/* Panel de marca — FIJO a la mitad izquierda en desktop: siempre cubre, nunca se recorta. */}
+            {/* Panel de marca — FIJO a la mitad izquierda en escritorio: siempre cubre, nunca se recorta. */}
             <motion.aside
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -23,8 +29,8 @@ export default function AuthShell({ eyebrow, title, subtitle, children, footer }
                 className="relative hidden overflow-hidden lg:fixed lg:inset-y-0 lg:left-0 lg:block lg:w-[45%]"
             >
                 <img
-                    src="/casashe/espacio-salon.jpg"
-                    alt="Salón de Casa Shé"
+                    src={BRAND_PHOTO.src}
+                    alt={BRAND_PHOTO.alt}
                     className="absolute inset-0 h-full w-full object-cover"
                 />
                 <div className="absolute inset-0" style={{ backgroundColor: 'rgba(22,38,26,0.62)' }} />
@@ -45,24 +51,51 @@ export default function AuthShell({ eyebrow, title, subtitle, children, footer }
                 </div>
             </motion.aside>
 
+            {/* Banda de marca en móvil — la misma foto, encuadre horizontal. Da contexto
+                antes del formulario sin robarle altura al teclado (se va en lg). */}
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5, ease: easeOut }}
+                className="relative h-56 overflow-hidden sm:h-64 lg:hidden"
+            >
+                <img
+                    src={BRAND_PHOTO.src}
+                    alt={BRAND_PHOTO.alt}
+                    className="absolute inset-0 h-full w-full object-cover"
+                />
+                <div className="absolute inset-0" style={{ backgroundColor: 'rgba(22,38,26,0.48)' }} />
+                {/* Velo inferior: asienta la frase sobre la foto sin lavarla (borde recto,
+                    igual que los marcos de la galería). */}
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[rgba(22,38,26,0.75)] to-transparent" />
+
+                <div className="relative z-10 flex h-full flex-col justify-between p-5 sm:p-6">
+                    <div className="flex items-center justify-between gap-4">
+                        <Link to="/" className="flex items-center">
+                            <img src="/casashe/logo-wordmark-cream.png" alt="Casa Shé" className="h-7 w-auto" />
+                        </Link>
+                        <Link
+                            to="/"
+                            className="font-body text-sm text-bmb-cream/75 transition-colors hover:text-bmb-cream"
+                        >
+                            Inicio
+                        </Link>
+                    </div>
+
+                    <p className="max-w-[18rem] font-heading text-2xl leading-tight text-bmb-cream sm:text-[1.75rem]">
+                        La comunidad es la medicina.
+                    </p>
+                </div>
+            </motion.div>
+
             {/* Panel de formulario — en flujo normal (scroll natural de la página). Nunca recorta. */}
-            <section className="flex min-h-[100dvh] flex-col px-5 py-12 sm:px-8 lg:ml-[45%] lg:px-14">
+            <section className="flex min-h-[calc(100dvh-14rem)] flex-col px-5 pb-12 pt-8 sm:min-h-[calc(100dvh-16rem)] sm:px-8 lg:ml-[45%] lg:min-h-[100dvh] lg:px-14 lg:py-12">
                 <motion.div
                     initial={{ opacity: 0, y: 18 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.45, ease: easeOut }}
                     className="m-auto w-full max-w-[440px]"
                 >
-                    {/* Encabezado móvil */}
-                    <div className="mb-8 flex items-center justify-between gap-4 lg:hidden">
-                        <Link to="/" className="flex items-center">
-                            <img src="/casashe/logo-wordmark.png" alt="Casa Shé" className="h-7 w-auto" />
-                        </Link>
-                        <Link to="/" className="font-body text-sm text-bmb-dark/65 transition-colors hover:text-bmb-dark">
-                            Inicio
-                        </Link>
-                    </div>
-
                     {/* Encabezado */}
                     <div>
                         {eyebrow && (
