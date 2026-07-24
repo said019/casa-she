@@ -51,23 +51,30 @@ const CARDS: Card[] = [
   { title: "SALSA · 4 CLASES", planName: "Salsa · 4 clases", color: "#2E1B22", tagline: "Cuatro encuentros para aprender, bailar y hacer comunidad.", hint: "4 clases · vigencia 1 mes", applies: "Salsa", kind: "Paquete" },
 ];
 
-const PILLARS = [
+type Pillar = { eyebrow: string; title: string; img: string; alt?: string; pos?: string; text: string };
+
+const PILLARS: Pillar[] = [
   {
     eyebrow: "Pilates Mat · Barre · Sculpt · Yoga · Flex · Salsa",
     title: "Movimiento",
-    img: "/casashe/pilates.jpg",
+    img: "/casashe/movimiento.webp",
+    alt: "Navasana sostenida sobre el tapete, junto a la barra del salón",
     text: "Desde la precisión del Pilates Mat hasta la definición del Sculpt y la postura del Barre, nuestras clases fortalecen cada parte de tu cuerpo. Complementamos con la serenidad del Yoga —Ashtanga y Vinyasa—, la movilidad profunda del Flex y cerramos el círculo con la energía de la Salsa.",
   },
   {
     eyebrow: "Diseña tu estilo de vida",
     title: "Nutrición Integral",
-    img: "/casashe/nutrition.jpg",
+    img: "/casashe/nutricion.webp",
+    alt: "Consulta de composición corporal con la especialista de Casa Shé",
+    // Foto vertical: al recortarse a 16/11 hay que anclar arriba o se cortan las caras.
+    pos: "50% 18%",
     text: "Más que una dieta, es diseñar un estilo de vida que nutra tus metas. Nuestra especialista te acompañará en un proceso personalizado para sanar tu relación con la comida, optimizar tu energía y elegir lo mejor para tu cuerpo.",
   },
   {
     eyebrow: "Restaura y potencia tu cuerpo",
     title: "Cuidado Especializado",
     img: "/casashe/espacio-bano.jpg",
+    alt: "Área de cuidado y recuperación de Casa Shé Condesa",
     text: "Masajes reductivos para definir tu silueta, drenaje linfático para desintoxicar y desinflamar, y faciales personalizados que devuelven la luminosidad y vitalidad a tu piel. El toque final para consentirte.",
   },
 ];
@@ -75,6 +82,7 @@ const PILLARS = [
 const NAV = [
   { label: "Inicio", href: "#inicio" },
   { label: "Servicios", href: "#servicios" },
+  { label: "Estudio", href: "#estudio" },
   { label: "Coaches", href: "#equipo" },
   { label: "Horario", href: "#horario" },
   { label: "Fuel Bar", href: "#bar" },
@@ -514,6 +522,24 @@ function Servicios() {
           </p>
         </div>
 
+        {/* Toma de apertura: el salón completo con la comunidad, antes de abrir los tres pilares. */}
+        <figure className="relative -mt-6 mb-16 overflow-hidden lg:mb-20">
+          <img
+            src="/casashe/experiencia-360.webp"
+            alt="Alumnas e instructores en la barra del salón principal de Casa Shé Condesa"
+            className="aspect-[16/10] w-full object-cover sm:aspect-[21/9]"
+            loading="lazy"
+            decoding="async"
+          />
+          {/* Velo inferior: la leyenda se lee también sobre el piso claro. */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-[rgba(22,38,26,0.55)] to-transparent" />
+          <span
+            className={`${body} absolute bottom-4 left-4 text-[10px] uppercase tracking-[0.25em] text-white/90`}
+          >
+            Casa Shé · Condesa
+          </span>
+        </figure>
+
         <div className="space-y-20 lg:space-y-28">
           {PILLARS.map((p, i) => (
             <div
@@ -521,8 +547,17 @@ function Servicios() {
               className="grid items-center gap-7 md:grid-cols-12 md:gap-0"
             >
               <figure className={`relative overflow-hidden md:col-span-7 ${i % 2 === 1 ? "md:order-2 md:col-start-6" : ""}`}>
-                <img src={p.img} alt={p.title} className="aspect-[4/5] w-full object-cover sm:aspect-[16/11]" loading="lazy" decoding="async" />
-                <span className={`${body} absolute bottom-4 left-4 text-[10px] uppercase tracking-[0.25em] text-white/80`}>Casa Shé · 0{i + 1}</span>
+                <img
+                  src={p.img}
+                  alt={p.alt ?? p.title}
+                  className="aspect-[4/5] w-full object-cover sm:aspect-[16/11]"
+                  style={{ objectPosition: p.pos ?? "center" }}
+                  loading="lazy"
+                  decoding="async"
+                />
+                {/* Velo inferior: la leyenda se lee también sobre piso claro. */}
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-[rgba(22,38,26,0.55)] to-transparent" />
+                <span className={`${body} absolute bottom-4 left-4 text-[10px] uppercase tracking-[0.25em] text-white/90`}>Casa Shé · 0{i + 1}</span>
               </figure>
               <div className={`relative border-t border-[#2A4E36]/30 pt-6 md:col-span-5 md:bg-[#F6EFDB] md:p-10 lg:p-14 ${i % 2 === 1 ? "md:order-1 md:col-start-1 md:mr-[-3rem] md:pr-16" : "md:ml-[-3rem] md:pl-16"}`}>
                 <p className={`${body} text-[12px] uppercase tracking-[0.3em]`} style={{ color: GREEN, opacity: 0.55 }}>
@@ -536,6 +571,127 @@ function Servicios() {
                 </p>
               </div>
             </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Galería del estudio — fotos reales de la práctica, el espacio y la comunidad.
+// Mosaico editorial asimétrico: 2 columnas en móvil, 12 en escritorio. Las verticales
+// (retrato) ocupan dos filas; los detalles cercanos rompen el ritmo de las panorámicas.
+type Shot = { src: string; alt: string; tag: string; span: string };
+
+const GALERIA: Shot[] = [
+  {
+    src: "/casashe/galeria/bakasana.webp",
+    alt: "Bakasana sostenida en el salón, luz de mañana entrando por los ventanales",
+    tag: "Yoga",
+    span: "col-span-2 md:col-span-7 md:row-span-2",
+  },
+  {
+    src: "/casashe/galeria/split-espejo.webp",
+    alt: "Apertura de cadera frente al espejo luna del salón principal",
+    tag: "Flex",
+    span: "row-span-2 md:col-span-5 md:row-span-2",
+  },
+  {
+    src: "/casashe/galeria/sonoterapia.webp",
+    alt: "Cuencos tibetanos y armonio dispuestos para cerrar la práctica",
+    tag: "Sonoterapia",
+    span: "md:col-span-4",
+  },
+  {
+    src: "/casashe/galeria/barre-duo.webp",
+    alt: "Dos alumnos trabajando alineación en la barra",
+    tag: "Barre",
+    span: "md:col-span-4",
+  },
+  {
+    src: "/casashe/galeria/comunidad.webp",
+    alt: "El grupo completo al terminar la clase, frente al espejo",
+    tag: "Comunidad",
+    span: "row-span-2 md:col-span-4 md:row-span-2",
+  },
+  {
+    src: "/casashe/galeria/perro-boca-abajo.webp",
+    alt: "Perro boca abajo en fila sobre los tapetes verdes del salón",
+    tag: "Yoga",
+    span: "md:col-span-4",
+  },
+  {
+    src: "/casashe/galeria/barra-manos.webp",
+    alt: "Manos sujetando la barra a contraluz",
+    tag: "Detalle",
+    span: "md:col-span-4",
+  },
+  {
+    src: "/casashe/galeria/barre-perfil.webp",
+    alt: "Trabajo de espalda en la barra, de perfil contra la cortina de lino",
+    tag: "Postura",
+    span: "col-span-2 md:col-span-5",
+  },
+  {
+    src: "/casashe/galeria/barra-tatuaje.webp",
+    alt: "Brazo tatuado sosteniendo la barra durante la serie de piernas",
+    tag: "Barre",
+    span: "col-span-2 md:col-span-7",
+  },
+];
+
+function Galeria() {
+  return (
+    <section
+      id="estudio"
+      className="scroll-mt-20 px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
+      style={{ backgroundColor: CREAM }}
+    >
+      <div className="mx-auto max-w-[1400px]">
+        <div className="mb-10 grid gap-5 border-b border-[#2A4E36]/25 pb-8 md:mb-14 md:grid-cols-[1fr_auto] md:items-end">
+          <div>
+            <p
+              className={`${body} text-[11px] uppercase tracking-[0.34em]`}
+              style={{ color: GREEN, opacity: 0.6 }}
+            >
+              El estudio
+            </p>
+            <h2
+              className={`${display} mt-3 text-5xl font-light leading-none sm:text-6xl lg:text-7xl`}
+              style={{ color: GREEN }}
+            >
+              Así se vive
+            </h2>
+          </div>
+          <p
+            className={`${body} text-sm tracking-[0.14em] md:text-right`}
+            style={{ color: GREEN, opacity: 0.65 }}
+          >
+            Luz, madera y espejos de luna · Condesa
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 auto-rows-[8.5rem] gap-2 sm:auto-rows-[11rem] sm:gap-3 md:grid-cols-12 md:auto-rows-[12rem] lg:auto-rows-[14rem]">
+          {GALERIA.map((shot) => (
+            <figure
+              key={shot.src}
+              className={`group relative overflow-hidden bg-[#E9E0CC] ${shot.span}`}
+            >
+              <img
+                src={shot.src}
+                alt={shot.alt}
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+              />
+              {/* Velo inferior: la leyenda se lee siempre, también en móvil (sin hover). */}
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[rgba(22,38,26,0.72)] to-transparent" />
+              <figcaption
+                className={`${body} pointer-events-none absolute bottom-3 left-3 text-[10px] uppercase tracking-[0.25em] text-white/85`}
+              >
+                {shot.tag}
+              </figcaption>
+            </figure>
           ))}
         </div>
       </div>
@@ -1036,6 +1192,7 @@ export default function CasaSheLanding() {
       <Hero />
       <Paquetes />
       <Servicios />
+      <Galeria />
       <Coaches />
       <Horario />
       <FuelBar />
