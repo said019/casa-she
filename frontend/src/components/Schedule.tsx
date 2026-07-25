@@ -502,8 +502,9 @@ function Row({
                       </span>
                     )}
                     {isFull && !isClosed && (
+                      // "Lista de espera" (no solo "Llena"): dice qué SÍ puede hacer.
                       <span className="shrink-0 rounded-full border border-bmb-deepgold/70 px-1.5 py-0 editorial-caption-sm text-bmb-deepgold">
-                        Llena
+                        Lista de espera
                       </span>
                     )}
                     {isBooking && (

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ScheduleClass, TimeOfDay, categoryColor } from "@/lib/schedule-state";
 
 type Category = ScheduleClass["category"] | "all";
@@ -58,6 +59,10 @@ export function FilterPills({
   timeOfDay, onTimeOfDayChange,
   resultCount, activeFilters, onClear,
 }: Props) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  // Cuántos filtros están puestos, para el contador del botón "Filtrar".
+  const activeCount = [category !== "all", instructor !== "all", timeOfDay !== "all"].filter(Boolean).length;
+
   // Casa Shé es mono-sede (Condesa): se eliminó el filtro de sucursal del render.
   const categoryOptions: [string, string][] = [
     ["all", "Todos los tipos"],
@@ -70,19 +75,44 @@ export function FilterPills({
 
   return (
     <div className="mt-5 border-y border-bmb-ink/16 py-4">
-      {/* ───────── Móvil: dropdowns compactos (no se amontona) ───────── */}
-      <div className="grid grid-cols-2 gap-2 lg:hidden">
-        <FilterSelect label="Tipo" value={category} onChange={(v) => onCategoryChange(v as Category)} options={categoryOptions} />
-        <FilterSelect label="Coach" value={instructor} onChange={onInstructorChange} options={instructorOptions} />
-        <FilterSelect label="Horario" value={timeOfDay} onChange={(v) => onTimeOfDayChange(v as TimeOfDay)} options={TIME_OPTIONS} />
-        <div className="col-span-2 mt-0.5 flex items-center justify-between">
-          <span className="editorial-caption-sm text-bmb-ink/70">{resultCount} {resultCount === 1 ? "clase" : "clases"}</span>
-          {activeFilters && (
-            <button type="button" onClick={onClear} className="editorial-caption-sm text-bmb-gold underline-offset-2 hover:underline">
-              Limpiar filtros
+      {/* ───────── Móvil: filtros COLAPSADOS ─────────
+          Antes se mostraban tres desplegables (Tipo/Coach/Horario) siempre abiertos:
+          la clienta los leía como un formulario obligatorio ("¿tengo que elegir coach
+          para reservar?"). Ahora por defecto solo ve sus clases; filtrar es opcional. */}
+      <div className="lg:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <span className="editorial-caption-sm text-bmb-ink/70">
+            {resultCount} {resultCount === 1 ? "clase" : "clases"}
+          </span>
+          <div className="flex items-center gap-3">
+            {activeFilters && (
+              <button type="button" onClick={onClear} className="editorial-caption-sm text-bmb-gold underline-offset-2 hover:underline">
+                Limpiar
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setMobileOpen((v) => !v)}
+              aria-expanded={mobileOpen}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-bmb-ink/25 px-3.5 py-1.5 font-heading italic text-[13px] text-bmb-ink/80 transition-colors active:scale-[0.97]"
+            >
+              Filtrar
+              {activeCount > 0 && (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-bmb-gold px-1 text-[11px] not-italic text-bmb-cream">
+                  {activeCount}
+                </span>
+              )}
             </button>
-          )}
+          </div>
         </div>
+
+        {mobileOpen && (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <FilterSelect label="Tipo" value={category} onChange={(v) => onCategoryChange(v as Category)} options={categoryOptions} />
+            <FilterSelect label="Coach" value={instructor} onChange={onInstructorChange} options={instructorOptions} />
+            <FilterSelect label="Horario" value={timeOfDay} onChange={(v) => onTimeOfDayChange(v as TimeOfDay)} options={TIME_OPTIONS} />
+          </div>
+        )}
       </div>
 
       {/* ───────── Escritorio: pills (Tipo) + dropdowns (Coach/Horario) ───────── */}

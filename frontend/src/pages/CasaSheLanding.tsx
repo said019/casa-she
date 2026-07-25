@@ -108,7 +108,9 @@ const DISCIPLINE_META: Record<string, { color: string; dur: number; cupo: number
 };
 const metaFor = (name: string) => DISCIPLINE_META[name] ?? { color: GREEN, dur: 60, cupo: 7, desc: "Una clase pensada para moverte, sentirte bien y conectar contigo misma." };
 
-type ClassSlot = { time: string; name: string; coach?: string };
+// `id` viaja hasta el CTA para poder mandar a la clienta directo a ESA clase
+// después de crear cuenta o iniciar sesión (antes se perdía y tenía que buscarla otra vez).
+type ClassSlot = { id?: string; time: string; name: string; coach?: string };
 
 interface ApiClass {
   id: string;
@@ -188,6 +190,7 @@ function useWeekSchedule(weekOffset: number) {
         const key = DAYS[(dow + 6) % 7];
         if (!key) continue;
         (grouped[key] ||= []).push({
+          id: c.id,
           time: (c.start_time || "").slice(0, 5),
           name: c.class_type_name || "Clase",
           coach: c.instructor_name,
@@ -972,14 +975,14 @@ function ClassChip({ c }: { c: ClassSlot }) {
               </div>
 
               <Link
-                to="/register"
+                to={c.id ? `/register?returnUrl=${encodeURIComponent(`/app/book/${c.id}`)}` : "/register"}
                 className={`${body} mt-6 block rounded-full py-3.5 text-center text-[12px] uppercase tracking-[0.22em] transition-transform active:scale-[0.98]`}
                 style={{ backgroundColor: GREEN, color: CREAM }}
               >
                 Crear cuenta para reservar
               </Link>
               <Link
-                to="/login"
+                to={c.id ? `/login?returnUrl=${encodeURIComponent(`/app/book/${c.id}`)}` : "/login"}
                 className={`${body} mt-3 block text-center text-[12px]`}
                 style={{ color: GREEN, opacity: 0.6 }}
               >
