@@ -1859,6 +1859,7 @@ async function runStartupMigrations(): Promise<void> {
                 v_enabled BOOLEAN;
                 v_refund_enabled BOOLEAN;
                 v_should_refund BOOLEAN := false;
+                v_late BOOLEAN := false;
             BEGIN
                 -- Read full cancellation policy
                 SELECT value INTO v_policy FROM system_settings WHERE key = 'cancellation_policy';
@@ -1924,9 +1925,13 @@ async function runStartupMigrations(): Promise<void> {
                     RAISE EXCEPTION 'CLASS_ALREADY_STARTED';
                 END IF;
 
-                -- Window: only admin can bypass
+                -- Ventana de cancelación. Antes esto lanzaba CANCELLATION_WINDOW_EXCEEDED y
+                -- RECHAZABA la cancelación: el lugar quedaba ocupado y bloqueado (nadie de la
+                -- lista de espera podía tomarlo) y la clienta perdía el crédito igual por no-show.
+                -- Ahora la cancelación tardía SÍ procede, pero sin devolver el crédito: la clienta
+                -- no pierde más de lo que ya perdía y el lugar se libera para alguien más.
                 IF NOT p_is_admin AND v_hours < v_min_hours THEN
-                    RAISE EXCEPTION 'CANCELLATION_WINDOW_EXCEEDED:%h', v_min_hours;
+                    v_late := true;
                 END IF;
 
                 -- Determine refund eligibility:
@@ -1941,6 +1946,9 @@ async function runStartupMigrations(): Promise<void> {
                     v_should_refund := p_force_refund;
                 ELSIF p_is_admin THEN
                     v_should_refund := true;
+                ELSIF v_late THEN
+                    -- Fuera de la ventana: se libera el lugar, pero el crédito no vuelve.
+                    v_should_refund := false;
                 ELSIF NOT v_refund_enabled THEN
                     v_should_refund := false;
                 ELSIF v_booking.membership_id IS NOT NULL THEN
@@ -2082,10 +2090,11 @@ async function runStartupMigrations(): Promise<void> {
                     RETURN NEXT; RETURN;
                 END IF;
 
+                -- Fuera de la ventana: SÍ puede cancelar (libera el lugar), pero sin devolución.
                 IF NOT p_is_admin AND v_hours < v_min_hours THEN
-                    out_can_cancel := false; out_would_refund := false;
-                    out_error_code := 'CANCELLATION_WINDOW_EXCEEDED';
-                    out_reason := 'Cancelaciones permitidas hasta ' || v_min_hours || 'h antes de la clase';
+                    out_can_cancel := true; out_would_refund := false;
+                    out_error_code := NULL;
+                    out_reason := 'Estás fuera de la ventana de ' || v_min_hours || 'h: tu lugar se libera, pero el crédito no se devuelve';
                     RETURN NEXT; RETURN;
                 END IF;
 

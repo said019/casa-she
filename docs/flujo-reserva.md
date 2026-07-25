@@ -174,13 +174,13 @@ Antes de confirmar, la app le consulta al backend qué va a pasar y se lo muestr
 ### La regla real: 5 horas
 
 - **A más de 5 h de la clase:** cancela y **se le devuelve el crédito** al mismo bucket del que salió.
-- **A menos de 5 h:** **no puede cancelar en absoluto.** El sistema rechaza la operación con *"Cancelaciones permitidas hasta 5h antes de la clase"*.
+- **A menos de 5 h:** **sí puede cancelar, pero sin devolución.** Su lugar se libera para que lo tome alguien de la lista de espera; el crédito no vuelve.
 
-> **Esto es más severo de lo que parece.** No es "cancela pero pierde el crédito": es que **no puede liberar el lugar**. Si ya no va a ir, su lugar se queda ocupado y bloqueado para otra clienta, y ella igual pierde el crédito por no-show. Vale la pena decidir si es el comportamiento que quieres (§12).
+> Antes el sistema **rechazaba** la cancelación tardía: el lugar quedaba ocupado y bloqueado, nadie de la lista de espera podía tomarlo, y la clienta perdía el crédito igual por no-show. Se cambió (jul-2026) para que al menos el lugar se libere.
 
-El límite de cancelaciones con devolución está configurado en **999**, es decir, en la práctica ilimitado.
+El límite de cancelaciones con devolución está configurado en **999**, es decir, en la práctica ilimitado. Una cancelación tardía **no** consume ese contador (solo cuentan las que sí devuelven crédito).
 
-**Al cancelar no se le avisa por ningún canal** (ni email, ni push): solo ve la respuesta en pantalla y su pase de Wallet se actualiza. El WhatsApp de cancelación está apagado.
+**Al cancelar recibe comprobante** (jul-2026): email *"Tu reserva quedó cancelada"* indicando si el crédito volvió o no, y push. Los socios de plataforma quedan excluidos, por política. El WhatsApp de cancelación sigue apagado.
 
 Si la reserva era de **lista de espera**, salirse no tiene ventana de tiempo, no gasta crédito y no cuenta como cancelación.
 
@@ -221,15 +221,13 @@ Ninguna rompe el flujo, pero varias afectan la experiencia:
 
 | # | Hallazgo | Por qué importa |
 |---|---|---|
-| 1 | **No se puede cancelar dentro de las 5 h.** No es "cancela sin reembolso": el sistema rechaza la operación. | El lugar se queda bloqueado y no puede pasar a quien está en lista de espera. Considera permitir cancelar sin devolución, para al menos liberar el cupo. |
-| 2 | **Cero aviso al cancelar.** No hay email ni push de "tu reserva quedó cancelada". | Se queda sin comprobante de que canceló. |
-| 3 | **Todos los crons apagados** (`ENABLE_CRON_JOBS=false`). | Sin recordatorios, sin reseñas, sin bonos de lealtad y sin marcado de no-show. Es un interruptor global: al prenderlo se activan todos a la vez, así que conviene revisarlos antes. |
-| 4 | **El perfilador nunca se ofrece.** Está completo pero sus puntos de entrada no están montados. | Se construyó y no se está usando. |
-| 5 | **Tres ventanas de cancelación distintas en el código:** 5 h (reglamento y backend), 12 h (un diálogo viejo que ya nadie usa) y el valor dinámico. | El diálogo de 12 h es una bomba de tiempo si alguien lo reutiliza. |
-| 6 | El saldo de créditos **no se ve al reservar**. | Se entera de que no le alcanza cuando la reserva ya falló. |
-| 7 | Una clase llena dice **"Llena"** en escritorio y **"Lista de espera"** en móvil. | Inconsistencia menor de copy. |
-| 8 | El push de *clase cancelada* **sí le llega a socias de plataforma**. | Contradice la regla de silenciarlas. |
-| 9 | El registro valida y envía **código de referida** pero no hay campo para escribirlo. | La función de referidos no se puede usar al registrarse. |
+| 1 | **Todos los crons apagados** (`ENABLE_CRON_JOBS=false`). | Sin recordatorios, sin reseñas, sin bonos de lealtad y sin marcado de no-show. Es un interruptor global: al prenderlo se activan todos a la vez, así que conviene revisarlos antes. |
+| 2 | **El perfilador nunca se ofrece.** Está completo pero sus puntos de entrada no están montados. | Se construyó y no se está usando. |
+| 3 | **Tres ventanas de cancelación distintas en el código:** 5 h (reglamento y backend), 12 h (un diálogo viejo que ya nadie usa) y el valor dinámico. | El diálogo de 12 h es una bomba de tiempo si alguien lo reutiliza. |
+| 4 | El push de *clase cancelada por el estudio* **sí le llega a socias de plataforma**. | Contradice la regla de silenciarlas. |
+| 5 | El registro valida y envía **código de referida** pero no hay campo para escribirlo. | La función de referidos no se puede usar al registrarse. |
+
+**Ya resueltos** (jul-2026): filtros que parecían formulario obligatorio en la pantalla de reservar · la landing perdía la clase elegida al crear cuenta · el saldo de créditos no se veía antes de reservar · *"Llena"* vs *"Lista de espera"* · no se podía cancelar dentro de las 5 h · no había aviso al cancelar.
 
 ---
 
