@@ -13,13 +13,22 @@ export async function findOrCreateGuest(
 ): Promise<{ userId: string; created: boolean }> {
     const phone = normalizeMxPhone(input.phone);
     const email = (input.email?.trim() || `inv-${phone}@invitado.bmb`).toLowerCase();
-    const existing = await db.query<{ id: string }>(
-        `SELECT id FROM users
-          WHERE right(regexp_replace(phone, '\\D', '', 'g'), 10) = $1
-             OR lower(email) = $2
-          LIMIT 1`,
-        [phone, email],
-    );
+
+    // Sin teléfono NO se busca por teléfono: `right(...,10) = ''` empata con CUALQUIER
+    // usuario que tenga el teléfono vacío (hay varios en prod), y le colgaba la reserva
+    // a una persona equivocada. Sin teléfono, la identidad la define solo el email.
+    const existing = phone
+        ? await db.query<{ id: string }>(
+            `SELECT id FROM users
+              WHERE right(regexp_replace(COALESCE(phone, ''), '\\D', '', 'g'), 10) = $1
+                 OR lower(email) = $2
+              LIMIT 1`,
+            [phone, email],
+        )
+        : await db.query<{ id: string }>(
+            `SELECT id FROM users WHERE lower(email) = $1 LIMIT 1`,
+            [email],
+        );
     if (existing.rows[0]) return { userId: existing.rows[0].id, created: false };
     const passwordHash = await bcrypt.hash(randomBytes(9).toString('base64url'), 12);
     const created = await db.query<{ id: string }>(
