@@ -671,6 +671,68 @@ export async function sendBookingConfirmationEmail({
     }
 }
 
+/**
+ * Comprobante de cancelación. Antes la clienta cancelaba y no recibía NADA por
+ * ningún canal: se quedaba sin constancia de que su lugar se liberó y de si le
+ * regresó el crédito. Se silencia para socias de plataforma (TotalPass/Wellhub/
+ * Fitpass), que por política solo reciben la confirmación de su reserva.
+ */
+export async function sendBookingCancelledEmail({
+    to,
+    clientName,
+    className,
+    classDate,
+    classStartTime,
+    refunded,
+}: {
+    to: string;
+    clientName: string;
+    className: string;
+    classDate: string;          // YYYY-MM-DD
+    classStartTime: string;     // HH:MM[:SS]
+    refunded: boolean;
+}) {
+    try {
+        if (await isPlatformMemberByEmail(to)) return null;
+
+        const fmtDate = new Date(classDate + 'T00:00:00').toLocaleDateString('es-MX', {
+            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        });
+        const startHm = classStartTime?.slice(0, 5) || classStartTime;
+
+        const html = simpleTemplate({
+            heading: 'Tu reserva quedó cancelada',
+            body: `
+                <p>Hola ${clientName}, liberamos tu lugar en esta clase.</p>
+                ${infoBox(`
+                    <div style="font-size:18px;font-weight:600;color:${brand.dark};margin-bottom:6px;">${className}</div>
+                    <div><strong>Día:</strong> ${fmtDate}</div>
+                    <div><strong>Hora:</strong> ${startHm}</div>
+                    <div style="margin-top:8px;"><strong>${refunded ? 'Se devolvió 1 crédito a tu membresía.' : 'No se devolvió el crédito de esta clase.'}</strong></div>
+                `)}
+                <p style="font-size:13px;color:${brand.text};">Cuando quieras volver, tu lugar te espera.</p>
+            `,
+            button: { label: 'Reservar otra clase', href: `${getFrontendUrl()}/app/book` },
+        });
+
+        const { data, error } = await getResend().emails.send({
+            from: getEmailFrom(),
+            to: [to],
+            subject: `Reserva cancelada — ${className} (${fmtDate.split(',')[1]?.trim() || fmtDate})`,
+            html,
+        });
+
+        if (error) {
+            console.error('[email] sendBookingCancelledEmail:', error);
+            return null;
+        }
+        return { id: data?.id };
+    } catch (err) {
+        console.error('[email] sendBookingCancelledEmail:', err);
+        return null;
+    }
+}
+
 // =============================================================================
 // 5. Event announcement
 // =============================================================================

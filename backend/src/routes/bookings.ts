@@ -6,7 +6,7 @@ import { requirePermission } from '../middleware/requirePermission.js';
 import { z } from 'zod';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { sendBookingConfirmation, sendCancellationNotice, sendWhatsAppMessage } from '../lib/whatsapp.js';
-import { sendBookingConfirmationEmail } from '../services/email.js';
+import { sendBookingConfirmationEmail, sendBookingCancelledEmail } from '../services/email.js';
 import { notifyAllUserDevices } from '../lib/apple-wallet.js';
 import { sendWebPushToUser } from '../lib/web-push.js';
 import { upsertGoogleLoyaltyObject } from '../lib/google-wallet.js';
@@ -1541,6 +1541,39 @@ router.post('/:id/cancel', authenticate, async (req: Request, res: Response) => 
             }
         } catch (waErr) {
             console.error('[WhatsApp] Non-blocking error:', waErr);
+        }
+
+        // Comprobante de cancelación (email + push). Antes la clienta cancelaba y no
+        // recibía nada por ningún canal: solo veía la respuesta en pantalla.
+        try {
+            const who = await queryOne<{ display_name: string; email: string | null }>(
+                'SELECT display_name, email FROM users WHERE id = $1', [booking.user_id]
+            );
+            const cls = await queryOne<{ class_name: string; date: string; start_time: string }>(`
+                SELECT ct.name AS class_name, c.date::text AS date, c.start_time::text AS start_time
+                  FROM classes c JOIN class_types ct ON ct.id = c.class_type_id
+                 WHERE c.id = $1`, [booking.class_id]);
+
+            if (who?.email && cls) {
+                void sendBookingCancelledEmail({
+                    to: who.email,
+                    clientName: who.display_name,
+                    className: cls.class_name,
+                    classDate: String(cls.date).slice(0, 10),
+                    classStartTime: cls.start_time,
+                    refunded: shouldRefund,
+                });
+            }
+            void sendWebPushToUser(booking.user_id, {
+                title: 'Reserva cancelada',
+                body: shouldRefund
+                    ? 'Liberamos tu lugar y te devolvimos 1 crédito.'
+                    : 'Liberamos tu lugar. Esta cancelación no devolvió crédito.',
+                url: '/app/classes',
+                tag: 'booking_cancelled',
+            });
+        } catch (notifErr) {
+            console.error('[notifications] cancel non-blocking error:', notifErr);
         }
 
         // Update Apple + Google Wallet passes (credits changed)
