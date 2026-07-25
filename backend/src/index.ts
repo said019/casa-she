@@ -4178,6 +4178,35 @@ async function runStartupMigrations(): Promise<void> {
         console.log('  ✅ Migration 113: checkins + processed_events');
     } catch (e) { console.error('Migration 113 error:', e); }
 
+    // ---- Migration 114: las socias de plataforma NO acumulan puntos de lealtad ----
+    // Regla del dueño: TotalPass/Wellhub/Fitpass no son clientas normales — solo reciben
+    // lo que su integración permite. Los puntos se otorgan desde 16 lugares distintos
+    // (check-in, pagos, barra, referidos, bonos de cumpleaños/aniversario/racha…), así que
+    // el candado va en la BD: cubre todas las vías actuales y las que se agreguen después.
+    // Solo bloquea ACUMULACIÓN (points > 0); los movimientos negativos (canjes, reversas)
+    // siguen pasando para no dejar estados a medias. Ningún INSERT usa RETURNING, así que
+    // saltar la fila no rompe a ningún llamador.
+    try {
+        await query(`
+            CREATE OR REPLACE FUNCTION skip_loyalty_points_for_platform() RETURNS TRIGGER AS $$
+            BEGIN
+                IF NEW.points > 0 AND EXISTS (
+                    SELECT 1 FROM memberships m
+                      JOIN plans p ON p.id = m.plan_id
+                     WHERE m.user_id = NEW.user_id
+                       AND m.status = 'active'
+                       AND p.is_internal = true
+                ) THEN
+                    RETURN NULL; -- socia de plataforma: no acumula puntos
+                END IF;
+                RETURN NEW;
+            END; $$ LANGUAGE plpgsql`);
+        await query(`DROP TRIGGER IF EXISTS trg_skip_loyalty_platform ON loyalty_points`);
+        await query(`CREATE TRIGGER trg_skip_loyalty_platform BEFORE INSERT ON loyalty_points
+                     FOR EACH ROW EXECUTE FUNCTION skip_loyalty_points_for_platform()`);
+        console.log('  ✅ Migration 114: socias de plataforma sin puntos de lealtad');
+    } catch (e) { console.error('Migration 114 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();

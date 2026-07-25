@@ -1,4 +1,5 @@
 import { query, queryOne } from '../config/database.js';
+import { isPlatformMember } from './platformMember.js';
 
 export type DbClient = {
   query: (text: string, params?: unknown[]) => Promise<{ rows: any[]; rowCount: number }>;
@@ -332,6 +333,12 @@ export async function awardPaymentLoyaltyPoints(params: {
  */
 export async function awardCheckinPoints(userId: string, bookingId: string): Promise<number> {
   try {
+    // Las socias de plataforma (TotalPass/Wellhub/Fitpass) no acumulan puntos: no son
+    // clientas normales, solo reciben lo que su integración permite. El candado duro está
+    // en la BD (trigger skip_loyalty_points_for_platform); esto lo corta antes, que es el
+    // camino más común (check-in por QR o manual desde recepción).
+    if (await isPlatformMember(userId)) return 0;
+
     const existing = await queryOne<{ id: string }>(
       `SELECT id FROM loyalty_points WHERE user_id = $1 AND related_booking_id = $2 AND type = 'class_attended'`,
       [userId, bookingId]
