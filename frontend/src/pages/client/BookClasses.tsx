@@ -4,6 +4,9 @@ import { useNavigate } from "react-router-dom";
 import type { AxiosError } from "axios";
 import api, { getErrorMessage } from "@/lib/api";
 import type { BookingClient } from "@/types/booking";
+import type { ClientMembership } from "@/types/membership";
+import { fetchMyMembership } from "@/lib/memberships";
+import { creditLabel } from "@/lib/credits";
 import type { ScheduleClass } from "@/lib/schedule-state";
 import { getCellStatus } from "@/lib/schedule-state";
 import Schedule from "@/components/Schedule";
@@ -30,6 +33,22 @@ export default function BookClasses() {
     queryKey: ["my-bookings"],
     queryFn: async () => (await api.get("/bookings/my-bookings")).data,
   });
+
+  const { data: membership } = useQuery<ClientMembership | null>({
+    queryKey: ["my-membership"],
+    queryFn: fetchMyMembership,
+  });
+
+  // Ilimitado (null) también cuenta como "tiene créditos".
+  const hasCredits = useMemo(() => {
+    if (!membership || membership.status !== "active") return false;
+    const buckets = [
+      membership.reformer_remaining,
+      membership.multi_remaining,
+      membership.classes_remaining,
+    ];
+    return buckets.some((v) => v === null || (typeof v === "number" && v > 0));
+  }, [membership]);
 
   const bookedIds = useMemo(
     () =>
@@ -148,6 +167,29 @@ export default function BookClasses() {
               </div>
             </div>
           </section>
+
+          {/* Créditos a la vista ANTES de reservar: antes solo se enteraba de que no
+              le alcanzaban cuando la reserva ya había fallado. */}
+          {membership && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.1rem] border border-balance-dark/12 bg-balance-cream/60 px-4 py-3">
+              <div className="min-w-0">
+                <p className="editorial-caption-sm text-balance-dark/55">Tus créditos</p>
+                <p className="mt-0.5 truncate font-heading text-lg italic text-balance-dark">
+                  {hasCredits ? creditLabel(membership) : "Sin créditos disponibles"}
+                </p>
+              </div>
+              {!hasCredits && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/app/checkout")}
+                  className="shrink-0 rounded-full bg-balance-dark px-4 py-2 text-[12px] uppercase tracking-[0.18em] text-balance-cream transition-transform active:scale-[0.97]"
+                >
+                  Comprar paquete
+                </button>
+              )}
+            </div>
+          )}
+
           <Schedule
             variant="app"
             bookedIds={bookedIds}
