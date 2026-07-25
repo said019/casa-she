@@ -13,7 +13,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
     ArrowRight,
-    Cake,
     Eye,
     EyeOff,
     Loader2,
@@ -31,14 +30,12 @@ const registerSchema = z.object({
     phone: z
         .string()
         .regex(/^\+52[0-9]{10}$/, 'Formato: +52 seguido de 10 dígitos'),
-    dateOfBirth: z.string().optional().or(z.literal('')),
     password: z
         .string()
         .min(8, 'Mínimo 8 caracteres')
         .regex(/[A-Z]/, 'Debe contener al menos una mayúscula')
         .regex(/[0-9]/, 'Debe contener al menos un número'),
     confirmPassword: z.string(),
-    acceptsTerms: z.boolean().refine(val => val === true, 'Debes aceptar los términos'),
     acceptsCommunications: z.boolean().default(false),
     referralCode: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -74,12 +71,10 @@ export default function Register() {
     } = useForm<RegisterForm>({
         resolver: zodResolver(registerSchema),
         defaultValues: {
-            acceptsTerms: false,
             acceptsCommunications: false,
         },
     });
 
-    const acceptsTerms = watch('acceptsTerms');
     const acceptsCommunications = watch('acceptsCommunications');
 
     useEffect(() => {
@@ -117,8 +112,9 @@ export default function Register() {
                 password: data.password,
                 displayName: data.displayName,
                 phone: data.phone,
-                dateOfBirth: data.dateOfBirth || undefined,
-                acceptsTerms: data.acceptsTerms,
+                // Ya no hay casilla: la aceptación es implícita al crear la cuenta, como
+                // dice el aviso legal junto al botón. El backend sigue exigiendo el campo.
+                acceptsTerms: true,
                 acceptsCommunications: data.acceptsCommunications,
                 referralCode: data.referralCode || undefined,
             });
@@ -208,20 +204,6 @@ export default function Register() {
                         )}
                     </motion.div>
 
-                    <motion.div {...fieldMotion} transition={{ duration: 0.28, delay: 0.16, ease: easeOut }} className="space-y-2">
-                        <Label htmlFor="dateOfBirth">Fecha de nacimiento</Label>
-                        <div className="relative">
-                            <Cake className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-bmb-dark/40" />
-                            <Input
-                                id="dateOfBirth"
-                                type="date"
-                                className={`${fieldClass} auth-date-field`}
-                                {...register('dateOfBirth')}
-                                disabled={isLoading}
-                            />
-                        </div>
-                    </motion.div>
-
                     <motion.div {...fieldMotion} transition={{ duration: 0.28, delay: 0.2, ease: easeOut }} className="space-y-2">
                         <Label htmlFor="password">Contraseña</Label>
                         <div className="relative">
@@ -282,29 +264,9 @@ export default function Register() {
                     className="rounded-2xl border border-bmb-dark/12 bg-white/50 p-4"
                 >
                     <div className="space-y-3">
-                        <div className="flex items-start gap-3">
-                            <Checkbox
-                                id="acceptsTerms"
-                                checked={acceptsTerms}
-                                onCheckedChange={(checked) => setValue('acceptsTerms', checked as boolean)}
-                                disabled={isLoading}
-                                className="mt-0.5 border-bmb-dark data-[state=checked]:bg-bmb-dark data-[state=checked]:text-bmb-cream"
-                            />
-                            <label htmlFor="acceptsTerms" className="cursor-pointer font-body text-sm leading-relaxed text-bmb-dark/78">
-                                Acepto los{' '}
-                                <Link to="/terms" className="font-semibold text-bmb-dark hover:text-bmb-dark/70">
-                                    términos y condiciones
-                                </Link>{' '}
-                                y la{' '}
-                                <Link to="/privacy" className="font-semibold text-bmb-dark hover:text-bmb-dark/70">
-                                    política de privacidad
-                                </Link>
-                            </label>
-                        </div>
-                        {errors.acceptsTerms && (
-                            <p className="text-sm text-destructive">{errors.acceptsTerms.message}</p>
-                        )}
-
+                        {/* La casilla obligatoria de términos se quitó para no frenar el registro.
+                            El aviso legal se conserva como texto junto al botón (abajo): sigue
+                            informando y enlazando términos y privacidad, sin un clic extra. */}
                         <div className="flex items-start gap-3">
                             <Checkbox
                                 id="acceptsCommunications"
@@ -343,6 +305,18 @@ export default function Register() {
                             </>
                         )}
                     </Button>
+
+                    {/* Aviso legal sin fricción: informa y enlaza, sin casilla que marcar. */}
+                    <p className="mt-3 text-center font-body text-xs leading-relaxed text-bmb-dark/60">
+                        Al crear tu cuenta aceptas los{' '}
+                        <Link to="/terms" className="font-semibold text-bmb-dark/80 hover:text-bmb-dark">
+                            términos y condiciones
+                        </Link>{' '}
+                        y la{' '}
+                        <Link to="/privacy" className="font-semibold text-bmb-dark/80 hover:text-bmb-dark">
+                            política de privacidad
+                        </Link>.
+                    </p>
                 </motion.div>
             </form>
 

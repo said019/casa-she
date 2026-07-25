@@ -956,38 +956,54 @@ export function initializeCronJobs(): void {
     });
 
     // ============================================
+    // LISTA BLANCA DE JOBS (CRON_JOBS)
+    // ============================================
+    // `ENABLE_CRON_JOBS` es todo-o-nada: prenderlo para UN job (p. ej. los de TotalPass)
+    // despierta los 15 de golpe, incluidos los que mueven puntos, vencen membresías y
+    // escriben a clientas. `CRON_JOBS` permite elegir cuáles corren, por nombre:
+    //     CRON_JOBS=TOTALPASS_TOKEN,TOTALPASS_PUBLISH,TOTALPASS_POOL,TOTALPASS_IMPORT
+    // Vacío o sin definir = TODOS (comportamiento histórico; no cambia nada existente).
+    const listaBlanca = (process.env.CRON_JOBS || '')
+        .split(',')
+        .map((s) => s.trim().toUpperCase())
+        .filter(Boolean);
+    const habilitado = (nombre: string) =>
+        listaBlanca.length === 0 || listaBlanca.includes(nombre.toUpperCase());
+    const job = (
+        nombre: string,
+        expresion: string,
+        fn: () => void | Promise<void>,
+        etiqueta: string,
+    ) => {
+        if (!habilitado(nombre)) {
+            console.log(`  ⏸️  ${nombre} - omitido (no está en CRON_JOBS)`);
+            return;
+        }
+        cron.schedule(expresion, fn, { timezone: 'America/Mexico_City' });
+        console.log(`  ✅ ${etiqueta}`);
+    };
+    if (listaBlanca.length) {
+        console.log(`  🎛️  CRON_JOBS activo — solo corren: ${listaBlanca.join(', ')}`);
+    }
+
+    // ============================================
     // SCHEDULE DE JOBS
     // ============================================
 
     // 3:00 AM - Generar clases recurrentes (cada día)
-    cron.schedule('0 3 * * *', generateRecurringClasses, {
-        timezone: 'America/Mexico_City',
-    });
-    console.log('  ✅ GENERATE_CLASSES - Diario 3:00 AM');
+    job('GENERATE_CLASSES', '0 3 * * *', generateRecurringClasses, 'GENERATE_CLASSES - Diario 3:00 AM');
 
     // Cada hora (:30) - Solicitar reseñas
-    cron.schedule('30 * * * *', requestReviews, {
-        timezone: 'America/Mexico_City',
-    });
-    console.log('  ✅ REQUEST_REVIEWS - Cada hora');
+    job('REQUEST_REVIEWS', '30 * * * *', requestReviews, 'REQUEST_REVIEWS - Cada hora');
 
     // 10:00 AM - Alertas de membresías por vencer
-    cron.schedule('0 10 * * *', notifyExpiringMemberships, {
-        timezone: 'America/Mexico_City',
-    });
-    console.log('  ✅ EXPIRING_MEMBERSHIPS - Diario 10:00 AM');
+    job('EXPIRING_MEMBERSHIPS', '0 10 * * *', notifyExpiringMemberships, 'EXPIRING_MEMBERSHIPS - Diario 10:00 AM');
 
     // 00:05 AM - Marcar membresías expiradas
-    cron.schedule('5 0 * * *', markExpiredMemberships, {
-        timezone: 'America/Mexico_City',
-    });
-    console.log('  ✅ MARK_EXPIRED - Diario 00:05 AM');
+    job('MARK_EXPIRED', '5 0 * * *', markExpiredMemberships, 'MARK_EXPIRED - Diario 00:05 AM');
 
     // Cada 6 horas - Limpiar órdenes expiradas
-    cron.schedule('0 */6 * * *', cleanupExpiredOrders, {
-        timezone: 'America/Mexico_City',
-    });
-    console.log('  ✅ CLEANUP_ORDERS - Cada 6 horas');
+    job('CLEANUP_ORDERS', '0 */6 * * *', cleanupExpiredOrders, 'CLEANUP_ORDERS - Cada 6 horas');
 
     // Cada 30 min - Marcar no-shows y completar clases, LUEGO auto-check-in de respaldo.
     // Antes corrían en cron.schedule separados (:05/:35 vs :10/:40): con ambos anclados en
@@ -995,39 +1011,29 @@ export function initializeCronJobs(): void {
     // si el minuto de end_time no caía en la "zona de peligro" {10,40} — hoy ningún horario de
     // producción cae ahí, pero un horario futuro sí podría. Correrlos secuenciales en el MISMO
     // tick garantiza el orden SIEMPRE, sin depender de en qué minuto termine una clase.
-    cron.schedule('5,35 * * * *', async () => {
+    job('MARK_NO_SHOWS', '5,35 * * * *', async () => {
         // markNoShows/autoCheckIn ya envuelven su cuerpo en try/catch y no relanzan (ver sus
         // definiciones), pero esa garantía vive en el callee, no aquí. .catch() explícito por
         // llamada asegura que un cambio futuro que rompa ese try/catch interno no le impida a
         // autoCheckIn ejecutar en el tick solo porque markNoShows lanzó.
         await markNoShows().catch((e) => logError('MARK_NO_SHOWS_WRAPPER', e));
         await autoCheckIn().catch((e) => logError('AUTO_CHECK_IN_WRAPPER', e));
-    }, {
-        timezone: 'America/Mexico_City',
-    });
-    console.log('  ✅ MARK_NO_SHOWS + AUTO_CHECK_IN (secuencial) - Cada 30 min');
+    }, 'MARK_NO_SHOWS + AUTO_CHECK_IN (secuencial) - Cada 30 min');
 
     // 2:00 AM - Expirar solicitudes de reseña
-    cron.schedule('0 2 * * *', expireReviewRequests, {
-        timezone: 'America/Mexico_City',
-    });
-    console.log('  ✅ EXPIRE_REVIEWS - Diario 2:00 AM');
+    job('EXPIRE_REVIEWS', '0 2 * * *', expireReviewRequests, 'EXPIRE_REVIEWS - Diario 2:00 AM');
 
     // 9:00 AM - Birthday bonuses
-    cron.schedule('0 9 * * *', () => { void birthdayBonus(); }, { timezone: 'America/Mexico_City' });
-    console.log('  ✅ BIRTHDAY_BONUS - Diario 9:00 AM');
+    job('BIRTHDAY_BONUS', '0 9 * * *', () => { void birthdayBonus(); }, 'BIRTHDAY_BONUS - Diario 9:00 AM');
 
     // 9:05 AM - Anniversary bonuses
-    cron.schedule('5 9 * * *', () => { void anniversaryBonus(); }, { timezone: 'America/Mexico_City' });
-    console.log('  ✅ ANNIVERSARY_BONUS - Diario 9:05 AM');
+    job('ANNIVERSARY_BONUS', '5 9 * * *', () => { void anniversaryBonus(); }, 'ANNIVERSARY_BONUS - Diario 9:05 AM');
 
     // Daily at 1:00 AM - Streak detection
-    cron.schedule('0 1 * * *', () => { void streakBonus(); }, { timezone: 'America/Mexico_City' });
-    console.log('  ✅ STREAK_BONUS - Diario 1:00 AM');
+    job('STREAK_BONUS', '0 1 * * *', () => { void streakBonus(); }, 'STREAK_BONUS - Diario 1:00 AM');
 
     // Daily at 1:30 AM - Expire loyalty benefits
-    cron.schedule('30 1 * * *', expireBenefits, { timezone: 'America/Mexico_City' });
-    console.log('  ✅ EXPIRE_BENEFITS - Diario 1:30 AM');
+    job('EXPIRE_BENEFITS', '30 1 * * *', expireBenefits, 'EXPIRE_BENEFITS - Diario 1:30 AM');
 
     // Recordatorios de clase DESACTIVADOS (24h y 2h). Mientras las clientas sigan
     // reservando/cancelando en Fitune, las cancelaciones llegan tarde a BMB y se mandaba
@@ -1042,20 +1048,16 @@ export function initializeCronJobs(): void {
     // ============================================
 
     // 00:15 - Renovar token JWT de TotalPass
-    cron.schedule('15 0 * * *', () => { void totalpassTokenJob(); }, { timezone: 'America/Mexico_City' });
-    console.log('  ✅ TOTALPASS_TOKEN - Diario 00:15 AM');
+    job('TOTALPASS_TOKEN', '15 0 * * *', () => { void totalpassTokenJob(); }, 'TOTALPASS_TOKEN - Diario 00:15 AM');
 
     // 00:20 - Publicar clases individuales de los próximos 21 días
-    cron.schedule('20 0 * * *', () => { void totalpassPublishJob(); }, { timezone: 'America/Mexico_City' });
-    console.log('  ✅ TOTALPASS_PUBLISH - Diario 00:20 AM');
+    job('TOTALPASS_PUBLISH', '20 0 * * *', () => { void totalpassPublishJob(); }, 'TOTALPASS_PUBLISH - Diario 00:20 AM');
 
     // Cada 10 min (:05,:15,...,:55) - Reconciliar cupo (pool) con TotalPass
-    cron.schedule('5,15,25,35,45,55 * * * *', () => { void totalpassPoolJob(); }, { timezone: 'America/Mexico_City' });
-    console.log('  ✅ TOTALPASS_POOL - Cada 10 min');
+    job('TOTALPASS_POOL', '5,15,25,35,45,55 * * * *', () => { void totalpassPoolJob(); }, 'TOTALPASS_POOL - Cada 10 min');
 
     // Cada 5 min - Importar reservas de socios TotalPass
-    cron.schedule('*/5 * * * *', () => { void totalpassImportJob(); }, { timezone: 'America/Mexico_City' });
-    console.log('  ✅ TOTALPASS_IMPORT - Cada 5 min');
+    job('TOTALPASS_IMPORT', '*/5 * * * *', () => { void totalpassImportJob(); }, 'TOTALPASS_IMPORT - Cada 5 min');
 
     console.log('\n⏰ Cron Jobs inicializados correctamente\n');
 }
