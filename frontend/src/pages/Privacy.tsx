@@ -2,21 +2,19 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 
+// Aviso de privacidad corto y legible. Se prefiere lenguaje llano sobre el
+// clásico texto legal largo: la clienta lo lee desde el celular al registrarse.
 const sections = [
-  { id: "intro", title: "Introducción" },
-  { id: "info-recopilada", title: "Información que Recopilamos" },
-  { id: "uso-info", title: "Uso de la Información" },
-  { id: "proteccion", title: "Protección de Datos" },
-  { id: "cookies", title: "Cookies y Tecnologías" },
-  { id: "compartir", title: "Compartir Información" },
-  { id: "derechos", title: "Tus Derechos" },
-  { id: "menores", title: "Privacidad de Menores" },
-  { id: "cambios", title: "Cambios a esta Política" },
-  { id: "contacto", title: "Contacto" },
+  { id: "responsable", title: "Quién cuida tus datos" },
+  { id: "datos", title: "Qué guardamos" },
+  { id: "uso", title: "Para qué lo usamos" },
+  { id: "compartir", title: "Con quién se comparte" },
+  { id: "derechos", title: "Tus derechos" },
+  { id: "cambios", title: "Cambios" },
 ];
 
 export default function Privacy() {
-  const [activeSection, setActiveSection] = useState("intro");
+  const [activeSection, setActiveSection] = useState("responsable");
 
   useEffect(() => {
     const handleScroll = () => {
@@ -103,7 +101,7 @@ export default function Privacy() {
             <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/20">
               <h3 className="text-sm font-semibold mb-2">¿Tienes dudas?</h3>
               <p className="text-xs text-muted-foreground mb-3">
-                Contáctanos para cualquier pregunta sobre privacidad
+                Escríbenos y con gusto te explicamos
               </p>
               <a
                 href="mailto:casashecondesa@gmail.com"
@@ -116,211 +114,112 @@ export default function Privacy() {
 
           {/* Main Content */}
           <main className="flex-1 max-w-3xl">
-            <div className="bg-background rounded-lg border p-8 lg:p-12 space-y-12">
+            <div className="bg-background rounded-lg border p-8 lg:p-12 space-y-10">
               {/* Header */}
               <div className="space-y-4 pb-8 border-b">
-                <h1 className="font-heading text-4xl font-bold">Política de Privacidad</h1>
+                <h1 className="font-heading text-4xl font-bold">Aviso de privacidad</h1>
                 <p className="text-muted-foreground">
-                  Última actualización: 10 de enero de 2026
+                  En corto: usamos tus datos para darte servicio en el estudio, nada más.
+                  No los vendemos ni los compartimos con quien no haga falta.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Última actualización: 26 de julio de 2026
                 </p>
               </div>
 
-              {/* Sections */}
-              <section id="intro" className="space-y-4">
-                <h2 className="font-heading text-2xl font-semibold">Introducción</h2>
+              <section id="responsable" className="space-y-3">
+                <h2 className="font-heading text-2xl font-semibold">Quién cuida tus datos</h2>
                 <p className="text-muted-foreground leading-relaxed">
-                  En Casa Shé, nos comprometemos a proteger tu privacidad y datos personales. 
-                  Esta Política de Privacidad describe cómo recopilamos, usamos, compartimos y protegemos 
-                  tu información cuando utilizas nuestros servicios de Pilates y fitness.
-                </p>
-                <p className="text-muted-foreground leading-relaxed">
-                  Al utilizar nuestros servicios, aceptas las prácticas descritas en esta política.
-                </p>
-              </section>
-
-              <section id="info-recopilada" className="space-y-4">
-                <h2 className="font-heading text-2xl font-semibold">Información que Recopilamos</h2>
-                
-                <div className="space-y-3">
-                  <h3 className="font-medium text-lg">Información de Cuenta</h3>
-                  <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
-                    <li>Nombre completo</li>
-                    <li>Correo electrónico</li>
-                    <li>Número de teléfono</li>
-                    <li>Fotografía de perfil (opcional)</li>
-                    <li>Fecha de nacimiento</li>
-                  </ul>
-                </div>
-
-                <div className="space-y-3">
-                  <h3 className="font-medium text-lg">Información de Salud</h3>
-                  <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
-                    <li>Condiciones médicas relevantes</li>
-                    <li>Lesiones previas</li>
-                    <li>Contacto de emergencia</li>
-                    <li>Notas de salud proporcionadas voluntariamente</li>
-                  </ul>
-                </div>
-
-                <div className="space-y-3">
-                  <h3 className="font-medium text-lg">Información de Uso</h3>
-                  <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
-                    <li>Reservas de clases</li>
-                    <li>Historial de asistencia</li>
-                    <li>Membresías y pagos</li>
-                    <li>Preferencias de comunicación</li>
-                  </ul>
-                </div>
-              </section>
-
-              <section id="uso-info" className="space-y-4">
-                <h2 className="font-heading text-2xl font-semibold">Uso de la Información</h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  Utilizamos tu información para:
-                </p>
-                <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
-                  <li>Gestionar tu cuenta y reservas de clases</li>
-                  <li>Procesar pagos y membresías</li>
-                  <li>Comunicar cambios en horarios o servicios</li>
-                  <li>Mejorar nuestros servicios y experiencia de usuario</li>
-                  <li>Enviar promociones y ofertas (con tu consentimiento)</li>
-                  <li>Garantizar la seguridad de nuestras instalaciones</li>
-                  <li>Cumplir con obligaciones legales</li>
-                </ul>
-              </section>
-
-              <section id="proteccion" className="space-y-4">
-                <h2 className="font-heading text-2xl font-semibold">Protección de Datos</h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  Implementamos medidas de seguridad técnicas y organizativas para proteger tu información:
-                </p>
-                <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
-                  <li>Cifrado SSL/TLS para transmisión de datos</li>
-                  <li>Contraseñas encriptadas con bcrypt</li>
-                  <li>Acceso restringido a datos personales</li>
-                  <li>Servidores seguros con certificaciones</li>
-                  <li>Auditorías de seguridad regulares</li>
-                  <li>Capacitación de personal en protección de datos</li>
-                </ul>
-              </section>
-
-              <section id="cookies" className="space-y-4">
-                <h2 className="font-heading text-2xl font-semibold">Cookies y Tecnologías Similares</h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  Utilizamos cookies y tecnologías similares para:
-                </p>
-                <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
-                  <li>Mantener tu sesión activa</li>
-                  <li>Recordar tus preferencias</li>
-                  <li>Analizar el uso de nuestro sitio web</li>
-                  <li>Mejorar la experiencia de usuario</li>
-                </ul>
-                <p className="text-muted-foreground leading-relaxed mt-4">
-                  Puedes configurar tu navegador para rechazar cookies, pero esto puede afectar 
-                  la funcionalidad del sitio.
-                </p>
-              </section>
-
-              <section id="compartir" className="space-y-4">
-                <h2 className="font-heading text-2xl font-semibold">Compartir Información</h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  No vendemos ni alquilamos tu información personal. Solo compartimos datos con:
-                </p>
-                <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
-                  <li><strong>Proveedores de servicios:</strong> procesamiento de pagos, hosting, email</li>
-                  <li><strong>Autoridades legales:</strong> cuando sea requerido por ley</li>
-                  <li><strong>Instructores:</strong> solo información necesaria para clases (nombre, notas de salud relevantes)</li>
-                </ul>
-              </section>
-
-              <section id="derechos" className="space-y-4">
-                <h2 className="font-heading text-2xl font-semibold">Tus Derechos</h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  De acuerdo con la Ley Federal de Protección de Datos Personales en Posesión de 
-                  Particulares (LFPDPPP), tienes derecho a:
-                </p>
-                <div className="bg-muted/50 p-4 rounded-lg space-y-2">
-                  <p className="font-medium">Derechos ARCO:</p>
-                  <ul className="list-disc list-inside space-y-1 text-muted-foreground ml-4">
-                    <li><strong>Acceder</strong> a tus datos personales</li>
-                    <li><strong>Rectificar</strong> datos incorrectos</li>
-                    <li><strong>Cancelar</strong> tu cuenta y datos</li>
-                    <li><strong>Oponerte</strong> al tratamiento de datos</li>
-                  </ul>
-                </div>
-                <p className="text-muted-foreground leading-relaxed">
-                  Para ejercer estos derechos, contáctanos en{" "}
+                  Casa Shé, con domicilio en Alfonso Reyes 131, Condesa, Ciudad de México, es
+                  responsable del uso y la protección de tus datos personales. Para cualquier
+                  tema de privacidad puedes escribirnos a{" "}
                   <a href="mailto:casashecondesa@gmail.com" className="text-primary hover:underline">
                     casashecondesa@gmail.com
-                  </a>
+                  </a>.
                 </p>
               </section>
 
-              <section id="menores" className="space-y-4">
-                <h2 className="font-heading text-2xl font-semibold">Privacidad de Menores</h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  Nuestros servicios están dirigidos a personas mayores de 18 años. Si eres menor de edad, 
-                  requieres el consentimiento de un padre o tutor para usar nuestros servicios.
-                </p>
-                <p className="text-muted-foreground leading-relaxed">
-                  Si descubrimos que hemos recopilado información de menores sin consentimiento, 
-                  eliminaremos dicha información inmediatamente.
-                </p>
-              </section>
-
-              <section id="cambios" className="space-y-4">
-                <h2 className="font-heading text-2xl font-semibold">Cambios a esta Política</h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  Podemos actualizar esta Política de Privacidad periódicamente. Te notificaremos sobre 
-                  cambios significativos mediante:
-                </p>
-                <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
-                  <li>Correo electrónico</li>
-                  <li>Aviso en nuestro sitio web</li>
-                  <li>Notificación en la aplicación</li>
+              <section id="datos" className="space-y-3">
+                <h2 className="font-heading text-2xl font-semibold">Qué guardamos</h2>
+                <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+                  <li>Tu nombre, correo y teléfono. Foto de perfil, si tú la subes.</li>
+                  <li>Tus reservas, asistencias, membresías, créditos y pagos.</li>
+                  <li>
+                    Lo que nos cuentes sobre tu salud (una lesión, un embarazo, algo a cuidar en
+                    clase). Son datos sensibles: solo los guardamos si tú decides compartirlos, y
+                    únicamente para cuidarte durante la práctica.
+                  </li>
                 </ul>
-                <p className="text-muted-foreground leading-relaxed mt-4">
-                  Te recomendamos revisar esta política periódicamente.
-                </p>
-              </section>
-
-              <section id="contacto" className="space-y-4">
-                <h2 className="font-heading text-2xl font-semibold">Contacto</h2>
                 <p className="text-muted-foreground leading-relaxed">
-                  Si tienes preguntas sobre esta Política de Privacidad o el tratamiento de tus datos, 
-                  contáctanos:
+                  En tu navegador guardamos lo mínimo para mantener tu sesión abierta. No usamos
+                  cookies de publicidad ni rastreamos tu navegación fuera de este sitio.
                 </p>
-                <div className="bg-muted/50 p-6 rounded-lg space-y-3">
-                  <div>
-                    <p className="text-sm font-medium">Casa Shé</p>
-                    <p className="text-sm text-muted-foreground">Alfonso Reyes 131 · Condesa, CDMX</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Email</p>
-                    <a
-                      href="mailto:casashecondesa@gmail.com"
-                      className="text-sm text-primary hover:underline"
-                    >
-                      casashecondesa@gmail.com
-                    </a>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Instagram</p>
-                    <a href="https://instagram.com/casashe.mx" className="text-sm text-primary hover:underline">
-                      @casashe.mx
-                    </a>
-                  </div>
-                </div>
               </section>
 
-              {/* Footer */}
-              <div className="pt-8 border-t">
-                <p className="text-xs text-muted-foreground">
-                  Esta Política de Privacidad cumple con la Ley Federal de Protección de Datos Personales 
-                  en Posesión de Particulares (LFPDPPP) de México y el Reglamento General de Protección 
-                  de Datos (RGPD) de la Unión Europea.
+              <section id="uso" className="space-y-3">
+                <h2 className="font-heading text-2xl font-semibold">Para qué lo usamos</h2>
+                <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+                  <li>Reservar tus clases y llevar la cuenta de tus créditos y membresías.</li>
+                  <li>Cobrarte y emitir tus comprobantes.</li>
+                  <li>Avisarte de tus reservas y de lo que pase con tu cuenta.</li>
+                  <li>Cuidarte en clase, si nos compartiste algo de salud.</li>
+                  <li>
+                    Mandarte promociones y novedades, solo si lo aceptaste al registrarte. Puedes
+                    decirnos que ya no en cualquier momento.
+                  </li>
+                </ul>
+              </section>
+
+              <section id="compartir" className="space-y-3">
+                <h2 className="font-heading text-2xl font-semibold">Con quién se comparte</h2>
+                <p className="text-muted-foreground leading-relaxed">
+                  Con nadie que no sea necesario para darte el servicio, y nunca para venderlo:
                 </p>
-              </div>
+                <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+                  <li>
+                    Nuestros procesadores de pago (Mercado Pago y Stripe), que reciben lo
+                    indispensable para cobrar. Tus datos de tarjeta los maneja el procesador,
+                    nosotros no los guardamos.
+                  </li>
+                  <li>
+                    Plataformas de beneficios como TotalPass, cuando reservas una clase a través
+                    de ellas. En ese caso intercambiamos lo necesario para confirmar tu lugar y
+                    tu asistencia.
+                  </li>
+                  <li>
+                    Los servicios con los que te enviamos correos y mensajes de WhatsApp.
+                  </li>
+                  <li>
+                    Autoridades, si la ley nos lo exige.
+                  </li>
+                </ul>
+              </section>
+
+              <section id="derechos" className="space-y-3">
+                <h2 className="font-heading text-2xl font-semibold">Tus derechos</h2>
+                <p className="text-muted-foreground leading-relaxed">
+                  Puedes pedirnos acceder a tus datos, corregirlos, cancelarlos u oponerte a que
+                  los usemos (derechos ARCO), además de retirar tu consentimiento cuando quieras.
+                  Escríbenos a{" "}
+                  <a href="mailto:casashecondesa@gmail.com" className="text-primary hover:underline">
+                    casashecondesa@gmail.com
+                  </a>{" "}
+                  desde el correo de tu cuenta y te respondemos dentro de los plazos que marca la
+                  ley.
+                </p>
+                <p className="text-muted-foreground leading-relaxed">
+                  Ten en cuenta que hay información que debemos conservar por obligaciones
+                  fiscales o contables, aunque cierres tu cuenta.
+                </p>
+              </section>
+
+              <section id="cambios" className="space-y-3">
+                <h2 className="font-heading text-2xl font-semibold">Cambios</h2>
+                <p className="text-muted-foreground leading-relaxed">
+                  Si cambiamos este aviso, publicamos aquí la versión nueva con su fecha. Si el
+                  cambio es importante, te lo avisamos por correo.
+                </p>
+              </section>
             </div>
           </main>
         </div>
