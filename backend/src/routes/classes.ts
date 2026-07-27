@@ -75,7 +75,10 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
         i.display_name as instructor_name, i.user_id as instructor_user_id,
         i.photo_url as instructor_photo,
         f.name as facility_name,
-        ci.max_spots AS totalpass_spots
+        ci.max_spots AS totalpass_spots,
+        -- Cuántos de esos lugares ya ocupó TotalPass: permite marcar la clase en
+        -- la rejilla sin tener que abrirla una por una.
+        COALESCE(ci.booked_spots, 0) AS totalpass_booked
       FROM classes c
       JOIN class_types ct ON c.class_type_id = ct.id
       JOIN instructors i ON c.instructor_id = i.id

@@ -58,6 +58,21 @@ interface ClassRow {
     status: string;
     booking_closed?: boolean;
     facility_name?: string | null;
+    /** Lugares de esta clase que ya ocupó TotalPass. */
+    totalpass_booked?: number;
+}
+
+// Punto verde de TotalPass en la tarjeta de la clase. Sin esto había que abrir
+// clase por clase para descubrir que llegó una socia desde su app.
+function MarcaTotalPass({ n }: { n: number }) {
+    if (!n) return null;
+    return (
+        <span
+            className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-[#2A4E36]"
+            title={`${n} ${n === 1 ? 'reserva' : 'reservas'} de TotalPass`}
+            aria-label={`${n} ${n === 1 ? 'reserva' : 'reservas'} de TotalPass`}
+        />
+    );
 }
 
 // Sucursal en formato corto para la etiqueta (quita el prefijo "Casa Shé")
@@ -944,6 +959,15 @@ function DayView({
                                 >
                                     {categoryLabel(c.category)}
                                 </span>
+                                {/* Aviso de que en esta clase hay gente de TotalPass, sin abrirla. */}
+                                {(c.totalpass_booked ?? 0) > 0 && (
+                                    <span
+                                        className="shrink-0 rounded-sm border border-[#2A4E36]/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#2A4E36]"
+                                        title={`${c.totalpass_booked} desde TotalPass`}
+                                    >
+                                        <span className="hidden sm:inline">TotalPass · </span>{c.totalpass_booked}
+                                    </span>
+                                )}
                                 <div className="text-right shrink-0 min-w-[64px]">
                                     <p className={`text-base font-semibold ${occTone}`}>{c.current_bookings}/{c.max_capacity}</p>
                                     <p className={`text-[11px] ${occTone}`}>{occ}%</p>
@@ -1055,7 +1079,10 @@ function WeekView({
                                             >
                                                 <div className="flex items-center justify-between gap-1">
                                                     <span className="font-mono tabular-nums font-semibold text-[12px]">{trimTime(c.start_time)}</span>
-                                                    <span className="text-[10px] text-muted-foreground">{c.current_bookings}/{c.max_capacity}</span>
+                                                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                                        <MarcaTotalPass n={c.totalpass_booked ?? 0} />
+                                                        {c.current_bookings}/{c.max_capacity}
+                                                    </span>
                                                 </div>
                                                 <div className="truncate font-medium">{c.class_type_name}</div>
                                                 <div className="text-[10px] text-muted-foreground truncate">

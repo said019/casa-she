@@ -2171,8 +2171,25 @@ function ClassEventCard({ item, onClick, mobile = false }: { item: Class; onClic
                 {capacity > 0 && (
                     <div className={mobile ? 'mt-4' : 'mt-2.5'}>
                         <div className="flex items-center justify-between gap-2 text-[10px] font-semibold text-balance-dark/70">
-                            <span>{full ? 'Cupo lleno' : nearly ? 'Últimos lugares' : 'Ocupación'}</span>
-                            <span className="tabular-nums text-balance-dark/68">{bookings}/{capacity}</span>
+                            {/* Con la marca de TotalPass presente, la palabra "Ocupación" no
+                                cabe y se cortaba a "Oc…"; como no aporta nada, se omite. */}
+                            <span className="truncate">
+                                {full ? 'Cupo lleno' : nearly ? 'Últimos lugares' : (item.totalpass_booked ?? 0) > 0 ? '' : 'Ocupación'}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-1">
+                                {/* Que se vea desde la rejilla que llegó gente por TotalPass:
+                                    antes la única señal era el contador de ocupación. Va aquí y
+                                    no junto al título porque la columna es angosta y lo aplastaba. */}
+                                {(item.totalpass_booked ?? 0) > 0 && !isCancelled && (
+                                    <span
+                                        className="inline-flex items-center gap-0.5 rounded-full border border-[#2A4E36]/35 bg-[#2A4E36]/10 px-1.5 text-[9px] font-semibold text-[#2A4E36]"
+                                        title={`${item.totalpass_booked} ${item.totalpass_booked === 1 ? 'reserva' : 'reservas'} de TotalPass`}
+                                    >
+                                        TP {item.totalpass_booked}
+                                    </span>
+                                )}
+                                <span className="tabular-nums text-balance-dark/68">{bookings}/{capacity}</span>
+                            </span>
                         </div>
                         <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-balance-dark/8" aria-hidden="true">
                             <div
