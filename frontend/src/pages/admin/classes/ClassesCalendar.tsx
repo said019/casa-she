@@ -63,6 +63,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { enlaceWhatsApp } from '@/lib/whatsapp';
 
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
@@ -130,26 +131,13 @@ interface Attendee {
     channel?: string | null;
 }
 
-/**
- * Enlace para escribirle por WhatsApp con el mensaje ya redactado. Se usa wa.me
- * (abre WhatsApp Web o la app) en vez de mandar el mensaje desde el servidor:
- * funciona siempre, y quien escribe es el estudio desde su propio número.
- */
-function enlaceWhatsApp(attendee: Attendee, clase?: Class | null): string | null {
-    const digitos = (attendee.phone || '').replace(/\D/g, '');
-    if (digitos.length < 10) return null;
-    // 10 dígitos = número nacional: se le antepone la lada de México.
-    const conLada = digitos.length === 10 ? `52${digitos}` : digitos;
-    const nombre = (attendee.display_name || '').split(' ')[0] || '';
-    // La fecha se arma por partes (YYYY-MM-DD) para no correrse de día por zona horaria.
-    const dia = clase?.date ? clase.date.slice(0, 10).split('-').reverse().slice(0, 2).join('/') : '';
-    // Solo se menciona la clase si están los tres datos; a medias el mensaje sale raro.
-    const cuando = clase?.class_type_name && dia && clase.start_time
-        ? ` sobre tu clase de ${clase.class_type_name} del ${dia} a las ${formatClassTime(clase.start_time)}`
-        : '';
-    const texto = `Hola ${nombre}, te escribimos de Casa Shé${cuando}.`;
-    return `https://wa.me/${conLada}?text=${encodeURIComponent(texto)}`;
-}
+const whatsAppDeAsistente = (attendee: Attendee, clase?: Class | null) => enlaceWhatsApp({
+    telefono: attendee.phone,
+    nombre: attendee.display_name,
+    clase: clase?.class_type_name,
+    fecha: clase?.date,
+    hora: clase?.start_time ? formatClassTime(clase.start_time) : null,
+});
 
 // "Reservó": si booked_by es la propia alumna (o null) se reservó sola; si difiere, lo hizo ese staff.
 function attendeeBookedBy(a: Attendee): string {
@@ -717,7 +705,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                 {/* Escribirle por WhatsApp. Importa sobre todo con las socias de
                     TotalPass: reservaron desde su app y el estudio no las conoce. */}
                 {(() => {
-                    const wa = enlaceWhatsApp(attendee, selectedClass);
+                    const wa = whatsAppDeAsistente(attendee, selectedClass);
                     if (!wa) return null;
                     return (
                         <Button

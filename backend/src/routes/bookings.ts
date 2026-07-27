@@ -67,6 +67,7 @@ router.get('/', authenticate, requireRole('admin', 'instructor', 'reception'), a
         b.booked_by,
         bb.display_name as booked_by_name,
         bb.role as booked_by_role,
+        b.channel,
         cb.display_name as checked_in_by_name,
         xb.display_name as cancelled_by_name,
         b.cancelled_at,
