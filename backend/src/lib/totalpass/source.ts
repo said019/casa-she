@@ -71,6 +71,23 @@ export interface TpImportSummary {
  * Solo toma los `confirmed`; rebana fecha (`slotDate.slice(0,10)`) y hora
  * (`startTime.slice(0,5)`) sin convertir zona; usa `event.title.trim()`.
  */
+/**
+ * Estados de slot que significan "la reserva EXISTIÓ y sigue siendo válida", aunque
+ * ya no sea reservable. Según los estados reales de TotalPass (ver TOTALPASS-OFICIAL
+ * §4): `confirmed` (viva), `expired` (la clase pasó sin que la usara) y `created`
+ * (recién hecha, pendiente de validar). Solo `canceled` y `denied` significan que la
+ * reserva se cayó.
+ *
+ * Esto importa para NO cancelar de más: antes la reconciliación armaba su lista de
+ * "slots presentes" únicamente con los `confirmed`, así que en cuanto TotalPass
+ * marcaba una reserva como `expired` (al pasar la clase) la reserva local se
+ * cancelaba sola. Se borraba el historial de asistencia de las socias de plataforma.
+ */
+export function esSlotVivo(status: unknown): boolean {
+    const s = String(status || '').toLowerCase();
+    return s !== 'canceled' && s !== 'cancelled' && s !== 'denied';
+}
+
 export function extractOfficialReservationRows(slots: TotalPassOfficialSlot[]): TotalPassImportRow[] {
     return (slots || [])
         .filter((slot) => String(slot.status || '').toLowerCase() === 'confirmed')
@@ -368,8 +385,16 @@ export async function syncTotalPassReservations(): Promise<TpSyncResult> {
     const summary = await importTotalPassReservations(rows);
 
     // ── Reconciliación de cancelaciones ──────────────────────────────────────
-    // presentSlotIds: slots CONFIRMADOS que siguen en el feed (= filas extraídas).
-    const presentSlotIds = new Set(rows.map((r) => r.sourceRef));
+    // presentSlotIds: slots que TotalPass sigue reconociendo como reserva válida.
+    // Ojo: NO son solo los `confirmed`. Un slot `expired` (la clase pasó y la socia
+    // no la usó) sigue siendo una reserva que existió, y cancelarlo borraría el
+    // historial. Solo `canceled`/`denied` cuentan como caídas.
+    const presentSlotIds = new Set(
+        (slots || [])
+            .filter((s) => esSlotVivo(s.status))
+            .map((s) => String(s._id))
+            .filter(Boolean),
+    );
     // readClassKeys: clases que el feed CUBRIÓ con certeza (cualquier estado de
     // slot). Si el feed devolvió algún slot de una clase, sabemos que la leyó;
     // así un slot que pasó a 'cancelled' en TP (no viene en presentSlotIds pero
