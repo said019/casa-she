@@ -57,7 +57,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/components/ui/use-toast';
 import {
     Loader2, ChevronLeft, ChevronRight, Calendar as CalendarIcon,
-    Plus, Minus, Repeat, Users, Trash2, Check, Edit, Phone, Clock, MapPin, Sparkles, X, RotateCcw, Lock, Unlock,
+    Plus, Minus, Repeat, Users, Trash2, Check, Edit, Phone, MessageCircle, Clock, MapPin, Sparkles, X, RotateCcw, Lock, Unlock,
     RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -126,6 +126,29 @@ interface Attendee {
     booked_by?: string | null;
     booked_by_name?: string | null;
     booked_by_role?: string | null;
+    /** 'app' | 'totalpass' | 'wellhub' | 'fitpass' — de dónde vino la reserva. */
+    channel?: string | null;
+}
+
+/**
+ * Enlace para escribirle por WhatsApp con el mensaje ya redactado. Se usa wa.me
+ * (abre WhatsApp Web o la app) en vez de mandar el mensaje desde el servidor:
+ * funciona siempre, y quien escribe es el estudio desde su propio número.
+ */
+function enlaceWhatsApp(attendee: Attendee, clase?: Class | null): string | null {
+    const digitos = (attendee.phone || '').replace(/\D/g, '');
+    if (digitos.length < 10) return null;
+    // 10 dígitos = número nacional: se le antepone la lada de México.
+    const conLada = digitos.length === 10 ? `52${digitos}` : digitos;
+    const nombre = (attendee.display_name || '').split(' ')[0] || '';
+    // La fecha se arma por partes (YYYY-MM-DD) para no correrse de día por zona horaria.
+    const dia = clase?.date ? clase.date.slice(0, 10).split('-').reverse().slice(0, 2).join('/') : '';
+    // Solo se menciona la clase si están los tres datos; a medias el mensaje sale raro.
+    const cuando = clase?.class_type_name && dia && clase.start_time
+        ? ` sobre tu clase de ${clase.class_type_name} del ${dia} a las ${formatClassTime(clase.start_time)}`
+        : '';
+    const texto = `Hola ${nombre}, te escribimos de Casa Shé${cuando}.`;
+    return `https://wa.me/${conLada}?text=${encodeURIComponent(texto)}`;
 }
 
 // "Reservó": si booked_by es la propia alumna (o null) se reservó sola; si difiere, lo hizo ese staff.
@@ -680,12 +703,36 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                         {mode === 'espera' && attendee.waitlist_position != null && (
                             <span className="font-medium text-balance-olive">#{attendee.waitlist_position} en espera</span>
                         )}
+                        {attendee.channel === 'totalpass' && (
+                            <Badge variant="outline" className="border-[#2A4E36]/40 text-[10px] text-[#2A4E36]">TotalPass</Badge>
+                        )}
                         {attendee.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{attendee.phone}</span>}
                     </div>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground/75">Reservó: {attendeeBookedBy(attendee)}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground/75">
+                        Reservó: {attendee.channel === 'totalpass' ? 'desde TotalPass' : attendeeBookedBy(attendee)}
+                    </p>
                 </div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
+                {/* Escribirle por WhatsApp. Importa sobre todo con las socias de
+                    TotalPass: reservaron desde su app y el estudio no las conoce. */}
+                {(() => {
+                    const wa = enlaceWhatsApp(attendee, selectedClass);
+                    if (!wa) return null;
+                    return (
+                        <Button
+                            asChild
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]"
+                            title={`Escribir a ${attendee.display_name} por WhatsApp`}
+                        >
+                            <a href={wa} target="_blank" rel="noopener noreferrer" aria-label={`Escribir a ${attendee.display_name} por WhatsApp`}>
+                                <MessageCircle className="h-4 w-4" />
+                            </a>
+                        </Button>
+                    );
+                })()}
                 {mode === 'reservado' && attendee.status === 'checked_in' && (
                     <>
                         <Badge className="bg-success"><Check className="mr-1 h-3 w-3" />Asistió</Badge>

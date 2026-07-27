@@ -1621,7 +1621,8 @@ router.get('/class/:classId', authenticate, requireRole('admin', 'instructor', '
                 m.id as membership_id, p.name as plan_name, b.is_free_booking,
                 b.booked_by,
                 bb.display_name as booked_by_name,
-                bb.role as booked_by_role
+                bb.role as booked_by_role,
+                b.channel
              FROM bookings b
              JOIN users u ON b.user_id = u.id
              LEFT JOIN users bb ON bb.id = b.booked_by
