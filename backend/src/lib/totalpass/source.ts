@@ -29,6 +29,7 @@ import type { PoolClient } from 'pg';
 import { pool, query, queryOne } from '../../config/database.js';
 import { localDateStr, addDaysToDateStr } from '../mx-time.js';
 import { findOrCreateGuest } from '../guestUser.js';
+import { avisarReservaTotalPass } from './alerta-admin.js';
 import {
     totalPassOfficialFromDb,
     isTotalPassRateLimit,
@@ -204,10 +205,18 @@ export async function importTotalPassReservations(rows: TotalPassImportRow[]): P
     for (const row of rows) {
         try {
             // (1) Empatar la clase Casa Shé por título + fecha + hora.
-            const cls = await queryOne<{ id: string; max_capacity: number; current_bookings: number }>(
-                `SELECT c.id, c.max_capacity, c.current_bookings
+            const cls = await queryOne<{
+                id: string;
+                max_capacity: number;
+                current_bookings: number;
+                instructor_name: string | null;
+            }>(
+                // El nombre del coach solo se usa para el aviso al estudio (LEFT JOIN:
+                // si faltara el instructor, el import no se cae).
+                `SELECT c.id, c.max_capacity, c.current_bookings, i.display_name AS instructor_name
                    FROM classes c
                    JOIN class_types ct ON ct.id = c.class_type_id
+                   LEFT JOIN instructors i ON i.id = c.instructor_id
                   WHERE ct.name = $1
                     AND c.date = $2::date
                     AND c.start_time::text LIKE $3
@@ -294,9 +303,20 @@ export async function importTotalPassReservations(rows: TotalPassImportRow[]): P
                     summary.alreadyExisted++;
                 } else {
                     summary.imported++;
-                    if (Number(capRow.current_bookings) >= Number(capRow.max_capacity)) {
+                    const sobrecupo = Number(capRow.current_bookings) >= Number(capRow.max_capacity);
+                    if (sobrecupo) {
                         summary.overbooked++;
                     }
+                    // Aviso al estudio. Va DESPUÉS del COMMIT y sin await: la reserva ya
+                    // está guardada y un fallo de WhatsApp/correo no debe afectar el import.
+                    void avisarReservaTotalPass({
+                        socia: row.displayName,
+                        clase: row.classTitle,
+                        fecha: row.date,
+                        hora: row.startTime,
+                        coach: cls.instructor_name ?? null,
+                        sobrecupo,
+                    });
                 }
             } catch (txErr) {
                 await client.query('ROLLBACK').catch(() => { /* noop */ });
