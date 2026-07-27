@@ -106,3 +106,24 @@ const emptyDecision = decideTotalPassCancellations([], new Set(), new Set());
 assert.deepEqual(emptyDecision, { toCancel: [], stillActive: 0, skipped: 0 });
 
 console.log('test-totalpass-import: OK');
+
+// ── esSlotVivo: qué estados de TotalPass NO deben cancelar la reserva local ───
+// Regresión del bug del 27-jul-2026: la reconciliación armaba "slots presentes"
+// solo con los `confirmed`, así que al pasar la clase TotalPass marcaba la reserva
+// como `expired` y nosotros la cancelábamos, borrando el historial de la socia.
+import { esSlotVivo } from '../src/lib/totalpass/source.js';
+
+// Siguen siendo reservas válidas (NO cancelar):
+assert.equal(esSlotVivo('confirmed'), true);
+assert.equal(esSlotVivo('expired'), true, 'expired = la clase pasó sin usarse, NO es cancelación');
+assert.equal(esSlotVivo('created'), true, 'created = recién hecha, pendiente de validar');
+// Sí se cayeron (cancelar):
+assert.equal(esSlotVivo('canceled'), false);
+assert.equal(esSlotVivo('cancelled'), false, 'tolerar la grafía con doble L');
+assert.equal(esSlotVivo('denied'), false);
+// Mayúsculas y basura
+assert.equal(esSlotVivo('EXPIRED'), true);
+assert.equal(esSlotVivo('CANCELED'), false);
+assert.equal(esSlotVivo(null), true, 'sin estado: se conserva, nunca se cancela por omisión');
+
+console.log('test-totalpass-import (esSlotVivo): OK');
