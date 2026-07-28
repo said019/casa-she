@@ -9,8 +9,21 @@ import {
 
 // ── isAllowedTpConfirmationHost ──────────────────────────────────────────────
 // Acepta EXACTAMENTE los hosts oficiales de TotalPass, en https.
+//
+// El host que TotalPass usa DE VERDAD en producción es el dominio raíz
+// `totalpass.com` — observado en 4 payloads reales. Este caso es el que se
+// rechazaba y tiraba los check-ins de las socias.
+assert.equal(isAllowedTpConfirmationHost('https://totalpass.com/api/v1/webhook_confirmations/abc123'), true);
 assert.equal(isAllowedTpConfirmationHost('https://admin.totalpass.com/api/v1/webhook_confirmations/abc123'), true);
 assert.equal(isAllowedTpConfirmationHost('https://admin.staging.totalpass.com/api/v1/webhook_confirmations/abc123'), true);
+
+// Agregar el dominio raíz NO debe volverse un comodín de subdominios: la
+// comparación es por igualdad exacta de hostname, no por sufijo.
+assert.equal(isAllowedTpConfirmationHost('https://cualquiera.totalpass.com/x'), false);
+assert.equal(isAllowedTpConfirmationHost('https://totalpass.com.evil.com/x'), false);
+assert.equal(isAllowedTpConfirmationHost('https://eviltotalpass.com/x'), false);
+assert.equal(isAllowedTpConfirmationHost('https://totalpass.com.mx/x'), false);
+assert.equal(isAllowedTpConfirmationHost('http://totalpass.com/x'), false);
 
 // Rechaza: protocolo no-https.
 assert.equal(isAllowedTpConfirmationHost('http://admin.totalpass.com/api/v1/webhook_confirmations/abc123'), false);

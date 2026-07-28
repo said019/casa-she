@@ -43,7 +43,22 @@ const totalPassCheckinLimiter = rateLimit({
 // Hosts oficiales de confirmación de check-in TotalPass. El `endpoint` que
 // manda el webhook es de un solo uso y expira rápido; solo llamamos si el host
 // es EXACTAMENTE uno de estos — nunca una URL arbitraria del payload.
-const TP_CONFIRMATION_ALLOWED_HOSTS = new Set(['admin.totalpass.com', 'admin.staging.totalpass.com']);
+//
+// `totalpass.com` (dominio raíz) es el que TotalPass usa DE VERDAD en producción:
+// https://totalpass.com/api/v1/webhook_confirmations/<TOKEN>. Faltaba, y por eso
+// TODOS los check-ins de socias se rechazaban con 400 y el estudio no cobraba
+// esas visitas. `admin.totalpass.com` venía copiado de la doc y nunca se validó
+// contra tráfico real (de hecho está detrás de AWS Verified Access: un POST de
+// partner nunca habría llegado a la app). Se deja por si acaso, junto a staging,
+// que sí es el host que aparece en la doc pública de TotalPass.
+//
+// OJO: la comparación es por igualdad EXACTA de hostname. Agregar el dominio
+// raíz no habilita subdominios ni sufijos parecidos — hay pruebas que lo fijan.
+const TP_CONFIRMATION_ALLOWED_HOSTS = new Set([
+    'totalpass.com',
+    'admin.totalpass.com',
+    'admin.staging.totalpass.com',
+]);
 
 /**
  * true SOLO si `rawUrl` es https, sin userinfo, y su hostname es EXACTAMENTE
