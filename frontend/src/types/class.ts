@@ -75,4 +75,6 @@ export interface Class {
     booking_closed?: boolean;
     category?: string;
     totalpass_spots?: number | null;
+    /** Cuántos de esos lugares ya ocupó TotalPass (para marcar la clase en la rejilla). */
+    totalpass_booked?: number;
 }

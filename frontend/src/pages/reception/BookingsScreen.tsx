@@ -24,13 +24,14 @@ import {
 import {
     CalendarDays, Plus, X, Loader2, Clock, User, AlertCircle, Search,
     ChevronLeft, ChevronRight, Users as UsersIcon, Check, CreditCard, Phone,
-    Lock, Unlock,
+    Lock, Unlock, MessageCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api, { getErrorMessage } from '@/lib/api';
 import { CancelBookingDialog } from '@/components/bookings/CancelBookingDialog';
 import { GuestBookingDialog } from '@/components/bookings/GuestBookingDialog';
 import { useFacilityScope } from '@/hooks/useFacilityScope';
+import { enlaceWhatsApp } from '@/lib/whatsapp';
 import { useIsElevated } from '@/hooks/useIsElevated';
 import { useAuthStore } from '@/stores/authStore';
 import SellPlanDialog from '@/components/memberships/SellPlanDialog';
@@ -57,6 +58,21 @@ interface ClassRow {
     status: string;
     booking_closed?: boolean;
     facility_name?: string | null;
+    /** Lugares de esta clase que ya ocupó TotalPass. */
+    totalpass_booked?: number;
+}
+
+// Punto verde de TotalPass en la tarjeta de la clase. Sin esto había que abrir
+// clase por clase para descubrir que llegó una socia desde su app.
+function MarcaTotalPass({ n }: { n: number }) {
+    if (!n) return null;
+    return (
+        <span
+            className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-[#2A4E36]"
+            title={`${n} ${n === 1 ? 'reserva' : 'reservas'} de TotalPass`}
+            aria-label={`${n} ${n === 1 ? 'reserva' : 'reservas'} de TotalPass`}
+        />
+    );
 }
 
 // Sucursal en formato corto para la etiqueta (quita el prefijo "Casa Shé")
@@ -135,6 +151,8 @@ interface BookingRow {
     booked_by?: string | null;
     booked_by_name?: string | null;
     booked_by_role?: string | null;
+    /** 'app' | 'totalpass' | ... — de dónde vino la reserva. */
+    channel?: string | null;
     // Trazabilidad — sucursal y quién agendó/check-in/canceló
     facility_name?: string | null;
     checked_in_by_name?: string | null;
@@ -143,8 +161,19 @@ interface BookingRow {
     cancellation_reason?: string | null;
 }
 
+const esTotalPass = (b: BookingRow) => b.channel === 'totalpass';
+
+const whatsAppDeReserva = (b: BookingRow) => enlaceWhatsApp({
+    telefono: b.user_phone,
+    nombre: b.user_name,
+    clase: b.class_name,
+    fecha: b.class_date,
+    hora: b.class_start_time ? trimTime(b.class_start_time) : null,
+});
+
 // "Reservó": si booked_by es la propia alumna (o null) se reservó sola; si difiere, lo hizo ese staff.
 function bookedByLabel(b: BookingRow): string {
+    if (esTotalPass(b)) return 'desde TotalPass';
     if (!b.booked_by || b.booked_by === b.user_id) return 'la alumna';
     const r = b.booked_by_role;
     const roleEs = r === 'reception' ? 'recepción' : (r === 'admin' || r === 'super_admin') ? 'admin' : r === 'instructor' ? 'coach' : (r || 'staff');
@@ -210,7 +239,10 @@ function ClassDetailDrawer({
         onError: (e) => toast.error(getErrorMessage(e)),
     });
 
-    const planLabel = (b: BookingRow) => b.is_free_booking ? 'Invitada' : (b.plan_name || 'Sin plan');
+    // Las socias de TotalPass nunca tienen plan de Casa Shé: marcarlas "Sin plan"
+    // (en ámbar, como una alerta) hacía pensar que algo estaba mal.
+    const planLabel = (b: BookingRow) =>
+        esTotalPass(b) ? 'TotalPass' : b.is_free_booking ? 'Invitada' : (b.plan_name || 'Sin plan');
 
     // Mini "Reservar a cliente" inline para esta clase específica
     const [clientSearch, setClientSearch] = useState('');
@@ -438,7 +470,9 @@ function ClassDetailDrawer({
                                                         ) : (
                                                             <div className="space-y-2">
                                                                 {active.map((b) => (
-                                                                    <div key={b.booking_id} className="flex items-center justify-between gap-2 p-2 rounded-md border bg-card">
+                                                                    /* En celular los botones bajan a su propia línea: si no, al nombre le
+                                                                       quedan ~60px de 290 y se lee "Montse…". En escritorio no cambia nada. */
+                                                                    <div key={b.booking_id} className="flex flex-col items-stretch gap-2 p-2 rounded-md border bg-card sm:flex-row sm:items-center sm:justify-between">
                                                                         <div className="min-w-0 flex-1">
                                                                             <p className="text-sm font-medium truncate">
                                                                                 {b.user_name}
@@ -458,19 +492,45 @@ function ClassDetailDrawer({
                                                                                     )}
                                                                                 </div>
                                                                             )}
-                                                                            <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                                                                            {/* div, no p: adentro van Badges (que son div) y anidarlos en <p> es HTML inválido.
+                                                                                flex-wrap en vez de truncate: en celular el plan y el teléfono
+                                                                                bajan a otra línea en lugar de quedar cortados a la mitad. */}
+                                                                            <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-1 gap-y-0.5">
                                                                                 <CreditCard className="h-3 w-3 shrink-0" />
                                                                                 {b.is_free_booking ? (
                                                                                     <Badge variant="outline" className="h-4 px-1.5 text-[10px] border-balance-gold/50 text-balance-gold">Invitada</Badge>
+                                                                                ) : esTotalPass(b) ? (
+                                                                                    <Badge variant="outline" className="h-4 px-1.5 text-[10px] border-[#2A4E36]/40 text-[#2A4E36]">TotalPass</Badge>
                                                                                 ) : (
                                                                                     <span className={b.plan_name ? '' : 'text-amber-600'}>{planLabel(b)}</span>
                                                                                 )}
                                                                                 {b.user_phone && (
                                                                                     <><Phone className="h-3 w-3 shrink-0 ml-1" /><span>{b.user_phone}</span></>
                                                                                 )}
-                                                                            </p>
+                                                                            </div>
                                                                             <p className="text-[11px] text-muted-foreground/75 truncate">Reservó: {bookedByLabel(b)}</p>
                                                                         </div>
+                                                                        {/* sm:contents = en escritorio este contenedor desaparece y los
+                                                                            botones vuelven a ser hijos directos de la fila (layout intacto);
+                                                                            en celular los mantiene juntos en un solo renglón. */}
+                                                                        <div className="flex items-center justify-end gap-1.5 sm:contents">
+                                                                        {/* Escribirle por WhatsApp: imprescindible con las socias de
+                                                                            TotalPass, que reservaron desde su app y el estudio no conoce. */}
+                                                                        {(() => {
+                                                                            const wa = whatsAppDeReserva(b);
+                                                                            if (!wa) return null;
+                                                                            return (
+                                                                                <Button
+                                                                                    asChild variant="ghost" size="icon"
+                                                                                    className="h-8 w-8 shrink-0 text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]"
+                                                                                    title={`Escribir a ${b.user_name} por WhatsApp`}
+                                                                                >
+                                                                                    <a href={wa} target="_blank" rel="noopener noreferrer" aria-label={`Escribir a ${b.user_name} por WhatsApp`}>
+                                                                                        <MessageCircle className="h-4 w-4" />
+                                                                                    </a>
+                                                                                </Button>
+                                                                            );
+                                                                        })()}
                                                                         {b.booking_status === 'checked_in' ? (
                                                                             <div className="flex items-center gap-1 shrink-0">
                                                                                 <Badge variant="outline" className="text-emerald-600 border-emerald-600">
@@ -508,6 +568,7 @@ function ClassDetailDrawer({
                                                                                 </Button>
                                                                             </div>
                                                                         )}
+                                                                        </div>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -898,6 +959,15 @@ function DayView({
                                 >
                                     {categoryLabel(c.category)}
                                 </span>
+                                {/* Aviso de que en esta clase hay gente de TotalPass, sin abrirla. */}
+                                {(c.totalpass_booked ?? 0) > 0 && (
+                                    <span
+                                        className="shrink-0 rounded-sm border border-[#2A4E36]/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#2A4E36]"
+                                        title={`${c.totalpass_booked} desde TotalPass`}
+                                    >
+                                        <span className="hidden sm:inline">TotalPass · </span>{c.totalpass_booked}
+                                    </span>
+                                )}
                                 <div className="text-right shrink-0 min-w-[64px]">
                                     <p className={`text-base font-semibold ${occTone}`}>{c.current_bookings}/{c.max_capacity}</p>
                                     <p className={`text-[11px] ${occTone}`}>{occ}%</p>
@@ -1009,7 +1079,10 @@ function WeekView({
                                             >
                                                 <div className="flex items-center justify-between gap-1">
                                                     <span className="font-mono tabular-nums font-semibold text-[12px]">{trimTime(c.start_time)}</span>
-                                                    <span className="text-[10px] text-muted-foreground">{c.current_bookings}/{c.max_capacity}</span>
+                                                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                                        <MarcaTotalPass n={c.totalpass_booked ?? 0} />
+                                                        {c.current_bookings}/{c.max_capacity}
+                                                    </span>
                                                 </div>
                                                 <div className="truncate font-medium">{c.class_type_name}</div>
                                                 <div className="text-[10px] text-muted-foreground truncate">

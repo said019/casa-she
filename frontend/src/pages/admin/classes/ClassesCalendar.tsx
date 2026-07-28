@@ -57,12 +57,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/components/ui/use-toast';
 import {
     Loader2, ChevronLeft, ChevronRight, Calendar as CalendarIcon,
-    Plus, Minus, Repeat, Users, Trash2, Check, Edit, Phone, Clock, MapPin, Sparkles, X, RotateCcw, Lock, Unlock,
+    Plus, Minus, Repeat, Users, Trash2, Check, Edit, Phone, MessageCircle, Clock, MapPin, Sparkles, X, RotateCcw, Lock, Unlock,
     RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { enlaceWhatsApp } from '@/lib/whatsapp';
 
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
@@ -126,7 +127,17 @@ interface Attendee {
     booked_by?: string | null;
     booked_by_name?: string | null;
     booked_by_role?: string | null;
+    /** 'app' | 'totalpass' | 'wellhub' | 'fitpass' — de dónde vino la reserva. */
+    channel?: string | null;
 }
+
+const whatsAppDeAsistente = (attendee: Attendee, clase?: Class | null) => enlaceWhatsApp({
+    telefono: attendee.phone,
+    nombre: attendee.display_name,
+    clase: clase?.class_type_name,
+    fecha: clase?.date,
+    hora: clase?.start_time ? formatClassTime(clase.start_time) : null,
+});
 
 // "Reservó": si booked_by es la propia alumna (o null) se reservó sola; si difiere, lo hizo ese staff.
 function attendeeBookedBy(a: Attendee): string {
@@ -680,12 +691,36 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                         {mode === 'espera' && attendee.waitlist_position != null && (
                             <span className="font-medium text-balance-olive">#{attendee.waitlist_position} en espera</span>
                         )}
+                        {attendee.channel === 'totalpass' && (
+                            <Badge variant="outline" className="border-[#2A4E36]/40 text-[10px] text-[#2A4E36]">TotalPass</Badge>
+                        )}
                         {attendee.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{attendee.phone}</span>}
                     </div>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground/75">Reservó: {attendeeBookedBy(attendee)}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground/75">
+                        Reservó: {attendee.channel === 'totalpass' ? 'desde TotalPass' : attendeeBookedBy(attendee)}
+                    </p>
                 </div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
+                {/* Escribirle por WhatsApp. Importa sobre todo con las socias de
+                    TotalPass: reservaron desde su app y el estudio no las conoce. */}
+                {(() => {
+                    const wa = whatsAppDeAsistente(attendee, selectedClass);
+                    if (!wa) return null;
+                    return (
+                        <Button
+                            asChild
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]"
+                            title={`Escribir a ${attendee.display_name} por WhatsApp`}
+                        >
+                            <a href={wa} target="_blank" rel="noopener noreferrer" aria-label={`Escribir a ${attendee.display_name} por WhatsApp`}>
+                                <MessageCircle className="h-4 w-4" />
+                            </a>
+                        </Button>
+                    );
+                })()}
                 {mode === 'reservado' && attendee.status === 'checked_in' && (
                     <>
                         <Badge className="bg-success"><Check className="mr-1 h-3 w-3" />Asistió</Badge>
@@ -2136,8 +2171,25 @@ function ClassEventCard({ item, onClick, mobile = false }: { item: Class; onClic
                 {capacity > 0 && (
                     <div className={mobile ? 'mt-4' : 'mt-2.5'}>
                         <div className="flex items-center justify-between gap-2 text-[10px] font-semibold text-balance-dark/70">
-                            <span>{full ? 'Cupo lleno' : nearly ? 'Últimos lugares' : 'Ocupación'}</span>
-                            <span className="tabular-nums text-balance-dark/68">{bookings}/{capacity}</span>
+                            {/* Con la marca de TotalPass presente, la palabra "Ocupación" no
+                                cabe y se cortaba a "Oc…"; como no aporta nada, se omite. */}
+                            <span className="truncate">
+                                {full ? 'Cupo lleno' : nearly ? 'Últimos lugares' : (item.totalpass_booked ?? 0) > 0 ? '' : 'Ocupación'}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-1">
+                                {/* Que se vea desde la rejilla que llegó gente por TotalPass:
+                                    antes la única señal era el contador de ocupación. Va aquí y
+                                    no junto al título porque la columna es angosta y lo aplastaba. */}
+                                {(item.totalpass_booked ?? 0) > 0 && !isCancelled && (
+                                    <span
+                                        className="inline-flex items-center gap-0.5 rounded-full border border-[#2A4E36]/35 bg-[#2A4E36]/10 px-1.5 text-[9px] font-semibold text-[#2A4E36]"
+                                        title={`${item.totalpass_booked} ${item.totalpass_booked === 1 ? 'reserva' : 'reservas'} de TotalPass`}
+                                    >
+                                        TP {item.totalpass_booked}
+                                    </span>
+                                )}
+                                <span className="tabular-nums text-balance-dark/68">{bookings}/{capacity}</span>
+                            </span>
                         </div>
                         <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-balance-dark/8" aria-hidden="true">
                             <div

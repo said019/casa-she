@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
     isAllowedTpConfirmationHost,
+    motivoRechazoConfirmacion,
     tpMatchCheckinToBookings,
     tpNormName,
     type TpBookingCandidate,
@@ -8,8 +9,21 @@ import {
 
 // ── isAllowedTpConfirmationHost ──────────────────────────────────────────────
 // Acepta EXACTAMENTE los hosts oficiales de TotalPass, en https.
+//
+// El host que TotalPass usa DE VERDAD en producción es el dominio raíz
+// `totalpass.com` — observado en 4 payloads reales. Este caso es el que se
+// rechazaba y tiraba los check-ins de las socias.
+assert.equal(isAllowedTpConfirmationHost('https://totalpass.com/api/v1/webhook_confirmations/abc123'), true);
 assert.equal(isAllowedTpConfirmationHost('https://admin.totalpass.com/api/v1/webhook_confirmations/abc123'), true);
 assert.equal(isAllowedTpConfirmationHost('https://admin.staging.totalpass.com/api/v1/webhook_confirmations/abc123'), true);
+
+// Agregar el dominio raíz NO debe volverse un comodín de subdominios: la
+// comparación es por igualdad exacta de hostname, no por sufijo.
+assert.equal(isAllowedTpConfirmationHost('https://cualquiera.totalpass.com/x'), false);
+assert.equal(isAllowedTpConfirmationHost('https://totalpass.com.evil.com/x'), false);
+assert.equal(isAllowedTpConfirmationHost('https://eviltotalpass.com/x'), false);
+assert.equal(isAllowedTpConfirmationHost('https://totalpass.com.mx/x'), false);
+assert.equal(isAllowedTpConfirmationHost('http://totalpass.com/x'), false);
 
 // Rechaza: protocolo no-https.
 assert.equal(isAllowedTpConfirmationHost('http://admin.totalpass.com/api/v1/webhook_confirmations/abc123'), false);
@@ -27,6 +41,37 @@ assert.equal(isAllowedTpConfirmationHost(''), false);
 assert.equal(isAllowedTpConfirmationHost('no-es-una-url'), false);
 
 console.log('isAllowedTpConfirmationHost: OK');
+
+// ── motivoRechazoConfirmacion ────────────────────────────────────────────────
+// Un check-in real de una socia se rechazó y no quedó rastro de POR QUÉ. Esta
+// función dice el motivo exacto (y el host) para poder diagnosticarlo sin
+// aflojar el guard anti-SSRF.
+assert.equal(motivoRechazoConfirmacion('https://admin.totalpass.com/api/v1/webhook_confirmations/abc').motivo, null);
+assert.equal(motivoRechazoConfirmacion(null).motivo, 'sin_endpoint');
+assert.equal(motivoRechazoConfirmacion('').motivo, 'sin_endpoint');
+assert.equal(motivoRechazoConfirmacion('no-es-una-url').motivo, 'url_invalida');
+assert.equal(motivoRechazoConfirmacion('http://admin.totalpass.com/x').motivo, 'no_https');
+assert.equal(motivoRechazoConfirmacion('https://user:pass@admin.totalpass.com/x').motivo, 'con_credenciales');
+
+// El caso que importa: host distinto al esperado. Debe decir CUÁL era.
+const ajeno = motivoRechazoConfirmacion('https://admin.totalpass.com.mx/api/v1/webhook_confirmations/abc');
+assert.equal(ajeno.motivo, 'host_no_permitido');
+assert.equal(ajeno.host, 'admin.totalpass.com.mx');
+
+// Coincide siempre con el guard: lo que el guard acepta, aquí no tiene motivo.
+for (const u of [
+    'https://admin.totalpass.com/x', 'https://admin.staging.totalpass.com/x',
+    'http://admin.totalpass.com/x', 'https://evil.com/x', 'https://admin.totalpass.com@evil.com/x',
+    'https://169.254.169.254/x', '', 'no-es-una-url',
+]) {
+    assert.equal(
+        motivoRechazoConfirmacion(u).motivo === null,
+        isAllowedTpConfirmationHost(u),
+        `motivo y guard discrepan en "${u}"`,
+    );
+}
+
+console.log('motivoRechazoConfirmacion: OK');
 
 // ── tpNormName ────────────────────────────────────────────────────────────────
 assert.equal(tpNormName('  Ana María Pérez  '), 'ana maria perez');
