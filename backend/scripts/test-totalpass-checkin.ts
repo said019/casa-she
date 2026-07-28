@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
     isAllowedTpConfirmationHost,
+    motivoRechazoConfirmacion,
     tpMatchCheckinToBookings,
     tpNormName,
     type TpBookingCandidate,
@@ -27,6 +28,37 @@ assert.equal(isAllowedTpConfirmationHost(''), false);
 assert.equal(isAllowedTpConfirmationHost('no-es-una-url'), false);
 
 console.log('isAllowedTpConfirmationHost: OK');
+
+// ── motivoRechazoConfirmacion ────────────────────────────────────────────────
+// Un check-in real de una socia se rechazó y no quedó rastro de POR QUÉ. Esta
+// función dice el motivo exacto (y el host) para poder diagnosticarlo sin
+// aflojar el guard anti-SSRF.
+assert.equal(motivoRechazoConfirmacion('https://admin.totalpass.com/api/v1/webhook_confirmations/abc').motivo, null);
+assert.equal(motivoRechazoConfirmacion(null).motivo, 'sin_endpoint');
+assert.equal(motivoRechazoConfirmacion('').motivo, 'sin_endpoint');
+assert.equal(motivoRechazoConfirmacion('no-es-una-url').motivo, 'url_invalida');
+assert.equal(motivoRechazoConfirmacion('http://admin.totalpass.com/x').motivo, 'no_https');
+assert.equal(motivoRechazoConfirmacion('https://user:pass@admin.totalpass.com/x').motivo, 'con_credenciales');
+
+// El caso que importa: host distinto al esperado. Debe decir CUÁL era.
+const ajeno = motivoRechazoConfirmacion('https://admin.totalpass.com.mx/api/v1/webhook_confirmations/abc');
+assert.equal(ajeno.motivo, 'host_no_permitido');
+assert.equal(ajeno.host, 'admin.totalpass.com.mx');
+
+// Coincide siempre con el guard: lo que el guard acepta, aquí no tiene motivo.
+for (const u of [
+    'https://admin.totalpass.com/x', 'https://admin.staging.totalpass.com/x',
+    'http://admin.totalpass.com/x', 'https://evil.com/x', 'https://admin.totalpass.com@evil.com/x',
+    'https://169.254.169.254/x', '', 'no-es-una-url',
+]) {
+    assert.equal(
+        motivoRechazoConfirmacion(u).motivo === null,
+        isAllowedTpConfirmationHost(u),
+        `motivo y guard discrepan en "${u}"`,
+    );
+}
+
+console.log('motivoRechazoConfirmacion: OK');
 
 // ── tpNormName ────────────────────────────────────────────────────────────────
 assert.equal(tpNormName('  Ana María Pérez  '), 'ana maria perez');

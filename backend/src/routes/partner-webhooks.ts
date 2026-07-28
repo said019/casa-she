@@ -63,6 +63,31 @@ export function isAllowedTpConfirmationHost(rawUrl: string): boolean {
     return TP_CONFIRMATION_ALLOWED_HOSTS.has(url.hostname);
 }
 
+/**
+ * Explica POR QUÉ se rechazó una URL de confirmación, sin aflojar el guard.
+ *
+ * Nació de un caso real: una socia hizo check-in, TotalPass nos mandó el evento
+ * y lo rechazamos con 400 — pero la rama de rechazo no guardaba nada, así que no
+ * quedó forma de saber si faltó el `endpoint`, si venía por http, o si el host
+ * era otro (y cuál). Sin ese dato no se puede arreglar sin adivinar, y adivinar
+ * en una allowlist anti-SSRF es justo lo que no se debe hacer.
+ *
+ * `motivo` null = la URL pasa el guard. PURA — sin red.
+ */
+export function motivoRechazoConfirmacion(rawUrl: string | null | undefined): { motivo: string | null; host: string | null } {
+    if (!rawUrl || !String(rawUrl).trim()) return { motivo: 'sin_endpoint', host: null };
+    let url: URL;
+    try {
+        url = new URL(String(rawUrl));
+    } catch {
+        return { motivo: 'url_invalida', host: null };
+    }
+    if (url.username || url.password) return { motivo: 'con_credenciales', host: url.hostname };
+    if (url.protocol !== 'https:') return { motivo: 'no_https', host: url.hostname };
+    if (!TP_CONFIRMATION_ALLOWED_HOSTS.has(url.hostname)) return { motivo: 'host_no_permitido', host: url.hostname };
+    return { motivo: null, host: url.hostname };
+}
+
 // ── Match de asistencia (funciones puras) ────────────────────────────────────
 
 export interface TpCheckinIdentity {
@@ -365,7 +390,16 @@ router.post('/totalpass/checkin', totalPassCheckinLimiter, async (req: Request, 
     try {
         // Guard anti-SSRF: sin esto, NO se hace el POST de confirmación.
         if (!rawEndpoint || !isAllowedTpConfirmationHost(rawEndpoint)) {
-            console.error(`[tp-checkin] endpoint de confirmación ausente o no permitido: ${JSON.stringify(rawEndpoint)}`);
+            // Se deja rastro del MOTIVO y del host. Antes esta rama devolvía 400 y
+            // no guardaba nada: un check-in real de una socia se perdió sin que
+            // quedara forma de saber por qué (ni de que el estudio se enterara).
+            const { motivo, host } = motivoRechazoConfirmacion(rawEndpoint);
+            console.error(`[tp-checkin] confirmación rechazada para ${who} — motivo=${motivo} host=${host ?? '—'} endpoint=${JSON.stringify(rawEndpoint)}`);
+            await upsertCheckinRecord({
+                eventId, bookingId: null, userId: null, classId: null, externalRef: null,
+                status: 'failed', payload,
+                platformResponse: { rechazado: true, motivo, host, endpoint: rawEndpoint ?? null },
+            }).catch((e) => console.error('[tp-checkin] error registrando checkin rechazado:', e));
             await finalizeProcessedEvent(eventId, 400).catch(() => { /* best-effort */ });
             return res.status(400).json({ ok: false, error: 'invalid_confirmation_endpoint' });
         }
