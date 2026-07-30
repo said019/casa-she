@@ -1196,6 +1196,36 @@ router.get('/', requireRole('admin', 'super_admin', 'reception'), async (req: Re
 // ============================================
 // DELETE /api/users/:id - Delete user account
 // ============================================
+async function anonymizeDeletedUser(id: string): Promise<void> {
+    const suffix = id.replace(/-/g, '').toLowerCase();
+    const deletedEmail = `deleted+${suffix}@deleted.invalid`;
+    const deletedPhone = `del${suffix.slice(0, 17)}`;
+    const invalidPasswordHash = await bcrypt.hash(randomBytes(32).toString('hex'), 12);
+
+    await query(
+        `UPDATE users
+            SET email = $2,
+                phone = $3,
+                display_name = 'Usuario eliminado',
+                photo_url = NULL,
+                emergency_contact_name = NULL,
+                emergency_contact_phone = NULL,
+                health_notes = NULL,
+                accepts_communications = false,
+                date_of_birth = NULL,
+                receive_reminders = false,
+                receive_promotions = false,
+                receive_weekly_summary = false,
+                firebase_uid = NULL,
+                password_hash = $4,
+                temp_password = false,
+                is_active = false,
+                updated_at = NOW()
+          WHERE id = $1`,
+        [id, deletedEmail, deletedPhone, invalidPasswordHash]
+    );
+}
+
 router.delete('/:id', async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
@@ -1286,13 +1316,10 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
             if (blockingRefs.length > 0) {
                 await client.query('ROLLBACK');
-                await query(
-                    'UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1',
-                    [id]
-                );
+                await anonymizeDeletedUser(id);
                 return res.json({
-                    message: 'No se pudo borrar permanentemente: el usuario tiene registros con referencias obligatorias (notas/historial); se desactivó en su lugar.',
-                    type: 'soft_delete',
+                    message: 'Los datos personales fueron eliminados. Se conservó únicamente un registro anónimo para mantener el historial.',
+                    type: 'anonymized_delete',
                     blocked_by: blockingRefs.map((r) => `${r.table}.${r.col}`),
                 });
             }
@@ -1316,16 +1343,14 @@ router.delete('/:id', async (req: Request, res: Response) => {
         } catch (err: any) {
             try { await client.query('ROLLBACK'); } catch { /* noop */ }
 
-            // FK violation we can't resolve — fall back to soft delete with clear message.
+            // FK violation we can't resolve — remove personal data while preserving
+            // the anonymous row required by historical records.
             if (err?.code === '23503') {
-                console.error('Hard delete blocked by FK, falling back to soft delete:', err.detail || err);
-                await query(
-                    'UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1',
-                    [id]
-                );
+                console.error('Hard delete blocked by FK, falling back to anonymization:', err.detail || err);
+                await anonymizeDeletedUser(id);
                 return res.json({
-                    message: 'No se pudo borrar permanentemente por datos relacionados; se desactivó el usuario en su lugar.',
-                    type: 'soft_delete',
+                    message: 'Los datos personales fueron eliminados. Se conservó únicamente un registro anónimo para mantener el historial.',
+                    type: 'anonymized_delete',
                     detail: err.detail || null,
                 });
             }
