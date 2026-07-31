@@ -129,6 +129,10 @@ function normalizePlanText(value: string) {
     .replace(/[̀-ͯ]/g, '');
 }
 
+export function isSalsaPlan(plan: PlanPresentationInput) {
+  return normalizePlanText(plan.name).includes('salsa');
+}
+
 export function getPackageType(plan: PlanPresentationInput): PackageType {
   const name = normalizePlanText(plan.name);
   const category = normalizePlanText(plan.category || '');

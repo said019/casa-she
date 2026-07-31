@@ -21,6 +21,7 @@ import {
   getClassesLabel,
   getPackagePresentation,
   getPackageType,
+  isSalsaPlan,
   packageOrder,
   packagePresentations,
 } from '@/lib/planPresentation';
@@ -47,6 +48,8 @@ interface Plan {
   price: number;
   duration_days: number;
   class_limit: number | null;
+  reformer_credits?: number | null;
+  multi_credits?: number | null;
   description: string | null;
   is_active: boolean;
   is_internal?: boolean;
@@ -127,6 +130,7 @@ export default function Checkout() {
   const queryClient = useQueryClient();
 
   const preselectedPlanId = searchParams.get('plan');
+  const bookingClassId = searchParams.get('classId');
 
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(preselectedPlanId);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<OrderPaymentMethod>('bank_transfer');
@@ -163,6 +167,18 @@ export default function Checkout() {
       return res.data.filter((p: Plan) => p.is_active && !p.is_internal).sort((a: Plan, b: Plan) => (a.sort_order || 0) - (b.sort_order || 0));
     },
   });
+
+  const { data: bookingClass, isLoading: bookingClassLoading } = useQuery<{
+    class_type_name?: string;
+    class_category?: 'reformer' | 'multi';
+  }>({
+    queryKey: ['checkout-class-requirement', bookingClassId],
+    queryFn: async () => (await api.get(`/classes/${bookingClassId}`)).data,
+    enabled: Boolean(bookingClassId),
+  });
+  const requiresSalsaPlan =
+    bookingClass?.class_category === 'reformer' ||
+    bookingClass?.class_type_name?.toLowerCase() === 'salsa';
 
   // Fetch user membership status 
   // We need to know if they have an active "membership_fee" plan
@@ -266,6 +282,10 @@ export default function Checkout() {
   const selectedPlan = plans?.find(p => p.id === selectedPlanId);
   const visiblePlans = (plans || []).filter((plan) => {
     if (isMembershipFeePlan(plan) && hasActiveMembershipFee) return false;
+    if (requiresSalsaPlan) {
+      const salsaCredits = plan.reformer_credits;
+      return isSalsaPlan(plan) && (salsaCredits === null || Number(salsaCredits) > 0);
+    }
     return true;
   });
   const groupedPlans = packageOrder
@@ -275,6 +295,15 @@ export default function Checkout() {
     }))
     .filter((group) => group.plans.length > 0);
   const needsStudio = !!selectedPlan?.requires_studio_selection;
+
+  useEffect(() => {
+    if (!requiresSalsaPlan || !selectedPlanId || !plans?.length) return;
+    const selected = plans.find((plan) => plan.id === selectedPlanId);
+    if (selected && !isSalsaPlan(selected)) {
+      setSelectedPlanId(null);
+      setStep('plan');
+    }
+  }, [plans, requiresSalsaPlan, selectedPlanId]);
 
   const handlePlanSelect = (planId: string) => {
     setSelectedPlanId(planId);
@@ -409,12 +438,14 @@ export default function Checkout() {
             </Button>
             <div>
               <h1 className="text-3xl font-semibold tracking-[-0.04em] text-balance-dark sm:text-4xl">
-                {step === 'plan' && 'Elige tu forma de moverte'}
+                {step === 'plan' && (requiresSalsaPlan ? 'Elige tu opción de Salsa' : 'Elige tu forma de moverte')}
                 {step === 'payment' && 'Pago tranquilo'}
                 {step === 'confirm' && 'Confirmar orden'}
               </h1>
               <p className="mt-1 text-sm text-balance-dark/62">
-                {step === 'plan' && 'Elige el paquete que va contigo.'}
+                {step === 'plan' && (requiresSalsaPlan
+                  ? 'Para reservar esta clase sólo aplican Clase de Salsa o Paquete de Salsa.'
+                  : 'Elige el paquete que va contigo.')}
                 {step === 'payment' && 'Elige el método que te quede más cómodo.'}
                 {step === 'confirm' && 'Revisa los detalles de tu compra'}
               </p>
@@ -433,7 +464,7 @@ export default function Checkout() {
           {/* Step 1: Select Plan */}
           {step === 'plan' && (
             <div>
-              {plansLoading ? (
+              {plansLoading || (Boolean(bookingClassId) && bookingClassLoading) ? (
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                   {[0, 1, 2].map((i) => (
                     <Skeleton key={i} className="h-[26rem] w-full rounded-2xl" />

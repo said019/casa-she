@@ -291,7 +291,13 @@ router.post('/bulk-month', authenticate, requireRole('admin'), async (req: Reque
         let membership: any = null;
         if (membershipId) {
             const { rows } = await client.query(
-                `SELECT * FROM memberships WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+                `SELECT m.*,
+                        p.reformer_credits AS plan_reformer_credits,
+                        p.multi_credits AS plan_multi_credits
+                   FROM memberships m
+                   JOIN plans p ON p.id = m.plan_id
+                  WHERE m.id = $1 AND m.user_id = $2
+                  FOR UPDATE OF m`,
                 [membershipId, userId]
             );
             membership = rows[0] || null;
@@ -303,11 +309,16 @@ router.post('/bulk-month', authenticate, requireRole('admin'), async (req: Reque
             // memberships are studio-eligible (matches prior bulk behavior).
             const { rows } = await client.query(
                 `SELECT m.*,
+                        p.reformer_credits AS plan_reformer_credits,
+                        p.multi_credits AS plan_multi_credits,
                         COALESCE(m.facility_id, o.facility_id) AS bound_facility_id
                  FROM memberships m
+                 JOIN plans p ON p.id = m.plan_id
                  LEFT JOIN orders o ON o.id = m.order_id
                  WHERE m.user_id = $1 AND m.status = 'active'
                    AND (m.${bulkCatCol} IS NULL OR m.${bulkCatCol} >= $2)
+                   AND (p.${bulkCategory === 'reformer' ? 'reformer_credits' : 'multi_credits'} IS NULL
+                        OR p.${bulkCategory === 'reformer' ? 'reformer_credits' : 'multi_credits'} >= $2)
                  FOR UPDATE OF m`,
                 [userId, targetClasses.length]
             );
@@ -315,6 +326,8 @@ router.post('/bulk-month', authenticate, requireRole('admin'), async (req: Reque
                 id: r.id,
                 reformer_remaining: r.reformer_remaining ?? null,
                 multi_remaining: r.multi_remaining ?? null,
+                plan_reformer_credits: r.plan_reformer_credits,
+                plan_multi_credits: r.plan_multi_credits,
                 end_date: r.end_date ? new Date(r.end_date).toISOString() : null,
                 created_at: new Date(r.created_at).toISOString(),
                 bound_facility_id: r.bound_facility_id ?? null,
@@ -326,6 +339,18 @@ router.post('/bulk-month', authenticate, requireRole('admin'), async (req: Reque
         if (!membership) {
             await client.query('ROLLBACK');
             return res.status(400).json({ error: 'No se encontró una membresía válida con suficientes créditos para las clases seleccionadas.' });
+        }
+
+        const bulkPlanCatCredits = membership[
+            bulkCategory === 'reformer' ? 'plan_reformer_credits' : 'plan_multi_credits'
+        ];
+        if (bulkPlanCatCredits !== null && bulkPlanCatCredits < targetClasses.length) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                error: bulkCategory === 'reformer'
+                    ? 'Estas clases requieren un paquete de Salsa con suficientes créditos.'
+                    : 'El paquete seleccionado no incluye suficientes créditos para estas clases.'
+            });
         }
 
         // Vigencia: el dueño quiere bloquear reservas en clases posteriores al vencimiento
@@ -688,9 +713,12 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                 if (membershipId) {
                     // Explicit membership: validate ownership, status, credits, studio.
                     const membershipRes = await client.query(
-                        `SELECT m.*, COALESCE(m.facility_id, o.facility_id) AS bound_facility_id,
+                        `SELECT m.*,
+                                p.reformer_credits, p.multi_credits,
+                                COALESCE(m.facility_id, o.facility_id) AS bound_facility_id,
                                 f.name AS bound_facility_name
                          FROM memberships m
+                         JOIN plans p ON p.id = m.plan_id
                          LEFT JOIN orders o ON o.id = m.order_id
                          LEFT JOIN facilities f ON f.id = COALESCE(m.facility_id, o.facility_id)
                          WHERE m.id = $1 AND m.user_id = $2`,
@@ -721,12 +749,19 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                     }
                     const cat: 'reformer' | 'multi' = classDetails.class_category;
                     const catCol = cat === 'reformer' ? 'reformer_remaining' : 'multi_remaining';
+                    const planCatCol = cat === 'reformer' ? 'reformer_credits' : 'multi_credits';
                     const catRemaining = membership[catCol];
-                    if (catRemaining !== null && catRemaining <= 0) {
+                    const planCatCredits = membership[planCatCol];
+                    if (
+                        (planCatCredits !== null && planCatCredits <= 0) ||
+                        (catRemaining !== null && catRemaining <= 0)
+                    ) {
                         await client.query('ROLLBACK');
                         releaseClient();
                         return res.status(403).json({
-                            error: `Tu membresía no incluye clases de ${cat === 'reformer' ? 'Salsa' : 'Clases'} o ya no te quedan créditos.`,
+                            error: cat === 'reformer'
+                                ? 'Esta clase requiere un crédito de Salsa. Elige Clase de Salsa o Paquete de Salsa.'
+                                : 'Tu membresía no incluye esta clase o ya no te quedan créditos.',
                             code: 'NEEDS_PURCHASE',
                         });
                     }
@@ -757,7 +792,9 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                         await client.query('ROLLBACK');
                         releaseClient();
                         return res.status(400).json({
-                            error: 'No tienes una membresía válida con créditos para una clase en este estudio.',
+                            error: classDetails.class_category === 'reformer'
+                                ? 'Esta clase requiere un crédito de Salsa. Elige Clase de Salsa o Paquete de Salsa.'
+                                : 'No tienes una membresía válida con créditos para una clase en este estudio.',
                             code: 'NEEDS_PURCHASE',
                         });
                     }
