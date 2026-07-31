@@ -15,6 +15,7 @@ import { selectMembershipForBooking, toDbClient, pickBestMembership } from '../l
 import { awardCheckinPoints } from '../lib/loyalty.js';
 import { joinWaitlist, waitlistOffer, compactWaitlist, promoteNextFromWaitlist } from '../lib/waitlist.js';
 import { cdmxWallClockToUtc } from '../lib/schedule.js';
+import { sendAdminBookingAlert } from '../lib/admin-booking-alert.js';
 
 const router = Router();
 
@@ -819,7 +820,8 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
 
         // Note: trigger_update_booking_count updates the classes table count automatically.
 
-        // Send booking confirmation (WhatsApp + email) — async, don't block response
+        // Send client confirmation and the studio's internal alert without blocking
+        // or rolling back the booking if either notification channel fails.
         try {
             const notifSettings = await queryOne(
                 "SELECT value FROM system_settings WHERE key = 'notification_settings'"
@@ -832,28 +834,28 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
             );
             const cancelHours = Number(cancelPolicy?.value?.min_hours ?? 4);
 
-            if (shouldSend) {
-                const user = await queryOne<{ display_name: string; phone: string; email: string }>(
-                    'SELECT display_name, phone, email FROM users WHERE id = $1',
-                    [userId]
-                );
-                const classInfo = await queryOne<any>(`
-                    SELECT ct.name as class_name, c.date, c.start_time, c.end_time,
-                           i.display_name as instructor_name,
-                           f.name as facility_name
-                    FROM classes c
-                    JOIN class_types ct ON c.class_type_id = ct.id
-                    JOIN instructors i ON c.instructor_id = i.id
-                    LEFT JOIN facilities f ON c.facility_id = f.id
-                    WHERE c.id = $1
-                `, [classId]);
+            const user = await queryOne<{ display_name: string; phone: string; email: string }>(
+                'SELECT display_name, phone, email FROM users WHERE id = $1',
+                [userId]
+            );
+            const classInfo = await queryOne<any>(`
+                SELECT ct.name as class_name, c.date, c.start_time, c.end_time,
+                       i.display_name as instructor_name,
+                       f.name as facility_name
+                FROM classes c
+                JOIN class_types ct ON c.class_type_id = ct.id
+                LEFT JOIN instructors i ON c.instructor_id = i.id
+                LEFT JOIN facilities f ON c.facility_id = f.id
+                WHERE c.id = $1
+            `, [classId]);
 
-                if (classInfo) {
-                    const isoDate = classInfo.date instanceof Date
-                        ? `${classInfo.date.getUTCFullYear()}-${String(classInfo.date.getUTCMonth()+1).padStart(2,'0')}-${String(classInfo.date.getUTCDate()).padStart(2,'0')}`
-                        : String(classInfo.date).split('T')[0];
-                    const startHm = classInfo.start_time?.substring(0, 5);
+            if (classInfo) {
+                const isoDate = classInfo.date instanceof Date
+                    ? `${classInfo.date.getUTCFullYear()}-${String(classInfo.date.getUTCMonth()+1).padStart(2,'0')}-${String(classInfo.date.getUTCDate()).padStart(2,'0')}`
+                    : String(classInfo.date).split('T')[0];
+                const startHm = classInfo.start_time?.substring(0, 5);
 
+                if (shouldSend) {
                     if (user?.phone) {
                         const classDateEs = new Date(isoDate + 'T00:00:00').toLocaleDateString('es-MX');
                         sendBookingConfirmation(
@@ -880,9 +882,20 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                         }).catch(err => console.error('[email] booking confirmation:', err));
                     }
                 }
+
+                if (user) {
+                    void sendAdminBookingAlert({
+                        clientName: user.display_name || 'Cliente',
+                        className: classInfo.class_name,
+                        date: isoDate,
+                        time: startHm,
+                        instructorName: classInfo.instructor_name || null,
+                        facilityName: classInfo.facility_name || null,
+                    });
+                }
             }
         } catch (notifErr) {
-            console.error('[notifications] booking confirm non-blocking error:', notifErr);
+            console.error('[notifications] booking notification non-blocking error:', notifErr);
         }
 
         // Update Apple + Google Wallet passes (credits changed)

@@ -13,7 +13,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
     ArrowRight,
-    Cake,
     Eye,
     EyeOff,
     Loader2,
@@ -31,7 +30,6 @@ const registerSchema = z.object({
     phone: z
         .string()
         .regex(/^\+52[0-9]{10}$/, 'Formato: +52 seguido de 10 dígitos'),
-    dateOfBirth: z.string().optional().or(z.literal('')),
     password: z
         .string()
         .min(8, 'Mínimo 8 caracteres')
@@ -117,7 +115,6 @@ export default function Register() {
                 password: data.password,
                 displayName: data.displayName,
                 phone: data.phone,
-                dateOfBirth: data.dateOfBirth || undefined,
                 acceptsTerms: data.acceptsTerms,
                 acceptsCommunications: data.acceptsCommunications,
                 referralCode: data.referralCode || undefined,
@@ -206,20 +203,6 @@ export default function Register() {
                         {errors.phone && (
                             <p className="text-sm text-destructive">{errors.phone.message}</p>
                         )}
-                    </motion.div>
-
-                    <motion.div {...fieldMotion} transition={{ duration: 0.28, delay: 0.16, ease: easeOut }} className="space-y-2">
-                        <Label htmlFor="dateOfBirth">Fecha de nacimiento</Label>
-                        <div className="relative">
-                            <Cake className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-bmb-dark/40" />
-                            <Input
-                                id="dateOfBirth"
-                                type="date"
-                                className={fieldClass}
-                                {...register('dateOfBirth')}
-                                disabled={isLoading}
-                            />
-                        </div>
                     </motion.div>
 
                     <motion.div {...fieldMotion} transition={{ duration: 0.28, delay: 0.2, ease: easeOut }} className="space-y-2">
