@@ -14,6 +14,7 @@
  */
 import { query, queryOne, pool } from '../src/config/database.js';
 import { cancelClassOnTotalpass, publishTotalPassIndividualClasses } from '../src/lib/totalpass/publish.js';
+import { localDateStr, addDaysToDateStr } from '../src/lib/mx-time.js';
 
 const APLICAR = process.argv.includes('--aplicar');
 
@@ -115,10 +116,15 @@ async function main() {
     log(APLICAR ? '  APLICANDO EL HORARIO (escribe en producción)' : '  SIMULACIÓN — no se escribe nada (usa --aplicar para ejecutar)');
     log('='.repeat(66));
 
-    const hoy = (await queryOne<{ d: string }>(`SELECT CURRENT_DATE::text AS d`))!.d;
+    // La fecha sale de la hora del ESTUDIO, no del reloj del servidor. Railway
+    // corre en UTC: a las 8 pm de CDMX el servidor ya está en el día siguiente,
+    // así que `CURRENT_DATE` decía "5 de agosto" cuando en el estudio todavía
+    // era 4. Con eso, el script se saltaba un día entero del horario nuevo.
+    const hoy = localDateStr();
     const sucursal = await queryOne<{ id: string; name: string }>(`SELECT id, name FROM facilities ORDER BY created_at LIMIT 1`);
     if (!sucursal) throw new Error('No hay sucursal configurada');
-    log(`\nHoy: ${hoy} · Sucursal: ${sucursal.name}`);
+    const utc = (await queryOne<{ d: string }>(`SELECT CURRENT_DATE::text AS d`))!.d;
+    log(`\nHoy en el estudio: ${hoy}${utc !== hoy ? `  (el servidor en UTC ya va en ${utc})` : ''} · Sucursal: ${sucursal.name}`);
 
     // ── 1. Catálogo: tipos de clase ──────────────────────────────────────────
     const tiposUsados = [...new Set(HORARIO.map((h) => h.clase))];
@@ -200,8 +206,10 @@ async function main() {
     }
 
     // ── 4. Calendario, de mañana en adelante ─────────────────────────────────
-    const desde = (await queryOne<{ d: string }>(`SELECT (CURRENT_DATE + 1)::text AS d`))!.d;
-    const hasta = (await queryOne<{ d: string }>(`SELECT COALESCE(max(date), CURRENT_DATE)::text AS d FROM classes WHERE date >= CURRENT_DATE`))!.d;
+    const desde = addDaysToDateStr(hoy, 1);
+    const hasta = (await queryOne<{ d: string }>(
+        `SELECT COALESCE(max(date), $1::date)::text AS d FROM classes WHERE date >= $1::date`, [hoy],
+    ))!.d;
     log(`\n4. CALENDARIO — de ${desde} a ${hasta} (hoy y el pasado NO se tocan)`);
 
     const actuales = await query<any>(
