@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CreditCard,
   Dumbbell,
+  Globe,
   Instagram,
   Mail,
   MapPin,
@@ -139,6 +140,10 @@ export default function BioLink() {
                 iban las dos a /#contacto — un ancla que la landing ni siquiera
                 tiene (sus secciones son inicio, paquetes, servicios, estudio,
                 equipo, horario, bar, nosotras), así que ambas caían al inicio. */}
+            {/* Página web primero: desde que la raíz es esta página, sin esta
+                tarjeta no quedaba forma de llegar al sitio completo. Va arriba,
+                pero en estilo normal — la reserva sigue siendo la destacada. */}
+            <BioAction to="/landing" label="Página web" detail="Conoce todo Casa Shé" icon={Globe} />
             <BioAction to="/bio/reservar" label="Reserva tu clase" detail="Elige, paga y confirma en pocos pasos" primary icon={CalendarDays} />
             <BioAction to="/bio/horarios" label="Horarios" detail="Clases reales de esta semana" icon={CalendarDays} />
             <BioAction to="/bio/paquetes" label="Paquetes" detail="Membresías y créditos" icon={Dumbbell} />

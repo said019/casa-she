@@ -24,6 +24,21 @@ export interface AvisoReservaTotalPass {
     coach?: string | null;
     /** true si entró por encima del cupo físico de la clase. */
     sobrecupo?: boolean;
+    /** De dónde vino la reserva. 'totalpass' por defecto (de ahí nació este aviso). */
+    origen?: 'totalpass' | 'app' | 'recepcion';
+}
+
+/**
+ * Destinatarios del aviso. `ADMIN_ALERT_WHATSAPP` acepta VARIOS números
+ * separados por coma: el estudio tiene dos administradoras y con un solo
+ * destinatario la otra nunca se enteraba.
+ *   ADMIN_ALERT_WHATSAPP="+525538861972,+525541822309"
+ */
+export function destinatariosWhatsApp(valor = process.env.ADMIN_ALERT_WHATSAPP): string[] {
+    return String(valor || '')
+        .split(/[,;]/)
+        .map((t) => t.trim())
+        .filter(Boolean);
 }
 
 const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
@@ -37,9 +52,15 @@ function fechaBonita(fecha: string): string {
     return `${dia} ${d} ${MESES[m - 1] ?? ''}`.trim();
 }
 
+const TITULO: Record<string, string> = {
+    totalpass: '🎟️ *Nueva reserva de TotalPass*',
+    app: '🌿 *Nueva reserva desde la app*',
+    recepcion: '🌿 *Nueva reserva desde recepción*',
+};
+
 export function construirMensaje(r: AvisoReservaTotalPass): string {
     const lineas = [
-        '🎟️ *Nueva reserva de TotalPass*',
+        TITULO[r.origen ?? 'totalpass'] ?? TITULO.totalpass,
         '',
         `*${r.socia}*`,
         `${r.clase} · ${fechaBonita(r.fecha)}, ${r.hora}`,
@@ -51,17 +72,19 @@ export function construirMensaje(r: AvisoReservaTotalPass): string {
 }
 
 export async function avisarReservaTotalPass(r: AvisoReservaTotalPass): Promise<void> {
-    const tel = process.env.ADMIN_ALERT_WHATSAPP?.trim();
+    const telefonos = destinatariosWhatsApp();
     const correo = process.env.ADMIN_ALERT_EMAIL?.trim();
-    if (!tel && !correo) return;
+    if (telefonos.length === 0 && !correo) return;
 
     const mensaje = construirMensaje(r);
 
-    if (tel) {
+    // Uno por uno y cada quien con su try: si el número de una administradora
+    // está mal escrito, la otra igual recibe el aviso.
+    for (const tel of telefonos) {
         try {
             await sendWhatsAppMessage(tel, mensaje);
         } catch (e) {
-            console.error('[tp-aviso] WhatsApp falló (no bloquea):', (e as Error).message);
+            console.error(`[aviso-reserva] WhatsApp a ${tel} falló (no bloquea):`, (e as Error).message);
         }
     }
     if (correo) {
