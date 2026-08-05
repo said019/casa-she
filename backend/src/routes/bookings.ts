@@ -16,6 +16,7 @@ import { awardCheckinPoints } from '../lib/loyalty.js';
 import { joinWaitlist, waitlistOffer, compactWaitlist, promoteNextFromWaitlist } from '../lib/waitlist.js';
 import { cdmxWallClockToUtc } from '../lib/schedule.js';
 import crypto from 'node:crypto';
+import { avisarReservaTotalPass } from '../lib/totalpass/alerta-admin.js';
 
 const router = Router();
 
@@ -922,6 +923,37 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
         } catch (notifErr) {
             console.error('[notifications] booking confirm non-blocking error:', notifErr);
         }
+
+        // Aviso a las administradoras. Nació para TotalPass, pero también corre con
+        // las reservas propias: el estudio quiere enterarse igual, sin abrir el panel.
+        // Best-effort y fuera del camino de la respuesta — si WhatsApp está caído,
+        // la reserva ya quedó hecha y no se toca.
+        void (async () => {
+            try {
+                const c = await queryOne<any>(
+                    `SELECT ct.name AS clase, c.date::text AS fecha,
+                            substr(c.start_time::text,1,5) AS hora,
+                            i.display_name AS coach, u.display_name AS quien
+                       FROM classes c
+                       JOIN class_types ct ON ct.id = c.class_type_id
+                       LEFT JOIN instructors i ON i.id = c.instructor_id
+                       JOIN users u ON u.id = $2
+                      WHERE c.id = $1`,
+                    [classId, userId],
+                );
+                if (!c) return;
+                await avisarReservaTotalPass({
+                    socia: c.quien,
+                    clase: c.clase,
+                    fecha: String(c.fecha).slice(0, 10),
+                    hora: c.hora,
+                    coach: c.coach,
+                    origen: req.user?.role === 'client' ? 'app' : 'recepcion',
+                });
+            } catch (e) {
+                console.error('[aviso-reserva] falló (no bloquea):', (e as Error).message);
+            }
+        })();
 
         // Update Apple + Google Wallet passes (credits changed)
         notifyAllUserDevices(userId, '✅ Reserva confirmada', 'Tu pase se actualizó con tu nueva reserva')

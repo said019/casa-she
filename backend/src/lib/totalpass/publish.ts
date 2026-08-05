@@ -23,6 +23,7 @@ import { GYM_DEFAULT_COACH } from '../gym-config.js';
 import { localDateTimeUtc } from '../mx-time.js';
 import { channelCapCeiling } from './caps.js';
 import { TP_CANCEL_HOURS, formatTpCancelDeadlinePanel } from './cancel-format.js';
+
 import {
     totalPassOfficialFromDb,
     totalPassPlanId,
@@ -33,6 +34,13 @@ import {
     type TotalPassOfficialEvent,
     type TotalPassOfficialOccurrence,
 } from './client.js';
+
+/**
+ * Texto que la socia de TotalPass ve en la descripción de la clase, dentro de su
+ * app. Configurable con TP_DESCRIPCION_CLASE por si el estudio cambia el aviso.
+ */
+export const TP_DESCRIPCION_CLASE =
+    process.env.TP_DESCRIPCION_CLASE?.trim() || 'Favor de confirmar por WhatsApp';
 
 // ── Parte pura (testeable) ───────────────────────────────────────────────────
 
@@ -100,6 +108,10 @@ export function buildIndividualInput(
         timezone: 'es-MX',
         eventDate: date,
         startTime: totalPassTime12(hhmm),
+        // La socia ve esto en su app al reservar. El estudio pide confirmación por
+        // WhatsApp porque el check-in de TotalPass no siempre llega a tiempo y
+        // necesitan saber quién llega de verdad.
+        description: TP_DESCRIPCION_CLASE,
         status: 'ACTIVE',
         maxTimeToCancel: formatTpCancelDeadlinePanel(date, hhmm, TP_CANCEL_HOURS),
         externalReference: cls.id,
