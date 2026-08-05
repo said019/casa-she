@@ -355,7 +355,7 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
 
         // Find user
         const user = await queryOne<{ id: string; email: string; phone: string | null; display_name: string }>(
-            'SELECT id, email, phone, display_name FROM users WHERE email = $1',
+            'SELECT id, email, phone, display_name FROM users WHERE email = $1 AND is_active = true',
             [email.toLowerCase()]
         );
 
@@ -435,10 +435,21 @@ router.post('/reset-password', async (req: Request, res: Response) => {
         const passwordHash = await bcrypt.hash(password, 12);
 
         // Update password (también limpia temp_password: si reseteó por este flujo, ya no es temporal).
-        const result = await query(
-            'UPDATE users SET password_hash = $1, temp_password = false, updated_at = NOW() WHERE id = $2',
+        const result = await queryOne<{ id: string }>(
+            `UPDATE users
+                SET password_hash = $1, temp_password = false, updated_at = NOW()
+              WHERE id = $2 AND is_active = true
+              RETURNING id`,
             [passwordHash, tokenData.userId]
         );
+
+        // The account may have been deleted or deactivated after the link was issued.
+        if (!result) {
+            return res.status(400).json({
+                error: 'Token inválido o expirado',
+                message: 'El enlace de recuperación ha expirado o es inválido',
+            });
+        }
 
         res.json({ message: 'Contraseña actualizada exitosamente' });
     } catch (error) {

@@ -46,7 +46,7 @@ Convención: todos los paths llevan prefijo `/api`. Auth = header `Authorization
 |U23|POST /users/:id/photo|client (propio)|imagen ≤10MB|200 + url|
 |U24|POST /users/:id/photo|client|archivo no-imagen|400|
 |U25|POST /users/:id/photo|client|archivo >10MB|413/400 (multer)|
-|U26|DELETE /users/:id|admin|usuario CON historial|200 type=soft_delete (is_active=false)|
+|U26|DELETE /users/:id|admin|usuario CON historial|200 type=anonymized_delete (correo/teléfono liberados, is_active=false)|
 |U27|DELETE /users/:id|admin|usuario SIN historial|200 type=hard_delete|
 |U28|DELETE /users/:id|admin|a sí mismo|403/400|
 |U29|POST /users/:id/resend-credentials|admin|reenviar|200 + nueva tempPassword|
