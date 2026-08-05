@@ -16,6 +16,7 @@ import { optionalAuth } from '../middleware/auth.js';
 import { capacityError } from '../lib/schedule.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { setTotalpassCap } from '../lib/totalpass/caps.js';
+import { copiarSemana, diasEntre } from '../lib/copy-week.js';
 
 const router = Router();
 
@@ -667,6 +668,90 @@ router.post('/generate', authenticate, requireElevated, async (req: Request, res
     } catch (error) {
         console.error('Generate classes error:', error);
         res.status(500).json({ error: 'Error al generar clases' });
+    }
+});
+
+// ============================================
+// POST /api/classes/copy-week — copiar una semana a otra
+// ============================================
+//
+// Distinto de /generate: aquél reconstruye desde la plantilla (`schedules`) y
+// pierde los ajustes de la semana (coach suplente, clase extra, horario movido).
+// Éste copia la semana REAL tal como quedó.
+//
+// Reglas para no duplicar ni ensuciar:
+//  - Solo copia clases `scheduled`. Las canceladas NO se arrastran.
+//  - Nunca crea en el pasado.
+//  - Respeta días de descanso del estudio (`studio_closed_days`) del destino.
+//  - El dedupe se apoya en el índice único PARCIAL `classes_slot_unique`
+//    (date, start_time, instructor_id, class_type_id, facility_id) WHERE
+//    status='scheduled'. Como `facility_id` es NULLable y en un índice único
+//    los NULL no chocan entre sí, además se hace una comprobación explícita
+//    con `IS NOT DISTINCT FROM` — si no, dos clases sin sucursal se duplicarían.
+//  - NO copia reservas, ni `is_free`, ni `booking_closed`: son estados de esa
+//    semana, no del horario. Una clase gratis no debe repetirse sola.
+//  - Sí copia el cupo de TotalPass de cada clase, porque el estudio lo ajusta
+//    a mano y perderlo significaría republicar con lugares equivocados.
+//
+// `dryRun: true` devuelve exactamente el mismo conteo sin escribir nada — la UI
+// lo usa para mostrar la vista previa antes de confirmar.
+const CopyWeekSchema = z.object({
+    fromWeekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD requerido'),
+    toWeekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD requerido'),
+    facilityId: z.string().uuid().optional().nullable(),
+    dryRun: z.boolean().optional(),
+});
+
+router.post('/copy-week', authenticate, requireElevated, async (req: Request, res: Response) => {
+    const validation = CopyWeekSchema.safeParse(req.body);
+    if (!validation.success) {
+        return res.status(400).json({
+            error: 'Datos inv\u00e1lidos',
+            details: validation.error.flatten().fieldErrors,
+        });
+    }
+    const { fromWeekStart, toWeekStart, facilityId, dryRun } = validation.data;
+
+    const desfase = diasEntre(fromWeekStart, toWeekStart);
+    if (desfase === 0) {
+        return res.status(400).json({ error: 'La semana origen y la destino son la misma.' });
+    }
+    if (desfase % 7 !== 0) {
+        return res.status(400).json({ error: 'Las semanas deben estar separadas por semanas completas.' });
+    }
+
+    const client = await pool.connect();
+    try {
+        // Recepci\u00f3n queda acotada a su sucursal; admin puede filtrar o copiar todas.
+        let sucursal: string | null = null;
+        if (req.user?.role === 'reception') {
+            const scope = await resolveRequestFacility(req.user, facilityId || null);
+            if (scope.kind === 'error') return res.status(scope.status).json({ error: scope.message });
+            if (scope.kind === 'facility') sucursal = scope.facilityId;
+        } else if (facilityId) {
+            sucursal = facilityId;
+        }
+
+        if (!dryRun) await client.query('BEGIN');
+        const resultado = await copiarSemana(client, { fromWeekStart, toWeekStart, facilityId: sucursal, dryRun });
+        if (!dryRun) {
+            await client.query('COMMIT');
+            await logAction(query, {
+                adminUserId: req.user!.userId,
+                actionType: 'classes_copy_week',
+                entityType: 'class',
+                description: `Semana del ${fromWeekStart} copiada al ${toWeekStart}: ${resultado.creadas} creadas, ${resultado.yaExistian} ya exist\u00edan`,
+                newData: { fromWeekStart, toWeekStart, facilityId: sucursal, ...resultado, detalle: undefined },
+                req,
+            }).catch((e) => console.error('[copy-week] auditor\u00eda fall\u00f3 (no bloquea):', e));
+        }
+        return res.json(resultado);
+    } catch (error) {
+        if (!dryRun) await client.query('ROLLBACK').catch(() => { /* best-effort */ });
+        console.error('Copy week error:', error);
+        return res.status(500).json({ error: 'Error al copiar la semana' });
+    } finally {
+        client.release();
     }
 });
 

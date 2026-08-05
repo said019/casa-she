@@ -58,7 +58,7 @@ import { useToast } from '@/components/ui/use-toast';
 import {
     Loader2, ChevronLeft, ChevronRight, Calendar as CalendarIcon,
     Plus, Minus, Repeat, Users, Trash2, Check, Edit, Phone, MessageCircle, Clock, MapPin, Sparkles, X, RotateCcw, Lock, Unlock,
-    RefreshCw,
+    RefreshCw, Copy as CopyIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -131,6 +131,17 @@ interface Attendee {
     channel?: string | null;
 }
 
+/** Lo que devuelve /classes/copy-week, en vista previa y en la copia real. */
+interface CopiaSemanaResumen {
+    creadas: number;
+    yaExistian: number;
+    enDiaCerrado: number;
+    enElPasado: number;
+    dryRun: boolean;
+    mensaje?: string;
+    detalle: Array<{ fecha: string; hora: string; clase: string; resultado: string }>;
+}
+
 const whatsAppDeAsistente = (attendee: Attendee, clase?: Class | null) => enlaceWhatsApp({
     telefono: attendee.phone,
     nombre: attendee.display_name,
@@ -159,6 +170,9 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     const [mobileSelectedDay, setMobileSelectedDay] = useState(new Date());
     const [isGenerateOpen, setIsGenerateOpen] = useState(initialGenerateOpen);
     const [isBulkFreeOpen, setIsBulkFreeOpen] = useState(false);
+    // Copiar semana: nunca se escribe sin haber mostrado antes la vista previa.
+    const [isCopyWeekOpen, setIsCopyWeekOpen] = useState(false);
+    const [copiaPrevia, setCopiaPrevia] = useState<CopiaSemanaResumen | null>(null);
     const [bulkFreeForm, setBulkFreeForm] = useState({
         from_date: '', to_date: '', from_time: '00:00', to_time: '23:59',
         free_label: 'Opening Day - Gratis',
@@ -763,6 +777,32 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         </div>
     );
 
+    // Copiar semana. Son dos llamadas al MISMO endpoint: la primera con
+    // dryRun para enseñar qué va a pasar, la segunda para hacerlo. Así el
+    // conteo que se muestra y el que se ejecuta salen de la misma lógica —
+    // no de dos cálculos que pueden desincronizarse.
+    const semanaDestinoStr = format(addDays(weekStart, 7), 'yyyy-MM-dd');
+    const copiarSemanaMutation = useMutation({
+        mutationFn: async (dryRun: boolean) => (await api.post('/classes/copy-week', {
+            fromWeekStart: startStr,
+            toWeekStart: semanaDestinoStr,
+            dryRun,
+        })).data as CopiaSemanaResumen,
+        onSuccess: (data) => {
+            if (data.dryRun) { setCopiaPrevia(data); return; }
+            setIsCopyWeekOpen(false);
+            setCopiaPrevia(null);
+            queryClient.invalidateQueries({ queryKey: ['classes'] });
+            toast({
+                title: data.creadas > 0 ? 'Semana copiada' : 'No había nada que copiar',
+                description: data.creadas > 0
+                    ? `${data.creadas} ${data.creadas === 1 ? 'clase creada' : 'clases creadas'}${data.yaExistian ? ` · ${data.yaExistian} ya existían` : ''}`
+                    : 'Todas las clases ya existían en la semana destino.',
+            });
+        },
+        onError: (err) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) }),
+    });
+
     const bulkDeleteMutation = useMutation({
         mutationFn: async () => {
             return await api.post('/classes/bulk-delete', {
@@ -904,6 +944,21 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                 </Button>
                                 <Button variant="outline" className="rounded-full border-balance-sand/70 bg-balance-cream/76" onClick={() => setIsGenerateOpen(true)}>
                                     <Repeat className="mr-2 h-4 w-4" /> Generar
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="rounded-full border-balance-sand/70 bg-balance-cream/76"
+                                    onClick={() => {
+                                        // La vista previa se pide aquí y no en onOpenChange: Radix
+                                        // no dispara onOpenChange cuando el diálogo se abre por
+                                        // estado del padre, así que ahí nunca llegaba a pedirse.
+                                        setCopiaPrevia(null);
+                                        setIsCopyWeekOpen(true);
+                                        copiarSemanaMutation.mutate(true);
+                                    }}
+                                    title="Copiar esta semana a la siguiente"
+                                >
+                                    <CopyIcon className="mr-2 h-4 w-4" /> Copiar semana
                                 </Button>
                                 {isAdmin && (
                                     <Button variant="outline" className="rounded-full border-balance-olive/25 bg-balance-olive/8 text-balance-olive hover:bg-balance-olive/12" onClick={() => setIsBulkFreeOpen(true)}>
@@ -1808,6 +1863,79 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                     </Button>
                                 </DialogFooter>
                             </form>
+                        </DialogContent>
+                    </Dialog>
+
+                    {/* Copiar semana — siempre con vista previa antes de escribir */}
+                    <Dialog
+                        open={isCopyWeekOpen}
+                        onOpenChange={(abierto) => {
+                            setIsCopyWeekOpen(abierto);
+                            if (!abierto) setCopiaPrevia(null);
+                        }}
+                    >
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                    <CopyIcon className="h-5 w-5 text-balance-olive" />
+                                    Copiar semana
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Se copian las clases del <strong>{format(weekStart, "d 'de' MMMM", { locale: es })}</strong> al{' '}
+                                    <strong>{format(addDays(weekStart, 6), "d 'de' MMMM", { locale: es })}</strong> a la semana que empieza el{' '}
+                                    <strong>{format(addDays(weekStart, 7), "d 'de' MMMM", { locale: es })}</strong>.
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            {copiarSemanaMutation.isPending && !copiaPrevia ? (
+                                <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Revisando qué haría…
+                                </div>
+                            ) : copiaPrevia ? (
+                                <div className="space-y-3 py-2">
+                                    <div className="rounded-lg border bg-card p-3">
+                                        <p className="text-2xl font-semibold text-balance-olive">
+                                            {copiaPrevia.creadas}
+                                            <span className="ml-2 text-sm font-normal text-muted-foreground">
+                                                {copiaPrevia.creadas === 1 ? 'clase se creará' : 'clases se crearán'}
+                                            </span>
+                                        </p>
+                                    </div>
+                                    {/* Lo que NO se va a hacer importa tanto como lo que sí: evita
+                                        que alguien apriete el botón dos veces "por si acaso". */}
+                                    <ul className="space-y-1 text-sm text-muted-foreground">
+                                        {copiaPrevia.yaExistian > 0 && (
+                                            <li>· <strong>{copiaPrevia.yaExistian}</strong> ya existen en esa semana y no se duplicarán.</li>
+                                        )}
+                                        {copiaPrevia.enDiaCerrado > 0 && (
+                                            <li>· <strong>{copiaPrevia.enDiaCerrado}</strong> caen en un día de descanso del estudio y se omiten.</li>
+                                        )}
+                                        {copiaPrevia.enElPasado > 0 && (
+                                            <li>· <strong>{copiaPrevia.enElPasado}</strong> quedarían en el pasado y se omiten.</li>
+                                        )}
+                                        <li>· Las clases canceladas no se copian.</li>
+                                        <li>· No se copian reservas, clases gratis ni cupos cerrados.</li>
+                                        <li>· El cupo de TotalPass de cada clase sí se conserva.</li>
+                                    </ul>
+                                    {copiaPrevia.mensaje && (
+                                        <p className="text-sm text-amber-700">{copiaPrevia.mensaje}</p>
+                                    )}
+                                </div>
+                            ) : null}
+
+                            <DialogFooter>
+                                <Button variant="ghost" onClick={() => setIsCopyWeekOpen(false)}>Cancelar</Button>
+                                <Button
+                                    onClick={() => copiarSemanaMutation.mutate(false)}
+                                    disabled={copiarSemanaMutation.isPending || !copiaPrevia || copiaPrevia.creadas === 0}
+                                >
+                                    {copiarSemanaMutation.isPending && copiaPrevia ? (
+                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Copiando…</>
+                                    ) : (
+                                        <>Copiar {copiaPrevia?.creadas ?? 0} {copiaPrevia?.creadas === 1 ? 'clase' : 'clases'}</>
+                                    )}
+                                </Button>
+                            </DialogFooter>
                         </DialogContent>
                     </Dialog>
 
