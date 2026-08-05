@@ -26,6 +26,7 @@ import reportsRoutes from './routes/reports.js';
 import reformersRoutes from './routes/reformers.js';
 import facilitiesRoutes from './routes/facilities.js';
 import ordersRoutes from './routes/orders.js';
+import bioCheckoutRoutes from './routes/bio-checkout.js';
 import reviewsRoutes from './routes/reviews.js';
 import cronRoutes from './routes/cron.js';
 import workoutTemplatesRoutes from './routes/workout-templates.js';
@@ -1121,10 +1122,29 @@ async function runStartupMigrations(): Promise<void> {
     // Migration 048: borrar plantillas (schedules) de salas cruft del base (Hot Room/Wunda/Barre).
     // 108 filas con coach placeholder "Coach Balance"; las reales son de BMB Tepa/San Miguel.
     // classes.schedule_id es ON DELETE SET NULL, así que es seguro.
+    //
+    // ⚠️ Esta migración viene del código de BMB y NO tenía bandera: corría en CADA
+    // arranque. En Casa Shé la única sede se llama "Casa Shé — Condesa", que no
+    // empieza con "BMB", así que cada despliegue borraba la plantilla COMPLETA del
+    // estudio — 64 horarios cargados desaparecieron en el deploy siguiente y el
+    // botón "Generar" quedaba inservible sin que nada lo avisara.
+    // Ahora corre una sola vez (ya hizo su limpieza hace meses) y además excluye
+    // explícitamente la sede de Casa Shé.
     try {
-        await query(`DELETE FROM schedules
-                      WHERE facility_id IN (SELECT id FROM facilities WHERE name NOT ILIKE 'BMB%')`);
-        console.log('Migration 048: plantillas de salas cruft borradas.');
+        const hecho = await queryOne<{ x: number }>(
+            `SELECT 1 AS x FROM system_settings WHERE key = 'migration_048_cruft_schedules'`
+        );
+        if (!hecho) {
+            await query(`DELETE FROM schedules
+                          WHERE facility_id IN (
+                              SELECT id FROM facilities
+                               WHERE name NOT ILIKE 'BMB%' AND name <> 'Casa Shé — Condesa'
+                          )`);
+            await query(`INSERT INTO system_settings (key, value)
+                         VALUES ('migration_048_cruft_schedules', 'true'::jsonb)
+                         ON CONFLICT (key) DO NOTHING`);
+            console.log('Migration 048: plantillas de salas cruft borradas (una sola vez).');
+        }
     } catch (e) { console.error('Migration 048 error:', e); }
 
     // Migration 049: facility_id en egresos (asignar gastos a una sucursal -> utilidad por local).
@@ -4207,6 +4227,30 @@ async function runStartupMigrations(): Promise<void> {
         console.log('  ✅ Migration 114: socias de plataforma sin puntos de lealtad');
     } catch (e) { console.error('Migration 114 error:', e); }
 
+    // ---- Migration 115: pago rápido desde Bio + retención temporal de lugar ----
+    try {
+        await query(`
+            CREATE TABLE IF NOT EXISTS bio_checkout_sessions (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                token_hash VARCHAR(64) NOT NULL UNIQUE,
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+                plan_id UUID NOT NULL REFERENCES plans(id) ON DELETE RESTRICT,
+                order_id UUID NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
+                is_new_user BOOLEAN NOT NULL DEFAULT false,
+                status VARCHAR(24) NOT NULL DEFAULT 'pending_payment'
+                    CHECK (status IN ('pending_payment','paid','ready','completed','cancelled')),
+                expires_at TIMESTAMPTZ NOT NULL,
+                completed_at TIMESTAMPTZ,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_bio_checkout_active_holds
+            ON bio_checkout_sessions(class_id, expires_at)
+            WHERE status IN ('pending_payment','paid','ready')`);
+        console.log('  ✅ Migration 115: bio_checkout_sessions');
+    } catch (e) { console.error('Migration 115 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();
@@ -4237,6 +4281,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/reformers', reformersRoutes);
 app.use('/api/facilities', facilitiesRoutes);
 app.use('/api/orders', ordersRoutes);
+app.use('/api/bio-checkout', bioCheckoutRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/workout-templates', workoutTemplatesRoutes);
