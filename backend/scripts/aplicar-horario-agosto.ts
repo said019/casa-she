@@ -94,11 +94,16 @@ const HORARIO: Array<{ day: number; hora: string; clase: string; coach: string }
     { day: 0, hora: '11:00', clase: 'Somatic Reset', coach: 'Ale' },
 ];
 
-/** Coaches que la hoja usa y no existían. Correo temporal: el estudio lo cambia después. */
+/**
+ * Coaches que la hoja usa y no existían. Correo y teléfono temporales, con la
+ * misma convención que las coaches ya cargadas (`@casashe.instructor.local`,
+ * tel 0000000000): el estudio los cambia cuando tenga los reales.
+ */
 const COACHES_NUEVOS = [
-    { nombre: 'Shelle', email: 'shelle@casashe.mx' },
-    { nombre: 'Sol', email: 'sol@casashe.mx' },
+    { nombre: 'Shelle', email: 'shelle@casashe.instructor.local' },
+    { nombre: 'Sol', email: 'sol@casashe.instructor.local' },
 ];
+const TEL_TEMPORAL = '0000000000';
 
 const DURACION_MIN = 50;
 
@@ -127,20 +132,35 @@ async function main() {
     log(`\nHoy en el estudio: ${hoy}${utc !== hoy ? `  (el servidor en UTC ya va en ${utc})` : ''} · Sucursal: ${sucursal.name}`);
 
     // ── 1. Catálogo: tipos de clase ──────────────────────────────────────────
+    // Varios de estos tipos EXISTEN pero desactivados. Hay que reactivarlos, no
+    // crear una copia: si se duplica, las clases históricas quedan apuntando a
+    // la fila vieja y el catálogo termina con dos "Yoga" que nadie sabe cuál es.
     const tiposUsados = [...new Set(HORARIO.map((h) => h.clase))];
-    const tiposFaltan: string[] = [];
+    const tiposCrear: string[] = [];
+    const tiposReactivar: string[] = [];
     for (const nombre of tiposUsados) {
-        const existe = await queryOne(`SELECT id FROM class_types WHERE lower(name)=lower($1) AND is_active`, [nombre]);
-        if (!existe) tiposFaltan.push(nombre);
+        const activo = await queryOne(`SELECT id FROM class_types WHERE lower(name)=lower($1) AND is_active`, [nombre]);
+        if (activo) continue;
+        const inactivo = await queryOne(`SELECT id FROM class_types WHERE lower(name)=lower($1) ORDER BY created_at LIMIT 1`, [nombre]);
+        if (inactivo) tiposReactivar.push(nombre);
+        else tiposCrear.push(nombre);
     }
-    log(`\n1. TIPOS DE CLASE — ${tiposUsados.length} usados, ${tiposFaltan.length} por crear`);
-    tiposFaltan.forEach((t) => log(`     + ${t}`));
+    log(`\n1. TIPOS DE CLASE — ${tiposUsados.length} usados, ${tiposCrear.length} por crear, ${tiposReactivar.length} por reactivar`);
+    tiposCrear.forEach((t) => log(`     + ${t}`));
+    tiposReactivar.forEach((t) => log(`     ↻ ${t} (existía desactivado)`));
     if (APLICAR) {
-        for (const nombre of tiposFaltan) {
+        for (const nombre of tiposCrear) {
             await query(
                 `INSERT INTO class_types (name, category, description, duration_minutes, max_capacity, totalpass_default_spots, is_active)
                  VALUES ($1,'multi',$2,$3,7,6,true)`,
                 [nombre, `${nombre} en Casa Shé`, DURACION_MIN],
+            );
+        }
+        for (const nombre of tiposReactivar) {
+            await query(
+                `UPDATE class_types SET is_active=true, max_capacity=7, totalpass_default_spots=6, updated_at=NOW()
+                  WHERE id = (SELECT id FROM class_types WHERE lower(name)=lower($1) ORDER BY created_at LIMIT 1)`,
+                [nombre],
             );
         }
     }
@@ -163,12 +183,11 @@ async function main() {
             // El instructor cuelga de un usuario; se crea sin contraseña utilizable
             // (el estudio la define al invitarla) y con rol instructor.
             const u = await queryOne<{ id: string }>(
-                `INSERT INTO users (email, display_name, password_hash, role)
-                 VALUES ($1,$2,'!',
-                         'instructor')
+                `INSERT INTO users (email, display_name, phone, password_hash, role)
+                 VALUES ($1,$2,$3,'!','instructor')
                  ON CONFLICT (email) DO UPDATE SET display_name=EXCLUDED.display_name
                  RETURNING id`,
-                [c.email, c.nombre],
+                [c.email, c.nombre, TEL_TEMPORAL],
             );
             await query(
                 `INSERT INTO instructors (user_id, display_name, email, is_active, visible_public)
