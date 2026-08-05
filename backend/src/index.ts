@@ -3537,20 +3537,33 @@ async function runStartupMigrations(): Promise<void> {
 
         // (b) Planes/paquetes Casa Shé (multi_credits; reformer=0). Valores iniciales SOLO al crear,
         //     así los precios/créditos que ajuste la admin persisten entre reinicios.
-        await query(`INSERT INTO plans (name, reformer_credits, multi_credits, price, duration_days, is_active, sort_order)
-            SELECT v.name, 0, v.credits, v.price, v.days, true, v.sort
+        await query(`INSERT INTO plans (name, reformer_credits, multi_credits, price, duration_days, is_active, sort_order, features)
+            SELECT v.name, 0, v.credits, v.price, v.days, true, v.sort, v.features
             FROM (VALUES
-              ('Clase de prueba',1,150,7,1),('Drop-in',1,280,30,2),('Paquete 5',5,1300,30,3),
-              ('Paquete 8',8,2000,30,4),('Paquete 12',12,2880,30,5),
-              ('Membresía 360',16,3600,30,6),('Membresía Black',24,4200,30,7)
-            ) AS v(name, credits, price, days, sort)
+              ('Clase de prueba',1,150,7,1,'[]'::jsonb),('Drop-in',1,280,30,2,'[]'::jsonb),('Paquete 5',5,1300,30,3,'[]'::jsonb),
+              ('Paquete 8',8,2000,30,4,'[]'::jsonb),('Paquete 12',12,2880,30,5,'[]'::jsonb),
+              ('Membresía 360',16,3600,30,6,'["16 créditos al mes","Acceso a Pilates Mat, Barre, Sculpt, Yoga y Flex","1 servicio de bienestar","Vigencia 30 días"]'::jsonb),
+              ('Membresía Black',24,4200,30,7,'["24 créditos al mes","Acceso total a clases","2 servicios de bienestar","1 taller incluido","Vigencia 30 días"]'::jsonb)
+            ) AS v(name, credits, price, days, sort, features)
             WHERE NOT EXISTS (SELECT 1 FROM plans p WHERE p.name = v.name)`);
 
         // (b.2) Planes de Salsa — bucket reformer reutilizado como "Salsa" (créditos solo-salsa; multi=0).
-        await query(`INSERT INTO plans (name, reformer_credits, multi_credits, price, duration_days, is_active, sort_order)
-            SELECT v.name, v.credits, 0, v.price, v.days, true, v.sort
-            FROM (VALUES ('Salsa · 1 clase',1,180,30,8),('Salsa · 4 clases',4,600,30,9)) AS v(name, credits, price, days, sort)
+        await query(`INSERT INTO plans (name, reformer_credits, multi_credits, price, duration_days, is_active, sort_order, features)
+            SELECT v.name, v.credits, 0, v.price, v.days, true, v.sort, v.features
+            FROM (VALUES
+              ('Salsa · 1 clase',1,180,30,8,'[]'::jsonb),('Salsa · 4 clases',4,600,30,9,'[]'::jsonb)
+            ) AS v(name, credits, price, days, sort, features)
             WHERE NOT EXISTS (SELECT 1 FROM plans p WHERE p.name = v.name)`);
+
+        // (b.3) Beneficios por modelo para membresías completas: se aplica UNA vez en instancias existentes.
+        const membershipFeaturesSet = await query(`SELECT 1 FROM migration_flags WHERE name = 'casashe_membership_features_v1'`);
+        if (!membershipFeaturesSet.length) {
+            await query(`UPDATE plans SET features = $1::jsonb, updated_at = NOW() WHERE name = 'Membresía 360'`,
+                [JSON.stringify(['16 créditos al mes', 'Acceso a Pilates Mat, Barre, Sculpt, Yoga y Flex', '1 servicio de bienestar', 'Vigencia 30 días'])]);
+            await query(`UPDATE plans SET features = $1::jsonb, updated_at = NOW() WHERE name = 'Membresía Black'`,
+                [JSON.stringify(['24 créditos al mes', 'Acceso total a clases', '2 servicios de bienestar', '1 taller incluido', 'Vigencia 30 días'])]);
+            await query(`INSERT INTO migration_flags (name) VALUES ('casashe_membership_features_v1')`);
+        }
 
         // (c) Sede única Casa Shé — Condesa.
         await query(`INSERT INTO facilities (name, description, capacity, is_active, sort_order)

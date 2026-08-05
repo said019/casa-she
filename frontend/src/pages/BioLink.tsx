@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowUpRight,
   CalendarDays,
+  Check,
   ChevronRight,
   CreditCard,
   Dumbbell,
@@ -46,6 +47,7 @@ type Plan = {
   class_limit?: number | null;
   is_active?: boolean;
   is_internal?: boolean;
+  features?: string[];
 };
 
 function localDate(date: Date) {
@@ -261,6 +263,20 @@ export function BioPackages() {
     },
     staleTime: 5 * 60_000,
   });
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
+
+  const buyPath = (planId: string) => {
+    const checkout = `/app/checkout?plan=${encodeURIComponent(planId)}&source=bio`;
+    if (isAuthenticated && user?.role === "client") return checkout;
+    return `/register?returnUrl=${encodeURIComponent(checkout)}`;
+  };
+
+  const planFeatures = (plan: Plan) => {
+    if (!plan.features || !plan.features.length) return [];
+    return plan.features;
+  };
+
   return (
     <BioFrame eyebrow="A tu ritmo" title="Paquetes">
       <p className={`${BASE} mt-4 text-[17px] leading-relaxed text-[#6f574e]`}>Elige la manera que más te guste de vivir Casa Shé.</p>
@@ -268,10 +284,21 @@ export function BioPackages() {
         {isLoading && <p className={`${BASE} rounded-2xl bg-[#f4e9df] p-5 text-[#6f574e]`}>Cargando paquetes…</p>}
         {plans.map((plan) => {
           const credits = plan.multi_credits ?? plan.reformer_credits;
+          const features = planFeatures(plan);
           return (
-            <Link key={plan.id} to="/bio/reservar" className="block rounded-[1.25rem] border border-[#eadbd1] bg-white p-4 transition hover:border-[#b66049]">
+            <Link key={plan.id} to={buyPath(plan.id)} className="block rounded-[1.25rem] border border-[#eadbd1] bg-white p-4 transition hover:border-[#b66049]">
               <div className="flex items-start justify-between gap-4"><h2 className={`${BASE} text-[24px] leading-none text-[#392a25]`}>{plan.name}</h2>{plan.price != null && <span className={`${BASE} text-[18px] text-[#b66049]`}>${Number(plan.price).toLocaleString("es-MX")}</span>}</div>
               <p className={`${BASE} mt-2 text-[14px] text-[#80685e]`}>{credits ? `${credits} créditos` : "Acceso a tu práctica"}{plan.duration_days ? ` · ${plan.duration_days} días de vigencia` : ""}</p>
+              {features.length > 0 && (
+                <ul className="mt-3 space-y-1">
+                  {features.map((feature, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-[13px] text-[#6f574e]">
+                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#b66049]" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </Link>
           );
         })}
