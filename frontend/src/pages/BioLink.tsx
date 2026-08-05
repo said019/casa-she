@@ -89,8 +89,10 @@ function BioAction({ to, label, detail, primary = false, icon: Icon }: {
   icon: typeof CalendarDays;
 }) {
   return (
-    <a
-      href={to}
+    // Link y no <a href>: con <a> cada tarjeta recargaba la app entera —
+    // desde Instagram eso es un parpadeo en blanco de un segundo por toque.
+    <Link
+      to={to}
       className="group flex items-center gap-4 rounded-[1.35rem] border px-4 py-4 text-left transition duration-200 hover:-translate-y-0.5"
       style={primary
         ? { background: TERRACOTTA, borderColor: TERRACOTTA, color: "#fffaf4", boxShadow: "0 14px 26px rgba(182,96,73,.22)" }
@@ -104,7 +106,7 @@ function BioAction({ to, label, detail, primary = false, icon: Icon }: {
         <span className={`${BASE} mt-1 block text-[14px] opacity-70`}>{detail}</span>
       </span>
       <ChevronRight className="h-5 w-5 shrink-0 transition-transform group-hover:translate-x-1" />
-    </a>
+    </Link>
   );
 }
 
@@ -119,7 +121,7 @@ export default function BioLink() {
     <main className="min-h-screen px-4 py-6 sm:px-6 sm:py-10" style={{ background: "radial-gradient(circle at 8% 0%, #f4ddd1, transparent 33%), #eee5dc" }}>
       <section className="mx-auto max-w-[560px] overflow-hidden rounded-[2.2rem] border border-white/80 bg-[#fffaf5] p-4 shadow-[0_24px_70px_rgba(57,42,37,.14)] sm:p-5">
         <div className="relative overflow-hidden rounded-[1.7rem] bg-[#244936] px-6 pb-8 pt-7 text-center text-[#fff9f2]">
-          <img src="/casashe/editorial/barre-balance.webp" alt="Clase en Casa Shé" className="absolute inset-0 h-full w-full object-cover opacity-30" />
+          <img src="/casashe/studio-barre-hero.webp" alt="Clase en Casa Shé" className="absolute inset-0 h-full w-full object-cover opacity-30" />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(24,59,41,.28),rgba(24,59,41,.92))]" />
           <div className="relative">
             <div className="mx-auto flex h-[78px] w-[78px] items-center justify-center rounded-full bg-[#fbf1e8] shadow-lg">
@@ -133,12 +135,16 @@ export default function BioLink() {
         <div className="px-1 pb-2 pt-5">
           <div className="mb-4 flex items-center gap-2 text-[#9a6555]"><Sparkles className="h-4 w-4" /><span className={`${BASE} text-[11px] uppercase tracking-[0.2em]`}>Todo Casa Shé en un lugar</span></div>
           <nav className="space-y-3" aria-label="Enlaces Casa Shé">
-            <BioAction to="/bio/horarios" label="Reserva tu clase" detail="Elige, paga y confirma en pocos pasos" primary icon={CalendarDays} />
+            {/* Cada tarjeta lleva a lo que promete. Antes "Ubicación" y "Contacto"
+                iban las dos a /#contacto — un ancla que la landing ni siquiera
+                tiene (sus secciones son inicio, paquetes, servicios, estudio,
+                equipo, horario, bar, nosotras), así que ambas caían al inicio. */}
+            <BioAction to="/bio/reservar" label="Reserva tu clase" detail="Elige, paga y confirma en pocos pasos" primary icon={CalendarDays} />
             <BioAction to="/bio/horarios" label="Horarios" detail="Clases reales de esta semana" icon={CalendarDays} />
             <BioAction to="/bio/paquetes" label="Paquetes" detail="Membresías y créditos" icon={Dumbbell} />
-            <BioAction to="/#estudio" label="Conoce el espacio" detail="Casa, servicios y comunidad" icon={Sparkles} />
-            <BioAction to="/#contacto" label="Ubicación" detail="Alfonso Reyes 131, Condesa" icon={MapPin} />
-            <BioAction to="/#contacto" label="Contacto" detail="Escríbenos o síguenos" icon={Mail} />
+            <BioAction to="/bio/espacio" label="Conoce el espacio" detail="Casa, servicios y comunidad" icon={Sparkles} />
+            <BioAction to="/bio/ubicacion" label="Ubicación" detail="Alfonso Reyes 131, Condesa" icon={MapPin} />
+            <BioAction to="/bio/contacto" label="Contacto" detail="Escríbenos o síguenos" icon={Mail} />
           </nav>
           <Link to="/login" className={`${BASE} mt-5 flex items-center justify-center rounded-[1.1rem] border border-[#e6d6ca] bg-[#f4e9df] px-4 py-3 text-[16px] text-[#59433a] transition hover:bg-[#eedfd4]`}>
             ¿Ya eres parte de Casa Shé? <span className="ml-2 underline decoration-[#b66049] underline-offset-4">Entrar</span>
@@ -299,7 +305,7 @@ export function BioReserve() {
 export function BioSpace() {
   return (
     <BioFrame eyebrow="Un refugio en la ciudad" title="Nuestro espacio">
-      <img src="/casashe/editorial/comunidad-casa-she.webp" alt="Comunidad Casa Shé" className="mt-5 h-64 w-full rounded-[1.4rem] object-cover" />
+      <img src="/casashe/galeria/comunidad.webp" alt="Comunidad Casa Shé" className="mt-5 h-64 w-full rounded-[1.4rem] object-cover" />
       <p className={`${BASE} mt-5 text-[18px] leading-relaxed text-[#6f574e]`}>Casa Shé es un wellness hub para hacer del movimiento un ritual y de la comunidad un lugar al que quieras volver.</p>
       <div className="mt-5 grid grid-cols-2 gap-3">
         {[["Movimiento", "Pilates, Barre, Sculpt, Yoga, Flex y Salsa"], ["Bienestar", "Nutrición, cuidado y momentos para ti"]].map(([title, detail]) => <div key={title} className="rounded-[1.2rem] bg-[#f4e9df] p-4"><h2 className={`${BASE} text-[21px] text-[#244936]`}>{title}</h2><p className={`${BASE} mt-1 text-[14px] leading-snug text-[#755e54]`}>{detail}</p></div>)}
@@ -313,7 +319,7 @@ export function BioLocation() {
   const mapUrl = "https://www.google.com/maps/search/?api=1&query=Alfonso+Reyes+131%2C+Condesa%2C+CDMX";
   return (
     <BioFrame eyebrow="Visítanos" title="Ubicación">
-      <img src="/casashe/editorial/interior-casa-she.webp" alt="Interior de Casa Shé" className="mt-5 h-64 w-full rounded-[1.4rem] object-cover" />
+      <img src="/casashe/espacio-salon.jpg" alt="Interior de Casa Shé" className="mt-5 h-64 w-full rounded-[1.4rem] object-cover" />
       <div className="mt-5 rounded-[1.4rem] bg-[#f4e9df] p-5"><MapPin className="h-6 w-6 text-[#b66049]" /><p className={`${BASE} mt-3 text-[27px] leading-tight text-[#392a25]`}>Alfonso Reyes 131<br />Condesa, CDMX</p></div>
       <a href={mapUrl} target="_blank" rel="noreferrer" className={`${BASE} mt-5 flex items-center justify-center rounded-full bg-[#244936] px-5 py-4 text-[19px] text-white`}>Abrir cómo llegar <ArrowUpRight className="ml-2 h-4 w-4" /></a>
     </BioFrame>

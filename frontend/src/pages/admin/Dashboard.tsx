@@ -89,6 +89,7 @@ export default function AdminDashboard() {
             detail: 'sesiones programadas',
             icon: Calendar,
             tone: 'sage',
+            to: '/admin/calendar',
         },
         {
             title: 'Reservas',
@@ -96,6 +97,7 @@ export default function AdminDashboard() {
             detail: 'lugares confirmados',
             icon: Users,
             tone: 'taupe',
+            to: '/admin/bookings',
         },
         {
             title: 'Paquetes activos',
@@ -103,6 +105,7 @@ export default function AdminDashboard() {
             detail: 'usuarios con créditos',
             icon: BadgeCheck,
             tone: 'cream',
+            to: '/admin/memberships',
         },
         {
             title: 'Ingresos hoy',
@@ -110,6 +113,7 @@ export default function AdminDashboard() {
             detail: 'total cobrado hoy',
             icon: CreditCard,
             tone: 'dark',
+            to: '/admin/payments',
         },
     ];
 
@@ -357,6 +361,8 @@ function MetricCard({
         detail: string;
         icon: React.ElementType;
         tone: string;
+        /** A dónde lleva la tarjeta. Sin esto, el número se ve pero no se puede ir al detalle. */
+        to?: string;
     };
     loading: boolean;
 }) {
@@ -368,8 +374,19 @@ function MetricCard({
         dark: 'bg-balance-dark text-balance-cream',
     }[kpi.tone] || 'bg-balance-cream text-balance-dark';
 
+    // Con destino la tarjeta es un enlace real (no un div con onClick): se puede
+    // abrir en pestaña nueva, el teclado la alcanza y el lector de pantalla la
+    // anuncia como enlace. Sin destino se queda como estaba.
+    const Contenedor: React.ElementType = kpi.to ? Link : 'div';
+    const props = kpi.to
+        ? { to: kpi.to, 'aria-label': `${kpi.title}: ver detalle` }
+        : {};
+
     return (
-        <div className="group rounded-[1.6rem] border border-balance-sand/65 bg-[hsl(var(--admin-panel))] p-4 shadow-[0_18px_58px_-48px_rgba(51,42,34,0.72)] transition-all duration-200 hover:-translate-y-0.5 hover:border-balance-olive/35">
+        <Contenedor
+            {...props}
+            className={`group block rounded-[1.6rem] border border-balance-sand/65 bg-[hsl(var(--admin-panel))] p-4 shadow-[0_18px_58px_-48px_rgba(51,42,34,0.72)] transition-all duration-200 hover:-translate-y-0.5 hover:border-balance-olive/35${kpi.to ? ' cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-balance-olive/45 focus-visible:ring-offset-2' : ''}`}
+        >
             <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold text-balance-dark/62">{kpi.title}</span>
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] ${toneClass}`}>
@@ -384,7 +401,7 @@ function MetricCard({
                 </p>
             )}
             <p className="mt-1 text-xs font-medium text-balance-dark/50">{kpi.detail}</p>
-        </div>
+        </Contenedor>
     );
 }
 

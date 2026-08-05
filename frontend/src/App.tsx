@@ -219,7 +219,10 @@ const App = () => (
         <AuthInitializer>
           <Routes>
             {/* Public Routes */}
-            <Route path="/" element={<CasaSheLanding />} />
+            {/* La raíz ES la página de enlaces (el link de Instagram apunta aquí).
+                La landing completa vive en /landing. */}
+            <Route path="/" element={<BioLink />} />
+            <Route path="/landing" element={<CasaSheLanding />} />
             <Route path="/bio" element={<BioLink />} />
             <Route path="/bio-link" element={<BioLink />} />
             <Route path="/bio/reservar" element={<BioReserve />} />
@@ -232,7 +235,7 @@ const App = () => (
             <Route path="/bio/contacto" element={<BioContact />} />
             <Route path="/inicio-clasico" element={<Index />} />
             <Route path="/clases/:classId" element={<LegacyClientBookRedirect />} />
-            <Route path="/coaches/:slug" element={<Navigate to="/#equipo" replace />} />
+            <Route path="/coaches/:slug" element={<Navigate to="/landing#equipo" replace />} />
             <Route path="/pricing" element={<Checkout />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
