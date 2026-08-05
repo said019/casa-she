@@ -15,6 +15,7 @@ import { selectMembershipForBooking, toDbClient, pickBestMembership } from '../l
 import { awardCheckinPoints } from '../lib/loyalty.js';
 import { joinWaitlist, waitlistOffer, compactWaitlist, promoteNextFromWaitlist } from '../lib/waitlist.js';
 import { cdmxWallClockToUtc } from '../lib/schedule.js';
+import crypto from 'node:crypto';
 
 const router = Router();
 
@@ -23,7 +24,12 @@ const CreateBookingSchema = z.object({
     classId: z.string().uuid(),
     membershipId: z.string().uuid().optional(), // Optional, if not provided we auto-select
     waitlist: z.boolean().optional(), // true = anotarse en lista de espera si la clase está llena
+    bioCheckoutToken: z.string().min(32).optional(),
 });
+
+function bioTokenHash(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+}
 
 // ============================================
 // GET /api/bookings - List bookings (Admin / Instructor / Reception)
@@ -427,8 +433,20 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
             });
         }
 
-        const { classId, waitlist } = validation.data;
+        const { classId, waitlist, bioCheckoutToken } = validation.data;
         let { membershipId } = validation.data;
+        let bioSessionId: string | null = null;
+        if (bioCheckoutToken) {
+            const bioSession = await queryOne<{ id: string }>(
+                `SELECT s.id FROM bio_checkout_sessions s
+                  JOIN orders o ON o.id=s.order_id
+                 WHERE s.token_hash=$1 AND s.user_id=$2 AND s.class_id=$3
+                   AND s.status='ready' AND s.expires_at>NOW() AND o.status='approved'`,
+                [bioTokenHash(bioCheckoutToken), userId, classId]
+            );
+            if (!bioSession) return res.status(403).json({ error: 'La confirmación de pago ya no es válida.' });
+            bioSessionId = bioSession.id;
+        }
 
         // 1. Get Class Details (check capacity)
         const classDetails = await queryOne(
@@ -442,7 +460,13 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
         if (!classDetails) return res.status(404).json({ error: 'Clase no encontrada' });
         if (classDetails.status !== 'scheduled') return res.status(400).json({ error: 'Esta clase no esta disponible' });
         if (classDetails.booking_closed) return res.status(400).json({ error: 'Esta clase está cerrada para nuevas reservas' });
-        if (classDetails.current_bookings >= classDetails.max_capacity) {
+        const activeHoldCount = await queryOne<{ count: string }>(
+            `SELECT COUNT(*)::text AS count FROM bio_checkout_sessions
+              WHERE class_id=$1 AND status IN ('pending_payment','paid','ready') AND expires_at>NOW()
+                AND ($2::uuid IS NULL OR id<>$2::uuid)`,
+            [classId, bioSessionId]
+        );
+        if (Number(classDetails.current_bookings) + Number(activeHoldCount?.count || 0) >= Number(classDetails.max_capacity)) {
             if (waitlist === true) {
                 const joined = await joinWaitlist({ userId, classId });
                 if (!joined.ok) {
@@ -647,7 +671,13 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                 [classId]
             );
             const capRow = capRes.rows[0];
-            if (capRow && Number(capRow.current_bookings) >= Number(capRow.max_capacity)) {
+            const holdRes = await client.query<{ count: string }>(
+                `SELECT COUNT(*)::text AS count FROM bio_checkout_sessions
+                  WHERE class_id=$1 AND status IN ('pending_payment','paid','ready') AND expires_at>NOW()
+                    AND ($2::uuid IS NULL OR id<>$2::uuid)`,
+                [classId, bioSessionId]
+            );
+            if (capRow && Number(capRow.current_bookings) + Number(holdRes.rows[0]?.count || 0) >= Number(capRow.max_capacity)) {
                 await client.query('ROLLBACK');
                 releaseClient();
                 if (waitlist === true) {
@@ -800,6 +830,13 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                 [classId, userId, membershipId, isFreeClass, consumedCategory, userId]
             );
             newBooking = insertRes.rows[0];
+
+            if (bioSessionId) {
+                await client.query(
+                    `UPDATE bio_checkout_sessions SET status='completed', completed_at=NOW(), updated_at=NOW() WHERE id=$1`,
+                    [bioSessionId]
+                );
+            }
 
             // El beneficio ya se marcó 'used' arriba (dentro de la tx, con rowCount verificado);
             // aquí solo se adjunta a qué reserva quedó ligado, para la reactivación al cancelar.

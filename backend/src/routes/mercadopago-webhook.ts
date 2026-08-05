@@ -80,6 +80,12 @@ router.post('/', async (req: Request, res: Response) => {
             if (payment.status === 'approved') {
                 // Idempotente: si la orden ya está approved, no hace nada.
                 await finalizePaidOrder(orderId, { provider: 'mercadopago', paymentRef: String(payment.id) });
+                await query(
+                    `UPDATE bio_checkout_sessions
+                        SET status='paid', expires_at=NOW()+INTERVAL '24 hours', updated_at=NOW()
+                      WHERE order_id=$1 AND status='pending_payment'`,
+                    [orderId]
+                );
             } else if (payment.status === 'rejected' || payment.status === 'cancelled') {
                 await query(
                     `UPDATE orders SET rejected_at=NOW(), updated_at=NOW()
