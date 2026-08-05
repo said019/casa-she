@@ -15,6 +15,7 @@ import instructorRoutes from './routes/instructors.js';
 import classTypeRoutes from './routes/class-types.js';
 import scheduleRoutes from './routes/schedules.js';
 import classRoutes from './routes/classes.js';
+import bioCheckoutRoutes from './routes/bio-checkout.js';
 import bookingRoutes from './routes/bookings.js';
 import clientsRouter from './routes/clients.js';
 import walletRoutes from './routes/wallet.js';
@@ -4258,6 +4259,10 @@ async function runStartupMigrations(): Promise<void> {
 
 // API Routes
 app.use('/api/auth', authLimiter, authRoutes);
+// Checkout público desde /bio. Lleva authLimiter y no solo el global: /complete
+// verifica la contraseña de cuentas EXISTENTES, así que a 600/min sería un
+// oráculo de fuerza bruta (caro —exige un pago aprobado antes— pero ilimitado).
+app.use('/api/bio-checkout', authLimiter, bioCheckoutRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/plans', planRoutes);
 app.use('/api/instructors', instructorRoutes);

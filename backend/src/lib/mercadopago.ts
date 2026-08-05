@@ -23,6 +23,7 @@ export interface CreatePreferenceInput {
     payerEmail?: string;
     backUrl: string;            // FRONTEND_URL/app/orders/:id  (a dónde regresa la clienta)
     notificationUrl?: string;   // BACKEND_URL/webhooks/mercadopago (si falta, se usa el webhook del panel)
+    expiresAt?: Date;
 }
 export interface CreatePreferenceResult { preferenceId: string; checkoutUrl: string; }
 
@@ -49,6 +50,11 @@ export function buildPreferenceBody(input: CreatePreferenceInput): Record<string
             pending: `${input.backUrl}?mp=pending`,
         },
         auto_return: 'approved',
+        ...(input.expiresAt ? {
+            expires: true,
+            expiration_date_from: new Date().toISOString(),
+            expiration_date_to: input.expiresAt.toISOString(),
+        } : {}),
         ...(input.notificationUrl ? { notification_url: input.notificationUrl } : {}),
         ...(input.orderNumber ? { metadata: { order_number: input.orderNumber } } : {}),
     };

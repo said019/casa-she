@@ -9,6 +9,8 @@ import UpdatePrompt from "@/components/UpdatePrompt";
 
 // Public pages
 import Index from "./pages/Index";
+import BioLink, { BioContact, BioLocation, BioPackages, BioReserve, BioSchedule, BioSpace } from "./pages/BioLink";
+import { BioCheckoutFinalize, BioGuestCheckout } from "./pages/BioGuestCheckout";
 import CasaSheLanding from "./pages/CasaSheLanding";
 import NotFound from "./pages/NotFound";
 import Privacy from "./pages/Privacy";
@@ -218,6 +220,16 @@ const App = () => (
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<CasaSheLanding />} />
+            <Route path="/bio" element={<BioLink />} />
+            <Route path="/bio-link" element={<BioLink />} />
+            <Route path="/bio/reservar" element={<BioReserve />} />
+            <Route path="/bio/horarios" element={<BioSchedule />} />
+            <Route path="/bio/pagar/:classId" element={<BioGuestCheckout />} />
+            <Route path="/bio/finalizar" element={<BioCheckoutFinalize />} />
+            <Route path="/bio/paquetes" element={<BioPackages />} />
+            <Route path="/bio/espacio" element={<BioSpace />} />
+            <Route path="/bio/ubicacion" element={<BioLocation />} />
+            <Route path="/bio/contacto" element={<BioContact />} />
             <Route path="/inicio-clasico" element={<Index />} />
             <Route path="/clases/:classId" element={<LegacyClientBookRedirect />} />
             <Route path="/coaches/:slug" element={<Navigate to="/#equipo" replace />} />
