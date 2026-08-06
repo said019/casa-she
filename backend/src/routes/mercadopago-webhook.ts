@@ -3,6 +3,7 @@ import { query } from '../config/database.js';
 import { verifyWebhookSignature, syncPayment } from '../lib/mercadopago.js';
 import { finalizePaidOrder, reversePaymentByReference } from '../lib/orderFulfillment.js';
 import { finalizeBarOrder } from '../lib/barFulfillment.js';
+import { finalizeEventRegistration } from '../lib/eventFulfillment.js';
 
 const router = Router();
 
@@ -67,6 +68,23 @@ router.post('/', async (req: Request, res: Response) => {
             await query(`UPDATE bar_orders SET payment_status='failed', updated_at=NOW() WHERE id=$1 AND payment_status='pending'`, [barOrderId]);
           }
           return res.status(200).json({ received: true, kind: 'bar' });
+        }
+
+        // Inscripciones a eventos van con "event:<registrationId>" — tampoco son membresías.
+        if (orderId && orderId.startsWith('event:')) {
+          const registrationId = orderId.slice(6);
+          await query(
+            `UPDATE event_registrations SET mp_payment_id=$1, provider='mercadopago', updated_at=NOW() WHERE id=$2`,
+            [String(payment.id), registrationId]);
+          if (payment.status === 'approved') {
+            await finalizeEventRegistration(registrationId, { provider: 'mercadopago', paymentRef: String(payment.id), paidAmount: payment.transaction_amount });
+          } else if (payment.status === 'rejected' || payment.status === 'cancelled') {
+            // Se suelta el lugar de inmediato en vez de esperar a que venza el hold.
+            await query(
+              `UPDATE event_registrations SET status='cancelled', hold_expires_at=NULL, updated_at=NOW()
+                WHERE id=$1 AND status='pending'`, [registrationId]);
+          }
+          return res.status(200).json({ received: true, kind: 'event' });
         }
 
         if (orderId) {
