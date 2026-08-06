@@ -6,8 +6,40 @@ import { cancelClassWithRefunds } from '../lib/cancel-class.js';
 import { sendEventAnnouncementEmail } from '../services/email.js';
 import { sendAlertToAllDevices, recordPassUpdate, notifyAllUserDevices } from '../lib/apple-wallet.js';
 import { sendMessageToAllGoogleObjects, upsertGoogleLoyaltyObject, sendGoogleWalletMessage } from '../lib/google-wallet.js';
+import { createPreference, mpConfigured } from '../lib/mercadopago.js';
+import { releaseExpiredEventHolds } from '../lib/eventFulfillment.js';
 
 const router = Router();
+
+// Minutos que se aparta el lugar mientras la clienta paga con tarjeta en MercadoPago.
+const CARD_HOLD_MINUTES = 30;
+
+/**
+ * Crea la preferencia de MP para una inscripción y le aparta el lugar.
+ *
+ * El prefijo "event:" en el external_reference es lo que el webhook usa para no tratar
+ * el pago como una compra de membresía. Lanza si MP falla; quien llama decide qué hacer
+ * con la inscripción.
+ */
+async function startCardCheckout(input: {
+    registrationId: string; eventTitle: string; amount: number; payerEmail?: string;
+}): Promise<string> {
+    const pref = await createPreference({
+        orderId: `event:${input.registrationId}`,
+        items: [{ title: input.eventTitle, quantity: 1, unit_price: input.amount }],
+        payerEmail: input.payerEmail || undefined,
+        backUrl: `${process.env.FRONTEND_URL}/app/events`,
+        notificationUrl: process.env.BACKEND_URL ? `${process.env.BACKEND_URL}/webhooks/mercadopago` : undefined,
+    });
+    await query(
+        `UPDATE event_registrations
+            SET provider = 'mercadopago', payment_method = 'card', mp_checkout_url = $1,
+                hold_expires_at = NOW() + ($2 || ' minutes')::interval, updated_at = NOW()
+          WHERE id = $3`,
+        [pref.checkoutUrl, String(CARD_HOLD_MINUTES), input.registrationId]
+    );
+    return pref.checkoutUrl;
+}
 
 // ============================================
 // SCHEMAS
@@ -111,6 +143,10 @@ function mapEventRow(row: any) {
 router.get('/', optionalAuth, async (req: Request, res: Response) => {
     try {
         const { type, upcoming } = req.query;
+
+        // Antes de reportar cupo: suelta los lugares de checkouts de tarjeta abandonados,
+        // si no la lista muestra eventos "llenos" de puros fantasmas.
+        await releaseExpiredEventHolds().catch((e) => console.error('releaseExpiredEventHolds (list):', e));
 
         let sql = `
             SELECT * FROM events
@@ -259,6 +295,8 @@ router.get('/registrations/pending', authenticate, requireRole('admin', 'super_a
 // ============================================
 router.get('/:id', optionalAuth, async (req: Request, res: Response) => {
     try {
+        await releaseExpiredEventHolds(req.params.id).catch((e) => console.error('releaseExpiredEventHolds (detail):', e));
+
         const event = await queryOne(`SELECT * FROM events WHERE id = $1`, [req.params.id]);
 
         if (!event) {
@@ -276,7 +314,8 @@ router.get('/:id', optionalAuth, async (req: Request, res: Response) => {
         let myRegistration = null;
         if (req.user) {
             const reg = await queryOne(
-                `SELECT id, status, amount, checked_in, payment_method, payment_reference, payment_proof_url, payment_proof_file_name, transfer_date
+                `SELECT id, status, amount, checked_in, payment_method, payment_reference, payment_proof_url, payment_proof_file_name, transfer_date,
+                        mp_checkout_url, hold_expires_at
                  FROM event_registrations WHERE event_id = $1 AND user_id = $2`,
                 [req.params.id, req.user.userId]
             );
@@ -291,6 +330,9 @@ router.get('/:id', optionalAuth, async (req: Request, res: Response) => {
                     hasPaymentProof: !!reg.payment_proof_url,
                     paymentProofFileName: reg.payment_proof_file_name,
                     transferDate: reg.transfer_date,
+                    // Permite retomar el pago con tarjeta mientras el lugar siga apartado.
+                    checkoutUrl: reg.mp_checkout_url,
+                    holdExpiresAt: reg.hold_expires_at,
                 };
             }
         }
@@ -489,6 +531,10 @@ router.post('/:id/register', authenticate, async (req: Request, res: Response) =
         const eventId = req.params.id;
         const userId = req.user!.userId;
 
+        // Se libera ANTES de leer el evento: `event.registered` se usa para decidir si está
+        // lleno, y sin esto un checkout abandonado mandaría a la clienta a la lista de espera.
+        await releaseExpiredEventHolds(eventId).catch((e) => console.error('releaseExpiredEventHolds (register):', e));
+
         // Get event
         const event = await queryOne(`SELECT * FROM events WHERE id = $1 AND status = 'published'`, [eventId]);
         if (!event) {
@@ -642,6 +688,38 @@ router.post('/:id/register', authenticate, async (req: Request, res: Response) =
             }
         }
 
+        // Tarjeta: se aparta el lugar por CARD_HOLD_MINUTES y se manda a MercadoPago.
+        // El prefijo "event:" es lo que el webhook usa para no tratarlo como membresía.
+        let checkoutUrl: string | null = null;
+        if (status === 'pending' && selectedPaymentMethod === 'card') {
+            if (!mpConfigured()) {
+                await query(`DELETE FROM event_registrations WHERE id = $1`, [registration.id]);
+                if (claimedWorkshopBenefitId) {
+                    await query(`UPDATE user_benefits SET status = 'active', used_at = NULL, used_on_event_registration_id = NULL
+                        WHERE id = $1 AND status = 'used' AND expires_at > NOW()`, [claimedWorkshopBenefitId]);
+                }
+                return res.status(503).json({ error: 'El pago con tarjeta no está disponible por ahora. Puedes pagar por transferencia.' });
+            }
+            try {
+                checkoutUrl = await startCardCheckout({
+                    registrationId: registration.id,
+                    eventTitle: event.title,
+                    amount,
+                    payerEmail: data.email,
+                });
+            } catch (e) {
+                // Sin preferencia no hay forma de pagar: se deshace todo para no dejar el
+                // lugar apartado a una inscripción que nunca podrá completarse.
+                console.error('Event card preference error:', e);
+                await query(`DELETE FROM event_registrations WHERE id = $1`, [registration.id]);
+                if (claimedWorkshopBenefitId) {
+                    await query(`UPDATE user_benefits SET status = 'active', used_at = NULL, used_on_event_registration_id = NULL
+                        WHERE id = $1 AND status = 'used' AND expires_at > NOW()`, [claimedWorkshopBenefitId]);
+                }
+                return res.status(502).json({ error: 'No pudimos iniciar el pago con tarjeta. Intenta de nuevo o paga por transferencia.' });
+            }
+        }
+
         res.status(201).json({
             id: registration.id,
             status: registration.status,
@@ -649,10 +727,14 @@ router.post('/:id/register', authenticate, async (req: Request, res: Response) =
             isFree,
             membershipWorkshopIncluded: !!claimedWorkshopBenefitId,
             waitlistPosition: registration.waitlist_position,
+            checkoutUrl,
+            holdMinutes: checkoutUrl ? CARD_HOLD_MINUTES : null,
             message: isFull
                 ? `Te agregamos a la lista de espera (posición ${waitlistPosition})`
                 : isFree
                 ? '¡Registro confirmado! Te esperamos en el evento.'
+                : checkoutUrl
+                ? `Te apartamos el lugar ${CARD_HOLD_MINUTES} minutos mientras completas el pago.`
                 : selectedPaymentMethod === 'cash'
                 ? 'Registro pendiente. Puedes pagar en recepción del studio para confirmar tu lugar.'
                 : 'Registro pendiente de pago. Una vez confirmado tu pago, recibirás la confirmación.',
@@ -663,6 +745,60 @@ router.post('/:id/register', authenticate, async (req: Request, res: Response) =
         }
         console.error('Register for event error:', error);
         res.status(500).json({ error: 'Error al registrarse en el evento' });
+    }
+});
+
+// ============================================
+// CLIENT: POST /api/events/:id/pay-card - Generar (o retomar) el pago con tarjeta
+// de una inscripción que ya existe y sigue pendiente.
+// ============================================
+router.post('/:id/pay-card', authenticate, async (req: Request, res: Response) => {
+    try {
+        const eventId = req.params.id;
+        const userId = req.user!.userId;
+
+        if (!mpConfigured()) {
+            return res.status(503).json({ error: 'El pago con tarjeta no está disponible por ahora.' });
+        }
+
+        const event = await queryOne<{ title: string }>(
+            `SELECT title FROM events WHERE id = $1 AND status = 'published'`, [eventId]);
+        if (!event) return res.status(404).json({ error: 'Evento no encontrado o no disponible' });
+
+        const reg = await queryOne<{
+            id: string; status: string; amount: string; email: string;
+            mp_checkout_url: string | null; hold_expires_at: Date | null;
+        }>(
+            `SELECT id, status, amount, email, mp_checkout_url, hold_expires_at
+               FROM event_registrations WHERE event_id = $1 AND user_id = $2`,
+            [eventId, userId]
+        );
+        if (!reg || reg.status !== 'pending') {
+            return res.status(400).json({ error: 'No tienes una inscripción pendiente en este evento' });
+        }
+
+        const amount = parseFloat(reg.amount) || 0;
+        if (amount <= 0) return res.status(400).json({ error: 'Esta inscripción no requiere pago' });
+
+        // Si el hold sigue vivo se reusa la misma preferencia: crear una nueva por cada clic
+        // dejaría varios checkouts abiertos para la misma inscripción.
+        const holdAlive = reg.hold_expires_at != null && reg.hold_expires_at.getTime() > Date.now();
+        if (holdAlive && reg.mp_checkout_url) {
+            return res.json({ checkoutUrl: reg.mp_checkout_url, holdMinutes: CARD_HOLD_MINUTES });
+        }
+
+        try {
+            const checkoutUrl = await startCardCheckout({
+                registrationId: reg.id, eventTitle: event.title, amount, payerEmail: reg.email,
+            });
+            return res.json({ checkoutUrl, holdMinutes: CARD_HOLD_MINUTES });
+        } catch (e) {
+            console.error('Event pay-card preference error:', e);
+            return res.status(502).json({ error: 'No pudimos iniciar el pago con tarjeta. Intenta de nuevo o paga por transferencia.' });
+        }
+    } catch (error) {
+        console.error('Event pay-card error:', error);
+        res.status(500).json({ error: 'Error al iniciar el pago' });
     }
 });
 

@@ -82,6 +82,8 @@ interface ClientEvent {
     hasPaymentProof: boolean;
     paymentProofFileName: string | null;
     transferDate: string | null;
+    checkoutUrl: string | null;
+    holdExpiresAt: string | null;
   } | null;
 }
 
@@ -93,7 +95,10 @@ interface BankInfo {
   reference_instructions: string;
 }
 
-type EventPaymentMethod = 'transfer' | 'cash';
+// Lo que la clienta puede ELEGIR en la app. El efectivo lo registra recepción, no ella.
+type EventPaymentMethod = 'transfer' | 'card';
+// Lo que puede traer una inscripción ya existente — incluye el efectivo de recepción.
+type RegistrationPaymentMethod = EventPaymentMethod | 'cash';
 
 const typeIcons: Record<string, React.ReactNode> = {
   masterclass: <Star className="h-5 w-5" />,
@@ -200,6 +205,11 @@ export default function ClientEvents() {
         title: data.isFree ? '¡Registro confirmado!' : 'Registro exitoso',
         description: data.message,
       });
+      // Tarjeta: el lugar ya quedó apartado, ahora se va a pagar a MercadoPago.
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return;
+      }
       // For paid events, stay on the detail view to show payment section
       if (!data.isFree && selectedEvent) {
         // Refresh the event detail to get the updated myRegistration
@@ -211,6 +221,20 @@ export default function ClientEvents() {
     onError: (err: any) => {
       const msg = err?.response?.data?.error || 'Error al registrarse';
       toast({ title: 'Error', description: msg, variant: 'destructive' });
+    },
+  });
+
+  // Genera (o retoma) el checkout de MP para una inscripción que ya está pendiente:
+  // sirve tanto para volver a un pago a medias como para cambiar de transferencia a tarjeta.
+  const payCardMutation = useMutation({
+    mutationFn: async (eventId: string) => {
+      return (await api.post(`/events/${eventId}/pay-card`)).data;
+    },
+    onSuccess: (data) => {
+      if (data.checkoutUrl) window.location.href = data.checkoutUrl;
+    },
+    onError: (err) => {
+      toast({ title: 'No pudimos abrir el pago', description: getErrorMessage(err), variant: 'destructive' });
     },
   });
 
@@ -314,12 +338,9 @@ export default function ClientEvents() {
   useEffect(() => {
     if (selectedRegistrationStatus !== 'pending') return;
 
-    if (selectedRegistrationMethod === 'cash') {
-      setEventPaymentMethod('cash');
-      return;
-    }
-
-    setEventPaymentMethod('transfer');
+    // El efectivo ya no es elegible aquí; si la inscripción viene de recepción se muestra
+    // vía `pendingMethod`, pero el selector se queda en transferencia.
+    setEventPaymentMethod(selectedRegistrationMethod === 'card' ? 'card' : 'transfer');
   }, [selectedRegistrationMethod, selectedRegistrationStatus]);
 
   // Detail view
@@ -333,7 +354,9 @@ export default function ClientEvents() {
     const isFull = ev.registered >= ev.capacity;
     const occupancy = Math.round((ev.registered / ev.capacity) * 100);
     const isRegistered = ev.myRegistration && ev.myRegistration.status !== 'cancelled';
-    const pendingMethod: EventPaymentMethod = ev.myRegistration?.paymentMethod === 'cash' ? 'cash' : eventPaymentMethod;
+    const rawMethod = ev.myRegistration?.paymentMethod;
+    const pendingMethod: RegistrationPaymentMethod =
+      rawMethod === 'cash' || rawMethod === 'card' || rawMethod === 'transfer' ? rawMethod : eventPaymentMethod;
 
     // Calculate price for user
     let userPrice = ev.price;
@@ -521,6 +544,8 @@ export default function ClientEvents() {
                             ? 'Estás en la lista de espera'
                             : pendingMethod === 'cash'
                             ? 'Pendiente de pago en studio'
+                            : pendingMethod === 'card'
+                            ? 'Pendiente de pago con tarjeta'
                             : ev.myRegistration!.hasPaymentProof || ev.myRegistration!.paymentReference
                             ? 'Comprobante enviado — en revisión'
                             : 'Pendiente de pago'}
@@ -540,6 +565,8 @@ export default function ClientEvents() {
                             : ev.myRegistration!.status === 'pending'
                             ? pendingMethod === 'cash'
                               ? 'Paga en recepción del studio para confirmar tu lugar.'
+                              : pendingMethod === 'card'
+                              ? 'Completa tu pago con tarjeta para confirmar tu lugar.'
                               : ev.myRegistration!.hasPaymentProof || ev.myRegistration!.paymentReference
                               ? 'Tu pago está siendo verificado. Te notificaremos cuando sea confirmado.'
                               : 'Realiza tu transferencia y sube tu comprobante abajo'
@@ -619,17 +646,44 @@ export default function ClientEvents() {
                             </div>
                           </label>
                           <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer">
-                            <RadioGroupItem value="cash" />
+                            <RadioGroupItem value="card" />
                             <CreditCard className="h-5 w-5 text-muted-foreground" />
                             <div>
-                              <p className="text-sm font-medium">Pagar en studio</p>
-                              <p className="text-xs text-muted-foreground">Liquidarás en recepción</p>
+                              <p className="text-sm font-medium">Tarjeta</p>
+                              <p className="text-xs text-muted-foreground">Pago seguro con MercadoPago</p>
                             </div>
                           </label>
                         </RadioGroup>
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* Tarjeta: retomar el checkout mientras el lugar siga apartado */}
+                  {pendingMethod === 'card' && (
+                    <Card className="border rounded-[1.25rem]" style={{ borderColor: `${color}30` }}>
+                      <CardContent className="p-6 space-y-4">
+                        <div className="flex items-center gap-3">
+                          <CreditCard className="h-5 w-5 text-primary" />
+                          <div>
+                            <h3 className="font-heading font-bold text-foreground">Completa tu pago</h3>
+                            <p className="text-xs text-muted-foreground">
+                              Tu lugar está apartado hasta que termines de pagar.
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          className="w-full"
+                          style={{ background: color }}
+                          disabled={payCardMutation.isPending}
+                          onClick={() => payCardMutation.mutate(ev.id)}
+                        >
+                          {payCardMutation.isPending
+                            ? 'Abriendo pago...'
+                            : `Pagar $${userPrice} MXN con tarjeta`}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Bank transfer details */}
                   {pendingMethod === 'transfer' && bankInfo && (
@@ -907,11 +961,13 @@ export default function ClientEvents() {
                         </div>
                       </label>
                       <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer">
-                        <RadioGroupItem value="cash" />
+                        <RadioGroupItem value="card" />
                         <CreditCard className="h-4 w-4 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium">Pagar en studio</p>
-                          <p className="text-xs text-muted-foreground">Pago físico en recepción</p>
+                          <p className="text-sm font-medium">Tarjeta</p>
+                          <p className="text-xs text-muted-foreground">
+                            Pago seguro con MercadoPago. Te apartamos el lugar 30 minutos.
+                          </p>
                         </div>
                       </label>
                     </RadioGroup>

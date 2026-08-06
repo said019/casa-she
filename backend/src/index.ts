@@ -4264,6 +4264,22 @@ async function runStartupMigrations(): Promise<void> {
         console.log('  ✅ Migration 116: event_registrations payment proof columns');
     } catch (e) { console.error('Migration 116 error:', e); }
 
+    // ---- Migration 117: pago de eventos con tarjeta (MercadoPago) ----
+    // `hold_expires_at` aparta el lugar mientras la clienta paga en MP. Solo se llena en
+    // pagos con TARJETA: una transferencia pendiente espera confirmación humana y no debe
+    // expirar nunca. Idempotente.
+    try {
+        await query(`ALTER TABLE event_registrations
+            ADD COLUMN IF NOT EXISTS mp_checkout_url TEXT,
+            ADD COLUMN IF NOT EXISTS mp_payment_id TEXT,
+            ADD COLUMN IF NOT EXISTS provider TEXT,
+            ADD COLUMN IF NOT EXISTS hold_expires_at TIMESTAMPTZ`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_event_reg_expired_card_holds
+            ON event_registrations(hold_expires_at)
+            WHERE status = 'pending' AND hold_expires_at IS NOT NULL`);
+        console.log('  ✅ Migration 117: event_registrations card payment columns');
+    } catch (e) { console.error('Migration 117 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();
