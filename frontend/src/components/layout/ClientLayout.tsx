@@ -61,10 +61,15 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     const navigate = useNavigate();
     const { user, logout } = useAuthStore();
     const { data: barCfg } = useBarConfig();
+    const fuelBarItem = { href: '/app/fuel-bar', label: 'Fuel Bar', icon: 'local_cafe' };
     // Fuel Bar como acceso rápido en el bottom-nav, solo cuando la barra está encendida.
-    const navItems = barCfg?.enabled
-        ? [...bottomNavItems.slice(0, 3), { href: '/app/fuel-bar', label: 'Fuel Bar', icon: 'local_cafe' }, bottomNavItems[3]]
+    const bottomNav = barCfg?.enabled
+        ? [...bottomNavItems.slice(0, 3), fuelBarItem, bottomNavItems[3]]
         : bottomNavItems;
+    // Nav completo (topbar desktop + menú hamburguesa): incluye Eventos y Videos.
+    const fullNav = barCfg?.enabled
+        ? [...navItems.slice(0, 4), fuelBarItem, ...navItems.slice(4)]
+        : navItems;
 
     // Badge de notificaciones in-app: polling cada 60s mientras la pestaña está activa.
     const { data: unreadData } = useQuery<{ count: number }>({
@@ -117,7 +122,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                     </Link>
 
                     <nav className="hidden items-center gap-1 rounded-full border border-balance-sand/55 bg-[hsl(var(--admin-panel))]/80 p-1.5 backdrop-blur lg:flex">
-                        {navItems.map((item) => {
+                        {fullNav.map((item) => {
                             const isActive = isActivePath(item.href);
                             return (
                                 <Link
@@ -216,7 +221,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                 {mobileMenuOpen && (
                     <nav className="border-t border-balance-sand/45 bg-[hsl(var(--admin-panel))]/96 p-4 backdrop-blur-xl lg:hidden">
                         <div className="mx-auto grid max-w-[1480px] gap-2 sm:grid-cols-2">
-                            {navItems.map((item) => {
+                            {fullNav.map((item) => {
                                 const isActive = isActivePath(item.href);
                                 return (
                                     <Link
@@ -256,8 +261,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                 className="fixed bottom-0 left-0 right-0 z-[55] border-t border-balance-sand/45 bg-[hsl(var(--admin-panel))]/92 shadow-[0_-24px_60px_-42px_rgba(42,33,24,0.85)] backdrop-blur-xl lg:hidden"
                 style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
             >
-                <div className={cn('grid gap-1 px-2 py-2', navItems.length >= 5 ? 'grid-cols-5' : 'grid-cols-4')}>
-                    {navItems.map((item) => {
+                <div className={cn('grid gap-1 px-2 py-2', bottomNav.length >= 5 ? 'grid-cols-5' : 'grid-cols-4')}>
+                    {bottomNav.map((item) => {
                         const isActive = isActivePath(item.href);
                         return (
                             <Link
