@@ -4251,6 +4251,19 @@ async function runStartupMigrations(): Promise<void> {
         console.log('  ✅ Migration 115: bio_checkout_sessions');
     } catch (e) { console.error('Migration 115 error:', e); }
 
+    // ---- Migration 116: comprobante de pago en event_registrations ----
+    // La 008 creó la tabla SIN estas columnas, pero GET /events/:id las lee cuando hay
+    // sesión → Postgres tiraba "column payment_proof_url does not exist" → 500. El front
+    // hacía .then() sin .catch(), así que la clienta solo veía que el evento no abría.
+    // Idempotente.
+    try {
+        await query(`ALTER TABLE event_registrations
+            ADD COLUMN IF NOT EXISTS payment_proof_url TEXT,
+            ADD COLUMN IF NOT EXISTS payment_proof_file_name VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS transfer_date DATE`);
+        console.log('  ✅ Migration 116: event_registrations payment proof columns');
+    } catch (e) { console.error('Migration 116 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();

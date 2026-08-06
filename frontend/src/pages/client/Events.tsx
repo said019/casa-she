@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
-import api from '@/lib/api';
+import api, { getErrorMessage } from '@/lib/api';
 import { fetchMyMembership } from '@/lib/memberships';
 import type { ClientMembership } from '@/types/membership';
 import { ClientLayout } from '@/components/layout/ClientLayout';
@@ -1018,7 +1018,17 @@ export default function ClientEvents() {
                     style={{ borderColor: `${color}20` }}
                     onClick={() => {
                       // Fetch detail for myRegistration
-                      api.get(`/events/${ev.id}`).then((res) => setSelectedEvent(res.data));
+                      api
+                        .get(`/events/${ev.id}`)
+                        .then((res) => setSelectedEvent(res.data))
+                        .catch((err) => {
+                          // Sin este catch el fallo era mudo: la tarjeta simplemente no abría.
+                          toast({
+                            title: 'No pudimos abrir el evento',
+                            description: getErrorMessage(err),
+                            variant: 'destructive',
+                          });
+                        });
                     }}
                   >
                     <CardContent className="p-5 space-y-4">
