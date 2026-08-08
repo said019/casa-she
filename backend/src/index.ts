@@ -4280,6 +4280,22 @@ async function runStartupMigrations(): Promise<void> {
         console.log('  ✅ Migration 117: event_registrations card payment columns');
     } catch (e) { console.error('Migration 117 error:', e); }
 
+    // ---- Migration 118: columnas de configuración de eventos ----
+    // Definidas en database/migrations/012_event_config_columns.sql pero NUNCA aplicadas
+    // aquí (schema drift del base). POST /api/events las INSERTA siempre, así que crear un
+    // evento desde el panel de admin reventaba con "column waitlist_enabled does not exist"
+    // → 500. Los toggles del panel tampoco guardaban nada. Los DEFAULT espejan los de la
+    // 012 y los de CreateEventSchema. Idempotente.
+    try {
+        await query(`ALTER TABLE events
+            ADD COLUMN IF NOT EXISTS waitlist_enabled BOOLEAN NOT NULL DEFAULT true,
+            ADD COLUMN IF NOT EXISTS required_payment BOOLEAN NOT NULL DEFAULT true,
+            ADD COLUMN IF NOT EXISTS wallet_pass BOOLEAN NOT NULL DEFAULT true,
+            ADD COLUMN IF NOT EXISTS auto_reminders BOOLEAN NOT NULL DEFAULT false,
+            ADD COLUMN IF NOT EXISTS allow_cancellations BOOLEAN NOT NULL DEFAULT false`);
+        console.log('  ✅ Migration 118: events config columns');
+    } catch (e) { console.error('Migration 118 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();
