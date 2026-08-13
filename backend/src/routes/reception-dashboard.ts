@@ -222,13 +222,15 @@ router.get('/checkin-agenda', authenticate, requireRole(...STAFF), async (req: R
             photo_url: string | null; status: string; checked_in_at: string | null;
             is_first_class: boolean | null; plan_name: string | null;
             plan_color: string | null; plan_is_internal: boolean | null;
+            payment_method: string | null;
         };
         const ids = classes.map((c) => c.id);
         const attendees = ids.length
             ? await query<Att>(`
                 SELECT b.class_id, b.id AS booking_id, b.user_id, u.display_name, u.photo_url,
                        b.status, b.checked_in_at::text AS checked_in_at, cl.is_first_class,
-                       p.name AS plan_name, p.color AS plan_color, p.is_internal AS plan_is_internal
+                       p.name AS plan_name, p.color AS plan_color, p.is_internal AS plan_is_internal,
+                       m.payment_method::text AS payment_method
                 FROM bookings b
                 JOIN users u ON u.id = b.user_id
                 LEFT JOIN checkin_logs cl ON cl.booking_id = b.id
@@ -270,6 +272,7 @@ router.get('/checkin-agenda', authenticate, requireRole(...STAFF), async (req: R
                     plan_name: a.plan_name,
                     plan_color: a.plan_color,
                     plan_is_internal: a.plan_is_internal,
+                    payment_method: a.payment_method,
                 })),
             })),
         });

@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { BookingToggleCard } from '@/components/admin/BookingToggleCard';
 import { CajaStatusCard } from '@/components/admin/CajaStatusCard';
 import { PlatformBadge } from '@/components/PlatformBadge';
+import { StudioPaymentBadge } from '@/components/bookings/StudioPaymentBadge';
 import {
     CreditCard, Users, TrendingUp, AlertCircle, Loader2,
     Calendar, UserCheck, ChevronRight, Banknote, Wallet,
@@ -68,6 +69,7 @@ interface AgendaAttendee {
     plan_name?: string | null;
     plan_color?: string | null;
     plan_is_internal?: boolean | null;
+    payment_method?: string | null;
 }
 interface AgendaClass {
     id: string;
@@ -222,6 +224,7 @@ function CheckinAgenda({ facilityIdParam }: { facilityIdParam: string | null }) 
                                                                         <div className="flex items-center gap-1.5">
                                                                             <p className="truncate text-sm font-medium">{a.display_name}</p>
                                                                             <PlatformBadge name={a.plan_color ? a.plan_name : null} color={a.plan_color} />
+                                                                            <StudioPaymentBadge paymentMethod={a.payment_method} />
                                                                         </div>
                                                                         <p className="truncate text-[11px] text-muted-foreground">
                                                                             {a.plan_name || (a.status === 'waitlist' ? 'Lista de espera' : '—')}

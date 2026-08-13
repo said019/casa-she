@@ -36,6 +36,7 @@ import { useIsElevated } from '@/hooks/useIsElevated';
 import { useAuthStore } from '@/stores/authStore';
 import SellPlanDialog from '@/components/memberships/SellPlanDialog';
 import { formatFolio } from '@/lib/folio';
+import { StudioPaymentBadge } from '@/components/bookings/StudioPaymentBadge';
 
 const WEEK_DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
@@ -146,6 +147,7 @@ interface BookingRow {
     class_name: string;
     instructor_name: string;
     plan_name?: string;
+    payment_method?: string | null;
     is_free_booking?: boolean;
     user_phone?: string;
     booked_by?: string | null;
@@ -504,6 +506,7 @@ function ClassDetailDrawer({
                                                                                 ) : (
                                                                                     <span className={b.plan_name ? '' : 'text-amber-600'}>{planLabel(b)}</span>
                                                                                 )}
+                                                                                <StudioPaymentBadge paymentMethod={b.payment_method} />
                                                                                 {b.user_phone && (
                                                                                     <><Phone className="h-3 w-3 shrink-0 ml-1" /><span>{b.user_phone}</span></>
                                                                                 )}
@@ -587,7 +590,10 @@ function ClassDetailDrawer({
                                                                                         <span className="ml-1.5 text-[10px] font-normal text-muted-foreground tabular-nums">{formatFolio(b.folio)}</span>
                                                                                     )}
                                                                                 </p>
-                                                                                <p className="text-xs text-muted-foreground truncate">{planLabel(b)}{b.user_phone ? ` · ${b.user_phone}` : ''}</p>
+                                                                                <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                                                                                    <span className="truncate">{planLabel(b)}{b.user_phone ? ` · ${b.user_phone}` : ''}</span>
+                                                                                    <StudioPaymentBadge paymentMethod={b.payment_method} />
+                                                                                </div>
                                                                             </div>
                                                                             <div className="flex items-center gap-1 shrink-0">
                                                                                 <Badge variant="outline" className="text-amber-600 border-amber-600">espera</Badge>

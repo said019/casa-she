@@ -10,6 +10,10 @@ assert.match(normal, /Montserrat Rojas/);
 assert.match(normal, /Barre · lunes 27 jul, 08:00/);
 assert.match(normal, /Coach: Regina/);
 assert.ok(!/sobre el cupo/i.test(normal), 'sin sobrecupo no debe advertir');
+assert.ok(!/Pago en estudio/.test(normal), 'sin pago en efectivo no debe mostrar la etiqueta');
+
+const pagoEnEstudio = construirMensaje({ ...base, coach: 'Regina', pagoEnEstudio: true });
+assert.match(pagoEnEstudio, /Pago en estudio/);
 
 // Sin coach: no aparece la línea vacía "Coach:"
 const sinCoach = construirMensaje({ ...base, coach: null });
