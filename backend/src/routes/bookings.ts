@@ -70,6 +70,7 @@ router.get('/', authenticate, requireRole('admin', 'instructor', 'reception'), a
         i.display_name as instructor_name,
         m.id as membership_id,
         p.name as plan_name,
+        m.payment_method::text as payment_method,
         b.is_free_booking,
         b.booked_by,
         bb.display_name as booked_by_name,
@@ -933,13 +934,15 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                 const c = await queryOne<any>(
                     `SELECT ct.name AS clase, c.date::text AS fecha,
                             substr(c.start_time::text,1,5) AS hora,
-                            i.display_name AS coach, u.display_name AS quien
+                            i.display_name AS coach, u.display_name AS quien,
+                            m.payment_method::text AS payment_method
                        FROM classes c
                        JOIN class_types ct ON ct.id = c.class_type_id
                        LEFT JOIN instructors i ON i.id = c.instructor_id
                        JOIN users u ON u.id = $2
+                       LEFT JOIN memberships m ON m.id = $3
                       WHERE c.id = $1`,
-                    [classId, userId],
+                    [classId, userId, membershipId],
                 );
                 if (!c) return;
                 await avisarReservaTotalPass({
@@ -949,6 +952,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                     hora: c.hora,
                     coach: c.coach,
                     origen: req.user?.role === 'client' ? 'app' : 'recepcion',
+                    pagoEnEstudio: c.payment_method === 'cash',
                 });
             } catch (e) {
                 console.error('[aviso-reserva] falló (no bloquea):', (e as Error).message);

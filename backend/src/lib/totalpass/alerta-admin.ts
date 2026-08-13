@@ -26,6 +26,8 @@ export interface AvisoReservaTotalPass {
     sobrecupo?: boolean;
     /** De dónde vino la reserva. 'totalpass' por defecto (de ahí nació este aviso). */
     origen?: 'totalpass' | 'app' | 'recepcion';
+    /** La membresía usada para reservar se pagó en efectivo en el estudio. */
+    pagoEnEstudio?: boolean;
 }
 
 /**
@@ -66,6 +68,7 @@ export function construirMensaje(r: AvisoReservaTotalPass): string {
         `${r.clase} · ${fechaBonita(r.fecha)}, ${r.hora}`,
     ];
     if (r.coach) lineas.push(`Coach: ${r.coach}`);
+    if (r.pagoEnEstudio) lineas.push('💵 *Pago en estudio*');
     if (r.sobrecupo) lineas.push('', '⚠️ Entró por encima del cupo de la clase.');
     lineas.push('', 'Ya aparece en el calendario de Casa Shé.');
     return lineas.join('\n');

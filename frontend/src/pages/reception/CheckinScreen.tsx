@@ -20,6 +20,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { CancelBookingDialog } from '@/components/bookings/CancelBookingDialog';
 import { useFacilityScope } from '@/hooks/useFacilityScope';
+import { StudioPaymentBadge } from '@/components/bookings/StudioPaymentBadge';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,6 +61,7 @@ interface Attendee {
   plan_name?: string | null;
   plan_color?: string | null;
   plan_is_internal?: boolean | null;
+  payment_method?: string | null;
 }
 
 interface AttendanceStats {
@@ -171,6 +173,7 @@ function AttendeeRow({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium truncate">{attendee.display_name}</span>
             <PlatformBadge name={attendee.plan_color ? attendee.plan_name : null} color={attendee.plan_color} />
+            <StudioPaymentBadge paymentMethod={attendee.payment_method} />
             {attendee.is_first_class && (
               <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
                 Primera clase

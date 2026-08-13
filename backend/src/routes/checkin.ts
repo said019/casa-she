@@ -910,6 +910,7 @@ router.get('/class/:classId', authenticate, requirePermission('checkin', ['instr
       plan_name: string | null;
       plan_color: string | null;
       plan_is_internal: boolean | null;
+      payment_method: string | null;
     }>(
       `SELECT
          b.id as booking_id,
@@ -933,7 +934,8 @@ router.get('/class/:classId', authenticate, requirePermission('checkin', ['instr
          f.name as facility_name,
          p.name as plan_name,
          p.color as plan_color,
-         p.is_internal as plan_is_internal
+         p.is_internal as plan_is_internal,
+         m.payment_method::text as payment_method
        FROM bookings b
        JOIN users u ON b.user_id = u.id
        LEFT JOIN checkin_logs cl ON b.id = cl.booking_id
