@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { cdmxToday, addDaysToDate } from '../lib/schedule.js';
 import { Readable } from 'node:stream';
 import { z } from 'zod';
 import { query, queryOne, pool } from '../config/database.js';
@@ -956,9 +957,10 @@ router.post('/:id/approve', authenticate, requireRole('admin', 'super_admin'), a
             await client.query('BEGIN');
 
             // Calculate membership dates
-            const start = startDate ? new Date(startDate) : new Date();
-            const end = new Date(start);
-            end.setDate(end.getDate() + order.duration_days);
+            // Fechas en CDMX, no en UTC: el servidor va un día adelante desde las 18:00 del
+            // estudio, y una membresía que arranca "mañana" no sirve para la clase de esta tarde.
+            const start = startDate ? String(startDate).split('T')[0] : cdmxToday();
+            const end = addDaysToDate(start, order.duration_days);
 
             // Map payment method to valid enum value
             // Create membership (bank_transfer now supported in enum)
@@ -1090,8 +1092,8 @@ router.post('/:id/approve', authenticate, requireRole('admin', 'super_admin'), a
 
             // Send notifications
             if (updatedOrder) {
-                const startStr = start.toISOString().split('T')[0];
-                const endStr = end.toISOString().split('T')[0];
+                const startStr = start;
+                const endStr = end;
                 if (updatedOrder.user_email) {
                     sendMembershipActivatedEmail({
                         to: updatedOrder.user_email,
@@ -1103,7 +1105,7 @@ router.post('/:id/approve', authenticate, requireRole('admin', 'super_admin'), a
                     }).catch(e => console.error('Email notification error:', e));
                 }
                 if (updatedOrder.user_phone) {
-                    const fmtEnd = end.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+                    const fmtEnd = new Date(`${end}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
                     sendMembershipActivatedNotice(
                         updatedOrder.user_phone, updatedOrder.user_name || 'Cliente',
                         updatedOrder.plan_name, updatedOrder.class_limit || null, fmtEnd

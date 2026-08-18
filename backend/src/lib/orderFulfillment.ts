@@ -3,6 +3,7 @@ import { sendMembershipActivatedEmail } from '../services/email.js';
 import { sendMembershipActivatedNotice } from '../lib/whatsapp.js';
 import { awardPaymentLoyaltyPoints, awardReferralBonus, reversePaymentLoyaltyPoints, reverseReferralBonus } from '../lib/loyalty.js';
 import { notifyMembershipRenewed, notifyPointsEarnedExternal } from '../lib/notifications.js';
+import { cdmxToday, addDaysToDate } from '../lib/schedule.js';
 
 export interface FinalizeOpts { provider: string; paymentRef: string | null; }
 
@@ -40,9 +41,11 @@ export async function finalizePaidOrder(orderId: string, opts: FinalizeOpts): Pr
             return;
         }
 
-        const start = new Date();
-        const end = new Date(start);
-        end.setDate(end.getDate() + order.duration_days);
+        // Fechas en CDMX, NO en UTC. El servidor corre en UTC, así que `new Date()` ya está
+        // en el día siguiente desde las 18:00 hora del estudio: quien pagaba a las 6 PM se
+        // quedaba con una membresía que arrancaba "mañana" y no podía tomar la clase de las 7.
+        const startDate = cdmxToday();
+        const endDate = addDaysToDate(startDate, order.duration_days);
 
         const membershipResult = await client.query(`
             INSERT INTO memberships (
@@ -50,7 +53,7 @@ export async function finalizePaidOrder(orderId: string, opts: FinalizeOpts): Pr
                 start_date, end_date, activated_at, payment_method, order_id
             ) VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, NOW(), 'card', $8)
             RETURNING id
-        `, [order.user_id, order.plan_id, order.class_limit ?? null, order.reformer_credits ?? null, order.multi_credits ?? null, start, end, orderId]);
+        `, [order.user_id, order.plan_id, order.class_limit ?? null, order.reformer_credits ?? null, order.multi_credits ?? null, startDate, endDate, orderId]);
         const membershipId = membershipResult.rows[0].id;
 
         await client.query(`
@@ -95,11 +98,11 @@ export async function finalizePaidOrder(orderId: string, opts: FinalizeOpts): Pr
             sendMembershipActivatedEmail({
                 to: order.user_email, clientName: order.user_name || 'Cliente', planName: order.plan_name,
                 classesIncluded: order.class_limit || null,
-                startDate: start.toISOString().split('T')[0], endDate: end.toISOString().split('T')[0],
+                startDate, endDate,
             }).catch((e: any) => console.error('Email error:', e));
         }
         if (order.user_phone) {
-            const fmtEnd = end.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+            const fmtEnd = new Date(`${endDate}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
             sendMembershipActivatedNotice(order.user_phone, order.user_name || 'Cliente', order.plan_name, order.class_limit || null, fmtEnd)
                 .catch((e: any) => console.error('WhatsApp error:', e));
         }
