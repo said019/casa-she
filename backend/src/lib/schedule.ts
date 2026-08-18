@@ -74,3 +74,27 @@ export function buildScheduleRows(ficha: FichaDef): ScheduleRow[] {
     is_active: s.active ?? true,
   }));
 }
+
+/**
+ * Fecha de HOY en CDMX como 'YYYY-MM-DD'.
+ *
+ * El servidor corre en UTC, así que `new Date()` ya está en el día SIGUIENTE desde las
+ * 18:00 hora de CDMX. Usar eso como start_date de una membresía la dejaba inservible el
+ * resto de la tarde: el selector de reservas exige `start_date <= fecha de la clase`, así
+ * que quien pagaba a las 6 PM no podía tomar la clase de las 7. `en-CA` formatea como
+ * YYYY-MM-DD, e Intl resuelve el horario de verano solo.
+ */
+export function cdmxToday(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Mexico_City',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now);
+}
+
+/** Suma días a una fecha 'YYYY-MM-DD'. Aritmética pura de calendario, sin zonas horarias. */
+export function addDaysToDate(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().split('T')[0];
+}

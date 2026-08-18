@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { cdmxToday, addDaysToDate } from '../lib/schedule.js';
 import { query, queryOne } from '../config/database.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { z } from 'zod';
@@ -403,9 +404,9 @@ router.post('/physical-sale', async (req: Request, res: Response) => {
                 : (notes || null);
 
         // Calculate dates
-        const startDate = paymentDate || new Date().toISOString().split('T')[0];
-        const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + (plan.duration_days || 30));
+        // Fechas en CDMX, no en UTC: el servidor va un día adelante desde las 18:00 del estudio.
+        const startDate = paymentDate || cdmxToday();
+        const endDate = addDaysToDate(startDate, plan.duration_days || 30);
 
         // Create membership
         const membership = await queryOne(`
@@ -416,7 +417,7 @@ router.post('/physical-sale', async (req: Request, res: Response) => {
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', $8, $9)
             RETURNING *
         `, [
-            userId, planId, startDate, endDate.toISOString().split('T')[0],
+            userId, planId, startDate, endDate,
             plan.class_limit ?? null,
             plan.reformer_credits ?? null,
             plan.multi_credits ?? null,
@@ -461,7 +462,7 @@ router.post('/physical-sale', async (req: Request, res: Response) => {
                     planName: plan.name,
                     classesIncluded: plan.class_limit || null,
                     startDate: startDate,
-                    endDate: endDate.toISOString().split('T')[0],
+                    endDate: endDate,
                 }).catch(e => console.error('[physical-sale] email error:', e));
             }
         } catch (e) {
