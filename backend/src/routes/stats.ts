@@ -17,7 +17,7 @@ router.get('/cash-payments-today', authenticate, requireRole('admin'), async (_r
                 COUNT(*) as payments_today,
                 COALESCE(SUM(amount), 0) as amount_today
              FROM payments
-             WHERE DATE(created_at AT TIME ZONE 'America/Mexico_City') = CURRENT_DATE
+             WHERE DATE(created_at AT TIME ZONE 'America/Mexico_City') = studio_today()
                AND payment_method IN ('cash', 'transfer')
                AND status = 'completed'`
         );
@@ -25,14 +25,14 @@ router.get('/cash-payments-today', authenticate, requireRole('admin'), async (_r
         const membershipsRow = await queryOne<{ count: string }>(
             `SELECT COUNT(*) as count
              FROM memberships
-             WHERE DATE(created_at AT TIME ZONE 'America/Mexico_City') = CURRENT_DATE
+             WHERE DATE(created_at AT TIME ZONE 'America/Mexico_City') = studio_today()
                AND status IN ('active', 'pending_activation')`
         );
 
         const guestsRow = await queryOne<{ count: string }>(
             `SELECT COUNT(*) as count
              FROM guest_bookings
-             WHERE DATE(created_at AT TIME ZONE 'America/Mexico_City') = CURRENT_DATE`
+             WHERE DATE(created_at AT TIME ZONE 'America/Mexico_City') = studio_today()`
         );
 
         res.json({

@@ -96,7 +96,7 @@ export async function copiarSemana(
     );
     const diasCerrados = new Set<string>(cerrados.rows.map((r: any) => r.date));
 
-    const hoy = (await client.query(`SELECT CURRENT_DATE::text AS hoy`)).rows[0].hoy as string;
+    const hoy = (await client.query(`SELECT studio_today()::text AS hoy`)).rows[0].hoy as string;
 
     const r: CopiarSemanaResultado = { ...vacio, detalle: [] };
 

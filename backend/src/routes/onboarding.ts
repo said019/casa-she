@@ -1,3 +1,4 @@
+import { cdmxToday } from '../lib/schedule.js';
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { query, queryOne } from '../config/database.js';
@@ -48,7 +49,7 @@ function buildHealthSummary(answers: OnboardingAnswers): string {
   const labels: Record<string, string> = { embarazo: 'Embarazo/posparto', lesion: 'Lesión o molestia', condicion: 'Condición médica' };
   const flags = answers.health.filter((h) => h !== 'ninguna').map((h) => labels[h]).filter(Boolean);
   if (flags.length === 0 && !answers.health_note?.trim()) return '';
-  const today = new Date().toISOString().slice(0, 10);
+  const today = cdmxToday();
   const parts = [`[Perfil ${today}]`, flags.join(', ')].filter(Boolean);
   if (answers.health_note?.trim()) parts.push(`Nota: ${answers.health_note.trim()}`);
   return '\n' + parts.join(' ');

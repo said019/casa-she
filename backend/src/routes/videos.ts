@@ -982,7 +982,7 @@ router.get('/:id/stream', authenticate, async (req: Request, res: Response) => {
                 `SELECT 1 FROM memberships
                  WHERE user_id = $1
                    AND status = 'active'
-                   AND (end_date >= CURRENT_DATE OR end_date IS NULL)`,
+                   AND (end_date >= studio_today() OR end_date IS NULL)`,
                 [userId]
             );
 

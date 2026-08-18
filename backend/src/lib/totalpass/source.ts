@@ -186,7 +186,7 @@ async function ensureInternalMembership(client: PoolClient, userId: string, plan
         `INSERT INTO memberships
              (user_id, plan_id, start_date, end_date, status,
               reformer_remaining, multi_remaining, classes_remaining, payment_method, activated_at)
-         VALUES ($1, $2, CURRENT_DATE, CURRENT_DATE + INTERVAL '365 days', 'active',
+         VALUES ($1, $2, studio_today(), studio_today() + INTERVAL '365 days', 'active',
                  $3, $4, $5, 'plataforma', NOW())
          RETURNING id`,
         [userId, plan.id, plan.reformer_credits, plan.multi_credits, plan.class_limit],

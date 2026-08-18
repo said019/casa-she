@@ -171,7 +171,7 @@ export async function getMembershipData(membershipId: string): Promise<Membershi
                 FROM event_registrations r
                 JOIN events e ON r.event_id = e.id
                 WHERE r.user_id = $1 AND r.status = 'confirmed'
-                  AND e.date >= CURRENT_DATE AND e.status = 'published'
+                  AND e.date >= studio_today() AND e.status = 'published'
                 ORDER BY e.date ASC, e.start_time ASC
                 LIMIT 1
             `, [membership.user_id]);
