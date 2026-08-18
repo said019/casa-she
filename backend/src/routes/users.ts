@@ -1124,7 +1124,7 @@ router.get('/', requireRole('admin', 'super_admin', 'reception'), async (req: Re
         } else if (membershipStatus === 'active') {
             where += ` AND m.status = 'active'`;
         } else if (membershipStatus === 'expired') {
-            where += ` AND m.id IS NOT NULL AND (m.status IN ('expired','cancelled') OR (m.end_date IS NOT NULL AND m.end_date < CURRENT_DATE))`;
+            where += ` AND m.id IS NOT NULL AND (m.status IN ('expired','cancelled') OR (m.end_date IS NOT NULL AND m.end_date < studio_today()))`;
         }
 
         // Orden.
@@ -1162,7 +1162,7 @@ router.get('/', requireRole('admin', 'super_admin', 'reception'), async (req: Re
             const c = await queryOne<{ active: string; expired: string; none: string; total: string }>(
                 `SELECT
                     COUNT(*) FILTER (WHERE m.status = 'active') AS active,
-                    COUNT(*) FILTER (WHERE m.id IS NOT NULL AND (m.status IN ('expired','cancelled') OR (m.end_date IS NOT NULL AND m.end_date < CURRENT_DATE))) AS expired,
+                    COUNT(*) FILTER (WHERE m.id IS NOT NULL AND (m.status IN ('expired','cancelled') OR (m.end_date IS NOT NULL AND m.end_date < studio_today()))) AS expired,
                     COUNT(*) FILTER (WHERE m.id IS NULL) AS none,
                     COUNT(*) AS total
                  ${fromClause}${whereNoStatus}`,

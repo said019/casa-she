@@ -186,7 +186,7 @@ router.post('/sell-membership', authenticate, requirePermission('vender'), async
                 classes_remaining, reformer_remaining, multi_remaining,
                 payment_method, payment_reference, cancellation_limit,
                 activated_by, activated_at, facility_id
-            ) VALUES ($1,$2,COALESCE($11::date, CURRENT_DATE), COALESCE($11::date, CURRENT_DATE) + ($3 || ' days')::interval, 'active',
+            ) VALUES ($1,$2,COALESCE($11::date, studio_today()), COALESCE($11::date, studio_today()) + ($3 || ' days')::interval, 'active',
                       $4,$5,$6,$7,$8,$9,$10,NOW(),$12)
             RETURNING *`,
             [
@@ -200,7 +200,7 @@ router.post('/sell-membership', authenticate, requirePermission('vender'), async
                 null,             // payment_reference
                 cancellationLimit,
                 sellerId,         // activated_by → atribución de la venta de mostrador
-                startStr,         // $11: inicio elegido (o null → CURRENT_DATE)
+                startStr,         // $11: inicio elegido (o null → studio_today())
                 facilityId,       // $12: sucursal de la venta
             ]
         );

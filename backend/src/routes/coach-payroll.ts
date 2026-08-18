@@ -1,3 +1,4 @@
+import { cdmxToday } from '../lib/schedule.js';
 import { Router, Request, Response } from 'express';
 import { query, queryOne, pool } from '../config/database.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
@@ -253,7 +254,7 @@ router.post('/payouts', authenticate, requireRole(...ADMIN), async (req: Request
 
             // Registrar automáticamente el pago como egreso categoría 'nomina' (estado pagado),
             // vinculado al payout vía source_payout_id para que el revert (DELETE) lo borre en cascada.
-            const today = new Date().toISOString().split('T')[0];
+            const today = cdmxToday();
             const eg = buildCoachPayrollEgreso({
                 payoutId: row.id,
                 coachName: inst.display_name,

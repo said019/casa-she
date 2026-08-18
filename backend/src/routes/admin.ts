@@ -33,7 +33,7 @@ router.get('/stats', async (req: Request, res: Response) => {
         const todayResult = await queryOne<{ d: string }>(
             `SELECT TO_CHAR((NOW() AT TIME ZONE 'America/Mexico_City')::date, 'YYYY-MM-DD') AS d`
         );
-        const today = todayResult?.d || new Date().toISOString().split('T')[0];
+        const today = todayResult?.d || cdmxToday();
 
         // Parallel queries for efficiency - each wrapped to avoid one failure crashing all
         const safeQuery = async <T>(text: string, params?: any[]): Promise<T | null> => {
@@ -139,7 +139,7 @@ router.get('/birthdays', async (req: Request, res: Response) => {
              FROM users
              WHERE role = 'client'
                AND date_of_birth IS NOT NULL
-               AND EXTRACT(MONTH FROM date_of_birth) = EXTRACT(MONTH FROM CURRENT_DATE)
+               AND EXTRACT(MONTH FROM date_of_birth) = EXTRACT(MONTH FROM studio_today())
              ORDER BY EXTRACT(DAY FROM date_of_birth) ASC`
         );
         res.json(birthdays);

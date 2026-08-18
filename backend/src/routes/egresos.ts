@@ -107,7 +107,7 @@ router.get('/dashboard', authenticate, requireRole('admin', 'super_admin'), asyn
                 COALESCE(SUM(CASE WHEN status = 'pendiente' THEN amount ELSE 0 END), 0) AS pending,
                 COUNT(*) AS count
             FROM egresos
-            WHERE date >= DATE_TRUNC('month', CURRENT_DATE)
+            WHERE date >= DATE_TRUNC('month', studio_today())
               AND status != 'cancelado'
         `);
 
@@ -118,7 +118,7 @@ router.get('/dashboard', authenticate, requireRole('admin', 'super_admin'), asyn
                 COALESCE(SUM(amount), 0) AS total,
                 COUNT(*) AS count
             FROM egresos
-            WHERE date >= DATE_TRUNC('month', CURRENT_DATE)
+            WHERE date >= DATE_TRUNC('month', studio_today())
               AND status != 'cancelado'
             GROUP BY category
             ORDER BY total DESC
@@ -131,7 +131,7 @@ router.get('/dashboard', authenticate, requireRole('admin', 'super_admin'), asyn
                 COALESCE(SUM(amount), 0) AS total,
                 COUNT(*) AS count
             FROM egresos
-            WHERE date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '${monthsBack} months'
+            WHERE date >= DATE_TRUNC('month', studio_today()) - INTERVAL '${monthsBack} months'
               AND status != 'cancelado'
             GROUP BY DATE_TRUNC('month', date)
             ORDER BY month ASC
@@ -141,7 +141,7 @@ router.get('/dashboard', authenticate, requireRole('admin', 'super_admin'), asyn
         const distributionRows = await query(`
             SELECT distribution, amount
             FROM egresos
-            WHERE date >= DATE_TRUNC('month', CURRENT_DATE)
+            WHERE date >= DATE_TRUNC('month', studio_today())
               AND status != 'cancelado'
               AND distribution IS NOT NULL
               AND distribution != '{}'::jsonb
@@ -172,7 +172,7 @@ router.get('/dashboard', authenticate, requireRole('admin', 'super_admin'), asyn
                    COALESCE(SUM(e.amount), 0) AS total, COUNT(*) AS count
             FROM egresos e
             LEFT JOIN facilities f ON f.id = e.facility_id
-            WHERE e.date >= DATE_TRUNC('month', CURRENT_DATE)
+            WHERE e.date >= DATE_TRUNC('month', studio_today())
               AND e.status != 'cancelado'
             GROUP BY e.facility_id, f.name
             ORDER BY total DESC

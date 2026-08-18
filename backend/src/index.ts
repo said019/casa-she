@@ -4296,6 +4296,29 @@ async function runStartupMigrations(): Promise<void> {
         console.log('  ✅ Migration 118: events config columns');
     } catch (e) { console.error('Migration 118 error:', e); }
 
+    // ---- Migration 119: studio_today() — "hoy" en hora del estudio ----
+    // El servidor corre en UTC, así que CURRENT_DATE ya es el día SIGUIENTE desde las 18:00
+    // en CDMX. Eso vencía membresías un día antes, escondía las clases de la misma tarde y
+    // dejaba los tableros de "hoy" en cero. Esta función es la fuente única de verdad para
+    // fechas de calendario del negocio; su contraparte en JS es cdmxToday() (lib/schedule.ts).
+    // STABLE para que el planeador la evalúe una vez por consulta y pueda usar índices.
+    // 119a va SOLA y primero: 38 consultas de la app ya llaman studio_today(). Si se creara
+    // junto a los ALTER de abajo, un fallo en cualquiera de ellos podría dejar la función sin
+    // crear y tumbaría media aplicación.
+    try {
+        await query(`CREATE OR REPLACE FUNCTION studio_today() RETURNS date
+            LANGUAGE sql STABLE AS $fn$ SELECT (NOW() AT TIME ZONE 'America/Mexico_City')::date $fn$`);
+        console.log('  ✅ Migration 119a: studio_today()');
+    } catch (e) { console.error('Migration 119a error (CRÍTICO — la app la necesita):', e); }
+
+    // Los DEFAULT de columna también anclaban en UTC: un ingreso o egreso capturado a las
+    // 7 PM se guardaba con la fecha de mañana y caía en el corte equivocado.
+    try {
+        await query(`ALTER TABLE manual_incomes ALTER COLUMN income_date SET DEFAULT studio_today()`);
+        await query(`ALTER TABLE egresos ALTER COLUMN date SET DEFAULT studio_today()`);
+        console.log('  ✅ Migration 119b: defaults de fecha en hora del estudio');
+    } catch (e) { console.error('Migration 119b error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();
