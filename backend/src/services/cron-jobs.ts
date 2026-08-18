@@ -27,6 +27,7 @@ import { renewTotalPassToken, isTotalpassEnabled } from '../lib/totalpass/token.
 import { publishTotalPassIndividualClasses } from '../lib/totalpass/publish.js';
 import { reconcileTotalpassPool } from '../lib/totalpass/pool.js';
 import { retirarClasesPendientesDeTotalpass } from '../lib/totalpass/retire.js';
+import { resincronizarClasesPendientes } from '../lib/totalpass/resync.js';
 import { syncTotalPassReservations } from '../lib/totalpass/source.js';
 import { withPgAdvisoryLock } from '../lib/totalpass/lock.js';
 import { localDateStr, addDaysToDateStr } from '../lib/mx-time.js';
@@ -877,6 +878,37 @@ async function totalpassRetireJob(): Promise<void> {
     }
 }
 
+/**
+ * Cada 10 min (:03,:13,…) — empuja a TotalPass los cambios de las clases que se
+ * editaron (fecha, hora, tipo, coach).
+ *
+ * Editar una clase no llegaba a TotalPass: la socia veía la hora vieja en su app
+ * y llegaba al estudio cuando la clase ya no estaba ahí. Cambiar título o coach
+ * se edita en su lugar sin tocar reservas; mover fecha u hora obliga a borrar y
+ * recrear, y ahí se avisa al estudio de cada socia que perdió su lugar.
+ *
+ * Desfasado del retiro (:00,:10,…) y del cupo (:05,:15,…) para repartir el rate
+ * limit de TotalPass entre los tres barridos.
+ */
+async function totalpassResyncJob(): Promise<void> {
+    const jobName = 'TOTALPASS_RESYNC';
+    try {
+        if (!(await totalPassOfficialFromDb())) return; // sin credenciales — inerte
+        if (!(await isTotalpassEnabled())) return; // is_enabled=false — inerte hasta "Probar conexión" exitoso
+        const result = await withPgAdvisoryLock(471005, () => resincronizarClasesPendientes());
+        if (result === null) {
+            logJob(jobName, 'lock ocupado (otra corrida en curso) — se omite este tick');
+            return;
+        }
+        if (result.pendientes === 0) return; // nada que resincronizar: ni log ni ruido
+        logJob(jobName, `pendientes=${result.pendientes} editadas=${result.editadas} movidas=${result.movidas} sinCambio=${result.sinCambio} noEstaban=${result.noEstaban} sociasAvisadas=${result.sociasAvisadas} fallidas=${result.fallidas}${result.skipped ? ` skipped=${result.skipped}` : ''}`);
+        await recordJobExecution(jobName, true, JSON.stringify(result));
+    } catch (error) {
+        logError(jobName, error);
+        await recordJobExecution(jobName, false, String(error));
+    }
+}
+
 // ============================================
 // INICIALIZACIÓN
 // ============================================
@@ -1097,6 +1129,9 @@ export function initializeCronJobs(): void {
     // Desfasado del pool (:05,:15,...) para repartir el rate limit de la API.
     job('TOTALPASS_RETIRE', '0,10,20,30,40,50 * * * *', () => { void totalpassRetireJob(); }, 'TOTALPASS_RETIRE - Cada 10 min');
 
+    // Cada 10 min (:03,:13,...) - Empujar a TotalPass los cambios de clases editadas.
+    job('TOTALPASS_RESYNC', '3,13,23,33,43,53 * * * *', () => { void totalpassResyncJob(); }, 'TOTALPASS_RESYNC - Cada 10 min');
+
     console.log('\n⏰ Cron Jobs inicializados correctamente\n');
 }
 
@@ -1124,6 +1159,7 @@ export const cronJobs = {
     totalpassPool: totalpassPoolJob,
     totalpassImport: totalpassImportJob,
     totalpassRetire: totalpassRetireJob,
+    totalpassResync: totalpassResyncJob,
 };
 
 export default initializeCronJobs;

@@ -68,6 +68,26 @@ assert.match(
     'debe existir el job TOTALPASS_RETIRE (reintenta solo si TotalPass estaba caído)',
 );
 
+// ── (c2) Editar una clase también tiene que llegar a TotalPass ─────────────
+// Mismo bug que la cancelación, un piso más arriba: mover una clase de hora o
+// cambiarle el coach no se propagaba, y la socia llegaba a la hora vieja.
+const clases = leer('routes/classes.ts');
+assert.match(
+    clases,
+    /marcarResyncTotalpass\s*\(/,
+    'PUT /classes/:id debe marcar la resincronización cuando cambia tipo, coach, fecha u hora',
+);
+// Las tres vías de edición: PUT general, cambio de coach por serie y sustitución.
+assert.ok(
+    (clases.match(/marcarResyncTotalpass\s*\(/g) || []).length >= 3,
+    'las tres vías de edición (PUT, cambio de coach, sustitución) deben marcar resync',
+);
+assert.match(
+    crons,
+    /TOTALPASS_RESYNC/,
+    'debe existir el job TOTALPASS_RESYNC',
+);
+
 // ── (d) El estado 'pending_delete' tiene que ser válido en la BD ────────────
 // partner_class_mappings.sync_status tiene un CHECK; sin migración, el UPDATE
 // del marcado truena y el retiro se pierde en silencio.
@@ -76,6 +96,11 @@ assert.match(
     index,
     /sync_status[^;]*pending_delete/s,
     'index.ts debe migrar el CHECK de sync_status para aceptar pending_delete',
+);
+assert.match(
+    index,
+    /sync_status[^;]*pending_resync/s,
+    'index.ts debe migrar el CHECK de sync_status para aceptar pending_resync',
 );
 
 // ── (e) El barrido se auto-cura ─────────────────────────────────────────────

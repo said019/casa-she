@@ -17,6 +17,7 @@ import { capacityError } from '../lib/schedule.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { setTotalpassCap } from '../lib/totalpass/caps.js';
 import { dispararRetiroTotalpass } from '../lib/totalpass/retire.js';
+import { marcarResyncTotalpass, dispararResyncTotalpass } from '../lib/totalpass/resync.js';
 import { copiarSemana, diasEntre } from '../lib/copy-week.js';
 
 const router = Router();
@@ -861,6 +862,17 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
             values
         );
 
+        // Propagar a TotalPass lo que la socia ve en su app: tipo (título), coach
+        // (responsable), fecha y hora. Sin esto la socia seguía viendo los datos
+        // viejos, reservaba a la hora vieja y llegaba cuando la clase ya no estaba.
+        // Solo BD aquí; el barrido hace el trabajo con red.
+        const tocaTotalpass = ['classTypeId', 'instructorId', 'date', 'startTime']
+            .some((k) => (data as Record<string, unknown>)[k] !== undefined);
+        if (tocaTotalpass) {
+            const marcadas = await marcarResyncTotalpass([id]);
+            if (marcadas) dispararResyncTotalpass();
+        }
+
         // Cambio de instructor: audit + advertencia si el mes ya tiene nómina pagada.
         // La nómina (admin y coach) cuenta EN VIVO desde classes.instructor_id, así que
         // el cambio surte efecto inmediato — excepto contra el snapshot de coach_payouts.
@@ -1034,6 +1046,9 @@ router.post('/:id/change-instructor', authenticate, requireElevated, async (req:
 
         let updated = 0;
         let scheduleUpdated = 0;
+        // Ids de las clases que de verdad cambiaron: se marcan para empujarle a
+        // TotalPass el coach nuevo (la socia ve el responsable en su app).
+        let tocadas: string[] = [];
 
         if (scope === 'this') {
             const r = await query<{ id: string }>(
@@ -1041,6 +1056,7 @@ router.post('/:id/change-instructor', authenticate, requireElevated, async (req:
                 [instructorId, id]
             );
             updated = r.length;
+            tocadas = r.map((x) => x.id);
         } else if (scope === 'series') {
             // Todas las clases futuras (desde la fecha de esta) de la misma recurrencia.
             const r = await query<{ id: string }>(
@@ -1055,6 +1071,7 @@ router.post('/:id/change-instructor', authenticate, requireElevated, async (req:
                 [instructorId, ref.class_type_id, ref.facility_id, ref.start_time, refDateStr]
             );
             updated = r.length;
+            tocadas = r.map((x) => x.id);
             // Persistir en el horario base (para que las clases futuras que se generen también).
             const s = await query<{ id: string }>(
                 `UPDATE schedules SET instructor_id = $1, updated_at = NOW()
@@ -1079,6 +1096,14 @@ router.post('/:id/change-instructor', authenticate, requireElevated, async (req:
                 [instructorId, ref.class_type_id, ref.facility_id, ref.start_time, dates]
             );
             updated = r.length;
+            tocadas = r.map((x) => x.id);
+        }
+
+        // Una serie completa son decenas de clases: se marcan todas en una sola
+        // consulta y un único barrido las empuja.
+        if (tocadas.length) {
+            const marcadas = await marcarResyncTotalpass(tocadas);
+            if (marcadas) dispararResyncTotalpass();
         }
 
         await logAction(query, {
@@ -1276,6 +1301,10 @@ router.post('/:id/substitute', authenticate, requireRole('admin'), async (req: R
             'UPDATE classes SET instructor_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
             [newInstructorId, id]
         );
+
+        // La socia de TotalPass ve el nombre del coach en su app: empujarle el cambio.
+        const marcadasSub = await marcarResyncTotalpass([id]);
+        if (marcadasSub) dispararResyncTotalpass();
 
         // Record substitution
         await queryOne(`

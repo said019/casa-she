@@ -4338,6 +4338,20 @@ async function runStartupMigrations(): Promise<void> {
         console.log('  ✅ Migration 120: partner_class_mappings.sync_status admite pending_delete');
     } catch (e) { console.error('Migration 120 error:', e); }
 
+    // ---- Migration 121: TotalPass — estado 'pending_resync' del mapping ----
+    // Hermano de la 120. Editar una clase (moverla de hora, cambiarle el tipo o el
+    // coach) tampoco llegaba a TotalPass: la socia veía la hora vieja, reservaba a
+    // esa hora y llegaba cuando la clase ya no estaba. La edición marca el mapping y
+    // un barrido lo empuja a la API. Aditiva e idempotente, igual que la 120.
+    try {
+        await query(`ALTER TABLE partner_class_mappings DROP CONSTRAINT IF EXISTS partner_class_mappings_sync_status_check`);
+        await query(`ALTER TABLE partner_class_mappings ADD CONSTRAINT partner_class_mappings_sync_status_check
+            CHECK (sync_status IN ('pending','synced','failed','skipped','published','error','not_configured','pending_delete','pending_resync'))`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_pcm_pending_resync
+            ON partner_class_mappings(channel, sync_status) WHERE sync_status = 'pending_resync'`);
+        console.log('  ✅ Migration 121: partner_class_mappings.sync_status admite pending_resync');
+    } catch (e) { console.error('Migration 121 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();
