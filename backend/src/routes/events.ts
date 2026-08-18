@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { query, queryOne } from '../config/database.js';
 import { authenticate, requireRole, optionalAuth } from '../middleware/auth.js';
 import { cancelClassWithRefunds } from '../lib/cancel-class.js';
+import { dispararRetiroTotalpass } from '../lib/totalpass/retire.js';
 import { sendEventAnnouncementEmail } from '../services/email.js';
 import { sendAlertToAllDevices, recordPassUpdate, notifyAllUserDevices } from '../lib/apple-wallet.js';
 import { sendMessageToAllGoogleObjects, upsertGoogleLoyaltyObject, sendGoogleWalletMessage } from '../lib/google-wallet.js';
@@ -1255,6 +1256,8 @@ async function cancelOverlappingClasses(
         );
         results.push({ classId: cls.id, ...result });
     }
+    // Las clases que tapó el evento también salen de TotalPass.
+    if (results.length) dispararRetiroTotalpass();
     return results;
 }
 

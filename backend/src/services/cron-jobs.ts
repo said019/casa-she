@@ -26,6 +26,7 @@ import { totalPassOfficialFromDb } from '../lib/totalpass/client.js';
 import { renewTotalPassToken, isTotalpassEnabled } from '../lib/totalpass/token.js';
 import { publishTotalPassIndividualClasses } from '../lib/totalpass/publish.js';
 import { reconcileTotalpassPool } from '../lib/totalpass/pool.js';
+import { retirarClasesPendientesDeTotalpass } from '../lib/totalpass/retire.js';
 import { syncTotalPassReservations } from '../lib/totalpass/source.js';
 import { withPgAdvisoryLock } from '../lib/totalpass/lock.js';
 import { localDateStr, addDaysToDateStr } from '../lib/mx-time.js';
@@ -843,6 +844,38 @@ async function totalpassImportJob(): Promise<void> {
     }
 }
 
+/**
+ * Cada 10 min (:00,:10,…) — retira de TotalPass las clases que Casa Shé canceló
+ * (o a las que se les apagó el cupo del canal).
+ *
+ * La orden de retiro la deja el flujo de cancelación en la BD
+ * (`sync_status='pending_delete'`), sin red. Este job la ejecuta contra la API:
+ * cancela los slots de las socias que ya habían reservado —para que su app les
+ * avise— y borra la ocurrencia. Como la orden vive en la BD, un TotalPass caído
+ * solo retrasa el retiro; no lo pierde.
+ *
+ * Va desfasado del reconcile de cupo (que corre en :05,:15,…) para no pelearse
+ * por el rate limit de TotalPass.
+ */
+async function totalpassRetireJob(): Promise<void> {
+    const jobName = 'TOTALPASS_RETIRE';
+    try {
+        if (!(await totalPassOfficialFromDb())) return; // sin credenciales — inerte
+        if (!(await isTotalpassEnabled())) return; // is_enabled=false — inerte hasta "Probar conexión" exitoso
+        const result = await withPgAdvisoryLock(471004, () => retirarClasesPendientesDeTotalpass());
+        if (result === null) {
+            logJob(jobName, 'lock ocupado (otra corrida en curso) — se omite este tick');
+            return;
+        }
+        if (result.pendientes === 0) return; // nada que retirar: ni log ni ruido
+        logJob(jobName, `pendientes=${result.pendientes} retiradas=${result.retiradas} yaNoEstaban=${result.yaNoEstaban} slotsCancelados=${result.slotsCancelados} fallidas=${result.fallidas}${result.skipped ? ` skipped=${result.skipped}` : ''}`);
+        await recordJobExecution(jobName, true, JSON.stringify(result));
+    } catch (error) {
+        logError(jobName, error);
+        await recordJobExecution(jobName, false, String(error));
+    }
+}
+
 // ============================================
 // INICIALIZACIÓN
 // ============================================
@@ -1059,6 +1092,10 @@ export function initializeCronJobs(): void {
     // Cada 5 min - Importar reservas de socios TotalPass
     job('TOTALPASS_IMPORT', '*/5 * * * *', () => { void totalpassImportJob(); }, 'TOTALPASS_IMPORT - Cada 5 min');
 
+    // Cada 10 min (:00,:10,...,:50) - Retirar de TotalPass las clases canceladas.
+    // Desfasado del pool (:05,:15,...) para repartir el rate limit de la API.
+    job('TOTALPASS_RETIRE', '0,10,20,30,40,50 * * * *', () => { void totalpassRetireJob(); }, 'TOTALPASS_RETIRE - Cada 10 min');
+
     console.log('\n⏰ Cron Jobs inicializados correctamente\n');
 }
 
@@ -1085,6 +1122,7 @@ export const cronJobs = {
     totalpassPublish: totalpassPublishJob,
     totalpassPool: totalpassPoolJob,
     totalpassImport: totalpassImportJob,
+    totalpassRetire: totalpassRetireJob,
 };
 
 export default initializeCronJobs;

@@ -4296,6 +4296,28 @@ async function runStartupMigrations(): Promise<void> {
         console.log('  ✅ Migration 118: events config columns');
     } catch (e) { console.error('Migration 118 error:', e); }
 
+    // ---- Migration 120: TotalPass — estado 'pending_delete' del mapping ----
+    // (La 119 la ocupa el barrido de fechas en hora del estudio; se salta el número
+    // a propósito para no chocar con esa rama.)
+    //
+    // Cancelar una clase en Casa Shé no la quitaba de TotalPass: la socia la seguía
+    // viendo y reservando en su app, y llegaba al estudio a una clase que ya no
+    // existía. El retiro ahora se marca en el mapping (`pending_delete`) dentro del
+    // flujo de cancelación —sin red, para no colgar la petición cuando se cancela un
+    // día completo— y un barrido lo ejecuta contra la API de TotalPass.
+    //
+    // Sin este CHECK actualizado el UPDATE del marcado truena y la orden de retiro se
+    // pierde en silencio, que es exactamente el modo de falla que estamos cerrando.
+    try {
+        await query(`ALTER TABLE partner_class_mappings DROP CONSTRAINT IF EXISTS partner_class_mappings_sync_status_check`);
+        await query(`ALTER TABLE partner_class_mappings ADD CONSTRAINT partner_class_mappings_sync_status_check
+            CHECK (sync_status IN ('pending','synced','failed','skipped','published','error','not_configured','pending_delete'))`);
+        // Los pendientes se buscan por estado en cada barrido; son pocos pero la tabla crece.
+        await query(`CREATE INDEX IF NOT EXISTS idx_pcm_pending_delete
+            ON partner_class_mappings(channel, sync_status) WHERE sync_status = 'pending_delete'`);
+        console.log('  ✅ Migration 120: partner_class_mappings.sync_status admite pending_delete');
+    } catch (e) { console.error('Migration 120 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();

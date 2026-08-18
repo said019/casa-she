@@ -1,5 +1,6 @@
 import { query, queryOne } from '../config/database.js';
 import { sendWebPushToUser } from './web-push.js';
+import { marcarRetiroTotalpass } from './totalpass/retire.js';
 
 /**
  * Cancel a class and all its active bookings, refunding membership credits.
@@ -24,6 +25,14 @@ export async function cancelClassWithRefunds(
     if (!result) {
         return { class: null, cancelledBookings: 0, refundedCredits: 0 };
     }
+
+    // Marcar el retiro de TotalPass. Solo BD (sin red): esta función se llama en
+    // bucle al cerrar un día completo o cancelar una serie, y una llamada a la API
+    // de TP por clase colgaría la petición del admin. El barrido
+    // (`retirarClasesPendientesDeTotalpass`) hace el trabajo con red enseguida y por
+    // cron. Sin esta línea la clase seguía viva y reservable en la app de TotalPass:
+    // la socia reservaba una clase cancelada y llegaba al estudio sin que nadie supiera.
+    await marcarRetiroTotalpass(classId);
 
     // Get all active bookings for this class
     const bookingsToCancel = await query(

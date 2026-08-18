@@ -102,3 +102,65 @@ export async function avisarReservaTotalPass(r: AvisoReservaTotalPass): Promise<
         }
     }
 }
+
+// ── Reserva huérfana: la socia reservó algo que en Casa Shé ya no existe ─────
+
+export interface AvisoReservaHuerfana {
+    socia: string;
+    clase: string;
+    fecha: string;  // YYYY-MM-DD
+    hora: string;   // HH:MM
+    telefono?: string | null;
+}
+
+/**
+ * Mensaje para el caso más incómodo del canal: TotalPass le confirmó a la socia
+ * una reserva de una clase que Casa Shé ya no tiene (la cancelaron, o el título
+ * dejó de empatar). El import la descarta con razón —no se puede reservar una
+ * clase cancelada— pero antes eso solo se escribía en un log del servidor: nadie
+ * en el estudio se enteraba hasta que la socia llegaba a la puerta. PURA.
+ */
+export function construirMensajeHuerfana(r: AvisoReservaHuerfana): string {
+    return [
+        '⚠️ *Reserva de TotalPass sin clase*',
+        '',
+        `*${r.socia}*${r.telefono ? ` · ${r.telefono}` : ''}`,
+        `Reservó: ${r.clase} · ${fechaBonita(r.fecha)}, ${r.hora}`,
+        '',
+        'Esa clase ya NO existe en Casa Shé (cancelada o cambiada), pero TotalPass',
+        'sí le confirmó la reserva a la socia. Va a llegar al estudio.',
+        '',
+        'Háblale para reubicarla.',
+    ].join('\n');
+}
+
+/**
+ * Avisa al estudio de una reserva huérfana. Mismo best-effort que
+ * `avisarReservaTotalPass`: si un canal falla, el otro sigue y el import nunca
+ * se rompe por un aviso.
+ */
+export async function avisarReservaHuerfanaTotalPass(r: AvisoReservaHuerfana): Promise<void> {
+    const telefonos = destinatariosWhatsApp();
+    const correo = process.env.ADMIN_ALERT_EMAIL?.trim();
+    if (telefonos.length === 0 && !correo) return;
+
+    const mensaje = construirMensajeHuerfana(r);
+    for (const tel of telefonos) {
+        try {
+            await sendWhatsAppMessage(tel, mensaje);
+        } catch (e) {
+            console.error(`[tp-huerfana] WhatsApp a ${tel} falló (no bloquea):`, (e as Error).message);
+        }
+    }
+    if (correo) {
+        try {
+            await sendPlainEmail(
+                correo,
+                `⚠️ Reserva TotalPass sin clase — ${r.clase} (${fechaBonita(r.fecha)})`,
+                mensaje.replace(/\*/g, ''),
+            );
+        } catch (e) {
+            console.error('[tp-huerfana] correo falló (no bloquea):', (e as Error).message);
+        }
+    }
+}

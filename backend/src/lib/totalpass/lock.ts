@@ -21,7 +21,7 @@ import { pool } from '../../config/database.js';
  *   `fn()` lanza (el error se re-lanza después de liberar).
  *
  * Claves por job (evitar colisiones entre jobs distintos):
- *   471001 = import, 471002 = pool, 471003 = publish.
+ *   471001 = import, 471002 = pool, 471003 = publish, 471004 = retiro de canceladas.
  */
 export async function withPgAdvisoryLock<T>(key: number, fn: () => Promise<T>): Promise<T | null> {
     const client = await pool.connect();

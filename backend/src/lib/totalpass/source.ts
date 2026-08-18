@@ -29,7 +29,7 @@ import type { PoolClient } from 'pg';
 import { pool, query, queryOne } from '../../config/database.js';
 import { localDateStr, addDaysToDateStr } from '../mx-time.js';
 import { findOrCreateGuest } from '../guestUser.js';
-import { avisarReservaTotalPass } from './alerta-admin.js';
+import { avisarReservaTotalPass, avisarReservaHuerfanaTotalPass } from './alerta-admin.js';
 import {
     totalPassOfficialFromDb,
     isTotalPassRateLimit,
@@ -195,6 +195,40 @@ async function ensureInternalMembership(client: PoolClient, userId: string, plan
 }
 
 /**
+ * Avisa al estudio, UNA sola vez por reserva, que TotalPass le confirmó a una
+ * socia una clase que en Casa Shé ya no existe.
+ *
+ * El import corre cada 5 minutos y la reserva huérfana sigue en el feed de TP
+ * hasta que pasa la clase, así que sin deduplicar mandaría el mismo WhatsApp
+ * ~288 veces. La dedupe se apoya en `processed_events` (misma tabla que usa el
+ * webhook de check-in): la PK del slot hace que el segundo INSERT no haga nada,
+ * y solo se avisa cuando el INSERT sí escribió.
+ *
+ * Best-effort de punta a punta: si el aviso truena, el import continúa.
+ */
+async function avisarHuerfanaUnaVez(row: TotalPassImportRow): Promise<void> {
+    try {
+        const res = await query(
+            `INSERT INTO processed_events (event_id, channel, event_type)
+             VALUES ($1, 'totalpass', 'reserva_huerfana')
+             ON CONFLICT (event_id) DO NOTHING
+             RETURNING event_id`,
+            [`tp-huerfana:${row.sourceRef}`],
+        );
+        if (!res.length) return; // ya se avisó de esta reserva
+        await avisarReservaHuerfanaTotalPass({
+            socia: row.displayName,
+            clase: row.classTitle,
+            fecha: row.date,
+            hora: row.startTime,
+            telefono: row.phone,
+        });
+    } catch (e: any) {
+        console.error('[tp-import] aviso de reserva huérfana falló (no bloquea):', e?.message);
+    }
+}
+
+/**
  * Materializa cada fila importada de TotalPass como una reserva de Casa Shé.
  * Por fila:
  *   1. Empata la clase por `class_types.name` + fecha + `HH:MM` (no cancelada).
@@ -245,6 +279,10 @@ export async function importTotalPassReservations(rows: TotalPassImportRow[]): P
             if (!cls) {
                 summary.skippedNoClass++;
                 console.warn(`[tp-import] sin clase para ${row.classTitle} ${row.date} ${row.startTime}`);
+                // La socia YA tiene su reserva confirmada del lado de TotalPass y va a
+                // llegar al estudio. Antes esto moría en este console.warn y recepción se
+                // enteraba en la puerta.
+                await avisarHuerfanaUnaVez(row);
                 continue;
             }
 
@@ -279,6 +317,7 @@ export async function importTotalPassReservations(rows: TotalPassImportRow[]): P
                     // inserta una reserva sobre una clase ya cancelada.
                     await client.query('ROLLBACK');
                     summary.skippedNoClass++;
+                    await avisarHuerfanaUnaVez(row);
                     continue;
                 }
 

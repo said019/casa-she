@@ -386,49 +386,13 @@ export async function publishTotalPassIndividualClasses(
 }
 
 // ── Retiro de una clase de TotalPass ─────────────────────────────────────────
-
-/**
- * Borra la ocurrencia TP de una clase (p.ej. al cancelarla o apagar su canal).
- * Usa el external_occurrence_id persistido. NUNCA borra si la ocurrencia tiene
- * reservas vivas (slotsInUse > 0). Si la ocurrencia ya no está en TP, solo
- * limpia el mapping. Best-effort: devuelve {ok:false, detail} en vez de lanzar.
- */
-export async function cancelClassOnTotalpass(classId: string): Promise<{ ok: boolean; detail?: string }> {
-    const mapping = await queryOne<{ external_event_id: string | null; external_occurrence_id: string | null }>(
-        `SELECT external_event_id, external_occurrence_id
-           FROM partner_class_mappings WHERE class_id = $1 AND channel = 'totalpass'`,
-        [classId],
-    );
-    const occurrenceUuid = mapping?.external_occurrence_id || null;
-    if (!occurrenceUuid) return { ok: false, detail: 'missing-owned-occurrence' };
-
-    const client = await totalPassOfficialFromDb();
-    if (!client) return { ok: false, detail: 'no-client' };
-
-    try {
-        // No borrar si la ocurrencia tiene reservas vivas: buscamos la ocurrencia
-        // en el snapshot por su uuid y revisamos slotsInUse.
-        const events = await client.listEvents();
-        let occ: TotalPassOfficialOccurrence | null = null;
-        for (const ev of events || []) {
-            for (const o of (ev.EventOccurrences || [])) {
-                if (totalPassOccurrenceUuid(o) === occurrenceUuid) { occ = o; break; }
-            }
-            if (occ) break;
-        }
-        if (occ && Number(occ.slotsInUse ?? 0) > 0) {
-            return { ok: false, detail: 'has-live-bookings' };
-        }
-        // Si sigue existiendo la borramos; si ya no está en TP, solo limpiamos el mapping.
-        if (occ) await client.deleteOccurrence(occurrenceUuid);
-        await query(
-            `DELETE FROM partner_class_mappings WHERE class_id = $1 AND channel = 'totalpass'`,
-            [classId],
-        );
-        return { ok: true };
-    } catch (e) {
-        const msg = (e as Error).message;
-        console.error(`[TP cancel-class] ${classId}:`, msg);
-        return { ok: false, detail: msg };
-    }
-}
+//
+// Vive en `retire.ts`, no aquí. Antes existía en este archivo una
+// `cancelClassOnTotalpass` correcta y bien documentada… con CERO llamadores:
+// ninguna vía de cancelación la invocaba, así que las clases canceladas se
+// quedaban vivas y reservables en la app de TotalPass. Además exigía el
+// `external_occurrence_id` guardado, que en producción faltaba en 19 de 27
+// mappings y ya no había forma de rellenar después de cancelar.
+//
+// El reemplazo (`retirarClasesPendientesDeTotalpass`) sí está cableado a las
+// tres vías de cancelación y localiza la ocurrencia sin depender de ese uuid.

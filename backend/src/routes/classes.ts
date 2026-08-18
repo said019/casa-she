@@ -16,6 +16,7 @@ import { optionalAuth } from '../middleware/auth.js';
 import { capacityError } from '../lib/schedule.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { setTotalpassCap } from '../lib/totalpass/caps.js';
+import { dispararRetiroTotalpass } from '../lib/totalpass/retire.js';
 import { copiarSemana, diasEntre } from '../lib/copy-week.js';
 
 const router = Router();
@@ -945,6 +946,8 @@ router.put('/:id/channels', authenticate, requireRole('admin', 'super_admin', 'r
         }
 
         const result = await setTotalpassCap(req.params.id, n);
+        // Apagar el cupo (0) marca la clase para retiro; ejecutarlo al vuelo.
+        if (n === 0) dispararRetiroTotalpass();
 
         try {
             await logAction(query, {
@@ -1133,6 +1136,9 @@ router.delete('/:id', authenticate, requireElevated, async (req: Request, res: R
                 const r = await cancelClassWithRefunds(s.id, req.user?.userId || '', reason || 'Cancelada por administrador (serie)');
                 if (r.class) { cancelledClasses++; seriesBookings += r.cancelledBookings; seriesRefunds += r.refundedCredits; }
             }
+            // Ya quedaron marcadas TODAS las clases de la serie: un solo barrido las
+            // retira de TotalPass en segundos (si falla, el cron lo retoma).
+            dispararRetiroTotalpass();
             try {
                 await logAction(query, {
                     adminUserId: req.user!.userId,
@@ -1174,6 +1180,9 @@ router.delete('/:id', authenticate, requireElevated, async (req: Request, res: R
             req.user?.userId || '',
             reason || 'Cancelada por administrador'
         );
+        // Quitarla de TotalPass enseguida: mientras siga publicada allá, una socia
+        // puede reservar una clase que ya no existe.
+        dispararRetiroTotalpass();
 
         // Aviso al coach (fuera de la app) de que su clase se canceló.
         try {

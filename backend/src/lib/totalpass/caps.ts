@@ -1,4 +1,5 @@
 import { query, queryOne } from '../../config/database.js';
+import { marcarRetiroTotalpass, desmarcarRetiroTotalpass } from './retire.js';
 
 // Matemática de cupo por canal (portada de Hundred partner-pool.ts). Fórmula ÚNICA de todo el sistema.
 export function channelCapAvailable(capacity: number, totalBooked: number, channelBooked: number, cap: number | null): number {
@@ -54,11 +55,19 @@ export async function setTotalpassCap(classId: string, maxSpots: number): Promis
   if (maxSpots === 0) {
     // Apagar el canal: borra la fila solo si no hay reservas activas (booked_spots = 0).
     await query(`DELETE FROM channel_inventory WHERE class_id = $1 AND channel = 'totalpass' AND booked_spots = 0`, [classId]);
+    // …y RETIRAR la clase de TotalPass. Sin esto quedaba fantasma: el reconcile de
+    // cupo hace JOIN con `max_spots > 0`, así que al borrar la fila dejaba de tocar
+    // esa clase y el evento se quedaba vivo en TP con su cupo viejo, para siempre.
+    await marcarRetiroTotalpass(classId);
     return { max_spots: 0, booked_spots: booked };
   }
   const saved = await queryOne<{ max_spots: number; booked_spots: number }>(
     `INSERT INTO channel_inventory (class_id, channel, max_spots) VALUES ($1, 'totalpass', $2)
      ON CONFLICT (class_id, channel) DO UPDATE SET max_spots = EXCLUDED.max_spots, updated_at = NOW()
      RETURNING max_spots, booked_spots`, [classId, maxSpots]);
+  // Volver a prender el canal cancela un retiro pendiente: si el barrido todavía no
+  // corría, dejarlo en 'pending_delete' haría que el publicador creara un evento
+  // NUEVO (busca mappings 'published') mientras el barrido borra el viejo.
+  await desmarcarRetiroTotalpass(classId);
   return saved!;
 }
