@@ -14,6 +14,7 @@ import { hasPermission } from '../lib/permissions.js';
 import { isElevated } from '../lib/elevation.js';
 import { openShiftForUser } from '../lib/openShift.js';
 import { manualDiscountNote, resolveManualPriceAdjustment } from '../lib/manual-price-adjustment.js';
+import { cdmxToday } from '../lib/schedule.js';
 
 const router = Router();
 
@@ -90,7 +91,7 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
         // Suma de créditos disponibles en TODAS las membresías activas vigentes hoy.
         // Cuando una usuaria tiene 2 membresías simultáneas o renovó antes de agotar
         // la anterior, este total refleja lo que realmente puede reservar.
-        const today = new Date().toISOString().split('T')[0];
+        const today = cdmxToday();
         const allActive = await query(
             `SELECT reformer_remaining, multi_remaining, classes_remaining
                FROM memberships
@@ -1210,7 +1211,7 @@ router.post('/:id/resume', authenticate, requireRole('admin', 'super_admin', 're
              SET status = 'active',
                  end_date = CASE
                      WHEN end_date IS NOT NULL AND paused_at IS NOT NULL
-                     THEN end_date + (CURRENT_DATE - paused_at::date)
+                     THEN end_date + (studio_today() - paused_at::date)
                      ELSE end_date
                  END,
                  paused_at = NULL,

@@ -30,6 +30,7 @@ import { retirarClasesPendientesDeTotalpass } from '../lib/totalpass/retire.js';
 import { syncTotalPassReservations } from '../lib/totalpass/source.js';
 import { withPgAdvisoryLock } from '../lib/totalpass/lock.js';
 import { localDateStr, addDaysToDateStr } from '../lib/mx-time.js';
+import { cdmxToday } from '../lib/schedule.js';
 
 // ============================================
 // TIPOS
@@ -282,7 +283,7 @@ async function notifyExpiringMemberships(): Promise<void> {
                     ON m.id = en.membership_id AND en.days_before = $1
                 WHERE m.status = 'active'
                 AND en.id IS NULL
-                AND m.end_date = CURRENT_DATE + $1
+                AND m.end_date = studio_today() + $1
                 -- No avisar si ya se acabaron los créditos (reformer + multi en 0).
                 -- NULL = ilimitado, así que cuenta como "tiene créditos".
                 AND (COALESCE(m.reformer_remaining, 1) > 0 OR COALESCE(m.multi_remaining, 1) > 0)
@@ -361,7 +362,7 @@ async function markExpiredMemberships(): Promise<void> {
             UPDATE memberships
             SET status = 'expired', updated_at = NOW()
             WHERE status = 'active'
-            AND end_date < CURRENT_DATE
+            AND end_date < studio_today()
             RETURNING id
         `);
 
@@ -576,11 +577,11 @@ export async function birthdayBonus(client?: DbClient): Promise<void> {
               AND EXISTS (
                   SELECT 1 FROM memberships m
                   WHERE m.user_id = u.id AND m.status = 'active'
-                    AND m.end_date >= CURRENT_DATE
+                    AND m.end_date >= studio_today()
               )
         `);
 
-        const today = new Date().toISOString().slice(0, 10);
+        const today = cdmxToday();
         let granted = 0;
         for (const u of targets) {
             const desc = `Cumpleaños ${today}`;
@@ -630,14 +631,14 @@ export async function anniversaryBonus(client?: DbClient): Promise<void> {
         // Users registered on this MM-DD, more than 1 year ago, with active membership
         const targets = await q(`
             SELECT u.id,
-                   EXTRACT(YEAR FROM AGE(CURRENT_DATE, u.created_at))::int AS years
+                   EXTRACT(YEAR FROM AGE(studio_today(), u.created_at))::int AS years
             FROM users u
             WHERE TO_CHAR(u.created_at, 'MM-DD') = TO_CHAR(NOW() AT TIME ZONE 'America/Mexico_City', 'MM-DD')
-              AND u.created_at <= (CURRENT_DATE - INTERVAL '1 year')
+              AND u.created_at <= (studio_today() - INTERVAL '1 year')
               AND EXISTS (
                   SELECT 1 FROM memberships m
                   WHERE m.user_id = u.id AND m.status = 'active'
-                    AND m.end_date >= CURRENT_DATE
+                    AND m.end_date >= studio_today()
               )
         `);
 
@@ -698,14 +699,14 @@ export async function streakBonus(client?: DbClient): Promise<void> {
                 FROM bookings b
                 JOIN classes c ON b.class_id = c.id
                 WHERE b.checked_in_at IS NOT NULL
-                  AND c.date >= CURRENT_DATE - INTERVAL '21 days'
+                  AND c.date >= studio_today() - INTERVAL '21 days'
                 GROUP BY b.user_id, DATE_TRUNC('week', c.date)
             ),
             pairs AS (
                 SELECT a.user_id, a.week_start AS prev_week, b.week_start AS curr_week
                 FROM recent a
                 JOIN recent b ON b.user_id = a.user_id AND b.week_start = a.week_start + INTERVAL '7 days'
-                WHERE b.week_start >= DATE_TRUNC('week', CURRENT_DATE)::date - INTERVAL '7 days'
+                WHERE b.week_start >= DATE_TRUNC('week', studio_today())::date - INTERVAL '7 days'
             )
             SELECT user_id, prev_week, curr_week FROM pairs
         `);

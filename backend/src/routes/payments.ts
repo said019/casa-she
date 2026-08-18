@@ -211,7 +211,7 @@ router.post('/manual-income', async (req: Request, res: Response) => {
         const row = await queryOne(
             `INSERT INTO manual_incomes
                (amount, currency, concept, payment_method, facility_id, notes, income_date, processed_by)
-             VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::date, CURRENT_DATE), $8)
+             VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::date, studio_today()), $8)
              RETURNING *`,
             [d.amount, d.currency, d.concept, d.paymentMethod,
              d.facilityId || null, d.notes || null, d.incomeDate || null,

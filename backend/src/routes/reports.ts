@@ -3,6 +3,7 @@ import { query, queryOne } from '../config/database.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { fillStudioCounts } from '../lib/dashboardStudio.js';
 import { getStaffSales, getStaffSalesDetail } from '../lib/staffSales.js';
+import { cdmxToday } from '../lib/schedule.js';
 
 const router = Router();
 
@@ -56,7 +57,7 @@ router.get('/overview', authenticate, requireRole('admin'), async (req: Request,
         const manualByMonth = await query<{ month: string; total: string }>(
             `SELECT TO_CHAR(DATE_TRUNC('month', income_date), 'YYYY-MM') as month, SUM(amount) as total
              FROM manual_incomes
-             WHERE income_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months'
+             WHERE income_date >= DATE_TRUNC('month', studio_today()) - INTERVAL '5 months'
              GROUP BY 1`
         );
         const manualByMonthMap: Record<string, number> = {};
@@ -65,7 +66,7 @@ router.get('/overview', authenticate, requireRole('admin'), async (req: Request,
         // Classes this week
         const weeklyClasses = await queryOne(
             `SELECT COUNT(*) as count FROM classes
-             WHERE date >= CURRENT_DATE AND date < CURRENT_DATE + 7 AND status = 'scheduled'`
+             WHERE date >= studio_today() AND date < studio_today() + 7 AND status = 'scheduled'`
         );
 
         // New members in period
@@ -122,8 +123,8 @@ router.get('/overview', authenticate, requireRole('admin'), async (req: Request,
                 COALESCE(rev.total, 0)::numeric as revenue,
                 COALESCE(exp.total, 0)::numeric as expenses
             FROM generate_series(
-                DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months',
-                DATE_TRUNC('month', CURRENT_DATE),
+                DATE_TRUNC('month', studio_today()) - INTERVAL '5 months',
+                DATE_TRUNC('month', studio_today()),
                 '1 month'
             ) AS month_date
             LEFT JOIN LATERAL (
@@ -189,7 +190,7 @@ router.get('/classes', authenticate, requireRole('admin'), async (req: Request, 
         const { startDate, endDate } = req.query;
 
         const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const end = endDate || new Date().toISOString().split('T')[0];
+        const end = endDate || cdmxToday();
 
         // Classes by type
         const byType = await query(
@@ -275,7 +276,7 @@ router.get('/revenue', authenticate, requireRole('admin'), async (req: Request, 
         const { startDate, endDate, facilityId } = req.query;
 
         const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const end = endDate || new Date().toISOString().split('T')[0];
+        const end = endDate || cdmxToday();
         // Filtro opcional por sucursal. 'all' o vacío => sin filtro.
         const fac = (typeof facilityId === 'string' && facilityId && facilityId !== 'all') ? facilityId : null;
 
@@ -410,7 +411,7 @@ router.get('/retention', authenticate, requireRole('admin'), async (req: Request
     try {
         const { startDate, endDate } = req.query;
         const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const end = endDate || new Date().toISOString().split('T')[0];
+        const end = endDate || cdmxToday();
 
         // 1. General Booking Stats (Attendance Flow)
         const bookingStats = await queryOne(
@@ -540,7 +541,7 @@ router.get('/instructors', authenticate, requireRole('admin'), async (req: Reque
         };
 
         const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const end = endDate || new Date().toISOString().split('T')[0];
+        const end = endDate || cdmxToday();
         const fac = facility_id && facility_id !== 'all' ? facility_id : null;
 
         const stats = await query(
@@ -662,7 +663,7 @@ router.get('/profit-by-facility', authenticate, requireRole('admin'), async (req
     try {
         const { startDate, endDate } = req.query;
         const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const end = endDate || new Date().toISOString().split('T')[0];
+        const end = endDate || cdmxToday();
         const TZ = 'America/Mexico_City';
 
         // Ingresos por sucursal (payments; los eventos no tienen sucursal => excluidos)
@@ -727,7 +728,7 @@ router.get('/top-clients', authenticate, requireRole('admin'), async (req: Reque
     try {
         const { startDate, endDate } = req.query;
         const start = (startDate as string) || new Date(Date.now() - 365 * 864e5).toISOString().split('T')[0];
-        const end = (endDate as string) || new Date().toISOString().split('T')[0];
+        const end = (endDate as string) || cdmxToday();
         // Gasto = valor de membresías (plan.price) + productos (sales). NO usa payments
         // porque los miembros migrados tienen la membresía directa, sin registro de pago;
         // contar memberships x precio cubre a todos sin doble-contar (1 venta = 1 membresía).
@@ -777,7 +778,7 @@ router.get('/revenue-by-type', authenticate, requireRole('admin'), async (req: R
     try {
         const { startDate, endDate } = req.query;
         const start = (startDate as string) || new Date(Date.now() - 30 * 864e5).toISOString().split('T')[0];
-        const end = (endDate as string) || new Date().toISOString().split('T')[0];
+        const end = (endDate as string) || cdmxToday();
         // Una sola fuente de verdad = el PAGO (alineado con /revenue).
         // Membresías y Productos salen de payments completados (membership_id / order_id);
         // Eventos de event_registrations por paid_at.
@@ -813,7 +814,7 @@ router.get('/renewal-by-plan', authenticate, requireRole('admin'), async (req: R
     try {
         const { startDate, endDate } = req.query;
         const start = (startDate as string) || new Date(Date.now() - 180 * 864e5).toISOString().split('T')[0];
-        const end = (endDate as string) || new Date().toISOString().split('T')[0];
+        const end = (endDate as string) || cdmxToday();
         const plans = await query(`
             WITH expired AS (
                 SELECT m.id, m.plan_id, m.user_id, m.end_date
@@ -853,7 +854,7 @@ router.get('/coach-ranking', authenticate, requireRole('admin'), async (req: Req
     try {
         const { startDate, endDate, facilityId } = req.query;
         const start = (startDate as string) || new Date(Date.now() - 60 * 864e5).toISOString().split('T')[0];
-        const end = (endDate as string) || new Date().toISOString().split('T')[0];
+        const end = (endDate as string) || cdmxToday();
         const params: any[] = [start, end];
         let facFilter = '';
         if (facilityId && facilityId !== 'all') { params.push(facilityId); facFilter = ` AND c.facility_id = $3`; }
@@ -900,7 +901,7 @@ router.get('/cancellation-reasons', authenticate, requireRole('admin'), async (r
     try {
         const { startDate, endDate } = req.query;
         const start = (startDate as string) || new Date(Date.now() - 30 * 864e5).toISOString().split('T')[0];
-        const end = (endDate as string) || new Date().toISOString().split('T')[0];
+        const end = (endDate as string) || cdmxToday();
         const reasons = await query(`
             SELECT
                 CASE

@@ -2414,8 +2414,8 @@ router.get('/:id/trends', authenticate, requireSelfInstructorOrStaff, async (req
             FROM classes c
             LEFT JOIN bookings b ON b.class_id = c.id AND b.status IN ('confirmed', 'checked_in', 'no_show')
             WHERE c.instructor_id = $1
-              AND c.date >= CURRENT_DATE - INTERVAL '12 weeks'
-              AND c.date < CURRENT_DATE
+              AND c.date >= studio_today() - INTERVAL '12 weeks'
+              AND c.date < studio_today()
             GROUP BY date_trunc('week', c.date::timestamp)
             ORDER BY week_start DESC
             LIMIT 12
@@ -2433,7 +2433,7 @@ router.get('/:id/trends', authenticate, requireSelfInstructorOrStaff, async (req
                 COUNT(*)::int AS classes_count
             FROM classes c
             WHERE c.instructor_id = $1
-              AND c.date >= CURRENT_DATE - INTERVAL '12 weeks'
+              AND c.date >= studio_today() - INTERVAL '12 weeks'
             GROUP BY EXTRACT(DOW FROM c.date), EXTRACT(HOUR FROM c.start_time::time)
             ORDER BY avg_pct DESC
             LIMIT 5

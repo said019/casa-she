@@ -162,7 +162,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
         }
 
         if (upcoming === 'true') {
-            sql += ` AND date >= CURRENT_DATE`;
+            sql += ` AND date >= studio_today()`;
         }
 
         sql += ` ORDER BY date ASC, start_time ASC`;
