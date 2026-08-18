@@ -4319,38 +4319,63 @@ async function runStartupMigrations(): Promise<void> {
         console.log('  ✅ Migration 119b: defaults de fecha en hora del estudio');
     } catch (e) { console.error('Migration 119b error:', e); }
 
-    // ---- Migration 120: TotalPass — estado 'pending_delete' del mapping ----
-    // Cancelar una clase en Casa Shé no la quitaba de TotalPass: la socia la seguía
-    // viendo y reservando en su app, y llegaba al estudio a una clase que ya no
-    // existía. El retiro ahora se marca en el mapping (`pending_delete`) dentro del
-    // flujo de cancelación —sin red, para no colgar la petición cuando se cancela un
-    // día completo— y un barrido lo ejecuta contra la API de TotalPass.
+    // ---- Migration 120: TotalPass — estados 'pending_delete' y 'pending_resync' ----
+    // Ni cancelar ni editar una clase llegaba a TotalPass: la socia seguía viendo (y
+    // reservando) clases canceladas, o llegaba a la hora vieja de una clase movida.
+    // Ambas acciones marcan ahora el mapping y un barrido las ejecuta contra la API,
+    // así que `sync_status` necesita los dos estados nuevos. Sin este CHECK al día el
+    // UPDATE del marcado truena y la orden se pierde en silencio.
     //
-    // Sin este CHECK actualizado el UPDATE del marcado truena y la orden de retiro se
-    // pierde en silencio, que es exactamente el modo de falla que estamos cerrando.
+    // CONDICIONAL Y CON lock_timeout, y no por elegancia: `app.listen()` espera a que
+    // terminen TODAS las migraciones, y un ALTER TABLE pide ACCESS EXCLUSIVE. Durante
+    // un deploy la instancia VIEJA sigue viva consultando esta misma tabla con sus
+    // crons, así que el ALTER se forma en la cola de locks —y todo lo que llegue
+    // detrás se forma tras él—. Sin tope, el servidor nunca escucha y Railway mata el
+    // deploy a los 100 segundos de healthcheck. Ya pasó una vez.
+    //
+    // Con el guard, después del primer arranque exitoso esto no vuelve a pedir el
+    // lock jamás; y si aun así no lo consigue en 3s, falla rápido, lo dice, y el
+    // siguiente arranque reintenta. Un deploy nunca debe morir por esto.
     try {
-        await query(`ALTER TABLE partner_class_mappings DROP CONSTRAINT IF EXISTS partner_class_mappings_sync_status_check`);
-        await query(`ALTER TABLE partner_class_mappings ADD CONSTRAINT partner_class_mappings_sync_status_check
-            CHECK (sync_status IN ('pending','synced','failed','skipped','published','error','not_configured','pending_delete'))`);
-        // Los pendientes se buscan por estado en cada barrido; son pocos pero la tabla crece.
-        await query(`CREATE INDEX IF NOT EXISTS idx_pcm_pending_delete
-            ON partner_class_mappings(channel, sync_status) WHERE sync_status = 'pending_delete'`);
-        console.log('  ✅ Migration 120: partner_class_mappings.sync_status admite pending_delete');
-    } catch (e) { console.error('Migration 120 error:', e); }
-
-    // ---- Migration 121: TotalPass — estado 'pending_resync' del mapping ----
-    // Hermano de la 120. Editar una clase (moverla de hora, cambiarle el tipo o el
-    // coach) tampoco llegaba a TotalPass: la socia veía la hora vieja, reservaba a
-    // esa hora y llegaba cuando la clase ya no estaba. La edición marca el mapping y
-    // un barrido lo empuja a la API. Aditiva e idempotente, igual que la 120.
-    try {
-        await query(`ALTER TABLE partner_class_mappings DROP CONSTRAINT IF EXISTS partner_class_mappings_sync_status_check`);
-        await query(`ALTER TABLE partner_class_mappings ADD CONSTRAINT partner_class_mappings_sync_status_check
-            CHECK (sync_status IN ('pending','synced','failed','skipped','published','error','not_configured','pending_delete','pending_resync'))`);
-        await query(`CREATE INDEX IF NOT EXISTS idx_pcm_pending_resync
-            ON partner_class_mappings(channel, sync_status) WHERE sync_status = 'pending_resync'`);
-        console.log('  ✅ Migration 121: partner_class_mappings.sync_status admite pending_resync');
-    } catch (e) { console.error('Migration 121 error:', e); }
+        const ESTADOS = "'pending','synced','failed','skipped','published','error','not_configured','pending_delete','pending_resync'";
+        const alDia = await queryOne<{ ok: boolean }>(
+            `SELECT (pg_get_constraintdef(oid) LIKE '%pending_delete%'
+                 AND pg_get_constraintdef(oid) LIKE '%pending_resync%') AS ok
+               FROM pg_constraint
+              WHERE conrelid = 'partner_class_mappings'::regclass
+                AND conname = 'partner_class_mappings_sync_status_check'`);
+        if (alDia?.ok) {
+            console.log('  ⏭️  Migration 120: el CHECK de sync_status ya está al día');
+        } else {
+            // DROP y ADD en la MISMA transacción: si fueran dos statements sueltos
+            // habría un instante sin constraint, y un INSERT concurrente podría colar
+            // un estado inválido justo en esa ventana.
+            const mig = await pool.connect();
+            try {
+                await mig.query(`SET lock_timeout = '3s'`);
+                await mig.query('BEGIN');
+                await mig.query(`ALTER TABLE partner_class_mappings DROP CONSTRAINT IF EXISTS partner_class_mappings_sync_status_check`);
+                await mig.query(`ALTER TABLE partner_class_mappings ADD CONSTRAINT partner_class_mappings_sync_status_check
+                    CHECK (sync_status IN (${ESTADOS}))`);
+                await mig.query('COMMIT');
+                console.log('  ✅ Migration 120: sync_status admite pending_delete y pending_resync');
+            } catch (e) {
+                await mig.query('ROLLBACK').catch(() => { /* noop */ });
+                throw e;
+            } finally {
+                mig.release();
+            }
+        }
+        // Los barridos buscan por estado en cada corrida. CREATE INDEX no toma
+        // ACCESS EXCLUSIVE y con IF NOT EXISTS es barato tras la primera vez.
+        await query(`CREATE INDEX IF NOT EXISTS idx_pcm_pendientes
+            ON partner_class_mappings(channel, sync_status)
+            WHERE sync_status IN ('pending_delete','pending_resync')`);
+    } catch (e) {
+        // No tumbar el arranque: los barridos quedan inertes (su UPDATE fallará el
+        // CHECK y se registra) hasta que el siguiente arranque lo consiga.
+        console.error('Migration 120 error (el arranque continúa; se reintenta en el próximo):', e);
+    }
 
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }

@@ -103,6 +103,25 @@ assert.match(
     'index.ts debe migrar el CHECK de sync_status para aceptar pending_resync',
 );
 
+// ── (d2) …y esa migración NUNCA puede colgar el arranque ───────────────────
+// `app.listen()` espera a que terminen TODAS las migraciones. Un ALTER TABLE pide
+// ACCESS EXCLUSIVE, y durante un deploy la instancia VIEJA sigue viva consultando
+// esa misma tabla con sus crons: el ALTER se forma en la cola de locks y el
+// servidor nunca llega a escuchar. El healthcheck de Railway da 100 segundos.
+// Esto tumbó un deploy real.
+assert.match(
+    index,
+    /lock_timeout/,
+    'la migración del CHECK debe fijar lock_timeout: sin él, un lock ocupado cuelga el arranque y el deploy muere en el healthcheck',
+);
+// Y tiene que ser condicional: después del primer arranque exitoso no debe volver
+// a pedir el lock nunca más.
+assert.match(
+    index,
+    /pg_get_constraintdef/,
+    'la migración debe LEER el CHECK actual (pg_get_constraintdef) para saltarse el ALTER cuando ya está al día',
+);
+
 // ── (e) El barrido se auto-cura ─────────────────────────────────────────────
 // Al desplegar este arreglo ya había 27 clases canceladas con el mapping en
 // 'published' y vivas en TotalPass. Nadie las va a marcar a mano: el barrido
