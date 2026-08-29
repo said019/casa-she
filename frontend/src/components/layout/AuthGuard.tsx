@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore';
 import type { UserRole } from '@/types/auth';
 import { Loader2 } from 'lucide-react';
 import { OnboardingGate } from '@/components/OnboardingGate';
+import { isReceptionAccount } from '@/lib/operationalAccess';
 
 interface AuthGuardProps {
     children?: ReactNode; // Make optional
@@ -15,6 +16,8 @@ interface AuthGuardProps {
      * "elevated" del backend.
      */
     allowElevated?: boolean;
+    /** Reportes son la única sección que recepción no puede abrir. */
+    denyReception?: boolean;
 }
 
 function isElevatedUser(user: ReturnType<typeof useAuthStore.getState>['user']): boolean {
@@ -24,7 +27,7 @@ function isElevatedUser(user: ReturnType<typeof useAuthStore.getState>['user']):
     return false;
 }
 
-export function AuthGuard({ children, requiredRoles, redirectTo = '/login', allowElevated = false }: AuthGuardProps) {
+export function AuthGuard({ children, requiredRoles, redirectTo = '/login', allowElevated = false, denyReception = false }: AuthGuardProps) {
     const navigate = useNavigate();
     const location = useLocation();
     const { user, isAuthenticated, isLoading, checkAuth } = useAuthStore();
@@ -49,6 +52,11 @@ export function AuthGuard({ children, requiredRoles, redirectTo = '/login', allo
             return;
         }
 
+        if (denyReception && isReceptionAccount(user)) {
+            navigate('/admin/dashboard', { replace: true });
+            return;
+        }
+
         // Check role if specified — elevated users bypass the role check when allowElevated.
         if (requiredRoles && user && !requiredRoles.includes(user.role)) {
             if (allowElevated && isElevatedUser(user)) {
@@ -65,7 +73,7 @@ export function AuthGuard({ children, requiredRoles, redirectTo = '/login', allo
                 navigate('/app', { replace: true });
             }
         }
-    }, [isLoading, isAuthenticated, user, requiredRoles, allowElevated, navigate, redirectTo, location.pathname, location.search]);
+    }, [isLoading, isAuthenticated, user, requiredRoles, allowElevated, denyReception, navigate, redirectTo, location.pathname, location.search]);
 
     // Show loading while checking auth
     if (isLoading) {
@@ -81,6 +89,10 @@ export function AuthGuard({ children, requiredRoles, redirectTo = '/login', allo
 
     // Not authenticated or wrong role
     if (!isAuthenticated) {
+        return null;
+    }
+
+    if (denyReception && isReceptionAccount(user)) {
         return null;
     }
 

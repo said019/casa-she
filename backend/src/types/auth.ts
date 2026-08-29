@@ -102,6 +102,8 @@ export interface JwtPayload {
     userId: string;
     email: string;
     role: UserRole;
+    /** Rol real; `role` puede elevarse a admin durante una petición operativa. */
+    accountRole?: UserRole;
     instructorId?: string; // Optional: set when user is an instructor
     isReceptionMaster?: boolean; // Optional: true when reception user has elevated master privileges
 }

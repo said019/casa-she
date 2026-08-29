@@ -4,8 +4,10 @@ import { authenticate, requireRole } from '../middleware/auth.js';
 import { computeCommission, resolveCommissionSetting } from '../lib/commission.js';
 import { getStaffSales, getStaffSalesDetail } from '../lib/staffSales.js';
 import { logAction } from '../lib/audit.js';
+import { requireReportAccess } from '../middleware/reportAccess.js';
 
 const router = Router();
+router.use(authenticate, requireReportAccess);
 const ADMIN = ['admin', 'super_admin'] as const;
 
 // Resuelve el mes (YYYY-MM); default = mes actual en CDMX

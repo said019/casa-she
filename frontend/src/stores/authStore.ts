@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import api, { setStoredToken, removeStoredToken, getStoredToken } from '@/lib/api';
 import type { User, LoginCredentials, RegisterData, AuthResponse } from '@/types/auth';
+import { withOperationalAccess } from '@/lib/operationalAccess';
 
 interface AuthState {
     user: User | null;
@@ -37,7 +38,7 @@ export const useAuthStore = create<AuthState>()(
 
                     setStoredToken(token);
                     set({
-                        user,
+                        user: withOperationalAccess(user),
                         token,
                         isAuthenticated: true,
                         isLoading: false,
@@ -58,7 +59,7 @@ export const useAuthStore = create<AuthState>()(
 
                     setStoredToken(token);
                     set({
-                        user,
+                        user: withOperationalAccess(user),
                         token,
                         isAuthenticated: true,
                         isLoading: false,
@@ -92,7 +93,7 @@ export const useAuthStore = create<AuthState>()(
                 try {
                     const response = await api.get<{ user: User }>('/auth/me');
                     set({
-                        user: response.data.user,
+                        user: withOperationalAccess(response.data.user),
                         token,
                         isAuthenticated: true,
                         isLoading: false,
@@ -110,12 +111,12 @@ export const useAuthStore = create<AuthState>()(
 
             clearError: () => set({ error: null }),
 
-            updateUser: (user: User) => set({ user }),
+            updateUser: (user: User) => set({ user: withOperationalAccess(user) }),
 
             setAuth: (user: User, token: string) => {
                 setStoredToken(token);
                 set({
-                    user,
+                    user: withOperationalAccess(user),
                     token,
                     isAuthenticated: true,
                     isLoading: false,

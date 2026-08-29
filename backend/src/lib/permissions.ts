@@ -95,10 +95,8 @@ export function hasPermission(
   if (!user || !user.role) return false;
   if (user.role === 'admin' || user.role === 'super_admin') return true;
   if (user.role !== 'reception') return false;
-  // Recepción master = puede hacer TODO (no depende de que el objeto permissions
-  // tenga cada clave; basta el flag is_reception_master). Acepta ambos casings.
-  if (user.is_reception_master === true || user.isReceptionMaster === true) return true;
-  return effectivePermissions(user.permissions)[key] === true;
+  // Paridad operativa completa. Reportes se bloquean en middleware dedicado.
+  return true;
 }
 
 /**
@@ -132,34 +130,12 @@ export interface PermissionChangeResult {
   error?: string;
 }
 
-/**
- * Candado anti-escalación (aprobado: completo). Admin sin topes. Reception con
- * `gestionar_permisos`:
- *  1. No edita sus propios permisos.
- *  2. No otorga (false→true) un permiso que él no tiene. Revocar siempre se permite.
- *  3. No otorga `gestionar_permisos` ni `nomina` (solo admin).
- */
+/** Admin, super_admin y recepción comparten la gestión operativa del equipo. */
 export function validatePermissionChange(ctx: PermissionChangeContext): PermissionChangeResult {
-  if (ctx.actorRole === 'admin' || ctx.actorRole === 'super_admin') {
+  if (ctx.actorRole === 'admin' || ctx.actorRole === 'super_admin' || ctx.actorRole === 'reception') {
     return { ok: true };
   }
-  if (ctx.actorRole !== 'reception' || ctx.actorPerms.gestionar_permisos !== true) {
-    return { ok: false, error: 'No tienes permiso para gestionar el equipo.' };
-  }
-  if (ctx.actorIsSelf) {
-    return { ok: false, error: 'No puedes editar tus propios permisos.' };
-  }
-  for (const key of PERMISSION_KEYS) {
-    const granting = ctx.requested[key] === true && ctx.current[key] !== true;
-    if (!granting) continue; // revocar o sin cambio: siempre permitido
-    if (ADMIN_ONLY_KEYS.includes(key)) {
-      return { ok: false, error: `Solo un administrador puede otorgar "${key}".` };
-    }
-    if (ctx.actorPerms[key] !== true) {
-      return { ok: false, error: `No puedes otorgar un permiso que tú no tienes ("${key}").` };
-    }
-  }
-  return { ok: true };
+  return { ok: false, error: 'No tienes permiso para gestionar el equipo.' };
 }
 
 /** ¿El set de permisos equivale exactamente al preset Master? (para sync de is_reception_master) */

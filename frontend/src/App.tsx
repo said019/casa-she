@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import UpdatePrompt from "@/components/UpdatePrompt";
 
@@ -192,6 +192,15 @@ function LegacyClientBookRedirect() {
   return <Navigate to={classId ? `/app/book/${classId}` : "/app/book"} replace />;
 }
 
+/** Recepción ahora opera en el panel admin; conserva compatibilidad con accesos /reception guardados. */
+function ReceptionForAdmins() {
+  const user = useAuthStore((state) => state.user);
+  if (user?.role === 'admin' || user?.role === 'super_admin') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+  return <Outlet />;
+}
+
 /**
  * Cambia el manifest según la ruta: en el portal de coaches (/coach/*) apunta a
  * coach-manifest.json (start_url /coach) para que el acceso directo que guardan los
@@ -319,18 +328,20 @@ const App = () => (
             <Route path="/admin/loyalty/redemptions" element={<LoyaltyRedemptions />} />
             <Route path="/admin/loyalty/adjust" element={<LoyaltyAdjust />} />
 
-            <Route path="/admin/reports/overview" element={<ReportsOverview />} />
-            <Route path="/admin/reports/classes" element={<ReportsClasses />} />
-            <Route path="/admin/reports/revenue" element={<ReportsRevenue />} />
-            <Route path="/admin/reports/retention" element={<ReportsRetention />} />
-            <Route path="/admin/reports/instructors/:id" element={<InstructorDetail />} />
-            <Route path="/admin/reports/instructors" element={<ReportsInstructors />} />
-            <Route path="/admin/reports/egresos" element={<ReportsEgresos />} />
-            <Route path="/admin/reports/top-clients" element={<ReportsTopClients />} />
-            <Route path="/admin/reports/revenue-by-type" element={<Navigate to="/admin/reports/revenue" replace />} />
-            <Route path="/admin/reports/renewal-by-plan" element={<Navigate to="/admin/reports/retention" replace />} />
-            <Route path="/admin/reports/coach-ranking" element={<Navigate to="/admin/reports/instructors" replace />} />
-            <Route path="/admin/reports/cancellation-reasons" element={<Navigate to="/admin/reports/retention" replace />} />
+            <Route element={<AuthGuard requiredRoles={['admin', 'super_admin']} denyReception />}>
+                <Route path="/admin/reports/overview" element={<ReportsOverview />} />
+                <Route path="/admin/reports/classes" element={<ReportsClasses />} />
+                <Route path="/admin/reports/revenue" element={<ReportsRevenue />} />
+                <Route path="/admin/reports/retention" element={<ReportsRetention />} />
+                <Route path="/admin/reports/instructors/:id" element={<InstructorDetail />} />
+                <Route path="/admin/reports/instructors" element={<ReportsInstructors />} />
+                <Route path="/admin/reports/egresos" element={<ReportsEgresos />} />
+                <Route path="/admin/reports/top-clients" element={<ReportsTopClients />} />
+                <Route path="/admin/reports/revenue-by-type" element={<Navigate to="/admin/reports/revenue" replace />} />
+                <Route path="/admin/reports/renewal-by-plan" element={<Navigate to="/admin/reports/retention" replace />} />
+                <Route path="/admin/reports/coach-ranking" element={<Navigate to="/admin/reports/instructors" replace />} />
+                <Route path="/admin/reports/cancellation-reasons" element={<Navigate to="/admin/reports/retention" replace />} />
+            </Route>
 
             <Route path="/admin/settings/general" element={<GeneralSettings />} />
             <Route path="/admin/settings/studio" element={<StudioSettings />} />
@@ -349,7 +360,9 @@ const App = () => (
             <Route path="/admin/notifications/difusion" element={<PushBroadcast />} />
 
             {/* Migration History Route - Only for reports */}
-            <Route path="/admin/migrations/history" element={<ClientMigrationPage />} />
+            <Route element={<AuthGuard requiredRoles={['admin', 'super_admin']} denyReception />}>
+                <Route path="/admin/migrations/history" element={<ClientMigrationPage />} />
+            </Route>
 
             <Route path="/admin/facilities" element={<FacilitiesList />} />
             <Route path="/admin/facilities/:facilityId/layout" element={<Navigate to="/admin/facilities" replace />} />
@@ -363,14 +376,16 @@ const App = () => (
             <Route element={<AuthGuard requiredRoles={['admin', 'super_admin']} allowElevated />}>
                 <Route path="/admin/cash-shifts" element={<CashShiftsList />} />
                 <Route path="/admin/cash-shifts/:id" element={<CashShiftDetail />} />
-                <Route path="/admin/reports/sales-by-staff" element={<SalesByStaff />} />
-                <Route path="/admin/reports/membership-movements" element={<MembershipMovements />} />
                 <Route path="/admin/reception" element={<ReceptionStaffList />} />
                 <Route path="/admin/products" element={<ProductsPage />} />
+                <Route path="/admin/substitutions" element={<SubstitutionsAdmin />} />
                 <Route path="/admin/audit" element={<AuditLog />} />
+            </Route>
+            <Route element={<AuthGuard requiredRoles={['admin', 'super_admin']} denyReception />}>
+                <Route path="/admin/reports/sales-by-staff" element={<SalesByStaff />} />
+                <Route path="/admin/reports/membership-movements" element={<MembershipMovements />} />
                 <Route path="/admin/commissions" element={<CommissionsPage />} />
                 <Route path="/admin/payroll/coaches" element={<CoachPayrollPage />} />
-                <Route path="/admin/substitutions" element={<SubstitutionsAdmin />} />
             </Route>
 
             {/* Admin Video Management */}
@@ -381,6 +396,7 @@ const App = () => (
 
             {/* Reception Routes */}
             <Route element={<AuthGuard requiredRoles={['reception', 'admin', 'super_admin']} />}>
+              <Route element={<ReceptionForAdmins />}>
                 <Route element={<ReceptionLayout />}>
                     <Route path="/reception" element={<ReceptionDashboardScreen />} />
                     <Route path="/reception/caja" element={<CajaScreen />} />
@@ -403,6 +419,7 @@ const App = () => (
                         <Route path="/reception/plantilla" element={<WeeklySchedule embedded />} />
                     </Route>
                 </Route>
+              </Route>
             </Route>
 
             {/* Coach Routes */}

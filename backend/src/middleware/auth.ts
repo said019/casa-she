@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { JwtPayload, UserRole } from '../types/auth.js';
 import { queryOne } from '../config/database.js';
+import { operationalRole } from '../lib/operationalAccess.js';
 
 // Extend Express Request to include user
 declare global {
@@ -45,12 +46,12 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
         // independientes. Sin este JOIN, un coach dado de baja seguía pasando el chequeo de
         // arriba con users.is_active intacto. bool_and sobre el LEFT JOIN cubre también el
         // caso de un registro de instructor duplicado desactivado por /merge.
-        const fresh = await queryOne<{ user_active: boolean; instructor_active: boolean | null }>(
-            `SELECT u.is_active AS user_active, bool_and(COALESCE(i.is_active, true)) AS instructor_active
+        const fresh = await queryOne<{ role: UserRole; user_active: boolean; instructor_active: boolean | null }>(
+            `SELECT u.role, u.is_active AS user_active, bool_and(COALESCE(i.is_active, true)) AS instructor_active
                FROM users u
                LEFT JOIN instructors i ON i.user_id = u.id
               WHERE u.id = $1
-              GROUP BY u.id, u.is_active`,
+              GROUP BY u.id, u.role, u.is_active`,
             [decoded.userId]
         );
         if (!fresh || fresh.user_active === false || fresh.instructor_active === false) {
@@ -60,10 +61,12 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
             });
         }
 
+        const accountRole = fresh.role;
         req.user = {
             userId: decoded.userId,
             email: decoded.email,
-            role: decoded.role,
+            role: operationalRole(accountRole),
+            accountRole,
             instructorId: decoded.instructorId,
             isReceptionMaster: decoded.isReceptionMaster === true,
         };
@@ -104,8 +107,9 @@ export function requireRole(...roles: UserRole[]) {
                 'SELECT role FROM users WHERE id = $1',
                 [req.user.userId]
             );
-            if (fresh && roles.includes(fresh.role as UserRole)) {
-                req.user.role = fresh.role as UserRole; // refrescar para los handlers aguas abajo
+            if (fresh && roles.includes(operationalRole(fresh.role as UserRole))) {
+                req.user.accountRole = fresh.role as UserRole;
+                req.user.role = operationalRole(fresh.role as UserRole); // refrescar para los handlers aguas abajo
                 return next();
             }
         } catch {
@@ -133,10 +137,12 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
 
         if (secret) {
             const decoded = jwt.verify(token, secret) as JwtPayload;
+            const accountRole = decoded.role;
             req.user = {
                 userId: decoded.userId,
                 email: decoded.email,
-                role: decoded.role,
+                role: operationalRole(accountRole),
+                accountRole,
                 instructorId: decoded.instructorId,
                 isReceptionMaster: decoded.isReceptionMaster === true,
             };

@@ -1,4 +1,4 @@
-import { ReactNode, useState, useEffect, Fragment } from 'react';
+import { ReactNode, useState, useEffect, useMemo, Fragment } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuthStore } from '@/stores/authStore';
@@ -47,6 +47,7 @@ import { RECEPTION_ENABLED } from '@/config/features';
 import { AdminBreadcrumbs } from '@/components/layout/AdminBreadcrumbs';
 import { AdminSearch } from '@/components/admin/AdminSearch';
 import api from '@/lib/api';
+import { isReceptionAccount } from '@/lib/operationalAccess';
 
 interface AdminLayoutProps {
     children: ReactNode;
@@ -162,7 +163,6 @@ const sidebarItems: SidebarItem[] = [
             { href: '/admin/reports/classes', label: 'Clases' },
             { href: '/admin/reports/sales-by-staff', label: 'Ventas por staff' },
             { href: '/admin/commissions', label: 'Comisiones' },
-            { href: '/admin/audit', label: 'Bitácora' },
         ],
     },
     {
@@ -181,6 +181,7 @@ const sidebarItems: SidebarItem[] = [
             { href: '/admin/settings/closed-days', label: 'Días cerrados' },
             { href: '/admin/settings/onboarding', label: 'Perfilador' },
             { href: '/admin/settings/totalpass', label: 'TotalPass' },
+            { href: '/admin/audit', label: 'Bitácora' },
         ],
     },
 ];
@@ -215,16 +216,21 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     const navigate = useNavigate();
     const { user, logout } = useAuthStore();
     const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+    const receptionAccount = isReceptionAccount(user);
+    const visibleSidebarItems = useMemo(
+        () => receptionAccount ? sidebarItems.filter((item) => item.label !== 'Reportes') : sidebarItems,
+        [receptionAccount],
+    );
 
     useEffect(() => {
         setMobileMenuOpen(false);
-        const activeParents = sidebarItems
+        const activeParents = visibleSidebarItems
             .filter((item) => item.children?.some((child) => child.href && isActivePath(location.pathname, child.href)))
             .map((item) => item.label);
         if (activeParents.length > 0) {
             setExpandedItems((prev) => Array.from(new Set([...prev, ...activeParents])));
         }
-    }, [location.pathname]);
+    }, [location.pathname, visibleSidebarItems]);
 
     useEffect(() => {
         if (!mobileMenuOpen) return;
@@ -321,7 +327,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     const SidebarContent = ({ mobile = false }: { mobile?: boolean }) => (
         <div className="admin-navigation h-full overflow-y-auto overflow-x-hidden px-3 py-4">
             <nav className="space-y-1.5" aria-label="Navegación de administración">
-                {sidebarItems.map((item) => {
+                {visibleSidebarItems.map((item) => {
                     const Icon = item.icon;
 
                     if (item.children) {

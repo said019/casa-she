@@ -11,6 +11,8 @@ export interface User {
     photo_url: string | null;
     avatar_url?: string | null; // Alias for photo_url for compatibility
     role: UserRole;
+    /** Rol real; recepción se presenta como admin solo para la operación. */
+    account_role?: UserRole;
     emergency_contact_name: string | null;
     emergency_contact_phone: string | null;
     health_notes: string | null;

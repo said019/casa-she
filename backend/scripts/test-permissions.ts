@@ -18,20 +18,19 @@ import {
   assert.equal((p as any).basura, undefined, 'clave desconocida se ignora');
 }
 
-// hasPermission: admin siempre; reception por mapa; otros false
+// hasPermission: admin y recepción tienen paridad operativa; otros false
 assert.equal(hasPermission({ role: 'admin' }, 'nomina'), true);
 assert.equal(hasPermission({ role: 'super_admin' }, 'editar_catalogo'), true);
 assert.equal(hasPermission({ role: 'reception', permissions: PRESET_NORMAL }, 'caja'), true);
-assert.equal(hasPermission({ role: 'reception', permissions: PRESET_NORMAL }, 'editar_catalogo'), false);
+assert.equal(hasPermission({ role: 'reception', permissions: PRESET_NORMAL }, 'editar_catalogo'), true);
 assert.equal(hasPermission({ role: 'reception', permissions: PRESET_MASTER }, 'nomina'), true);
 assert.equal(hasPermission({ role: 'client', permissions: PRESET_MASTER }, 'caja'), false);
 assert.equal(hasPermission(null, 'caja'), false);
 
-// Recepción master: pasa CUALQUIER permiso por el flag, aunque el objeto permissions
-// esté incompleto/desincronizado (root cause del bug "master no puede hacer check-in").
+// Toda recepción pasa CUALQUIER permiso, aunque el mapa legacy esté incompleto.
 assert.equal(hasPermission({ role: 'reception', permissions: { checkin: false }, is_reception_master: true }, 'checkin'), true, 'master pasa aunque checkin=false en el objeto');
 assert.equal(hasPermission({ role: 'reception', permissions: {}, isReceptionMaster: true }, 'nomina'), true, 'master (camelCase del JWT) pasa nomina');
-assert.equal(hasPermission({ role: 'reception', permissions: { checkin: false } }, 'checkin'), false, 'recepción NO master sin checkin sigue denegada');
+assert.equal(hasPermission({ role: 'reception', permissions: { checkin: false } }, 'checkin'), true, 'recepción tiene paridad operativa');
 
 // isMasterPreset
 assert.equal(isMasterPreset(PRESET_MASTER), true);
@@ -47,16 +46,16 @@ assert.equal(isMasterPreset(PRESET_NORMAL), false);
   assert.equal(r.ok, true, 'admin puede todo');
 }
 
-// master no edita lo suyo
+// Recepción tiene paridad: puede editar permisos, incluso los propios.
 {
   const r = validatePermissionChange({
     actorRole: 'reception', actorIsSelf: true,
     actorPerms: PRESET_MASTER, current: PRESET_NORMAL, requested: PRESET_NORMAL,
   });
-  assert.equal(r.ok, false, 'no edita lo propio');
+  assert.equal(r.ok, true, 'recepción comparte autoridad administrativa');
 }
 
-// master no otorga permiso que no tiene
+// El mapa legacy no limita a recepción.
 {
   const actor = { ...PRESET_NORMAL, gestionar_permisos: true }; // master parcial: gestiona pero NO edita catálogo
   const r = validatePermissionChange({
@@ -64,17 +63,17 @@ assert.equal(isMasterPreset(PRESET_NORMAL), false);
     actorPerms: actor, current: PRESET_NORMAL,
     requested: { ...PRESET_NORMAL, editar_catalogo: true },
   });
-  assert.equal(r.ok, false, 'no otorga lo que no tiene');
+  assert.equal(r.ok, true, 'recepción puede otorgar permisos operativos');
 }
 
-// master no otorga gestionar_permisos / nomina aunque los tenga
+// Recepción puede gestionar también las capacidades históricamente admin-only.
 {
   const r = validatePermissionChange({
     actorRole: 'reception', actorIsSelf: false,
     actorPerms: PRESET_MASTER, current: PRESET_NORMAL,
     requested: { ...PRESET_NORMAL, gestionar_permisos: true },
   });
-  assert.equal(r.ok, false, 'gestionar_permisos solo admin');
+  assert.equal(r.ok, true, 'paridad administrativa completa');
 }
 
 // master SÍ puede revocar algo que él no tiene

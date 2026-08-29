@@ -2,10 +2,12 @@ import { Router, Request, Response } from 'express';
 import { query, queryOne } from '../config/database.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { fillStudioCounts } from '../lib/dashboardStudio.js';
+import { requireReportAccess } from '../middleware/reportAccess.js';
 import { getStaffSales, getStaffSalesDetail } from '../lib/staffSales.js';
 import { cdmxToday } from '../lib/schedule.js';
 
 const router = Router();
+router.use(authenticate, requireReportAccess);
 
 // ============================================
 // GET /api/reports/overview - Dashboard overview stats

@@ -5,6 +5,7 @@ import { authenticate, requireRole } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/requirePermission.js';
 import { logAction } from '../lib/audit.js';
 import { buildCoachPayrollEgreso } from '../lib/coachPayrollEgreso.js';
+import { requireReportAccess } from '../middleware/reportAccess.js';
 import {
     PayrollPeriod,
     currentPeriodToken,
@@ -14,6 +15,7 @@ import {
 } from '../lib/payrollPeriod.js';
 
 const router = Router();
+router.use(authenticate, requireReportAccess);
 const ADMIN = ['admin', 'super_admin'] as const;
 
 // Frecuencia configurada (settings.payroll_config). Default 'monthly'.
