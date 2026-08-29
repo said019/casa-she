@@ -6,6 +6,7 @@ import { ClientLayout } from '@/components/layout/ClientLayout';
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api';
 import { fetchMyMembership } from '@/lib/memberships';
+import { isMembershipScheduled } from '@/lib/membershipStatus';
 import type { ClientMembership } from '@/types/membership';
 
 const STATUS_LABELS: Record<ClientMembership['status'], string> = {
@@ -43,7 +44,9 @@ export default function Profile() {
   const membership = {
     plan: membershipData?.plan_name ?? 'Sin plan activo',
     credits: membershipData?.classes_remaining ?? 0,
-    status: membershipData ? (STATUS_LABELS[membershipData.status] ?? membershipData.status) : 'Sin membresía',
+    status: membershipData
+      ? (isMembershipScheduled(membershipData) ? 'Programada' : (STATUS_LABELS[membershipData.status] ?? membershipData.status))
+      : 'Sin membresía',
   };
 
   const wallet = {

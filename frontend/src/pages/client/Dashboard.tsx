@@ -6,6 +6,7 @@ import { es } from 'date-fns/locale';
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api';
 import { fetchMyMembership } from '@/lib/memberships';
+import { isMembershipScheduled } from '@/lib/membershipStatus';
 import type { BookingClient } from '@/types/booking';
 import type { ClientMembership } from '@/types/membership';
 import { categoryCredits } from '@/types/membership';
@@ -85,6 +86,7 @@ export default function ClientDashboard() {
   });
 
   const isExpiredOrCancelled = membership?.status === 'expired' || membership?.status === 'cancelled';
+  const membershipScheduled = isMembershipScheduled(membership);
   const totalAvailable = membership?.has_multiple_memberships
     ? membership.total_classes_available ?? membership.total_reformer_available ?? membership.total_multi_available
     : membership?.classes_remaining;
@@ -162,7 +164,7 @@ export default function ClientDashboard() {
   const membershipStatusText = isOutOfCredits
     ? 'Sin créditos'
     : membership
-      ? statusLabel[membership.status]
+      ? (membershipScheduled ? 'Programada' : statusLabel[membership.status])
       : 'Sin membresía';
   const showRenewPrompt = Boolean(!membership || isExpiredOrCancelled || isOutOfCredits || (classLimit && (classesRemaining ?? 0) <= 1));
 
@@ -323,9 +325,9 @@ export default function ClientDashboard() {
                       )}
                     </div>
                     <Badge
-                      variant={membership?.status === 'active' ? 'default' : 'secondary'}
+                      variant={membership?.status === 'active' && !membershipScheduled ? 'default' : 'secondary'}
                       className={
-                        membership?.status === 'active' && !isOutOfCredits
+                        membership?.status === 'active' && !membershipScheduled && !isOutOfCredits
                           ? 'w-fit rounded-full bg-[#DDE4D5] px-3 py-1 text-[#2E1B22]'
                           : 'w-fit rounded-full border border-[#AE4836]/30 bg-[#AE4836]/10 px-3 py-1 text-[#AE4836]'
                       }

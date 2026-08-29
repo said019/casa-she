@@ -45,6 +45,7 @@ import {
     type ManualDiscountType,
 } from '@/lib/manualDiscount';
 import { MembershipStartPicker } from '@/components/memberships/MembershipStartPicker';
+import { isMembershipScheduled } from '@/lib/membershipStatus';
 
 const mxn = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
 
@@ -575,17 +576,27 @@ function AdjustCreditsDialog({ membership, onDone }: { membership: ClientMembers
 }
 
 // ─── Cancel membership dialog (recepción master / admin) ─────────────────────
-function CancelMembershipDialog({ membership, clientName, onDone }: { membership: ClientMembership; clientName: string; onDone: () => void }) {
+function CancelMembershipDialog({
+    membership,
+    clientName,
+    allowRefund,
+    onDone,
+}: {
+    membership: ClientMembership;
+    clientName: string;
+    allowRefund: boolean;
+    onDone: () => void;
+}) {
     const [open, setOpen] = useState(false);
     const [reason, setReason] = useState('');
-    // Por defecto reembolsa: una cancelación saca el pago de ingresos, ventas y caja
-    // (regla del estudio: "es una cancelación"). Se puede desmarcar si el estudio retiene el cobro.
-    const [refund, setRefund] = useState(true);
+    // Solo un rol elevado puede registrar el reembolso contable. Recepción normal
+    // conserva la facultad de cancelar, pero siempre envía refund=false.
+    const [refund, setRefund] = useState(allowRefund);
 
     const cancel = useMutation({
         mutationFn: async () => api.post(`/memberships/${membership.id}/cancel`, {
             reason: reason.trim() || undefined,
-            refund,
+            refund: allowRefund && refund,
         }),
         onSuccess: (res) => {
             const info = res.data?.refund;
@@ -596,14 +607,20 @@ function CancelMembershipDialog({ membership, clientName, onDone }: { membership
             );
             setOpen(false);
             setReason('');
-            setRefund(true);
+            setRefund(allowRefund);
             onDone();
         },
         onError: (e) => toast.error(getErrorMessage(e)),
     });
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+            open={open}
+            onOpenChange={(nextOpen) => {
+                setOpen(nextOpen);
+                if (nextOpen) setRefund(allowRefund);
+            }}
+        >
             <DialogTrigger asChild>
                 <Button
                     variant="outline"
@@ -635,15 +652,17 @@ function CancelMembershipDialog({ membership, clientName, onDone }: { membership
                             rows={2}
                         />
                     </div>
-                    <label className="flex items-center justify-between gap-3 rounded-md border p-3">
-                        <div>
-                            <p className="text-sm font-medium">Reembolsar pago</p>
-                            <p className="text-xs text-muted-foreground">
-                                Marca los pagos como reembolsados y revierte los puntos de lealtad otorgados.
-                            </p>
-                        </div>
-                        <Switch checked={refund} onCheckedChange={setRefund} />
-                    </label>
+                    {allowRefund && (
+                        <label className="flex items-center justify-between gap-3 rounded-md border p-3">
+                            <div>
+                                <p className="text-sm font-medium">Reembolsar pago</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Marca los pagos como reembolsados y revierte los puntos de lealtad otorgados.
+                                </p>
+                            </div>
+                            <Switch checked={refund} onCheckedChange={setRefund} />
+                        </label>
+                    )}
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setOpen(false)}>Volver</Button>
@@ -1073,14 +1092,21 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
                                 <p className="text-sm text-muted-foreground">Sin membresías activas.</p>
                             ) : (
                                 <div className="space-y-2">
-                                    {memberships.map((m) => (
+                                    {memberships.map((m) => {
+                                        const scheduled = isMembershipScheduled(m);
+                                        return (
                                         <div key={m.id} className="p-3 rounded-md border bg-card">
                                             <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
                                                 <div className="min-w-0">
                                                     <p className="font-medium text-sm">{m.plan_name ?? 'Plan'}</p>
                                                     <p className="text-xs text-muted-foreground">
                                                         {m.status === 'active' ? (
-                                                            <Badge variant="outline" className="text-emerald-600 border-emerald-600">activa</Badge>
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={scheduled ? 'border-sky-300 bg-sky-50 text-sky-700' : 'text-emerald-600 border-emerald-600'}
+                                                            >
+                                                                {scheduled ? 'Programada' : 'Activa'}
+                                                            </Badge>
                                                         ) : (
                                                             <Badge variant="outline">{m.status}</Badge>
                                                         )}
@@ -1099,10 +1125,11 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
                                                     {(m.status === 'active' || m.status === 'expired') && (
                                                         <EditValidityDialog membership={m} onSuccess={refetchMemberships} />
                                                     )}
-                                                    {elevated && m.status !== 'cancelled' && (
+                                                    {m.status !== 'cancelled' && (
                                                         <CancelMembershipDialog
                                                             membership={m}
                                                             clientName={client.display_name}
+                                                            allowRefund={elevated}
                                                             onDone={() => {
                                                                 refetchMemberships();
                                                                 qc.invalidateQueries({ queryKey: ['reception-clients'] });
@@ -1126,7 +1153,8 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
                                                 );
                                             })()}
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </CardContent>
@@ -1157,6 +1185,7 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
                                         .map((m) => {
                                             const dateRaw = m.created_at ?? m.start_date;
                                             const priceRaw = m.plan_price ?? m.price;
+                                            const scheduled = isMembershipScheduled(m);
                                             return (
                                                 <div key={m.id} className="p-3 rounded-md border bg-card">
                                                     <div className="flex items-start justify-between gap-2">
@@ -1180,11 +1209,13 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
                                                             </p>
                                                             <Badge
                                                                 variant="outline"
-                                                                className={m.status === 'active'
+                                                                className={scheduled
+                                                                    ? 'border-sky-300 bg-sky-50 text-sky-700 text-xs'
+                                                                    : m.status === 'active'
                                                                     ? 'text-emerald-600 border-emerald-600 text-xs'
                                                                     : 'text-xs'}
                                                             >
-                                                                {MEMBERSHIP_STATUS_LABELS[m.status] ?? m.status}
+                                                                {scheduled ? 'Programada' : (MEMBERSHIP_STATUS_LABELS[m.status] ?? m.status)}
                                                             </Badge>
                                                         </div>
                                                     </div>

@@ -10,6 +10,7 @@ import { RECEPTION_ENABLED } from '@/config/features';
 import api from '@/lib/api';
 import type { AdminStats, Membership } from '@/types/auth';
 import type { Order } from '@/types/order';
+import { isMembershipScheduled } from '@/lib/membershipStatus';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -219,7 +220,7 @@ export default function AdminDashboard() {
                                                         {membership.user_name}
                                                     </p>
                                                     <p className="mt-1 truncate text-xs text-balance-dark/55">
-                                                        {membership.plan_name} · {translateMembershipStatus(membership.status)}
+                                                        {membership.plan_name} · {translateMembershipStatus(membership)}
                                                     </p>
                                                 </div>
                                                 <span className="shrink-0 text-[11px] text-balance-dark/45">
@@ -498,7 +499,9 @@ function formatMoney(value: number) {
     return `$${Number(value || 0).toLocaleString('es-MX')}`;
 }
 
-function translateMembershipStatus(status: string) {
+function translateMembershipStatus(membership: Membership) {
+    if (isMembershipScheduled(membership)) return 'Programada';
+    const { status } = membership;
     if (status === 'active') return 'Activa';
     if (status === 'pending_payment') return 'Pendiente de pago';
     if (status === 'pending_activation') return 'Pendiente de activación';

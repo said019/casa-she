@@ -38,6 +38,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { CLIENT_TAGS } from '@/data/clientTags';
 import SellPlanDialog from '@/components/memberships/SellPlanDialog';
 import { AdjustCreditsDialog } from '@/components/clients/AdjustCreditsDialog';
+import { isMembershipScheduled } from '@/lib/membershipStatus';
 
 interface FacilityOpt {
     id: string;
@@ -364,9 +365,13 @@ export default function ClientsList() {
                                                 {user.membership_status ? (
                                                     <Badge
                                                         variant="outline"
-                                                        className={statusColors[user.membership_status] || ''}
+                                                        className={isMembershipScheduled({ status: user.membership_status, start_date: user.membership_start_date })
+                                                            ? 'border-sky-300 bg-sky-50 text-sky-700'
+                                                            : statusColors[user.membership_status] || ''}
                                                     >
-                                                        {statusLabels[user.membership_status] || user.membership_status}
+                                                        {isMembershipScheduled({ status: user.membership_status, start_date: user.membership_start_date })
+                                                            ? 'Programada'
+                                                            : statusLabels[user.membership_status] || user.membership_status}
                                                     </Badge>
                                                 ) : (
                                                     <Badge variant="outline" className="text-gray-500">
@@ -469,8 +474,15 @@ export default function ClientsList() {
                                                 )}
                                                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                                                     {user.membership_status ? (
-                                                        <Badge variant="outline" className={statusColors[user.membership_status] || ''}>
-                                                            {statusLabels[user.membership_status] || user.membership_status}
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={isMembershipScheduled({ status: user.membership_status, start_date: user.membership_start_date })
+                                                                ? 'border-sky-300 bg-sky-50 text-sky-700'
+                                                                : statusColors[user.membership_status] || ''}
+                                                        >
+                                                            {isMembershipScheduled({ status: user.membership_status, start_date: user.membership_start_date })
+                                                                ? 'Programada'
+                                                                : statusLabels[user.membership_status] || user.membership_status}
                                                         </Badge>
                                                     ) : (
                                                         <Badge variant="outline" className="text-gray-500">Sin membresía</Badge>

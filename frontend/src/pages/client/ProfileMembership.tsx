@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchMyMembership } from '@/lib/memberships';
+import { isMembershipScheduled } from '@/lib/membershipStatus';
 import type { ClientMembership } from '@/types/membership';
 import { categoryCredits } from '@/types/membership';
 import { Link } from 'react-router-dom';
@@ -37,6 +38,7 @@ export default function ProfileMembership() {
     ? (classesRemaining / classLimit) * 100
     : null;
   const credits = categoryCredits(membership);
+  const scheduled = isMembershipScheduled(membership);
 
   return (
     <AuthGuard requiredRoles={['client']}>
@@ -73,8 +75,8 @@ export default function ProfileMembership() {
                           : 'Precio no disponible'}
                       </p>
                     </div>
-                    <Badge variant={membership.status === 'active' ? 'default' : 'secondary'}>
-                      {statusLabel[membership.status]}
+                    <Badge variant={membership.status === 'active' && !scheduled ? 'default' : 'secondary'}>
+                      {scheduled ? 'Programada' : statusLabel[membership.status]}
                     </Badge>
                   </div>
 

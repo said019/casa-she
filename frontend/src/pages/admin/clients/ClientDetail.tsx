@@ -53,6 +53,7 @@ import { creditLabel } from '@/lib/credits';
 import { PAYMENT_METHOD_LABELS as paymentMethodLabels } from '@/lib/membershipPaymentMethods';
 import { EditValidityDialog } from '@/components/memberships/EditValidityDialog';
 import SellPlanDialog from '@/components/memberships/SellPlanDialog';
+import { isMembershipScheduled } from '@/lib/membershipStatus';
 
 const statusLabels: Record<string, string> = {
     active: 'Activo',
@@ -447,8 +448,12 @@ export default function ClientDetail() {
 
                                     {/* Current Membership Status */}
                                     {client.currentMembership ? (
-                                        <Badge className={`mt-2 ${statusColors[client.currentMembership.status] || ''}`}>
-                                            {statusLabels[client.currentMembership.status] || client.currentMembership.status}
+                                        <Badge className={`mt-2 ${isMembershipScheduled(client.currentMembership)
+                                            ? 'border-sky-300 bg-sky-50 text-sky-700'
+                                            : statusColors[client.currentMembership.status] || ''}`}>
+                                            {isMembershipScheduled(client.currentMembership)
+                                                ? 'Programada'
+                                                : statusLabels[client.currentMembership.status] || client.currentMembership.status}
                                         </Badge>
                                     ) : (
                                         <Badge variant="outline" className="mt-2 text-muted-foreground">
@@ -623,8 +628,10 @@ export default function ClientDetail() {
                                                         <div>
                                                             <div className="font-semibold font-heading flex items-center gap-2">
                                                                 {m.plan_name}
-                                                                <Badge className={`rounded-lg text-xs font-body ${statusColors[m.status] || 'bg-muted text-foreground'}`}>
-                                                                    {statusLabels[m.status] || m.status}
+                                                                <Badge className={`rounded-lg text-xs font-body ${isMembershipScheduled(m)
+                                                                    ? 'border-sky-300 bg-sky-50 text-sky-700'
+                                                                    : statusColors[m.status] || 'bg-muted text-foreground'}`}>
+                                                                    {isMembershipScheduled(m) ? 'Programada' : statusLabels[m.status] || m.status}
                                                                 </Badge>
                                                             </div>
                                                             <div className="text-sm text-muted-foreground mt-1 font-body">

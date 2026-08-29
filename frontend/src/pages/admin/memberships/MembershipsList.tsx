@@ -52,6 +52,7 @@ import { getPaymentMethodLabel } from '@/lib/paymentLabels';
 import { ManualPriceAdjustmentFields } from '@/components/payments/ManualPriceAdjustmentFields';
 import { calculateManualDiscount, MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH, type ManualDiscountType } from '@/lib/manualDiscount';
 import { MembershipStartPicker } from '@/components/memberships/MembershipStartPicker';
+import { isMembershipScheduled } from '@/lib/membershipStatus';
 
 // Trazabilidad de adquisición: convierte el campo `acquisition` (calculado en backend)
 // en un título + subtítulo legibles para la columna "Adquisición".
@@ -120,7 +121,7 @@ export default function MembershipsList({
     const [activationMembership, setActivationMembership] = useState<Membership | null>(null);
     const [cancellationMembership, setCancellationMembership] = useState<Membership | null>(null);
     const [cancelReason, setCancelReason] = useState('');
-    const [cancelRefund, setCancelRefund] = useState(true);
+    const [cancelRefund, setCancelRefund] = useState(false);
     const [externalRefundConfirmed, setExternalRefundConfirmed] = useState(false);
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -210,7 +211,7 @@ export default function MembershipsList({
             toast({ title: 'Membresía cancelada', description });
             setCancellationMembership(null);
             setCancelReason('');
-            setCancelRefund(true);
+            setCancelRefund(false);
             setExternalRefundConfirmed(false);
         },
         onError: (error) => {
@@ -341,8 +342,10 @@ export default function MembershipsList({
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    filteredMemberships?.map((m) => (
-                                        <TableRow key={m.id}>
+                                    filteredMemberships?.map((m) => {
+                                        const scheduled = isMembershipScheduled(m);
+                                        return (
+                                            <TableRow key={m.id}>
                                             <TableCell>
                                                 <div className="font-medium">{m.user_name}</div>
                                                 <div className="text-xs text-muted-foreground">{m.user_email}</div>
@@ -350,14 +353,16 @@ export default function MembershipsList({
                                             <TableCell>{m.plan_name}</TableCell>
                                             <TableCell>
                                                 <Badge variant={
-                                                    m.status === 'active' ? 'default' :
+                                                    m.status === 'active' && !scheduled ? 'default' :
                                                         m.status.includes('pending') ? 'outline' : 'secondary'
                                                 } className={
+                                                    scheduled ? 'border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-50' :
                                                     m.status === 'active' ? 'bg-success/10 text-success hover:bg-success/10 border-success/30' :
                                                         m.status === 'pending_payment' ? 'text-warning border-warning/30 bg-warning/10' :
                                                             ''
                                                 }>
-                                                    {m.status === 'active' ? 'Activa' :
+                                                    {scheduled ? 'Programada' :
+                                                        m.status === 'active' ? 'Activa' :
                                                         m.status === 'pending_payment' ? 'Pendiente Pago' :
                                                             m.status === 'pending_activation' ? 'Por Activar' :
                                                                 m.status === 'cancelled' ? 'Cancelada' :
@@ -404,7 +409,7 @@ export default function MembershipsList({
                                                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                                             onClick={() => {
                                                                 setCancelReason('');
-                                                                setCancelRefund(true);
+                                                                setCancelRefund(isElevated);
                                                                 setExternalRefundConfirmed(false);
                                                                 setCancellationMembership(m);
                                                             }}
@@ -416,8 +421,9 @@ export default function MembershipsList({
                                                     )}
                                                 </div>
                                             </TableCell>
-                                        </TableRow>
-                                    ))
+                                            </TableRow>
+                                        );
+                                    })
                                 )}
                             </TableBody>
                         </Table>
@@ -590,26 +596,28 @@ export default function MembershipsList({
                                         maxLength={500}
                                     />
                                 </div>
-                                <div className="flex items-start gap-3 rounded-md border p-3">
-                                    <Checkbox
-                                        id="cancel-refund"
-                                        checked={cancelRefund}
-                                        onCheckedChange={(v) => {
-                                            const checked = v === true;
-                                            setCancelRefund(checked);
-                                            if (!checked) setExternalRefundConfirmed(false);
-                                        }}
-                                    />
-                                    <div className="space-y-1">
-                                        <Label htmlFor="cancel-refund" className="cursor-pointer">
-                                            Registrar reembolso en Casa Shé
-                                        </Label>
-                                        <p className="text-xs text-muted-foreground">
-                                            Marca los pagos asociados como reembolsados y revierte los puntos otorgados en el sistema.
-                                        </p>
+                                {isElevated && (
+                                    <div className="flex items-start gap-3 rounded-md border p-3">
+                                        <Checkbox
+                                            id="cancel-refund"
+                                            checked={cancelRefund}
+                                            onCheckedChange={(v) => {
+                                                const checked = v === true;
+                                                setCancelRefund(checked);
+                                                if (!checked) setExternalRefundConfirmed(false);
+                                            }}
+                                        />
+                                        <div className="space-y-1">
+                                            <Label htmlFor="cancel-refund" className="cursor-pointer">
+                                                Registrar reembolso en Casa Shé
+                                            </Label>
+                                            <p className="text-xs text-muted-foreground">
+                                                Marca los pagos asociados como reembolsados y revierte los puntos otorgados en el sistema.
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
-                                {cancelRefund && (
+                                )}
+                                {isElevated && cancelRefund && (
                                     <div className="space-y-3 rounded-xl border border-warning/35 bg-warning/10 p-4">
                                         <div className="flex items-start gap-2">
                                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
@@ -651,13 +659,13 @@ export default function MembershipsList({
                                         cancelMutation.mutate({
                                             id: cancellationMembership.id,
                                             reason: cancelReason.trim() || undefined,
-                                            refund: cancelRefund,
+                                            refund: isElevated && cancelRefund,
                                         });
                                     }}
-                                    disabled={cancelMutation.isPending || (cancelRefund && !externalRefundConfirmed)}
+                                    disabled={cancelMutation.isPending || (isElevated && cancelRefund && !externalRefundConfirmed)}
                                 >
                                     {cancelMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    {cancelRefund ? 'Cancelar y registrar reembolso' : 'Cancelar sin reembolso'}
+                                    {isElevated && cancelRefund ? 'Cancelar y registrar reembolso' : 'Cancelar sin reembolso'}
                                 </Button>
                             </DialogFooter>
                         </DialogContent>

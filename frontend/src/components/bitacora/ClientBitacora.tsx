@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import api, { getErrorMessage } from '@/lib/api';
+import { isMembershipScheduled } from '@/lib/membershipStatus';
 
 interface Asistencia {
   booking_id: string;
@@ -112,10 +113,10 @@ function PeriodoBlock({ periodo, defaultOpen }: { periodo: PeriodoMembresia; def
             {m.start_date ? formatDate(m.start_date) : '—'} → {m.end_date ? formatDate(m.end_date) : 'sin vencimiento'}
           </span>
           <Badge
-            variant={m.status === 'active' ? 'default' : 'secondary'}
+            variant={m.status === 'active' && !isMembershipScheduled(m) ? 'default' : 'secondary'}
             className="ml-2 text-[10px] h-4"
           >
-            {m.status === 'active' ? 'activa' : m.status}
+            {isMembershipScheduled(m) ? 'programada' : m.status === 'active' ? 'activa' : m.status}
           </Badge>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0 ml-2">
