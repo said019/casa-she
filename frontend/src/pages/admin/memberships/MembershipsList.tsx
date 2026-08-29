@@ -46,11 +46,12 @@ import { useIsElevated } from '@/hooks/useIsElevated';
 import {
     getMembershipPaymentMethods,
 } from '@/lib/membershipPaymentMethods';
-import { formatDateForInput, addDaysForInput } from '@/lib/date';
+import { addDaysForInput } from '@/lib/date';
 import { creditLabel } from '@/lib/credits';
 import { getPaymentMethodLabel } from '@/lib/paymentLabels';
 import { ManualPriceAdjustmentFields } from '@/components/payments/ManualPriceAdjustmentFields';
 import { calculateManualDiscount, MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH, type ManualDiscountType } from '@/lib/manualDiscount';
+import { MembershipStartPicker } from '@/components/memberships/MembershipStartPicker';
 
 // Trazabilidad de adquisición: convierte el campo `acquisition` (calculado en backend)
 // en un título + subtítulo legibles para la columna "Adquisición".
@@ -94,7 +95,7 @@ const assignSchema = z.object({
     reason: z.string().optional(),
     discountType: z.enum(['percentage', 'fixed']).optional(),
     discountValue: z.coerce.number().min(0).optional(),
-    startDate: z.string().optional(),
+    startDate: z.string().min(1, 'Elige cuándo inicia la membresía'),
     endDate: z.string().optional(),
 });
 
@@ -130,7 +131,7 @@ export default function MembershipsList({
         resolver: zodResolver(assignSchema),
         defaultValues: {
             status: 'active',
-            startDate: formatDateForInput(),
+            startDate: '',
         }
     });
 
@@ -225,7 +226,7 @@ export default function MembershipsList({
             queryClient.invalidateQueries({ queryKey: ['memberships'] });
             toast({ title: 'Membresía asignada', description: 'La membresía se ha creado exitosamente.' });
             setIsAssignDialogOpen(false);
-            reset({ status: 'active', startDate: formatDateForInput() });
+            reset({ status: 'active', startDate: '' });
             setAssignDiscountEnabled(false);
             setEndDateTouched(false);
         },
@@ -272,7 +273,7 @@ export default function MembershipsList({
     };
 
     return (
-        <AuthGuard requiredRoles={['admin']}>
+        <AuthGuard requiredRoles={['admin', 'super_admin', 'reception']}>
             <AdminLayout>
                 <div className="space-y-6">
                     <div className="flex justify-between items-center">
@@ -281,7 +282,7 @@ export default function MembershipsList({
                             <p className="text-muted-foreground">{description}</p>
                         </div>
                         <Button onClick={() => {
-                            reset({ status: 'active', startDate: formatDateForInput() });
+                            reset({ status: 'active', startDate: '' });
                             setAssignDiscountEnabled(false);
                             setEndDateTouched(false);
                             setIsAssignDialogOpen(true);
@@ -475,27 +476,29 @@ export default function MembershipsList({
                                             <SelectValue placeholder="Seleccionar estado" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="active">Activa (Inicia hoy)</SelectItem>
+                                            <SelectItem value="active">Activa (según fecha elegida)</SelectItem>
                                             <SelectItem value="pending_payment">Pendiente de Pago</SelectItem>
                                             <SelectItem value="pending_activation">Pendiente de Activación</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
 
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="assign-start">Inicio</Label>
-                                        <Input id="assign-start" type="date" {...register('startDate')} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="assign-end">Vence</Label>
-                                        <Input
-                                            id="assign-end"
-                                            type="date"
-                                            value={watchedEndDate ?? ''}
-                                            onChange={(e) => { setValue('endDate', e.target.value); setEndDateTouched(true); }}
-                                        />
-                                    </div>
+                                <MembershipStartPicker
+                                    id="assign-start"
+                                    value={watchedStartDate ?? ''}
+                                    onChange={(value) => setValue('startDate', value, { shouldValidate: true })}
+                                    durationDays={plans?.find((p) => p.id === watchedPlanId)?.duration_days}
+                                    disabled={isSubmitting}
+                                />
+                                {errors.startDate && <p className="text-xs text-destructive">{errors.startDate.message}</p>}
+                                <div className="space-y-2">
+                                    <Label htmlFor="assign-end">Vence (opcional)</Label>
+                                    <Input
+                                        id="assign-end"
+                                        type="date"
+                                        value={watchedEndDate ?? ''}
+                                        onChange={(e) => { setValue('endDate', e.target.value); setEndDateTouched(true); }}
+                                    />
                                 </div>
 
                                 <div className="space-y-2">

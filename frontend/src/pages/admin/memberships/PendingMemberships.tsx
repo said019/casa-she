@@ -4,7 +4,7 @@ import { PendingMembershipsPanel } from '@/components/memberships/PendingMembers
 
 export default function PendingMemberships() {
   return (
-    <AuthGuard requiredRoles={['admin', 'super_admin']}>
+    <AuthGuard requiredRoles={['admin', 'super_admin', 'reception']}>
       <AdminLayout>
         <PendingMembershipsPanel />
       </AdminLayout>

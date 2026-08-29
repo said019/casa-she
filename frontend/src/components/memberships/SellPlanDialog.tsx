@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api, { getErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -14,10 +13,11 @@ import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useIsElevated } from '@/hooks/useIsElevated';
 import { getMembershipPaymentMethods } from '@/lib/membershipPaymentMethods';
-import { formatDateForInput, addDaysForInput } from '@/lib/date';
+import { addDaysForInput } from '@/lib/date';
 import { planClassLabel } from '@/lib/credits';
 import { ManualPriceAdjustmentFields } from '@/components/payments/ManualPriceAdjustmentFields';
 import { calculateManualDiscount, MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH, type ManualDiscountType } from '@/lib/manualDiscount';
+import { MembershipStartPicker } from '@/components/memberships/MembershipStartPicker';
 
 interface Plan {
     id: string;
@@ -48,7 +48,7 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
     const [discountEnabled, setDiscountEnabled] = useState(false);
     const [discountType, setDiscountType] = useState<ManualDiscountType>('percentage');
     const [discountValue, setDiscountValue] = useState('');
-    const [assignStartDate, setAssignStartDate] = useState(formatDateForInput());
+    const [assignStartDate, setAssignStartDate] = useState('');
     const [assignEndDate, setAssignEndDate] = useState('');
     const isGratis = paymentMethod === 'gratis';
 
@@ -66,7 +66,7 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
             setDiscountEnabled(false);
             setDiscountType('percentage');
             setDiscountValue('');
-            setAssignStartDate(formatDateForInput());
+            setAssignStartDate('');
             setAssignEndDate('');
         }
     }, [open]);
@@ -92,7 +92,7 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
             planId: selectedPlanId,
             status: 'active',
             paymentMethod,
-            startDate: assignStartDate || undefined,
+            startDate: assignStartDate,
             endDate: assignEndDate || undefined,
             reason: adjustmentNeedsComment ? assignReason.trim() : undefined,
             ...(!isGratis && discountEnabled ? {
@@ -138,18 +138,13 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
                         </Select>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label htmlFor="sell-start">Inicio</Label>
-                            <Input id="sell-start" type="date" value={assignStartDate}
-                                onChange={(e) => setAssignStartDate(e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="sell-end">Vence (automático)</Label>
-                            <Input id="sell-end" type="date" value={assignEndDate} disabled
-                                title="Se calcula del plan (inicio + duración). Para cambiarlo, cambia el plan." />
-                        </div>
-                    </div>
+                    <MembershipStartPicker
+                        id="sell-start"
+                        value={assignStartDate}
+                        onChange={setAssignStartDate}
+                        durationDays={selectedPlan?.duration_days}
+                        disabled={assignMutation.isPending}
+                    />
 
                     <div className="space-y-2">
                         <Label htmlFor="sell-method">Método de pago</Label>
@@ -198,6 +193,7 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
                         onClick={() => { if (selectedPlanId) assignMutation.mutate(); }}
                         disabled={
                             !selectedPlanId ||
+                            !assignStartDate ||
                             assignMutation.isPending ||
                             !adjustmentValid
                         }

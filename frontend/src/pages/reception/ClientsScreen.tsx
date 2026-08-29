@@ -44,6 +44,7 @@ import {
     MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH,
     type ManualDiscountType,
 } from '@/lib/manualDiscount';
+import { MembershipStartPicker } from '@/components/memberships/MembershipStartPicker';
 
 const mxn = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
 
@@ -186,7 +187,7 @@ function SellPlanDialog({ clientId, onDone }: { clientId: string; onDone: () => 
     const [discountEnabled, setDiscountEnabled] = useState(false);
     const [discountType, setDiscountType] = useState<ManualDiscountType>('percentage');
     const [discountValue, setDiscountValue] = useState('');
-    const [startDate, setStartDate] = useState(formatDateForInput());
+    const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [endDateTouched, setEndDateTouched] = useState(false);
 
@@ -221,7 +222,7 @@ function SellPlanDialog({ clientId, onDone }: { clientId: string; onDone: () => 
         setDiscountEnabled(false);
         setDiscountType('percentage');
         setDiscountValue('');
-        setStartDate(formatDateForInput());
+        setStartDate('');
         setEndDate('');
         setEndDateTouched(false);
     };
@@ -290,23 +291,20 @@ function SellPlanDialog({ clientId, onDone }: { clientId: string; onDone: () => 
                             </p>
                         )}
                     </div>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className="space-y-1">
-                            <Label>Inicio</Label>
-                            <Input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <Label>Vence</Label>
-                            <Input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => { setEndDate(e.target.value); setEndDateTouched(true); }}
-                            />
-                        </div>
+                    <MembershipStartPicker
+                        id="reception-membership-start"
+                        value={startDate}
+                        onChange={setStartDate}
+                        durationDays={plan?.duration_days}
+                        disabled={assign.isPending}
+                    />
+                    <div className="space-y-1">
+                        <Label>Vence (opcional)</Label>
+                        <Input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => { setEndDate(e.target.value); setEndDateTouched(true); }}
+                        />
                     </div>
                     <div className="space-y-1">
                         <Label>Método de pago</Label>

@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { MembershipStartPicker } from '@/components/memberships/MembershipStartPicker';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -36,8 +37,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/components/ui/use-toast';
 import { useDebounce } from '@/hooks/useDebounce';
 import { cn } from '@/lib/utils';
@@ -81,7 +80,7 @@ const cashAssignmentSchema = z.object({
   discountType: z.enum(['percentage', 'fixed']).optional(),
   discountValue: z.coerce.number().min(0).optional(),
   reason: z.string().optional(),
-  startDate: z.date(),
+  startDate: z.string().min(1, 'Elige cuándo inicia la membresía'),
   reference: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -211,7 +210,6 @@ function CashAssignmentInner() {
   const [selectedClass, setSelectedClass] = useState<ClassSchedule | null>(null);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [lastAssignment, setLastAssignment] = useState<AssignmentResponse | null>(null);
-  const [calendarOpen, setCalendarOpen] = useState(false);
   const [discountEnabled, setDiscountEnabled] = useState(false);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
@@ -232,7 +230,7 @@ function CashAssignmentInner() {
     resolver: zodResolver(cashAssignmentSchema),
     defaultValues: {
       paymentMethod: 'cash',
-      startDate: new Date(),
+      startDate: '',
       discountType: 'percentage',
       discountValue: 0,
       reason: '',
@@ -345,7 +343,7 @@ function CashAssignmentInner() {
       if (data.paymentMethod !== 'gratis' && !discountEnabled) delete payload.reason;
       const response = await api.post<AssignmentResponse>('/memberships/assign-cash', {
         ...payload,
-        startDate: format(data.startDate, 'yyyy-MM-dd'),
+        startDate: data.startDate,
       });
       return response.data;
     },
@@ -809,7 +807,7 @@ function CashAssignmentInner() {
                         />
 
                         {/* Amount & Date Row */}
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="space-y-4">
                           <div className="space-y-3">
                             <Label className="flex items-center gap-2 text-base font-semibold">
                               <DollarSign className="h-4 w-4 text-primary" />
@@ -830,45 +828,13 @@ function CashAssignmentInner() {
                             )}
                           </div>
 
-                          <div className="space-y-3">
-                            <Label className="flex items-center gap-2 text-base font-semibold">
-                              <CalendarIcon className="h-4 w-4 text-primary" />
-                              Fecha de Inicio
-                            </Label>
-                            <Controller
-                              name="startDate"
-                              control={control}
-                              render={({ field }) => (
-                                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                                  <PopoverTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      className="w-full h-12 justify-start font-normal"
-                                    >
-                                      <CalendarIcon className="mr-2 h-4 w-4" />
-                                      {field.value && !isNaN(new Date(field.value).getTime())
-                                        ? format(field.value, "d 'de' MMMM, yyyy", { locale: es })
-                                        : 'Selecciona una fecha'}
-                                    </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                      mode="single"
-                                      selected={field.value}
-                                      onSelect={(date) => {
-                                        if (date) {
-                                          field.onChange(date);
-                                          setCalendarOpen(false);
-                                        }
-                                      }}
-                                      locale={es}
-                                      initialFocus
-                                    />
-                                  </PopoverContent>
-                                </Popover>
-                              )}
-                            />
-                          </div>
+                          <MembershipStartPicker
+                            id="cash-assignment-start"
+                            value={startDate ?? ''}
+                            onChange={(value) => setValue('startDate', value, { shouldValidate: true })}
+                            durationDays={selectedPlan?.duration_days}
+                            disabled={assignMutation.isPending}
+                          />
                         </div>
 
                         {/* Reference & Notes */}

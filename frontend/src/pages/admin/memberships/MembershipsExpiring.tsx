@@ -52,7 +52,7 @@ export default function MembershipsExpiring() {
   }, [expiringSoon, search]);
 
   return (
-    <AuthGuard requiredRoles={['admin']}>
+    <AuthGuard requiredRoles={['admin', 'super_admin', 'reception']}>
       <AdminLayout>
         <div className="space-y-6">
           <div>

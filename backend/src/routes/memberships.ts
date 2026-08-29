@@ -3,7 +3,6 @@ import { randomUUID } from 'crypto';
 import { query, queryOne, pool } from '../config/database.js';
 import { logAction } from '../lib/audit.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
-import { requireElevated } from '../middleware/elevation.js';
 import { z } from 'zod';
 import { sendMembershipActivatedEmail } from '../services/email.js';
 import { sendMembershipActivatedNotice } from '../lib/whatsapp.js';
@@ -330,7 +329,7 @@ router.get('/', authenticate, requireRole('admin', 'super_admin', 'reception'), 
 // ============================================
 // GET /api/memberships/pending - List pending activations (Admin)
 // ============================================
-router.get('/pending', authenticate, requireElevated, async (req: Request, res: Response) => {
+router.get('/pending', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
     try {
         const memberships = await query(`
       SELECT m.*,
@@ -358,7 +357,8 @@ router.get('/pending', authenticate, requireElevated, async (req: Request, res: 
 const AssignMembershipSchema = z.object({
     userId: z.string().uuid(),
     planId: z.string().uuid(),
-    startDate: z.string().optional(), // ISO date string
+    // El staff debe elegir explícitamente si inicia hoy o en otra fecha.
+    startDate: dateString,
     // Vencimiento explícito opcional: si no viene, se calcula start + plan.duration_days.
     endDate: dateString.optional(),
     status: z.enum(['active', 'pending_payment', 'pending_activation']).default('active'),
@@ -378,7 +378,7 @@ const ActivateMembershipSchema = z.object({
     reason: z.string().optional(),
     discountType: z.enum(['percentage', 'fixed']).optional(),
     discountValue: z.coerce.number().min(0).optional(),
-    startDate: z.string().optional(),
+    startDate: dateString,
     // Vencimiento explícito opcional: si no viene, se calcula start + plan.duration_days.
     endDate: dateString.optional(),
     notes: z.string().max(500).optional(),
@@ -425,7 +425,7 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
         }
 
         // Calculate dates (endDate explícito sobreescribe start + duration_days)
-        const start = startDate ? new Date(startDate) : new Date();
+        const start = new Date(`${startDate}T12:00:00`);
         const { end, error: endErr } = computeEndDate(start, plan.duration_days, endDate);
         if (endErr) {
             return res.status(400).json({ error: endErr });
@@ -604,7 +604,7 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
 const AssignCashSchema = z.object({
     userId: z.string().uuid(),
     planId: z.string().uuid(),
-    startDate: z.string().optional(), // ISO date string (yyyy-MM-dd)
+    startDate: dateString,
     // Vencimiento explícito opcional: si no viene, se calcula start + plan.duration_days.
     endDate: dateString.optional(),
     paymentMethod: z.enum(['cash', 'transfer', 'card', 'gratis']).default('cash'),
@@ -615,7 +615,7 @@ const AssignCashSchema = z.object({
     notes: z.string().optional(),
 });
 
-router.post('/assign-cash', authenticate, requireRole('admin'), async (req: Request, res: Response) => {
+router.post('/assign-cash', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
     try {
         const validation = AssignCashSchema.safeParse(req.body);
         if (!validation.success) {
@@ -634,6 +634,9 @@ router.post('/assign-cash', authenticate, requireRole('admin'), async (req: Requ
 
         const isGratis = paymentMethod === 'gratis';
         const gratisReason = String(reason ?? '').trim();
+        if (isGratis && !isElevated(req.user)) {
+            return res.status(403).json({ error: 'Solo admin o recepción master pueden registrar membresías gratis.' });
+        }
         if (isGratis && gratisReason.length < 5) {
             return res.status(400).json({ error: 'El comentario es obligatorio para una membresía gratis (mínimo 5 caracteres).' });
         }
@@ -654,7 +657,7 @@ router.post('/assign-cash', authenticate, requireRole('admin'), async (req: Requ
                 ? [notes, manualDiscountNote(manualAdjustment)].filter(Boolean).join(' | ')
                 : (notes || null);
 
-        const start = startDate ? new Date(startDate) : new Date();
+        const start = new Date(`${startDate}T12:00:00`);
         const { end, error: endErr } = computeEndDate(start, plan.duration_days, endDate);
         if (endErr) {
             return res.status(400).json({ error: endErr });
@@ -793,7 +796,7 @@ router.post('/assign-cash', authenticate, requireRole('admin'), async (req: Requ
 // ============================================
 // POST /api/memberships/:id/activate - Activate membership (Admin)
 // ============================================
-router.post('/:id/activate', authenticate, requireElevated, async (req: Request, res: Response) => {
+router.post('/:id/activate', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
 
@@ -863,7 +866,7 @@ router.post('/:id/activate', authenticate, requireElevated, async (req: Request,
             return res.status(400).json({ error: 'La membresía ya está activa' });
         }
 
-        const start = startDate ? new Date(startDate) : new Date();
+        const start = new Date(`${startDate}T12:00:00`);
         if (Number.isNaN(start.getTime())) {
             return res.status(400).json({ error: 'Fecha de inicio inválida' });
         }
@@ -1076,7 +1079,7 @@ const CancelMembershipSchema = z.object({
     refund: z.boolean().optional(),
 });
 
-router.post('/:id/cancel', authenticate, requireElevated, async (req: Request, res: Response) => {
+router.post('/:id/cancel', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
         const { id } = req.params;
@@ -1086,6 +1089,9 @@ router.post('/:id/cancel', authenticate, requireElevated, async (req: Request, r
             return res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten() });
         }
         const { reason, refund = false } = parsed.data;
+        if (refund && !isElevated(req.user)) {
+            return res.status(403).json({ error: 'Solo admin o recepción master pueden registrar un reembolso.' });
+        }
 
         await client.query('BEGIN');
 
@@ -1102,7 +1108,7 @@ router.post('/:id/cancel', authenticate, requireElevated, async (req: Request, r
 
         // Cancelar/rechazar una membresía dispara reembolsos (marca pagos como 'refunded') y revierte
         // lealtad: es acción de staff elevado (admin, super_admin, recepción master), ya garantizada por
-        // requireElevated. Un cliente NO puede auto-cancelar su membresía para borrar sus pagos de la
+        // Solo staff autorizado llega a esta ruta. Un cliente NO puede auto-cancelar su membresía para borrar sus pagos de la
         // contabilidad ni manipular su saldo de puntos.
 
         // Idempotent: if already cancelled, return current state without further side effects.
@@ -1246,6 +1252,15 @@ const UpdateDatesSchema = z.object({
 );
 
 router.patch('/:id/dates', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    let inTransaction = false;
+    let released = false;
+    const releaseClient = () => {
+        if (!released) {
+            released = true;
+            client.release();
+        }
+    };
     try {
         const { id } = req.params;
         const parsed = UpdateDatesSchema.safeParse(req.body ?? {});
@@ -1254,13 +1269,25 @@ router.patch('/:id/dates', authenticate, requireRole('admin', 'super_admin', 're
         }
         const { startDate, endDate, reason } = parsed.data;
 
-        const membership = await queryOne<any>('SELECT * FROM memberships WHERE id = $1', [id]);
+        await client.query('BEGIN');
+        inTransaction = true;
+        // Serializa cambios de vigencia contra cualquier reserva que pretenda usar
+        // esta membresía. Los flujos de reserva toman el mismo bloqueo.
+        const membershipResult = await client.query<any>(
+            'SELECT * FROM memberships WHERE id = $1 FOR UPDATE',
+            [id],
+        );
+        const membership = membershipResult.rows[0];
         if (!membership) {
+            await client.query('ROLLBACK');
+            inTransaction = false;
             return res.status(404).json({ error: 'Membresía no encontrada' });
         }
 
         // Validación: endDate >= startDate cuando ambos vienen.
         if (startDate && endDate && endDate < startDate) {
+            await client.query('ROLLBACK');
+            inTransaction = false;
             return res.status(400).json({ error: 'El vencimiento no puede ser anterior al inicio' });
         }
         // También contra el valor existente si solo viene uno de los dos.
@@ -1277,7 +1304,38 @@ router.patch('/:id/dates', authenticate, requireRole('admin', 'super_admin', 're
         const effStart = startDate ?? existingStart;
         const effEnd = endDate ?? existingEnd;
         if (effStart && effEnd && effEnd < effStart) {
+            await client.query('ROLLBACK');
+            inTransaction = false;
             return res.status(400).json({ error: 'El vencimiento no puede ser anterior al inicio' });
+        }
+
+        // No convertir una reserva ya confirmada en una reserva fuera de vigencia.
+        // Los flujos de reserva bloquean la fila de membresía; esta validación cubre
+        // también el camino inverso (editar fechas después de haber reservado).
+        const conflictingBookingResult = await client.query<{ id: string; class_date: string }>(
+            `SELECT b.id, c.date::text AS class_date
+               FROM bookings b
+               JOIN classes c ON c.id = b.class_id
+              WHERE b.membership_id = $1
+                AND b.status::text <> 'cancelled'
+                AND (
+                    ($2::date IS NOT NULL AND c.date < $2::date)
+                    OR ($3::date IS NOT NULL AND c.date > $3::date)
+                )
+              ORDER BY c.date ASC
+              LIMIT 1`,
+            [id, effStart, effEnd],
+        );
+        const conflictingBooking = conflictingBookingResult.rows[0];
+        if (conflictingBooking) {
+            await client.query('ROLLBACK');
+            inTransaction = false;
+            return res.status(409).json({
+                code: 'MEMBERSHIP_DATE_CONFLICT',
+                error: `No puedes usar esas fechas: la membresía ya está vinculada a una clase del ${conflictingBooking.class_date}.`,
+                bookingId: conflictingBooking.id,
+                classDate: conflictingBooking.class_date,
+            });
         }
 
         // Update dinámico de los campos enviados.
@@ -1292,15 +1350,16 @@ router.patch('/:id/dates', authenticate, requireRole('admin', 'super_admin', 're
             setClauses.push(`end_date = $${params.length}::date`);
         }
         params.push(id);
-        const updated = await queryOne<any>(
+        const updatedResult = await client.query<any>(
             `UPDATE memberships SET ${setClauses.join(', ')}, updated_at = NOW() WHERE id = $${params.length} RETURNING *`,
             params
         );
+        const updated = updatedResult.rows[0];
 
         // Reactivación / consistencia inmediata vs hoy (zona México):
         //  - end_date >= hoy y status='expired' → 'active' (reactivar vencida editada a futuro)
         //  - end_date <  hoy y status='active'  → 'expired'
-        const reactivated = await queryOne<any>(
+        const reactivatedResult = await client.query<any>(
             `UPDATE memberships
                 SET status = CASE
                     WHEN end_date IS NOT NULL
@@ -1316,7 +1375,12 @@ router.patch('/:id/dates', authenticate, requireRole('admin', 'super_admin', 're
               RETURNING *`,
             [id]
         );
+        const reactivated = reactivatedResult.rows[0];
         const finalRow = reactivated ?? updated;
+
+        await client.query('COMMIT');
+        inTransaction = false;
+        releaseClient();
 
         const reasonText = typeof reason === 'string' && reason.trim() ? reason.trim() : null;
         await logAction(query, {
@@ -1343,8 +1407,13 @@ router.patch('/:id/dates', authenticate, requireRole('admin', 'super_admin', 're
 
         res.json(finalRow);
     } catch (error) {
+        if (inTransaction) {
+            try { await client.query('ROLLBACK'); } catch { /* preserve original error */ }
+        }
         console.error('Update membership dates error:', error);
         res.status(500).json({ error: 'Error al editar la vigencia' });
+    } finally {
+        releaseClient();
     }
 });
 

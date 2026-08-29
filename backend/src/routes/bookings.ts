@@ -12,6 +12,7 @@ import { sendWebPushToUser } from '../lib/web-push.js';
 import { upsertGoogleLoyaltyObject } from '../lib/google-wallet.js';
 import { studioBookingError } from '../lib/membershipStudio.js';
 import { selectMembershipForBooking, toDbClient, pickBestMembership } from '../lib/membershipSelection.js';
+import { membershipDateOnly, membershipValidityForClassDate } from '../lib/membershipValidity.js';
 import { awardCheckinPoints } from '../lib/loyalty.js';
 import { joinWaitlist, waitlistOffer, compactWaitlist, promoteNextFromWaitlist } from '../lib/waitlist.js';
 import { cdmxWallClockToUtc } from '../lib/schedule.js';
@@ -336,25 +337,26 @@ router.post('/bulk-month', authenticate, requireRole('admin'), async (req: Reque
             return res.status(400).json({ error: 'No se encontró una membresía válida con suficientes créditos para las clases seleccionadas.' });
         }
 
+        if (membership.status !== 'active') {
+            await client.query('ROLLBACK');
+            return res.status(403).json({
+                code: 'MEMBERSHIP_NOT_ACTIVE',
+                error: 'La membresía elegida no está activa.',
+            });
+        }
+
         // Vigencia: el dueño quiere bloquear reservas en clases posteriores al vencimiento
         // EN TODOS LADOS, incluido el agendado masivo. Se excluyen las clases cuyo día es
         // posterior al end_date de la membresía elegida. NULL end_date = ilimitado (no filtra).
-        const bulkEndDate: string | null = membership.end_date
-            ? (membership.end_date instanceof Date
-                ? membership.end_date.toISOString().split('T')[0]
-                : String(membership.end_date).split('T')[0])
-            : null;
-        if (bulkEndDate) {
-            targetClasses = targetClasses.filter((c: any) => {
-                const cDate = c.date instanceof Date
-                    ? c.date.toISOString().split('T')[0]
-                    : String(c.date).split('T')[0];
-                return cDate <= bulkEndDate;
+        targetClasses = targetClasses.filter((c: any) =>
+            membershipValidityForClassDate(membership, membershipDateOnly(c.date)).ok
+        );
+        if (targetClasses.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                code: 'MEMBERSHIP_OUTSIDE_VALIDITY',
+                error: 'No hay clases seleccionadas dentro de la vigencia de esa membresía.',
             });
-            if (targetClasses.length === 0) {
-                await client.query('ROLLBACK');
-                return res.status(400).json({ error: 'La membresía vence antes de las fechas seleccionadas. No hay clases dentro de la vigencia.' });
-            }
         }
 
         const bulkCatRemaining = membership[bulkCatCol];
@@ -725,7 +727,8 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                          FROM memberships m
                          LEFT JOIN orders o ON o.id = m.order_id
                          LEFT JOIN facilities f ON f.id = COALESCE(m.facility_id, o.facility_id)
-                         WHERE m.id = $1 AND m.user_id = $2`,
+                         WHERE m.id = $1 AND m.user_id = $2
+                         FOR UPDATE OF m`,
                         [membershipId, userId]
                     );
                     const membership = membershipRes.rows[0];
@@ -734,22 +737,11 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                         releaseClient();
                         return res.status(403).json({ error: 'Membresía inválida' });
                     }
-                    if (membership.status !== 'active') {
+                    const validity = membershipValidityForClassDate(membership, dateStr);
+                    if (!validity.ok) {
                         await client.query('ROLLBACK');
                         releaseClient();
-                        return res.status(403).json({ error: 'Membresía no activa' });
-                    }
-                    // Vigencia vs la fecha de la CLASE: si la membresía vence antes del día
-                    // de la clase, no se puede usar para reservarla. NULL = ilimitado (válido).
-                    const mEnd = membership.end_date
-                        ? (membership.end_date instanceof Date
-                            ? membership.end_date.toISOString().split('T')[0]
-                            : String(membership.end_date).split('T')[0])
-                        : null;
-                    if (mEnd && mEnd < dateStr) {
-                        await client.query('ROLLBACK');
-                        releaseClient();
-                        return res.status(403).json({ error: 'Membresía vencida para la fecha de la clase', code: 'NEEDS_PURCHASE' });
+                        return res.status(403).json({ code: validity.code, error: validity.message });
                     }
                     const cat: 'reformer' | 'multi' = classDetails.class_category;
                     const catCol = cat === 'reformer' ? 'reformer_remaining' : 'multi_remaining';

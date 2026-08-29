@@ -11,7 +11,7 @@ import api, { getErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { formatDateForInput, addDaysForInput } from '@/lib/date';
+import { MembershipStartPicker } from '@/components/memberships/MembershipStartPicker';
 import {
   Card,
   CardContent,
@@ -538,7 +538,7 @@ function MembresiaTab() {
   const [discountType, setDiscountType] = useState<ManualDiscountType>('percentage');
   const [discountValue, setDiscountValue] = useState('');
   // Inicio de la membresía (default hoy). Permite cobrar hoy pero arrancar otro día.
-  const [startDate, setStartDate] = useState(formatDateForInput());
+  const [startDate, setStartDate] = useState('');
 
   const isGratis = paymentMethod === 'gratis';
 
@@ -583,6 +583,7 @@ function MembresiaTab() {
       setSelectedClient(null);
       setPlanId('');
       setPaymentMethod('');
+      setStartDate('');
       setGratisReason('');
       setDiscountEnabled(false);
       setDiscountValue('');
@@ -637,6 +638,7 @@ function MembresiaTab() {
       setSelectedClient(null);
       setPlanId('');
       setPaymentMethod('');
+      setStartDate('');
       setGratisReason('');
       setDiscountEnabled(false);
       setDiscountValue('');
@@ -660,6 +662,7 @@ function MembresiaTab() {
     !!selectedClient &&
     !!planId &&
     !!paymentMethod &&
+    !!startDate &&
     (!discountEnabled || membershipAdjustment.valid) &&
     (!adjustmentNeedsComment || gratisReason.trim().length >= MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH);
 
@@ -782,23 +785,13 @@ function MembresiaTab() {
             );
           })()}
 
-          <div className="space-y-2">
-            <Label htmlFor="sell-start">Inicio de la membresía</Label>
-            <Input
-              id="sell-start"
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Se cobra hoy, pero la membresía corre desde esta fecha (no pierdes días).
-              {(() => {
-                const plan = plans.find((p) => p.id === planId);
-                if (!plan || !startDate) return null;
-                return <> Vence el {addDaysForInput(startDate, plan.duration_days)}.</>;
-              })()}
-            </p>
-          </div>
+          <MembershipStartPicker
+            id="sell-start"
+            value={startDate}
+            onChange={setStartDate}
+            durationDays={selectedPlan?.duration_days}
+            disabled={sellMutation.isPending || sellConfirmMutation.isPending}
+          />
 
           <div className="space-y-2">
             <Label>Método de pago</Label>

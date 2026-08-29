@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format } from 'date-fns';
 import type { Membership } from '@/types/auth';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -20,6 +19,7 @@ import {
 import { useIsElevated } from '@/hooks/useIsElevated';
 import { ManualPriceAdjustmentFields } from '@/components/payments/ManualPriceAdjustmentFields';
 import { calculateManualDiscount, MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH } from '@/lib/manualDiscount';
+import { MembershipStartPicker } from '@/components/memberships/MembershipStartPicker';
 
 const activationSchema = z.object({
   paymentMethod: z.enum(['cash', 'transfer', 'card', 'online', 'gratis'], {
@@ -79,12 +79,11 @@ export function MembershipActivationDialog({
     ? [...ACTIVATION_BASE_METHODS, 'gratis' as const]
     : ACTIVATION_BASE_METHODS;
 
-  const today = format(new Date(), 'yyyy-MM-dd');
   const { register, setValue, watch, handleSubmit, reset, formState: { errors } } = useForm<ActivationForm>({
     resolver: zodResolver(activationSchema),
     defaultValues: {
       paymentMethod: 'transfer',
-      startDate: today,
+      startDate: '',
       notifyMember: true,
       generateWalletPass: false,
     },
@@ -94,6 +93,7 @@ export function MembershipActivationDialog({
     register('paymentMethod');
     register('notifyMember');
     register('generateWalletPass');
+    register('startDate');
   }, [register]);
 
   useEffect(() => {
@@ -110,19 +110,20 @@ export function MembershipActivationDialog({
       discountType: 'percentage',
       discountValue: 0,
       paymentReference: membership.payment_reference || '',
-      startDate: today,
+      startDate: '',
       notes: '',
       notifyMember: true,
       generateWalletPass: false,
     });
     setDiscountEnabled(false);
-  }, [membership, reset, today, isElevated]);
+  }, [membership, reset, isElevated]);
 
   const paymentMethod = watch('paymentMethod');
   const reason = watch('reason');
   const discountType = watch('discountType') ?? 'percentage';
   const discountValue = watch('discountValue') ?? 0;
   const notifyMember = watch('notifyMember');
+  const startDate = watch('startDate') ?? '';
   const isGratis = paymentMethod === 'gratis';
 
   const amount = membership?.plan_price ?? membership?.price_paid ?? null;
@@ -204,13 +205,16 @@ export function MembershipActivationDialog({
             <Input placeholder="Folio o referencia" {...register('paymentReference')} />
           </div>
 
-          <div className="space-y-2">
-            <Label>Fecha de inicio *</Label>
-            <Input type="date" {...register('startDate')} />
-            {errors.startDate && (
-              <p className="text-xs text-destructive">{errors.startDate.message}</p>
-            )}
-          </div>
+          <MembershipStartPicker
+            id="activate-membership-start"
+            value={startDate}
+            onChange={(value) => setValue('startDate', value, { shouldValidate: true })}
+            durationDays={membership?.plan_duration_days}
+            disabled={isSubmitting}
+          />
+          {errors.startDate && (
+            <p className="text-xs text-destructive">{errors.startDate.message}</p>
+          )}
 
           <div className="space-y-2">
             <Label>Notas (opcional)</Label>

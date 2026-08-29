@@ -97,9 +97,11 @@ router.post('/sell-membership', authenticate, requirePermission('vender'), async
     const sellerId = req.user?.userId;
     const { user_id, plan_id, payment_method, reason, start_date, discount_type, discount_value } = req.body;
     if (!user_id || !plan_id) return res.status(400).json({ error: 'Falta user_id o plan_id' });
-    // Fecha de inicio opcional (YYYY-MM-DD). Default: hoy. Permite cobrar hoy pero que la
-    // membresía arranque otro día (p. ej. pagar sábado y que corra desde el lunes) sin perder días.
+    // Fecha elegida explícitamente por recepción: hoy o una fecha personalizada.
     const startStr = (typeof start_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(start_date)) ? start_date : null;
+    if (!startStr) {
+        return res.status(400).json({ error: 'Elige cuándo inicia la membresía (formato YYYY-MM-DD).' });
+    }
     const scope = await resolveRequestFacility(req.user, req.body.facility_id || null);
     if (scope.kind === 'error') return res.status(scope.status).json({ error: scope.message });
     // La sucursal puede venir del scope (recepción de 1 sucursal) o, para elevados sin sucursal
@@ -186,7 +188,7 @@ router.post('/sell-membership', authenticate, requirePermission('vender'), async
                 classes_remaining, reformer_remaining, multi_remaining,
                 payment_method, payment_reference, cancellation_limit,
                 activated_by, activated_at, facility_id
-            ) VALUES ($1,$2,COALESCE($11::date, studio_today()), COALESCE($11::date, studio_today()) + ($3 || ' days')::interval, 'active',
+            ) VALUES ($1,$2,$11::date, $11::date + ($3 || ' days')::interval, 'active',
                       $4,$5,$6,$7,$8,$9,$10,NOW(),$12)
             RETURNING *`,
             [
@@ -200,7 +202,7 @@ router.post('/sell-membership', authenticate, requirePermission('vender'), async
                 null,             // payment_reference
                 cancellationLimit,
                 sellerId,         // activated_by → atribución de la venta de mostrador
-                startStr,         // $11: inicio elegido (o null → studio_today())
+                startStr,         // $11: inicio elegido explícitamente
                 facilityId,       // $12: sucursal de la venta
             ]
         );
