@@ -3,7 +3,7 @@ import { CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { addDaysForInput, formatDateForInput } from '@/lib/date';
+import { addDaysForInput, studioTodayForInput } from '@/lib/date';
 
 interface MembershipStartPickerProps {
   value: string;
@@ -20,7 +20,7 @@ export function MembershipStartPicker({
   disabled = false,
   id = 'membership-start-date',
 }: MembershipStartPickerProps) {
-  const today = formatDateForInput();
+  const today = studioTodayForInput();
   const [mode, setMode] = useState<'today' | 'custom' | null>(() =>
     value ? (value === today ? 'today' : 'custom') : null
   );

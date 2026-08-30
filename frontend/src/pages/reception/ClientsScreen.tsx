@@ -34,7 +34,7 @@ import {
     getMembershipPaymentMethods,
     PAYMENT_METHOD_LABELS,
 } from '@/lib/membershipPaymentMethods';
-import { formatDateForInput, addDaysForInput } from '@/lib/date';
+import { formatDateForInput, addDaysForInput, studioTodayForInput } from '@/lib/date';
 import { creditCells } from '@/lib/credits';
 import { EditValidityDialog } from '@/components/memberships/EditValidityDialog';
 import ClientBitacora from '@/components/bitacora/ClientBitacora';
@@ -363,7 +363,7 @@ interface DayClass {
 }
 
 function trimTime(t: string) { return t.length >= 5 ? t.slice(0, 5) : t; }
-function todayIso() { return new Date().toISOString().slice(0, 10); }
+function todayIso() { return studioTodayForInput(); }
 
 function ReserveClassDialog({ clientId, clientName, onDone }: { clientId: string; clientName: string; onDone: () => void }) {
     const [open, setOpen] = useState(false);

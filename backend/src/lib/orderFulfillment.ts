@@ -3,7 +3,7 @@ import { sendMembershipActivatedEmail } from '../services/email.js';
 import { sendMembershipActivatedNotice } from '../lib/whatsapp.js';
 import { awardPaymentLoyaltyPoints, awardReferralBonus, reversePaymentLoyaltyPoints, reverseReferralBonus } from '../lib/loyalty.js';
 import { notifyMembershipRenewed, notifyPointsEarnedExternal } from '../lib/notifications.js';
-import { cdmxToday, addDaysToDate } from '../lib/schedule.js';
+import { resolvePaidMembershipDates } from './membershipActivation.js';
 
 export interface FinalizeOpts { provider: string; paymentRef: string | null; }
 
@@ -41,11 +41,10 @@ export async function finalizePaidOrder(orderId: string, opts: FinalizeOpts): Pr
             return;
         }
 
-        // Fechas en CDMX, NO en UTC. El servidor corre en UTC, así que `new Date()` ya está
-        // en el día siguiente desde las 18:00 hora del estudio: quien pagaba a las 6 PM se
-        // quedaba con una membresía que arrancaba "mañana" y no podía tomar la clase de las 7.
-        const startDate = cdmxToday();
-        const endDate = addDaysToDate(startDate, order.duration_days);
+        const { startDate, endDate } = await resolvePaidMembershipDates(client, {
+            userId: order.user_id,
+            durationDays: Number(order.duration_days || 0),
+        });
 
         const membershipResult = await client.query(`
             INSERT INTO memberships (

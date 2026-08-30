@@ -93,8 +93,24 @@ export function cdmxToday(now: Date = new Date()): string {
 
 /** Suma días a una fecha 'YYYY-MM-DD'. Aritmética pura de calendario, sin zonas horarias. */
 export function addDaysToDate(dateStr: string, days: number): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + days);
-  return dt.toISOString().split('T')[0];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) throw new Error(`Fecha civil inválida: ${dateStr}`);
+  let [year, month, day] = dateStr.split('-').map(Number);
+  let remaining = Math.max(0, Math.trunc(Number(days) || 0));
+  const daysInMonth = (y: number, m: number) => {
+    if (m === 2) return (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0)) ? 29 : 28;
+    return [4, 6, 9, 11].includes(m) ? 30 : 31;
+  };
+  while (remaining > 0) {
+    const available = daysInMonth(year, month) - day;
+    if (remaining <= available) {
+      day += remaining;
+      remaining = 0;
+    } else {
+      remaining -= available + 1;
+      day = 1;
+      month += 1;
+      if (month === 13) { month = 1; year += 1; }
+    }
+  }
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { cdmxToday, addDaysToDate } from '../lib/schedule.js';
+import { resolvePaidMembershipDates } from '../lib/membershipActivation.js';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import multer from 'multer';
@@ -728,9 +728,10 @@ router.post('/guest', requireRole('admin', 'super_admin', 'reception'), async (r
                 return res.status(409).json({ code: 'HAS_ACTIVE_MEMBERSHIP', error: `Esta persona ya tiene una membresía activa (${active.rows[0].name}). Confirma para asignar otra.`, activeMembership: active.rows[0] });
             }
         }
-        // Fechas en CDMX, no en UTC: el servidor va un día adelante desde las 18:00 del estudio.
-        const start = cdmxToday();
-        const end = addDaysToDate(start, plan.duration_days);
+        const { startDate: start, endDate: end } = await resolvePaidMembershipDates(db, {
+            userId,
+            durationDays: Number(plan.duration_days || 0),
+        });
         const policyRow = await db.query(`SELECT value FROM system_settings WHERE key = 'cancellation_policy'`);
         const cancellationLimit = Number(policyRow.rows[0]?.value?.cancellations_per_membership ?? 2);
         const membership = await db.query<any>(

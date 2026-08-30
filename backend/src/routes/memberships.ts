@@ -13,7 +13,7 @@ import { hasPermission } from '../lib/permissions.js';
 import { isElevated } from '../lib/elevation.js';
 import { openShiftForUser } from '../lib/openShift.js';
 import { manualDiscountNote, resolveManualPriceAdjustment } from '../lib/manual-price-adjustment.js';
-import { cdmxToday } from '../lib/schedule.js';
+import { addDaysToDate, cdmxToday } from '../lib/schedule.js';
 
 const router = Router();
 
@@ -26,17 +26,13 @@ const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD r
  * - Si no, end = start + plan.duration_days.
  * Devuelve { end, error }: si endDate < start, error con mensaje.
  */
-function computeEndDate(start: Date, durationDays: number, endDate?: string): { end: Date; error?: string } {
+function computeEndDate(start: string, durationDays: number, endDate?: string): { end: string; error?: string } {
     if (endDate) {
-        // Se ancla a mediodía local para que no recorra un día al serializar a UTC.
-        const explicit = new Date(`${endDate}T12:00:00`);
-        if (Number.isNaN(explicit.getTime())) return { end: start, error: 'Fecha de vencimiento inválida' };
-        if (explicit < start) return { end: explicit, error: 'El vencimiento no puede ser anterior al inicio' };
-        return { end: explicit };
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return { end: start, error: 'Fecha de vencimiento inválida' };
+        if (endDate < start) return { end: endDate, error: 'El vencimiento no puede ser anterior al inicio' };
+        return { end: endDate };
     }
-    const end = new Date(start);
-    end.setDate(end.getDate() + durationDays);
-    return { end };
+    return { end: addDaysToDate(start, durationDays) };
 }
 
 /** Compute legacy classes_remaining from category buckets.
@@ -425,7 +421,7 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
         }
 
         // Calculate dates (endDate explícito sobreescribe start + duration_days)
-        const start = new Date(`${startDate}T12:00:00`);
+        const start = startDate;
         const { end, error: endErr } = computeEndDate(start, plan.duration_days, endDate);
         if (endErr) {
             return res.status(400).json({ error: endErr });
@@ -532,8 +528,8 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
             if (status === 'active') {
                 const user = await queryOne<any>('SELECT display_name, email, phone FROM users WHERE id = $1', [userId]);
                 if (user) {
-                    const endStr = end.toISOString().split('T')[0];
-                    const startStr = start.toISOString().split('T')[0];
+                    const endStr = end;
+                    const startStr = start;
                     // Email
                     if (user.email) {
                         sendMembershipActivatedEmail({
@@ -547,7 +543,7 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
                     }
                     // WhatsApp
                     if (user.phone) {
-                        const fmtEnd = end.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+                        const fmtEnd = new Date(`${end}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
                         sendMembershipActivatedNotice(
                             user.phone, user.display_name || 'Cliente',
                             plan.name, plan.class_limit || null, fmtEnd
@@ -657,7 +653,7 @@ router.post('/assign-cash', authenticate, requireRole('admin', 'super_admin', 'r
                 ? [notes, manualDiscountNote(manualAdjustment)].filter(Boolean).join(' | ')
                 : (notes || null);
 
-        const start = new Date(`${startDate}T12:00:00`);
+        const start = startDate;
         const { end, error: endErr } = computeEndDate(start, plan.duration_days, endDate);
         if (endErr) {
             return res.status(400).json({ error: endErr });
@@ -733,8 +729,8 @@ router.post('/assign-cash', authenticate, requireRole('admin', 'super_admin', 'r
 
             const user = await queryOne<any>('SELECT display_name, email, phone FROM users WHERE id = $1', [userId]);
             if (user) {
-                const endStr = end.toISOString().split('T')[0];
-                const startStr = start.toISOString().split('T')[0];
+                const endStr = end;
+                const startStr = start;
                 if (user.email) {
                     sendMembershipActivatedEmail({
                         to: user.email,
@@ -746,7 +742,7 @@ router.post('/assign-cash', authenticate, requireRole('admin', 'super_admin', 'r
                     }).catch(e => console.error('Email notification error:', e));
                 }
                 if (user.phone) {
-                    const fmtEnd = end.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+                    const fmtEnd = new Date(`${end}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
                     sendMembershipActivatedNotice(
                         user.phone, user.display_name || 'Cliente',
                         plan.name, plan.class_limit || null, fmtEnd
@@ -866,10 +862,7 @@ router.post('/:id/activate', authenticate, requireRole('admin', 'super_admin', '
             return res.status(400).json({ error: 'La membresía ya está activa' });
         }
 
-        const start = new Date(`${startDate}T12:00:00`);
-        if (Number.isNaN(start.getTime())) {
-            return res.status(400).json({ error: 'Fecha de inicio inválida' });
-        }
+        const start = startDate;
         // endDate explícito sobreescribe start + plan.duration_days.
         const { end, error: endErr } = computeEndDate(start, membership.duration_days, endDate);
         if (endErr) {

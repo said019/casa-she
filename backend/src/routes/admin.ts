@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { cdmxToday, addDaysToDate } from '../lib/schedule.js';
-import { query, queryOne } from '../config/database.js';
+import { cdmxToday } from '../lib/schedule.js';
+import { query, queryOne, pool } from '../config/database.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { z } from 'zod';
 import {
@@ -17,6 +17,7 @@ import {
 import { getFrontendUrl } from '../services/email-templates.js';
 import { fillStudioCounts } from '../lib/dashboardStudio.js';
 import { manualDiscountNote, resolveManualPriceAdjustment } from '../lib/manual-price-adjustment.js';
+import { civilDate, resolvePaidMembershipDates } from '../lib/membershipActivation.js';
 
 const router = Router();
 
@@ -403,13 +404,28 @@ router.post('/physical-sale', async (req: Request, res: Response) => {
                 ? [notes, manualDiscountNote(manualAdjustment)].filter(Boolean).join(' | ')
                 : (notes || null);
 
-        // Calculate dates
-        // Fechas en CDMX, no en UTC: el servidor va un día adelante desde las 18:00 del estudio.
-        const startDate = paymentDate || cdmxToday();
-        const endDate = addDaysToDate(startDate, plan.duration_days || 30);
+        const client = await pool.connect();
+        let membership: any;
+        let order: any;
+        let payment: any;
+        let startDate = '';
+        let endDate = '';
+        try {
+            await client.query('BEGIN');
+            const selectedPaymentDate = civilDate(paymentDate);
+            const purchaseToday = cdmxToday();
+            const dates = await resolvePaidMembershipDates(client, {
+                userId,
+                durationDays: Number(plan.duration_days || 30),
+                // El formulario trae hoy por defecto; una fecha distinta sí es
+                // programación explícita de admin y se respeta exacta.
+                explicitStartDate: selectedPaymentDate === purchaseToday ? null : selectedPaymentDate,
+                today: purchaseToday,
+            });
+            startDate = dates.startDate;
+            endDate = dates.endDate;
 
-        // Create membership
-        const membership = await queryOne(`
+            const membershipResult = await client.query(`
             INSERT INTO memberships (
                 user_id, plan_id, start_date, end_date,
                 classes_remaining, reformer_remaining, multi_remaining,
@@ -423,20 +439,20 @@ router.post('/physical-sale', async (req: Request, res: Response) => {
             plan.multi_credits ?? null,
             method,
             reference || null
-        ]);
+            ]);
+            membership = membershipResult.rows[0];
 
-        // Create order record for reporting
-        const order = await queryOne(`
+            const orderResult = await client.query(`
             INSERT INTO orders (
                 user_id, plan_id, subtotal, discount_amount, tax_amount, total_amount,
                 currency, payment_method, customer_notes, status, paid_at, approved_at, membership_id
             ) VALUES ($1, $2, $3, $4, 0, $5, 'MXN', $6, $7, 'approved', NOW(), NOW(), $8)
             RETURNING *
-        `, [userId, planId, Number(plan.price), isGratis ? Number(plan.price) : manualAdjustment.discountAmount,
+            `, [userId, planId, Number(plan.price), isGratis ? Number(plan.price) : manualAdjustment.discountAmount,
             paymentAmount, method, auditNotes, membership.id]);
+            order = orderResult.rows[0];
 
-        // Create payment row so revenue reports include this physical sale
-        const payment = await queryOne(`
+            const paymentResult = await client.query(`
             INSERT INTO payments (
                 user_id, membership_id, order_id, amount, currency,
                 payment_method, notes, status, processed_by, completed_at
@@ -448,7 +464,15 @@ router.post('/physical-sale', async (req: Request, res: Response) => {
             method,
             auditNotes,
             req.user?.userId || null,
-        ]);
+            ]);
+            payment = paymentResult.rows[0];
+            await client.query('COMMIT');
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
 
         // Notify the client (email + non-blocking) — fixes "no me llegó correo" on cash sales
         try {

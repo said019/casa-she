@@ -27,6 +27,16 @@ export function formatDateForInput(value: Date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Día civil del estudio para selectores de fecha; no usa UTC del dispositivo. */
+export function studioTodayForInput(value: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Mexico_City',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(value);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
 /**
  * Suma `days` a una fecha base (hora local) y la devuelve como 'YYYY-MM-DD'.
  * Sirve para precalcular el vencimiento = inicio + duración del plan.

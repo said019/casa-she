@@ -24,6 +24,7 @@ import api from '@/lib/api';
 import { planClassLabel } from '@/lib/credits';
 import { ManualPriceAdjustmentFields } from '@/components/payments/ManualPriceAdjustmentFields';
 import { calculateManualDiscount, MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH, type ManualDiscountType } from '@/lib/manualDiscount';
+import { studioTodayForInput } from '@/lib/date';
 
 interface Plan {
   id: string;
@@ -63,7 +64,7 @@ export const PhysicalSaleForm = ({
   
   const [formData, setFormData] = useState({
     planId: '',
-    paymentDate: new Date().toISOString().split('T')[0],
+    paymentDate: studioTodayForInput(),
     amount: 0,
     paymentMethod: 'cash',
     reference: '',

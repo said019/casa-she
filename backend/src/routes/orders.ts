@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { cdmxToday, addDaysToDate } from '../lib/schedule.js';
+import { civilDate, resolvePaidMembershipDates } from '../lib/membershipActivation.js';
 import { Readable } from 'node:stream';
 import { z } from 'zod';
 import { query, queryOne, pool } from '../config/database.js';
@@ -955,12 +955,19 @@ router.post('/:id/approve', authenticate, requireRole('admin', 'super_admin'), a
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
+            const lockedOrder = await client.query(`SELECT status FROM orders WHERE id = $1 FOR UPDATE`, [id]);
+            if (!['pending_verification', 'pending_payment'].includes(lockedOrder.rows[0]?.status)) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ error: 'La orden ya fue procesada por otra solicitud.' });
+            }
 
-            // Calculate membership dates
-            // Fechas en CDMX, no en UTC: el servidor va un día adelante desde las 18:00 del
-            // estudio, y una membresía que arranca "mañana" no sirve para la clase de esta tarde.
-            const start = startDate ? String(startDate).split('T')[0] : cdmxToday();
-            const end = addDaysToDate(start, order.duration_days);
+            const dates = await resolvePaidMembershipDates(client, {
+                userId: order.user_id,
+                durationDays: Number(order.duration_days || 0),
+                explicitStartDate: civilDate(startDate),
+            });
+            const start = dates.startDate;
+            const end = dates.endDate;
 
             // Map payment method to valid enum value
             // Create membership (bank_transfer now supported in enum)
