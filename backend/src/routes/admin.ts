@@ -380,6 +380,10 @@ router.post('/physical-sale', async (req: Request, res: Response) => {
         if (!plan) {
             return res.status(404).json({ error: 'Plan no encontrado' });
         }
+        const selectedPaymentDate = civilDate(paymentDate);
+        if (paymentDate != null && paymentDate !== '' && !selectedPaymentDate) {
+            return res.status(400).json({ error: 'Fecha de inicio inválida (formato YYYY-MM-DD).' });
+        }
 
         const method = paymentMethod || 'cash';
         if (!['cash', 'transfer', 'card', 'online', 'gratis'].includes(method)) {
@@ -412,7 +416,6 @@ router.post('/physical-sale', async (req: Request, res: Response) => {
         let endDate = '';
         try {
             await client.query('BEGIN');
-            const selectedPaymentDate = civilDate(paymentDate);
             const purchaseToday = cdmxToday();
             const dates = await resolvePaidMembershipDates(client, {
                 userId,

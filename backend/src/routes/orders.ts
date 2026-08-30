@@ -193,7 +193,7 @@ export function decodePaymentProofDataUrl(
 const ApproveOrderSchema = z.object({
     admin_notes: z.string().max(500).optional(),
     adminNotes: z.string().max(500).optional(), // Legacy support
-    startDate: z.string().optional(), // ISO date para inicio de membresía
+    startDate: z.string().refine((value) => civilDate(value) !== null, 'Fecha de inicio inválida').optional(),
 });
 
 const RejectOrderSchema = z.object({

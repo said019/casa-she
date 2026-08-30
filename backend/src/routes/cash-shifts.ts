@@ -8,6 +8,7 @@ import { logAction } from '../lib/audit.js';
 import { isElevated } from '../lib/elevation.js';
 import { requireElevated } from '../middleware/elevation.js';
 import { manualDiscountNote, resolveManualPriceAdjustment } from '../lib/manual-price-adjustment.js';
+import { civilDate, MembershipDateInputError, resolveStaffMembershipDates } from '../lib/membershipActivation.js';
 
 const router = Router();
 const STAFF = ['admin', 'super_admin', 'reception'] as const;
@@ -97,10 +98,9 @@ router.post('/sell-membership', authenticate, requirePermission('vender'), async
     const sellerId = req.user?.userId;
     const { user_id, plan_id, payment_method, reason, start_date, discount_type, discount_value } = req.body;
     if (!user_id || !plan_id) return res.status(400).json({ error: 'Falta user_id o plan_id' });
-    // Fecha elegida explícitamente por recepción: hoy o una fecha personalizada.
-    const startStr = (typeof start_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(start_date)) ? start_date : null;
-    if (!startStr) {
-        return res.status(400).json({ error: 'Elige cuándo inicia la membresía (formato YYYY-MM-DD).' });
+    const requestedStartDate = civilDate(start_date);
+    if (start_date != null && start_date !== '' && !requestedStartDate) {
+        return res.status(400).json({ error: 'Fecha de inicio inválida (formato YYYY-MM-DD).' });
     }
     const scope = await resolveRequestFacility(req.user, req.body.facility_id || null);
     if (scope.kind === 'error') return res.status(scope.status).json({ error: scope.message });
@@ -182,19 +182,26 @@ router.post('/sell-membership', authenticate, requirePermission('vender'), async
     try {
         await client.query('BEGIN');
 
+        const dates = await resolveStaffMembershipDates(client, {
+            userId: user_id,
+            durationDays: Number((plan as any).duration_days || 0),
+            requestedStartDate,
+        });
+
         const membershipResult = await client.query(
             `INSERT INTO memberships (
                 user_id, plan_id, start_date, end_date, status,
                 classes_remaining, reformer_remaining, multi_remaining,
                 payment_method, payment_reference, cancellation_limit,
                 activated_by, activated_at, facility_id
-            ) VALUES ($1,$2,$11::date, $11::date + ($3 || ' days')::interval, 'active',
-                      $4,$5,$6,$7,$8,$9,$10,NOW(),$12)
+            ) VALUES ($1,$2,$3::date,$4::date,'active',
+                      $5,$6,$7,$8,$9,$10,$11,NOW(),$12)
             RETURNING *`,
             [
                 user_id,
                 (plan as any).id,
-                String((plan as any).duration_days),
+                dates.startDate,
+                dates.endDate,
                 (plan as any).class_limit ?? null,
                 (plan as any).reformer_credits ?? null,
                 (plan as any).multi_credits ?? null,
@@ -202,7 +209,6 @@ router.post('/sell-membership', authenticate, requirePermission('vender'), async
                 null,             // payment_reference
                 cancellationLimit,
                 sellerId,         // activated_by → atribución de la venta de mostrador
-                startStr,         // $11: inicio elegido explícitamente
                 facilityId,       // $12: sucursal de la venta
             ]
         );
@@ -258,6 +264,9 @@ router.post('/sell-membership', authenticate, requirePermission('vender'), async
         return res.status(201).json(m);
     } catch (e) {
         await client.query('ROLLBACK');
+        if (e instanceof MembershipDateInputError) {
+            return res.status(400).json({ error: e.message });
+        }
         throw e;
     } finally {
         client.release();

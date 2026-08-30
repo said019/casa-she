@@ -14,11 +14,12 @@ import { isElevated } from '../lib/elevation.js';
 import { openShiftForUser } from '../lib/openShift.js';
 import { manualDiscountNote, resolveManualPriceAdjustment } from '../lib/manual-price-adjustment.js';
 import { addDaysToDate, cdmxToday } from '../lib/schedule.js';
+import { civilDate, MembershipDateInputError, resolveStaffMembershipDates } from '../lib/membershipActivation.js';
 
 const router = Router();
 
 /** Fecha 'YYYY-MM-DD' (validada). Se usa para vigencia (start_date/end_date). */
-const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD requerido');
+const dateString = z.string().refine((value) => civilDate(value) === value, 'Fecha inválida; usa YYYY-MM-DD');
 
 /**
  * Calcula el end_date de una membresía.
@@ -420,18 +421,24 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
             return res.status(400).json({ error: 'Una cortesía gratis no puede combinarse con otro descuento.' });
         }
 
-        // Calculate dates (endDate explícito sobreescribe start + duration_days)
-        const start = startDate;
-        const { end, error: endErr } = computeEndDate(start, plan.duration_days, endDate);
-        if (endErr) {
-            return res.status(400).json({ error: endErr });
-        }
-
         // Create membership within transaction
         const client = await pool.connect();
+        let start = startDate;
+        let end = endDate || addDaysToDate(startDate, Number(plan.duration_days || 0));
         try {
             await client.query('BEGIN');
             let purchasePointsAwarded = 0;
+
+            if (status === 'active') {
+                const dates = await resolveStaffMembershipDates(client, {
+                    userId,
+                    durationDays: Number(plan.duration_days || 0),
+                    requestedStartDate: startDate,
+                    requestedEndDate: endDate,
+                });
+                start = dates.startDate;
+                end = dates.endDate;
+            }
 
             // 1. Create membership
             const normalizedPaymentMethod = paymentMethod === 'bank_transfer' ? 'transfer' : (paymentMethod || null);
@@ -588,6 +595,9 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
         }
     } catch (error) {
         console.error('Assign membership error:', error);
+        if (error instanceof MembershipDateInputError) {
+            return res.status(400).json({ error: error.message });
+        }
         res.status(500).json({ error: 'Error al asignar membresía' });
     }
 });
@@ -653,16 +663,21 @@ router.post('/assign-cash', authenticate, requireRole('admin', 'super_admin', 'r
                 ? [notes, manualDiscountNote(manualAdjustment)].filter(Boolean).join(' | ')
                 : (notes || null);
 
-        const start = startDate;
-        const { end, error: endErr } = computeEndDate(start, plan.duration_days, endDate);
-        if (endErr) {
-            return res.status(400).json({ error: endErr });
-        }
-
         const client = await pool.connect();
+        let start = startDate;
+        let end = endDate || addDaysToDate(startDate, Number(plan.duration_days || 0));
         try {
             await client.query('BEGIN');
             let purchasePointsAwarded = 0;
+
+            const dates = await resolveStaffMembershipDates(client, {
+                userId,
+                durationDays: Number(plan.duration_days || 0),
+                requestedStartDate: startDate,
+                requestedEndDate: endDate,
+            });
+            start = dates.startDate;
+            end = dates.endDate;
 
             const policyRow = await client.query(`SELECT value FROM system_settings WHERE key = 'cancellation_policy'`);
             const cancellationLimit = Number(policyRow.rows[0]?.value?.cancellations_per_membership ?? 2);
@@ -785,6 +800,9 @@ router.post('/assign-cash', authenticate, requireRole('admin', 'super_admin', 'r
         }
     } catch (error) {
         console.error('Assign cash membership error:', error);
+        if (error instanceof MembershipDateInputError) {
+            return res.status(400).json({ error: error.message });
+        }
         res.status(500).json({ error: 'Error al asignar membresía' });
     }
 });
@@ -862,16 +880,20 @@ router.post('/:id/activate', authenticate, requireRole('admin', 'super_admin', '
             return res.status(400).json({ error: 'La membresía ya está activa' });
         }
 
-        const start = startDate;
-        // endDate explícito sobreescribe start + plan.duration_days.
-        const { end, error: endErr } = computeEndDate(start, membership.duration_days, endDate);
-        if (endErr) {
-            return res.status(400).json({ error: endErr });
-        }
-
         const client = await pool.connect();
+        let start = startDate;
+        let end = endDate || addDaysToDate(startDate, Number(membership.duration_days || 0));
         try {
             await client.query('BEGIN');
+
+            const dates = await resolveStaffMembershipDates(client, {
+                userId: membership.user_id,
+                durationDays: Number(membership.duration_days || 0),
+                requestedStartDate: startDate,
+                requestedEndDate: endDate,
+            });
+            start = dates.startDate;
+            end = dates.endDate;
 
             const updatedResult = await client.query(
                 `UPDATE memberships
@@ -1057,6 +1079,9 @@ router.post('/:id/activate', authenticate, requireRole('admin', 'super_admin', '
         }
     } catch (error) {
         console.error('Activate membership error:', error);
+        if (error instanceof MembershipDateInputError) {
+            return res.status(400).json({ error: error.message });
+        }
         res.status(500).json({ error: 'Error al activar membresía' });
     }
 });

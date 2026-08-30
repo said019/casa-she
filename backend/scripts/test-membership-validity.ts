@@ -29,7 +29,8 @@ assert.match(
 );
 
 const cashShifts = readFileSync(new URL('../src/routes/cash-shifts.ts', import.meta.url), 'utf8');
-assert.match(cashShifts, /if \(!startStr\)/);
+assert.match(cashShifts, /resolveStaffMembershipDates\(client/);
+assert.doesNotMatch(cashShifts, /Elige cuándo inicia la membresía/);
 
 const startPicker = readFileSync(
   new URL('../../frontend/src/components/memberships/MembershipStartPicker.tsx', import.meta.url),
