@@ -760,7 +760,7 @@ router.post('/copy-week', authenticate, requireElevated, async (req: Request, re
                 actionType: 'classes_copy_week',
                 entityType: 'class',
                 description: `Semana del ${fromWeekStart} copiada al ${toWeekStart}: ${resultado.creadas} creadas, ${resultado.canceladasConservadas} canceladas conservadas, ${resultado.yaExistian} ya exist\u00edan`,
-                newData: { fromWeekStart, toWeekStart, facilityId: sucursal, includeCancelled, ...resultado, detalle: undefined },
+                newData: { fromWeekStart, toWeekStart, facilityId: sucursal, ...resultado, detalle: undefined },
                 req,
             }).catch((e) => console.error('[copy-week] auditor\u00eda fall\u00f3 (no bloquea):', e));
         }
