@@ -45,7 +45,7 @@ async function main() {
         const c1 = await crearClase(origen, '07:00', ct.id);
         await crearClase(origen, '08:00', ct2.id);
         await crearClase(sumarDias(origen, 2), '19:00', ct.id);
-        // Una cancelada: NO debe arrastrarse a la semana nueva.
+        // Una cancelada: la UI decidirá si se omite o se conserva cancelada.
         await crearClase(sumarDias(origen, 3), '10:00', ct.id, 'cancelled');
 
         // Cupo de TotalPass ajustado a mano en una clase: debe viajar con la copia.
@@ -65,6 +65,8 @@ async function main() {
             `SELECT count(*)::int AS n FROM classes WHERE date >= $1::date AND date < $1::date + 7`, [destino],
         )).rows[0].n;
         assert.equal(previa.creadas, 3, 'la vista previa debe contar las 3 clases vivas');
+        assert.equal(previa.canceladasOmitidas, 1, 'por defecto debe avisar que omitirá 1 cancelada');
+        assert.equal(previa.canceladasConservadas, 0);
         assert.equal(despuesDePrevia, antes, 'la vista previa NO debe escribir nada');
         console.log('  vista previa: cuenta 3 y no escribe · OK');
 
@@ -107,7 +109,46 @@ async function main() {
         assert.equal(total, antes + 3, 'el total no debe moverse tras la segunda corrida');
         console.log('  idempotencia: segunda corrida crea 0 · OK');
 
-        // ── 5. Días de descanso del estudio se respetan ──────────────────────
+        // ── 5. Las canceladas se pueden conservar de forma explícita ────────
+        const destinoConCanceladas = sumarDias(origen, 14);
+        const previaConCanceladas = await copiarSemana(client, {
+            fromWeekStart: origen,
+            toWeekStart: destinoConCanceladas,
+            includeCancelled: true,
+            dryRun: true,
+        });
+        assert.equal(previaConCanceladas.creadas, 4, 'debe contar las 3 activas y la cancelada');
+        assert.equal(previaConCanceladas.canceladasConservadas, 1);
+        assert.equal(previaConCanceladas.canceladasOmitidas, 0);
+
+        const conCanceladas = await copiarSemana(client, {
+            fromWeekStart: origen,
+            toWeekStart: destinoConCanceladas,
+            includeCancelled: true,
+        });
+        assert.equal(conCanceladas.creadas, 4);
+        assert.equal(conCanceladas.canceladasConservadas, 1);
+        const estadosConservados = await client.query(
+            `SELECT status::text, count(*)::int AS n
+               FROM classes WHERE date >= $1::date AND date < $1::date + 7
+              GROUP BY status ORDER BY status`,
+            [destinoConCanceladas],
+        );
+        assert.deepEqual(estadosConservados.rows, [
+            { status: 'cancelled', n: 1 },
+            { status: 'scheduled', n: 3 },
+        ]);
+
+        const segundaConCanceladas = await copiarSemana(client, {
+            fromWeekStart: origen,
+            toWeekStart: destinoConCanceladas,
+            includeCancelled: true,
+        });
+        assert.equal(segundaConCanceladas.creadas, 0, 'la cancelada tampoco debe duplicarse');
+        assert.equal(segundaConCanceladas.yaExistian, 4);
+        console.log('  canceladas: se pueden omitir o conservar sin duplicar · OK');
+
+        // ── 6. Días de descanso del estudio se respetan ─────────────────────
         const destino3 = sumarDias(origen, 21);
         await client.query(
             `INSERT INTO studio_closed_days (date, reason) VALUES ($1::date, 'prueba')
@@ -122,7 +163,7 @@ async function main() {
         );
         console.log('  días cerrados: se respetan · OK');
 
-        // ── 6. Nunca crear en el pasado ──────────────────────────────────────
+        // ── 7. Nunca crear en el pasado ──────────────────────────────────────
         const semanaPasada = sumarDias(origen, -14);
         const r4 = await copiarSemana(client, { fromWeekStart: origen, toWeekStart: semanaPasada });
         assert.equal(r4.creadas, 0, 'no debe crear clases en el pasado');
