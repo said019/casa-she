@@ -680,7 +680,8 @@ router.post('/generate', authenticate, requireElevated, async (req: Request, res
 // Éste copia la semana REAL tal como quedó.
 //
 // Reglas para no duplicar ni ensuciar:
-//  - Solo copia clases `scheduled`. Las canceladas NO se arrastran.
+//  - Siempre copia clases `scheduled`. Las canceladas se omiten por defecto y
+//    solo se conservan (como `cancelled`) si el usuario lo confirma.
 //  - Nunca crea en el pasado.
 //  - Respeta días de descanso del estudio (`studio_closed_days`) del destino.
 //  - El dedupe se apoya en el índice único PARCIAL `classes_slot_unique`
@@ -699,6 +700,7 @@ const CopyWeekSchema = z.object({
     fromWeekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD requerido'),
     toWeekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD requerido'),
     facilityId: z.string().uuid().optional().nullable(),
+    includeCancelled: z.boolean().optional().default(false),
     dryRun: z.boolean().optional(),
 });
 
@@ -710,7 +712,7 @@ router.post('/copy-week', authenticate, requireElevated, async (req: Request, re
             details: validation.error.flatten().fieldErrors,
         });
     }
-    const { fromWeekStart, toWeekStart, facilityId, dryRun } = validation.data;
+    const { fromWeekStart, toWeekStart, facilityId, includeCancelled, dryRun } = validation.data;
 
     const desfase = diasEntre(fromWeekStart, toWeekStart);
     if (desfase === 0) {
@@ -732,16 +734,31 @@ router.post('/copy-week', authenticate, requireElevated, async (req: Request, re
             sucursal = facilityId;
         }
 
-        if (!dryRun) await client.query('BEGIN');
-        const resultado = await copiarSemana(client, { fromWeekStart, toWeekStart, facilityId: sucursal, dryRun });
+        if (!dryRun) {
+            await client.query('BEGIN');
+            // Las clases canceladas no participan en el índice único parcial.
+            // Serializar por semana destino evita que dos operadores creen la misma
+            // cancelada a la vez entre la comprobación y el INSERT.
+            await client.query(
+                `SELECT pg_advisory_xact_lock(hashtext('copy-week'), hashtext($1))`,
+                [`${toWeekStart}:${sucursal ?? 'all'}`],
+            );
+        }
+        const resultado = await copiarSemana(client, {
+            fromWeekStart,
+            toWeekStart,
+            facilityId: sucursal,
+            includeCancelled,
+            dryRun,
+        });
         if (!dryRun) {
             await client.query('COMMIT');
             await logAction(query, {
                 adminUserId: req.user!.userId,
                 actionType: 'classes_copy_week',
                 entityType: 'class',
-                description: `Semana del ${fromWeekStart} copiada al ${toWeekStart}: ${resultado.creadas} creadas, ${resultado.yaExistian} ya exist\u00edan`,
-                newData: { fromWeekStart, toWeekStart, facilityId: sucursal, ...resultado, detalle: undefined },
+                description: `Semana del ${fromWeekStart} copiada al ${toWeekStart}: ${resultado.creadas} creadas, ${resultado.canceladasConservadas} canceladas conservadas, ${resultado.yaExistian} ya exist\u00edan`,
+                newData: { fromWeekStart, toWeekStart, facilityId: sucursal, includeCancelled, ...resultado, detalle: undefined },
                 req,
             }).catch((e) => console.error('[copy-week] auditor\u00eda fall\u00f3 (no bloquea):', e));
         }

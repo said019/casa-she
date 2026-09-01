@@ -137,6 +137,9 @@ interface CopiaSemanaResumen {
     yaExistian: number;
     enDiaCerrado: number;
     enElPasado: number;
+    canceladasConservadas: number;
+    canceladasOmitidas: number;
+    includeCancelled: boolean;
     dryRun: boolean;
     mensaje?: string;
     detalle: Array<{ fecha: string; hora: string; clase: string; resultado: string }>;
@@ -173,6 +176,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     // Copiar semana: nunca se escribe sin haber mostrado antes la vista previa.
     const [isCopyWeekOpen, setIsCopyWeekOpen] = useState(false);
     const [copiaPrevia, setCopiaPrevia] = useState<CopiaSemanaResumen | null>(null);
+    const [conservarCanceladas, setConservarCanceladas] = useState<boolean | null>(null);
     const [bulkFreeForm, setBulkFreeForm] = useState({
         from_date: '', to_date: '', from_time: '00:00', to_time: '23:59',
         free_label: 'Opening Day - Gratis',
@@ -783,9 +787,10 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     // no de dos cálculos que pueden desincronizarse.
     const semanaDestinoStr = format(addDays(weekStart, 7), 'yyyy-MM-dd');
     const copiarSemanaMutation = useMutation({
-        mutationFn: async (dryRun: boolean) => (await api.post('/classes/copy-week', {
+        mutationFn: async ({ dryRun, includeCancelled }: { dryRun: boolean; includeCancelled: boolean }) => (await api.post('/classes/copy-week', {
             fromWeekStart: startStr,
             toWeekStart: semanaDestinoStr,
+            includeCancelled,
             dryRun,
         })).data as CopiaSemanaResumen,
         onSuccess: (data) => {
@@ -796,8 +801,10 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
             toast({
                 title: data.creadas > 0 ? 'Semana copiada' : 'No había nada que copiar',
                 description: data.creadas > 0
-                    ? `${data.creadas} ${data.creadas === 1 ? 'clase creada' : 'clases creadas'}${data.yaExistian ? ` · ${data.yaExistian} ya existían` : ''}`
-                    : 'Todas las clases ya existían en la semana destino.',
+                    ? `${data.creadas} ${data.creadas === 1 ? 'clase creada' : 'clases creadas'}${data.canceladasConservadas ? ` · ${data.canceladasConservadas} cancelada${data.canceladasConservadas === 1 ? '' : 's'} conservada${data.canceladasConservadas === 1 ? '' : 's'}` : ''}${data.yaExistian ? ` · ${data.yaExistian} ya existían` : ''}`
+                    : data.canceladasOmitidas > 0
+                        ? `${data.canceladasOmitidas} ${data.canceladasOmitidas === 1 ? 'clase cancelada no se copió' : 'clases canceladas no se copiaron'}.`
+                        : data.mensaje || 'Todas las clases ya existían en la semana destino.',
             });
         },
         onError: (err) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) }),
@@ -953,8 +960,8 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                         // no dispara onOpenChange cuando el diálogo se abre por
                                         // estado del padre, así que ahí nunca llegaba a pedirse.
                                         setCopiaPrevia(null);
+                                        setConservarCanceladas(null);
                                         setIsCopyWeekOpen(true);
-                                        copiarSemanaMutation.mutate(true);
                                     }}
                                     title="Copiar esta semana a la siguiente"
                                 >
@@ -1871,7 +1878,10 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                         open={isCopyWeekOpen}
                         onOpenChange={(abierto) => {
                             setIsCopyWeekOpen(abierto);
-                            if (!abierto) setCopiaPrevia(null);
+                            if (!abierto) {
+                                setCopiaPrevia(null);
+                                setConservarCanceladas(null);
+                            }
                         }}
                     >
                         <DialogContent>
@@ -1887,7 +1897,39 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                 </DialogDescription>
                             </DialogHeader>
 
-                            {copiarSemanaMutation.isPending && !copiaPrevia ? (
+                            <div className="space-y-3 py-2">
+                                <p className="text-sm font-medium text-balance-dark">¿Quieres conservar las clases canceladas?</p>
+                                <RadioGroup
+                                    value={conservarCanceladas === null ? undefined : (conservarCanceladas ? 'si' : 'no')}
+                                    disabled={copiarSemanaMutation.isPending}
+                                    onValueChange={(value) => {
+                                        const conservar = value === 'si';
+                                        setConservarCanceladas(conservar);
+                                        setCopiaPrevia(null);
+                                        copiarSemanaMutation.mutate({ dryRun: true, includeCancelled: conservar });
+                                    }}
+                                    className="grid gap-2 sm:grid-cols-2"
+                                >
+                                    <Label htmlFor="copy-cancelled-no" className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 hover:bg-muted/40">
+                                        <RadioGroupItem id="copy-cancelled-no" value="no" className="mt-0.5" />
+                                        <span>
+                                            <span className="block font-medium">No conservarlas</span>
+                                            <span className="mt-0.5 block text-xs font-normal text-muted-foreground">Las canceladas no se copiarán.</span>
+                                        </span>
+                                    </Label>
+                                    <Label htmlFor="copy-cancelled-si" className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 hover:bg-muted/40">
+                                        <RadioGroupItem id="copy-cancelled-si" value="si" className="mt-0.5" />
+                                        <span>
+                                            <span className="block font-medium">Sí, conservarlas</span>
+                                            <span className="mt-0.5 block text-xs font-normal text-muted-foreground">Se copiarán y seguirán canceladas.</span>
+                                        </span>
+                                    </Label>
+                                </RadioGroup>
+                            </div>
+
+                            {conservarCanceladas === null ? (
+                                <p className="text-sm text-muted-foreground">Elige una opción para revisar la copia.</p>
+                            ) : copiarSemanaMutation.isPending && !copiaPrevia ? (
                                 <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
                                     <Loader2 className="h-4 w-4 animate-spin" /> Revisando qué haría…
                                 </div>
@@ -1913,7 +1955,12 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                         {copiaPrevia.enElPasado > 0 && (
                                             <li>· <strong>{copiaPrevia.enElPasado}</strong> quedarían en el pasado y se omiten.</li>
                                         )}
-                                        <li>· Las clases canceladas no se copian.</li>
+                                        {copiaPrevia.canceladasConservadas > 0 && (
+                                            <li>· <strong>{copiaPrevia.canceladasConservadas}</strong> cancelada{copiaPrevia.canceladasConservadas === 1 ? '' : 's'} se copiará{copiaPrevia.canceladasConservadas === 1 ? '' : 'n'} y seguirá{copiaPrevia.canceladasConservadas === 1 ? '' : 'n'} cancelada{copiaPrevia.canceladasConservadas === 1 ? '' : 's'}.</li>
+                                        )}
+                                        {copiaPrevia.canceladasOmitidas > 0 && (
+                                            <li>· <strong>{copiaPrevia.canceladasOmitidas}</strong> cancelada{copiaPrevia.canceladasOmitidas === 1 ? '' : 's'} no se copiará{copiaPrevia.canceladasOmitidas === 1 ? '' : 'n'}.</li>
+                                        )}
                                         <li>· No se copian reservas, clases gratis ni cupos cerrados.</li>
                                         <li>· El cupo de TotalPass de cada clase sí se conserva.</li>
                                     </ul>
@@ -1926,8 +1973,8 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                             <DialogFooter>
                                 <Button variant="ghost" onClick={() => setIsCopyWeekOpen(false)}>Cancelar</Button>
                                 <Button
-                                    onClick={() => copiarSemanaMutation.mutate(false)}
-                                    disabled={copiarSemanaMutation.isPending || !copiaPrevia || copiaPrevia.creadas === 0}
+                                    onClick={() => conservarCanceladas !== null && copiarSemanaMutation.mutate({ dryRun: false, includeCancelled: conservarCanceladas })}
+                                    disabled={copiarSemanaMutation.isPending || conservarCanceladas === null || !copiaPrevia || copiaPrevia.creadas === 0}
                                 >
                                     {copiarSemanaMutation.isPending && copiaPrevia ? (
                                         <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Copiando…</>

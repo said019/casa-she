@@ -15,6 +15,8 @@ export interface CopiarSemanaParams {
     fromWeekStart: string;   // YYYY-MM-DD
     toWeekStart: string;     // YYYY-MM-DD
     facilityId?: string | null;
+    /** true = las clases canceladas también se crean y conservan ese estado. */
+    includeCancelled?: boolean;
     /** true = solo calcula y no escribe nada (vista previa de la UI). */
     dryRun?: boolean;
 }
@@ -24,6 +26,9 @@ export interface CopiarSemanaResultado {
     yaExistian: number;
     enDiaCerrado: number;
     enElPasado: number;
+    canceladasConservadas: number;
+    canceladasOmitidas: number;
+    includeCancelled: boolean;
     dryRun: boolean;
     detalle: Array<{ fecha: string; hora: string; clase: string; resultado: string }>;
     mensaje?: string;
@@ -45,7 +50,8 @@ export function diasEntre(desde: string, hasta: string): number {
 
 /**
  * Reglas para no duplicar ni ensuciar:
- *  - Solo copia clases `scheduled`. Las canceladas NO se arrastran.
+ *  - Siempre copia las clases `scheduled`. Las canceladas solo se arrastran si
+ *    el usuario lo confirma y, en ese caso, conservan el estado `cancelled`.
  *  - Nunca crea en el pasado.
  *  - Respeta los días de descanso del estudio (`studio_closed_days`) del destino.
  *  - El dedupe se apoya en el índice único PARCIAL `classes_slot_unique`
@@ -62,28 +68,42 @@ export function diasEntre(desde: string, hasta: string): number {
  */
 export async function copiarSemana(
     client: PoolClient,
-    { fromWeekStart, toWeekStart, facilityId = null, dryRun = false }: CopiarSemanaParams,
+    {
+        fromWeekStart,
+        toWeekStart,
+        facilityId = null,
+        includeCancelled = false,
+        dryRun = false,
+    }: CopiarSemanaParams,
 ): Promise<CopiarSemanaResultado> {
     const desfase = diasEntre(fromWeekStart, toWeekStart);
 
     const origen = await client.query(
         `SELECT c.id, c.schedule_id, c.class_type_id, c.instructor_id, c.facility_id,
                 c.date::text AS date, c.start_time::text AS start_time,
-                c.end_time::text AS end_time, c.max_capacity,
+                c.end_time::text AS end_time, c.max_capacity, c.status::text AS status,
                 ct.name AS class_type_name,
                 ci.max_spots AS totalpass_spots
            FROM classes c
            JOIN class_types ct ON ct.id = c.class_type_id
            LEFT JOIN channel_inventory ci ON ci.class_id = c.id AND ci.channel = 'totalpass'
           WHERE c.date >= $1::date AND c.date < $1::date + 7
-            AND c.status = 'scheduled'
+            AND c.status IN ('scheduled', 'cancelled')
             AND ($2::uuid IS NULL OR c.facility_id = $2::uuid)
           ORDER BY c.date, c.start_time`,
         [fromWeekStart, facilityId],
     );
 
     const vacio: CopiarSemanaResultado = {
-        creadas: 0, yaExistian: 0, enDiaCerrado: 0, enElPasado: 0, dryRun, detalle: [],
+        creadas: 0,
+        yaExistian: 0,
+        enDiaCerrado: 0,
+        enElPasado: 0,
+        canceladasConservadas: 0,
+        canceladasOmitidas: 0,
+        includeCancelled,
+        dryRun,
+        detalle: [],
     };
     if (origen.rows.length === 0) {
         return { ...vacio, mensaje: 'La semana de origen no tiene clases que copiar.' };
@@ -103,8 +123,16 @@ export async function copiarSemana(
     for (const c of origen.rows) {
         const destino = sumarDias(c.date, desfase);
         const hora = String(c.start_time).slice(0, 5);
+        const esCancelada = c.status === 'cancelled';
+        const estadoDestino = esCancelada ? 'cancelled' : 'scheduled';
         const anota = (resultado: string) =>
             r.detalle.push({ fecha: destino, hora, clase: c.class_type_name, resultado });
+
+        if (esCancelada && !includeCancelled) {
+            r.canceladasOmitidas++;
+            anota('cancelada omitida');
+            continue;
+        }
 
         if (destino < hoy) { r.enElPasado++; anota('en el pasado'); continue; }
         if (diasCerrados.has(destino)) { r.enDiaCerrado++; anota('día cerrado'); continue; }
@@ -116,26 +144,31 @@ export async function copiarSemana(
               WHERE date = $1::date AND start_time = $2::time
                 AND instructor_id = $3 AND class_type_id = $4
                 AND facility_id IS NOT DISTINCT FROM $5
-                AND status = 'scheduled'
+                AND status = $6::class_status
               LIMIT 1`,
-            [destino, c.start_time, c.instructor_id, c.class_type_id, c.facility_id],
+            [destino, c.start_time, c.instructor_id, c.class_type_id, c.facility_id, estadoDestino],
         );
         if (yaHay.rows.length > 0) { r.yaExistian++; anota('ya existía'); continue; }
 
-        if (dryRun) { r.creadas++; anota('se creará'); continue; }
+        if (dryRun) {
+            r.creadas++;
+            if (esCancelada) r.canceladasConservadas++;
+            anota(esCancelada ? 'se conservará cancelada' : 'se creará');
+            continue;
+        }
 
         // ON CONFLICT sobre el índice PARCIAL: hay que repetir su predicado para que
         // Postgres lo infiera. Protege de una carrera entre el SELECT y el INSERT
         // (dos personas apretando el botón a la vez).
         const insertada = await client.query(
             `INSERT INTO classes (schedule_id, class_type_id, instructor_id, facility_id,
-                                  date, start_time, end_time, max_capacity)
-             VALUES ($1, $2, $3, $4, $5::date, $6::time, $7::time, $8)
+                                  date, start_time, end_time, max_capacity, status)
+             VALUES ($1, $2, $3, $4, $5::date, $6::time, $7::time, $8, $9::class_status)
              ON CONFLICT (date, start_time, instructor_id, class_type_id, facility_id)
                  WHERE status = 'scheduled' DO NOTHING
              RETURNING id`,
             [c.schedule_id, c.class_type_id, c.instructor_id, c.facility_id,
-                destino, c.start_time, c.end_time, c.max_capacity],
+                destino, c.start_time, c.end_time, c.max_capacity, estadoDestino],
         );
 
         if (insertada.rows.length === 0) { r.yaExistian++; anota('ya existía'); continue; }
@@ -156,7 +189,8 @@ export async function copiarSemana(
         }
 
         r.creadas++;
-        anota('creada');
+        if (esCancelada) r.canceladasConservadas++;
+        anota(esCancelada ? 'conservada cancelada' : 'creada');
     }
 
     return r;
