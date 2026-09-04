@@ -36,7 +36,7 @@ export default function EventListView({ events, isLoading, onSelect, onCreateNew
         <div>
           <h1 className="text-3xl font-heading font-bold">Eventos del Estudio</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {events.length} eventos creados · {activeCount} activos
+            {events.length} eventos próximos · {activeCount} publicados
           </p>
         </div>
         <Button onClick={onCreateNew} className="gap-2">

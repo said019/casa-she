@@ -176,11 +176,16 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
 });
 
 // ============================================
-// ADMIN: GET /api/events/admin/all - All events (including drafts)
+// ADMIN: GET /api/events/admin/all - Upcoming events (including drafts)
 // ============================================
 router.get('/admin/all', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
     try {
-        const events = await query(`SELECT * FROM events ORDER BY date DESC, start_time DESC`);
+        const events = await query(`
+            SELECT * FROM events
+            WHERE status <> 'completed'
+              AND (date + end_time) >= (NOW() AT TIME ZONE 'America/Mexico_City')
+            ORDER BY date ASC, start_time ASC
+        `);
 
         // Fetch registrations for each event
         const eventsWithRegs = await Promise.all(
