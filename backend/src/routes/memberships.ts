@@ -710,7 +710,7 @@ router.post('/assign-cash', authenticate, requireRole('admin', 'super_admin', 'r
           user_id, membership_id, amount, currency,
           payment_method, reference, notes, status, processed_by, shift_id, facility_id
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', $8, $9, $10)
-        RETURNING id`,
+        RETURNING id, amount, status, reference`,
                 [
                     userId,
                     membership.id,
@@ -791,7 +791,24 @@ router.post('/assign-cash', authenticate, requireRole('admin', 'super_admin', 'r
                 },
                 req,
             });
-            res.status(201).json(membership);
+            res.status(201).json({
+                membership: {
+                    ...membership,
+                    user_name: user?.display_name ?? null,
+                    user_email: user?.email ?? null,
+                    user_phone: user?.phone ?? null,
+                    plan_name: plan.name,
+                    plan_price: plan.price,
+                    plan_currency: plan.currency,
+                    plan_duration_days: plan.duration_days,
+                },
+                transaction: {
+                    id: payResult.rows[0].id,
+                    amount: Number(payResult.rows[0].amount),
+                    status: payResult.rows[0].status,
+                    reference: payResult.rows[0].reference ?? undefined,
+                },
+            });
         } catch (err) {
             await client.query('ROLLBACK');
             throw err;

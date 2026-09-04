@@ -117,6 +117,9 @@ interface AssignmentResponse {
   };
 }
 
+const isAssignmentResponse = (value: AssignmentResponse | Membership): value is AssignmentResponse =>
+  'membership' in value && Boolean(value.membership) && 'transaction' in value && Boolean(value.transaction);
+
 interface GuestBookingResponse {
   booking: {
     id: string;
@@ -341,11 +344,26 @@ function CashAssignmentInner() {
         delete payload.discountValue;
       }
       if (data.paymentMethod !== 'gratis' && !discountEnabled) delete payload.reason;
-      const response = await api.post<AssignmentResponse>('/memberships/assign-cash', {
+      const response = await api.post<AssignmentResponse | Membership>('/memberships/assign-cash', {
         ...payload,
         startDate: data.startDate,
       });
-      return response.data;
+      if (isAssignmentResponse(response.data)) return response.data;
+
+      // Compatibilidad con backends anteriores, que devolvían la membresía sin envolver.
+      return {
+        membership: {
+          ...response.data,
+          user_name: response.data.user_name || selectedUser?.display_name || selectedUser?.full_name,
+          plan_name: response.data.plan_name || selectedPlan?.name,
+        },
+        transaction: {
+          id: '',
+          amount: Number(data.amountPaid),
+          status: 'completed',
+          reference: data.reference,
+        },
+      } satisfies AssignmentResponse;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['memberships'] });
@@ -1123,7 +1141,7 @@ function CashAssignmentInner() {
                   La membresía ha sido asignada exitosamente
                 </DialogDescription>
               </DialogHeader>
-              {lastAssignment && (
+              {lastAssignment?.membership && lastAssignment?.transaction && (
                 <div className="space-y-3 py-4">
                   <div className="rounded-lg bg-muted p-3 space-y-2 text-sm">
                     <div className="flex justify-between">
