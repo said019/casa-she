@@ -9,7 +9,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "npx serve dist -s -p ${PORT:-8080}",
+    "start": "exec node node_modules/serve/build/main.js dist -s -p ${PORT:-8080}",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
