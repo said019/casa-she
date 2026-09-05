@@ -16,4 +16,4 @@ NODE_ENV = "development"
 NPM_CONFIG_PRODUCTION = "false"
 
 [start]
-cmd = "npx serve dist -s -p ${PORT:-8080}"
+cmd = "node node_modules/serve/build/main.js dist -s -p ${PORT:-8080}"
