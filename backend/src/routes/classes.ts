@@ -18,7 +18,8 @@ import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { setTotalpassCap } from '../lib/totalpass/caps.js';
 import { dispararRetiroTotalpass } from '../lib/totalpass/retire.js';
 import { marcarResyncTotalpass, dispararResyncTotalpass } from '../lib/totalpass/resync.js';
-import { copiarSemana, diasEntre } from '../lib/copy-week.js';
+import { copiarSemana, diasEntre, sumarDias } from '../lib/copy-week.js';
+import { avisarCargaCalendario } from '../lib/aviso-carga-calendario.js';
 
 const router = Router();
 
@@ -606,6 +607,9 @@ router.post('/generate', authenticate, requireElevated, async (req: Request, res
         const end = new Date(`${endDate}T00:00:00Z`);
         let classesCreated = 0;
         let classesSkipped = 0;
+        // Días cerrados que se saltaron. Se cuenta para que el resumen que se le
+        // manda al estudio no diga "0 omitidas" cuando sí hubo días saltados.
+        let diasCerradosSaltados = 0;
 
         while (current <= end) {
             // getUTCDay() para que el día coincida con la fecha en toISOString() (UTC).
@@ -614,6 +618,7 @@ router.post('/generate', authenticate, requireElevated, async (req: Request, res
 
             // Skip closed days
             if (closedDates.has(dateStr)) {
+                diasCerradosSaltados++;
                 current.setUTCDate(current.getUTCDate() + 1);
                 continue;
             }
@@ -659,6 +664,19 @@ router.post('/generate', authenticate, requireElevated, async (req: Request, res
 
             current.setUTCDate(current.getUTCDate() + 1);
         }
+
+        // Resumen al estudio de lo que quedó cargado, para cotejarlo contra la
+        // agenda real antes de que las clientas reserven. Fire-and-forget: el
+        // calendario ya está guardado y no debe esperar a WhatsApp.
+        void avisarCargaCalendario({
+            desde: startDate,
+            hasta: endDate,
+            facilityId,
+            creadas: classesCreated,
+            yaExistian: classesSkipped,
+            omitidas: diasCerradosSaltados,
+            origen: 'plantilla',
+        });
 
         res.json({
             message: 'Generación completada',
@@ -763,6 +781,19 @@ router.post('/copy-week', authenticate, requireElevated, async (req: Request, re
                 newData: { fromWeekStart, toWeekStart, facilityId: sucursal, ...resultado, detalle: undefined },
                 req,
             }).catch((e) => console.error('[copy-week] auditor\u00eda fall\u00f3 (no bloquea):', e));
+
+            // Resumen al estudio de lo que qued\u00f3 cargado. Esta es la v\u00eda por la
+            // que entr\u00f3 septiembre 2026 con 11 horarios que nadie impart\u00eda:
+            // copiar arrastra la semana tal como estaba, errores incluidos.
+            void avisarCargaCalendario({
+                desde: toWeekStart,
+                hasta: sumarDias(toWeekStart, 6),
+                facilityId: sucursal,
+                creadas: resultado.creadas,
+                yaExistian: resultado.yaExistian,
+                omitidas: resultado.enDiaCerrado + resultado.enElPasado,
+                origen: 'copia',
+            });
         }
         return res.json(resultado);
     } catch (error) {
