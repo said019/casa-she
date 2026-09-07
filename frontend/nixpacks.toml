@@ -9,11 +9,11 @@ NODE_ENV = "development"
 NPM_CONFIG_PRODUCTION = "false"
 
 [phases.build]
-cmds = ["rm -rf node_modules/.vite", "npx --no-install vite build"]
+cmds = ["rm -rf node_modules/.vite", "npx --no-install vite build", "node scripts/prepare-static-runtime.mjs"]
 
 [phases.build.variables]
 NODE_ENV = "development"
 NPM_CONFIG_PRODUCTION = "false"
 
 [start]
-cmd = "node node_modules/serve/build/main.js dist -s -p ${PORT:-8080}"
+cmd = "./.runtime/caddy run --config Caddyfile --adapter caddyfile"
