@@ -6,6 +6,7 @@
 
 :{$PORT:8080} {
 	root * ./dist
+	header /favicon.ico Content-Type "image/x-icon"
 	redir /index.html /index 301
 	redir /index / 301
 	try_files {path} /index.html

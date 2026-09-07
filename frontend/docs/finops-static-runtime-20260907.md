@@ -19,6 +19,8 @@ Offline test: 175 source routes, 82 original files and 263 equivalent GET paths.
 
 Known invalid-URL differences: `/sw.js/` redirects 308 to canonical `/sw.js` instead of serving SPA HTML. `/../package.json` returns only public SPA HTML instead of Node's 400, never repository contents. Valid registration URL is checked byte-for-byte for content and JavaScript MIME.
 
+Linux CI initially detected a platform MIME default difference for favicon.ico. Caddy now explicitly preserves Node's image/x-icon response; the equivalence assertion remains strict. No production deployment occurred before this correction.
+
 Railway pre-deploy 24h: 360 in-window RAM samples, mean 0.1274495949 GB, max 0.1837124267 GB, last 0.095741952 GB. Decimal MB = GB * 1000. Local RSS is not Railway billing savings. Post-deploy full-window usage is required before claiming sustained savings.
 
 ## Release and rollback
