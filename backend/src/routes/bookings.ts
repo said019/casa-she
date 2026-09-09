@@ -13,6 +13,7 @@ import { upsertGoogleLoyaltyObject } from '../lib/google-wallet.js';
 import { studioBookingError } from '../lib/membershipStudio.js';
 import { selectMembershipForBooking, toDbClient, pickBestMembership } from '../lib/membershipSelection.js';
 import { membershipDateOnly, membershipValidityForClassDate } from '../lib/membershipValidity.js';
+import { assertMembershipDailyLimit, MembershipDailyLimitError } from '../lib/membershipDailyLimit.js';
 import { awardCheckinPoints } from '../lib/loyalty.js';
 import { joinWaitlist, waitlistOffer, compactWaitlist, promoteNextFromWaitlist } from '../lib/waitlist.js';
 import { cdmxWallClockToUtc } from '../lib/schedule.js';
@@ -381,6 +382,7 @@ router.post('/bulk-month', authenticate, requireRole('admin'), async (req: Reque
         const bulkConsumedCategory: 'reformer' | 'multi' | null = bulkCatRemaining !== null ? bulkCategory : null;
         const bookingIds: string[] = [];
         for (const cls of targetClasses) {
+            await assertMembershipDailyLimit({ db: toDbClient(client), userId, classId: cls.id, remaining: bulkCatRemaining });
             const { rows } = await client.query(
                 `INSERT INTO bookings (class_id, user_id, membership_id, status, consumed_category, booked_by)
                  VALUES ($1, $2, $3, 'confirmed', $4, $5) RETURNING id`,
@@ -402,6 +404,7 @@ router.post('/bulk-month', authenticate, requireRole('admin'), async (req: Reque
         });
     } catch (error) {
         try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+        if (error instanceof MembershipDailyLimitError) return res.status(error.status).json({ error: error.message, code: error.code });
         console.error('Bulk booking error:', error);
         return res.status(500).json({ error: 'Error al procesar reserva masiva' });
     } finally {
@@ -796,6 +799,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                     [membershipId]
                 );
                 const creditRow = creditRes.rows[0];
+                if (creditRow) await assertMembershipDailyLimit({ db: toDbClient(client), userId, classId, remaining: creditRow.remaining });
                 if (creditRow && creditRow.remaining !== null) {
                     // Self-guarding decrement: only deducts when a credit is
                     // actually available. If a concurrent booking won the race
@@ -962,6 +966,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
         res.status(201).json(newBooking);
 
     } catch (error) {
+        if (error instanceof MembershipDailyLimitError) return res.status(error.status).json({ error: error.message, code: error.code });
         console.error('Create booking error:', error);
         res.status(500).json({ error: 'Error al procesar reserva' });
     }
@@ -1066,6 +1071,7 @@ router.post('/admin-book', authenticate, requireRole('admin', 'super_admin', 're
                 const cat: 'reformer' | 'multi' = classDetails.class_category;
                 const col = cat === 'reformer' ? 'reformer_remaining' : 'multi_remaining';
                 const creditRes = await client.query(`SELECT ${col} AS remaining FROM memberships WHERE id = $1`, [membershipId]);
+                if (creditRes.rows[0]) await assertMembershipDailyLimit({ db: toDbClient(client), userId, classId, remaining: creditRes.rows[0].remaining });
                 if (creditRes.rows[0] && creditRes.rows[0].remaining !== null) {
                     const dec = await client.query(`UPDATE memberships SET ${col} = ${col} - 1 WHERE id = $1 AND ${col} > 0`, [membershipId]);
                     if (dec.rowCount === 0) {
@@ -1093,6 +1099,7 @@ router.post('/admin-book', authenticate, requireRole('admin', 'super_admin', 're
 
         res.status(201).json(newBooking);
     } catch (error) {
+        if (error instanceof MembershipDailyLimitError) return res.status(error.status).json({ error: error.message, code: error.code });
         console.error('Admin book error:', error);
         res.status(500).json({ error: 'Error al crear la reserva' });
     }

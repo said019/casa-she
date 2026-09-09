@@ -5,6 +5,7 @@
  */
 import { query, queryOne, pool } from '../config/database.js';
 import { selectMembershipForBooking, toDbClient, ClassCategory } from './membershipSelection.js';
+import { assertMembershipDailyLimit, MembershipDailyLimitError } from './membershipDailyLimit.js';
 import { writeInAppNotification } from './in-app-notifications.js';
 import { sendWhatsAppMessage } from './whatsapp.js';
 import { notifyAllUserDevices } from './apple-wallet.js';
@@ -126,6 +127,10 @@ export async function joinWaitlist(params: { userId: string; classId: string }):
             await client.query('ROLLBACK');
             return { ok: false, status: 400, error: 'Necesitas una membresía con créditos de esta categoría para anotarte' };
         }
+        await assertMembershipDailyLimit({
+            db: toDbClient(client), userId, classId,
+            remaining: cls.class_category === 'reformer' ? picked.reformer_remaining : picked.multi_remaining,
+        });
         const ins = await client.query(
             `INSERT INTO bookings (class_id, user_id, membership_id, status, waitlist_position, booked_by)
              VALUES ($1, $2, $3, 'waitlist',
@@ -137,6 +142,7 @@ export async function joinWaitlist(params: { userId: string; classId: string }):
         return { ok: true, booking: ins.rows[0] };
     } catch (e) {
         await client.query('ROLLBACK').catch(() => { /* ya */ });
+        if (e instanceof MembershipDailyLimitError) return { ok: false, status: e.status, error: e.message, code: e.code };
         throw e;
     } finally {
         client.release();
@@ -208,6 +214,15 @@ export async function promoteNextFromWaitlist(params: {
                 classDate: promoteClassDate,
             });
             if (!picked) { skipped++; continue; } // sin crédito elegible: se salta, conserva posición
+            try {
+                await assertMembershipDailyLimit({
+                    db: toDbClient(client), userId: cand.user_id, classId,
+                    remaining: picked[col], excludeBookingId: cand.id,
+                });
+            } catch (e) {
+                if (e instanceof MembershipDailyLimitError) { skipped++; continue; }
+                throw e;
+            }
             const membershipId = picked.id as string;
             // Descuento auto-guardado; bucket NULL = ilimitado (no descuenta, no marca consumo).
             const dec = await client.query(
