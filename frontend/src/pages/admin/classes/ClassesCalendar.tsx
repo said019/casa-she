@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { CompanionPanel, CompanionReview } from '@/components/bookings/CompanionPanel';
 import { ClassIntensity, ClassIntensitySelector, isClassIntensity } from '@/components/classes/ClassIntensity';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -171,6 +172,8 @@ interface ClassesCalendarProps {
 }
 
 export default function ClassesCalendar({ initialGenerateOpen = false, embedded = false }: ClassesCalendarProps) {
+    const [companionHost, setCompanionHost] = useState<Attendee | null>(null);
+    const [companionReviewOpen, setCompanionReviewOpen] = useState(false);
     const [currentDate, setCurrentDate] = useState(new Date());
     const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
     const [mobileSelectedDay, setMobileSelectedDay] = useState(new Date());
@@ -733,6 +736,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                 </div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
+                {['admin', 'super_admin', 'reception'].includes(user?.role || '') && <Button size="icon" variant="outline" aria-label={`Invitadas de ${attendee.display_name}`} title="Invitadas" onClick={() => setCompanionHost(attendee)}><Users className="h-4 w-4" /></Button>}
                 {/* Escribirle por WhatsApp. Importa sobre todo con las socias de
                     TotalPass: reservaron desde su app y el estudio no las conoce. */}
                 {(() => {
@@ -871,6 +875,16 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
 
     const content = (
                 <div className="space-y-5">
+                    {['admin', 'super_admin', 'reception'].includes(user?.role || '') && <Button variant="outline" onClick={() => setCompanionReviewOpen(true)}>Invitadas: revisión de recepción</Button>}
+                    <Dialog open={!!companionHost} onOpenChange={open => { if (!open) setCompanionHost(null); }}>
+                        <DialogContent className="max-h-[90vh] overflow-y-auto">
+                            <DialogHeader><DialogTitle>Invitadas de {companionHost?.display_name}</DialogTitle><DialogDescription>Gestiona las invitadas de esta reserva.</DialogDescription></DialogHeader>
+                            {companionHost && <CompanionPanel key={companionHost.booking_id} bookingId={companionHost.booking_id} staff />}
+                        </DialogContent>
+                    </Dialog>
+                    <Dialog open={companionReviewOpen} onOpenChange={setCompanionReviewOpen}>
+                        <DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Invitadas por revisar</DialogTitle><DialogDescription>Seguimiento de pagos y cancelaciones.</DialogDescription></DialogHeader><CompanionReview /></DialogContent>
+                    </Dialog>
                     <section className="overflow-hidden rounded-[1.6rem] bg-balance-dark text-balance-cream shadow-[0_28px_80px_-58px_rgba(22,38,26,.95)]">
                         <div className="grid lg:grid-cols-[minmax(0,1.08fr)_minmax(22rem,.92fr)]">
                             <div className="flex min-w-0 flex-col justify-between p-5 sm:p-7 lg:p-9">

@@ -4,6 +4,7 @@ import { verifyWebhookSignature, syncPayment } from '../lib/mercadopago.js';
 import { finalizePaidOrder, reversePaymentByReference } from '../lib/orderFulfillment.js';
 import { finalizeBarOrder } from '../lib/barFulfillment.js';
 import { finalizeEventRegistration } from '../lib/eventFulfillment.js';
+import { syncCompanionPayment } from '../lib/companionFulfillment.js';
 
 const router = Router();
 
@@ -55,6 +56,10 @@ router.post('/', async (req: Request, res: Response) => {
         // Nunca confiar en el body: consultar el estado real a MP.
         const payment = await syncPayment(dataId);
         const orderId = payment.external_reference;
+        if (orderId?.startsWith('companion:')) {
+            await syncCompanionPayment(orderId.slice(10),payment);
+            return res.status(200).json({received:true,kind:'companion'});
+        }
 
         // Órdenes de barra van con external_reference "bar:<id>" — nunca las trates como membresía.
         if (orderId && orderId.startsWith('bar:')) {

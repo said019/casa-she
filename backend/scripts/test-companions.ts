@@ -1,0 +1,85 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {readFileSync} from 'node:fs';
+import pg from 'pg';
+import {companionDDL} from '../src/lib/companionSchema.js';
+import {companionCycle,lockCompanionHost,companionPolicy,confirmCompanion,receiveCompanionPayment} from '../src/lib/companions.js';
+const url=new URL(process.env.TEST_DATABASE_URL||'');
+assert.ok(['127.0.0.1','localhost'].includes(url.hostname),'Only local test database allowed');
+const pool=new pg.Pool({connectionString:url.toString()}),db=await pool.connect();
+const schema=`companions_${randomUUID().replaceAll('-','')}`;
+try {
+ await db.query('BEGIN');await db.query(`CREATE SCHEMA ${schema}; SET LOCAL search_path TO ${schema}`);
+ await db.query(`
+ CREATE TABLE users(id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+ CREATE TABLE orders(id uuid PRIMARY KEY,facility_id uuid);
+ CREATE TABLE memberships(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid,order_id uuid,facility_id uuid,status text DEFAULT 'active',start_date date DEFAULT '2026-01-01',end_date date DEFAULT '2099-12-31',multi_remaining int,reformer_remaining int);
+ CREATE TABLE class_types(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),category text DEFAULT 'multi');
+ CREATE TABLE classes(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),class_type_id uuid,facility_id uuid,date date DEFAULT '2099-09-15',start_time time DEFAULT '10:00',status text DEFAULT 'scheduled',booking_closed boolean DEFAULT false,current_bookings int DEFAULT 0,max_capacity int DEFAULT 8);
+ CREATE TABLE bookings(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),class_id uuid,user_id uuid,membership_id uuid,status text DEFAULT 'confirmed',consumed_category text,booked_by uuid,is_free_booking boolean DEFAULT false,cancelled_at timestamptz);
+ CREATE UNIQUE INDEX active_booking ON bookings(class_id,user_id) WHERE status<>'cancelled';
+ CREATE TABLE payments(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid,amount numeric,currency varchar(3),payment_method text,status text,provider text,reference_id text);
+ CREATE TABLE bio_checkout_sessions(class_id uuid,status text,expires_at timestamptz);
+ CREATE TABLE system_settings(key text PRIMARY KEY,value jsonb);
+ INSERT INTO system_settings VALUES('cancellation_policy','{"min_hours":5}');
+ CREATE FUNCTION booking_count() RETURNS trigger AS $$ BEGIN
+ IF TG_OP='INSERT' AND NEW.status='confirmed' THEN UPDATE classes SET current_bookings=current_bookings+1 WHERE id=NEW.class_id;
+ ELSIF TG_OP='UPDATE' AND NEW.status='cancelled' AND OLD.status='confirmed' THEN UPDATE classes SET current_bookings=current_bookings-1 WHERE id=NEW.class_id; END IF;
+ RETURN NEW; END; $$ LANGUAGE plpgsql;
+ CREATE TRIGGER count_booking AFTER INSERT OR UPDATE ON bookings FOR EACH ROW EXECUTE FUNCTION booking_count();
+ `);
+ await db.query(companionDDL);await db.query(companionDDL);
+ await db.query(`ALTER TABLE memberships ADD cancellations_used int DEFAULT 0,ADD cancellation_limit int DEFAULT 2,ADD classes_remaining int;
+ ALTER TABLE bookings ADD cancelled_by uuid,ADD cancellation_reason text,ADD updated_at timestamptz;
+ CREATE TABLE user_benefits(status text,used_at timestamptz,used_by uuid,used_on_booking_id uuid,expires_at timestamptz);`);
+ const startup=readFileSync(new URL('../src/index.ts',import.meta.url),'utf8');
+ const cancelSQL=startup.match(/CREATE OR REPLACE FUNCTION cancel_booking\([\s\S]*?\$func\$ LANGUAGE plpgsql;/)?.[0];
+ assert.ok(cancelSQL);await db.query(cancelSQL);
+ assert.equal(companionCycle('2026-01-31','2026-02-28'),'2026-02-28');
+ assert.equal(companionCycle('2026-01-31','2026-03-30'),'2026-02-28');
+ const host=(await db.query('INSERT INTO users DEFAULT VALUES RETURNING id')).rows[0].id;
+ const m=(await db.query('INSERT INTO memberships(user_id,multi_remaining) VALUES($1,5) RETURNING id',[host])).rows[0].id;
+ const type=(await db.query('INSERT INTO class_types DEFAULT VALUES RETURNING id')).rows[0].id;
+ const cls=(await db.query('INSERT INTO classes(class_type_id) VALUES($1) RETURNING id',[type])).rows[0].id;
+ const b=(await db.query('INSERT INTO bookings(class_id,user_id,membership_id) VALUES($1,$2,$3) RETURNING id',[cls,host,m])).rows[0].id;
+ async function add(mode:string){
+  const guest=(await db.query('INSERT INTO users DEFAULT VALUES RETURNING id')).rows[0].id;
+  return (await db.query(`INSERT INTO booking_companions(request_id,host_booking_id,membership_id,guest_user_id,guest_name,mode,status,cycle_start,amount)
+   VALUES($1,$2,$3,$4,'Guest',$5,$6,'2099-09-01',$7) RETURNING *`,[randomUUID(),b,m,guest,mode,mode==='paid'?'pending_payment':'confirmed',mode==='paid'?280:0])).rows[0];
+ }
+ let ctx=await lockCompanionHost(db,b);
+ assert.equal((await companionPolicy(db,ctx)).mode,'credit');
+ const credit=await add('credit');await confirmCompanion(db,credit,ctx,host);
+ assert.equal((await db.query('SELECT multi_remaining FROM memberships WHERE id=$1',[m])).rows[0].multi_remaining,4);
+ await db.query('SAVEPOINT host_cancel');
+ await assert.rejects(db.query("UPDATE bookings SET status='cancelled' WHERE id=$1",[b]),/COMPANIONS_ACTIVE/);
+ await db.query('ROLLBACK TO SAVEPOINT host_cancel');
+ await db.query(`SELECT * FROM cancel_booking((SELECT guest_booking_id FROM booking_companions WHERE id=$1),$2,false)`,[credit.id,credit.guest_user_id]);
+ assert.equal((await db.query('SELECT multi_remaining FROM memberships WHERE id=$1',[m])).rows[0].multi_remaining,5,'timely credit guest cancellation returns host credit');
+ await db.query('UPDATE memberships SET multi_remaining=NULL WHERE id=$1',[m]);
+ ctx=await lockCompanionHost(db,b);
+ assert.equal((await companionPolicy(db,ctx)).mode,'monthly_free');
+ const free=await add('monthly_free');await confirmCompanion(db,free,ctx,host);
+ assert.equal((await companionPolicy(db,ctx)).mode,'paid');
+ assert.equal((await db.query('SELECT is_companion_booking FROM bookings WHERE id=(SELECT guest_booking_id FROM booking_companions WHERE id=$1)',[free.id])).rows[0].is_companion_booking,true);
+ const paid=await add('paid');
+ await receiveCompanionPayment(db,paid.id,{reference:'mp:1',amount:280,currency:'MXN',method:'card'});
+ await receiveCompanionPayment(db,paid.id,{reference:'mp:1',amount:280,currency:'MXN',method:'card'});
+ assert.equal((await db.query('SELECT count(*)::int n FROM payments')).rows[0].n,1);
+ assert.equal((await db.query('SELECT status FROM booking_companions WHERE id=$1',[paid.id])).rows[0].status,'confirmed');
+ assert.equal((await companionPolicy(db,await lockCompanionHost(db,b))).remaining_slots,0);
+ await receiveCompanionPayment(db,paid.id,{reference:'mp:2',amount:280,currency:'MXN',method:'card'});
+ assert.equal((await db.query('SELECT fulfilled FROM companion_payments WHERE reference=$1',['mp:2'])).rows[0].fulfilled,false);
+ await db.query(`SELECT * FROM cancel_booking((SELECT guest_booking_id FROM booking_companions WHERE id=$1),$2,false)`,[paid.id,paid.guest_user_id]);
+ assert.equal((await db.query('SELECT cancellations_used FROM memberships WHERE id=$1',[m])).rows[0].cancellations_used,1,'paid cancellation must not spend host allowance');
+ assert.equal((await db.query('SELECT status FROM booking_companions WHERE id=$1',[paid.id])).rows[0].status,'refund_review');
+ const wrong=await add('paid');await receiveCompanionPayment(db,wrong.id,{reference:'mp:3',amount:280,currency:'USD',method:'card'});
+ assert.equal((await db.query('SELECT status FROM booking_companions WHERE id=$1',[wrong.id])).rows[0].status,'payment_review');
+ const full=await add('paid');await db.query('UPDATE classes SET max_capacity=current_bookings WHERE id=$1',[cls]);
+ await receiveCompanionPayment(db,full.id,{reference:'mp:4',amount:280,currency:'MXN',method:'card'});
+ assert.equal((await db.query('SELECT status FROM booking_companions WHERE id=$1',[full.id])).rows[0].status,'payment_review');
+ await db.query(`SELECT * FROM cancel_booking((SELECT guest_booking_id FROM booking_companions WHERE id=$1),$2,false)`,[free.id,free.guest_user_id]);
+ assert.equal((await db.query('SELECT cancellations_used FROM memberships WHERE id=$1',[m])).rows[0].cancellations_used,1,'free cancellation must not spend host allowance');
+ assert.equal((await db.query('SELECT free_released FROM booking_companions WHERE id=$1',[free.id])).rows[0].free_released,true);
+ console.log('Companions PostgreSQL: credit debit, free cycle, paid receipt, idempotency, capacity, cancellation guard and quota restoration OK');
+} finally {await db.query('ROLLBACK');db.release();await pool.end();}

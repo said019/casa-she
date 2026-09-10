@@ -1483,6 +1483,9 @@ router.post('/:id/cancel', authenticate, async (req: Request, res: Response) => 
         cancelResult = rows[0];
     } catch (err: any) {
         const code: string = (err.message || '').split('\n')[0].replace('cancel_booking: ', '');
+        if (code.includes('COMPANIONS_ACTIVE')) {
+            return res.status(409).json({error:'Cancela primero las invitadas de esta reserva.',code:'COMPANIONS_ACTIVE'});
+        }
         if (code.includes('BOOKING_NOT_FOUND')) {
             return res.status(404).json({ error: 'Reserva no encontrada', code: 'BOOKING_NOT_FOUND' });
         }

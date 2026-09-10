@@ -115,6 +115,7 @@ export function verifyWebhookSignature(params: {
 
 // Consulta el estado REAL del pago. Nunca se confía en el body del webhook.
 export interface MpPayment {
+    currency_id?: string;
     id: number | string;
     status: string;          // approved | pending | in_process | rejected | cancelled | refunded ...
     status_detail: string;
@@ -136,5 +137,6 @@ export async function syncPayment(mpPaymentId: string): Promise<MpPayment> {
         status_detail: String(p.status_detail ?? ''),
         external_reference: p.external_reference ?? null,
         transaction_amount: p.transaction_amount ?? null,
+        currency_id: p.currency_id,
     };
 }

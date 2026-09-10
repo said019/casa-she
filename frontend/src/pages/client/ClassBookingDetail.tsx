@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CompanionPanel } from '@/components/bookings/CompanionPanel';
 import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { parseISO, format } from 'date-fns';
@@ -179,6 +180,8 @@ export default function ClassBookingDetail() {
               </CardContent>
             </Card>
           )}
+
+          {data && bookingId && <CompanionPanel bookingId={bookingId} />}
 
           {(() => {
             if (data?.booking_status === 'waitlist') {

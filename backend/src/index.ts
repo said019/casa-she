@@ -6,6 +6,8 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { pool } from './config/database.js';
 import { classIntensityDDL } from './lib/classIntensity.js';
+import { companionDDL } from './lib/companionSchema.js';
+import companionRoutes from './routes/companions.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import planRoutes from './routes/plans.js';
@@ -1888,6 +1890,10 @@ async function runStartupMigrations(): Promise<void> {
                 v_enabled        := COALESCE((v_policy->>'enabled')::boolean, true);
                 v_refund_enabled := COALESCE((v_policy->>'refund_credit_on_cancel')::boolean, true);
 
+                -- Match booking/companion operations: class first, then booking.
+                -- The class reference is immutable; re-read/lock the booking below.
+                PERFORM c.id FROM classes c JOIN bookings b ON b.class_id=c.id
+                  WHERE b.id=p_booking_id FOR UPDATE OF c;
                 -- LOCK booking row to prevent double-cancel race
                 SELECT * INTO v_booking FROM bookings WHERE id = p_booking_id FOR UPDATE;
 
@@ -1959,7 +1965,7 @@ async function runStartupMigrations(): Promise<void> {
                 --   admin always refunds, otherwise gated by:
                 --     refund_credit_on_cancel toggle AND personal cancellation limit.
                 --   Free-class bookings NEVER refund (no credit was deducted).
-                IF v_booking.is_free_booking THEN
+                IF v_booking.is_free_booking OR (v_booking.is_companion_booking AND v_booking.consumed_category IS NULL) THEN
                     v_should_refund := false;
                 ELSIF p_force_refund IS NOT NULL THEN
                     -- Override explícito del staff (el switch "Devolver crédito" del diálogo).
@@ -4397,6 +4403,7 @@ app.use('/api/class-types', classTypeRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/classes', classRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/companions', companionRoutes);
 app.use('/api/clients', clientsRouter);
 app.use('/api/memberships', membershipRoutes);
 app.use('/api/admin/audit', auditRoutes);
@@ -4464,6 +4471,7 @@ runStartupMigrations()
         // Unlike best-effort legacy migrations, these columns are required by
         // class reads. Never accept traffic before this succeeds.
         await query(classIntensityDDL);
+        await query(companionDDL);
         app.listen(PORT, () => {
             console.log(`
 🚀 Casa Shé API Server
