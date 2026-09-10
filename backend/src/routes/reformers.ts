@@ -1,3 +1,4 @@
+import { publicPhoto } from '../lib/public-photo-fields.js';
 import { Router, Request, Response } from 'express';
 import { query, queryOne } from '../config/database.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
@@ -182,7 +183,7 @@ router.post('/', authenticate, requireRole('admin', 'super_admin'), async (req: 
         const created = await queryOne(
             `INSERT INTO reformers (facility_id, number, label, position_x, position_y, rotation, scale, image_url)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-            [facility_id, number, label || null, position_x, position_y, rotation ?? 0, scale ?? 1.0, image_url || null]
+            [facility_id, number, label || null, position_x, position_y, rotation ?? 0, scale ?? 1.0, (await publicPhoto(image_url)) || null]
         );
         res.status(201).json(created);
     } catch (err: any) {
@@ -206,7 +207,7 @@ router.put('/:id', authenticate, requireRole('admin', 'super_admin'), async (req
                updated_at = CURRENT_TIMESTAMP
              WHERE id = $9 RETURNING *`,
             [number ?? null, label ?? null, position_x ?? null, position_y ?? null,
-             rotation ?? null, scale ?? null, image_url ?? null, is_active ?? null, req.params.id]
+             rotation ?? null, scale ?? null, (await publicPhoto(image_url)) ?? null, is_active ?? null, req.params.id]
         );
         if (!updated) return res.status(404).json({ error: 'Lugar no encontrado' });
         res.json(updated);
@@ -248,7 +249,7 @@ router.put('/facility/:facilityId/layout', authenticate, requireRole('admin', 's
              WHERE id = $6
              RETURNING id, name, background_url, default_reformer_image_url,
                        front_position_x, front_position_y, map_notes`,
-            [background_url ?? null, default_reformer_image_url ?? null,
+            [(await publicPhoto(background_url)) ?? null, (await publicPhoto(default_reformer_image_url)) ?? null,
              front_position_x ?? null, front_position_y ?? null,
              map_notes ?? null, req.params.facilityId]
         );

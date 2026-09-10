@@ -1,3 +1,4 @@
+import { publicPhoto } from '../lib/public-photo-fields.js';
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { query, queryOne } from '../config/database.js';
@@ -225,7 +226,7 @@ router.post('/', authenticate, requirePermission('inventario'), async (req: Requ
             INSERT INTO products (name, description, price, cost, stock, sku, category_id, image_url, facility_id)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
-        `, [name, description || null, parsedPrice, parsedCost, parsedStock, sku || null, category_id || null, image_url || null, facilityId]);
+        `, [name, description || null, parsedPrice, parsedCost, parsedStock, sku || null, category_id || null, (await publicPhoto(image_url)) || null, facilityId]);
 
         await logAction(query, {
             adminUserId: req.user!.userId,
@@ -294,7 +295,7 @@ router.put('/:id', authenticate, requirePermission('inventario'), async (req: Re
                     params.push(num);
                 } else {
                     setClauses.push(`${field} = $${paramCount}`);
-                    params.push(req.body[field]);
+                    params.push(field === 'image_url' ? await publicPhoto(req.body[field]) : req.body[field]);
                 }
             }
         }

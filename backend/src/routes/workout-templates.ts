@@ -1,3 +1,4 @@
+import { publicPhoto } from '../lib/public-photo-fields.js';
 import { Router, Request, Response } from 'express';
 import { query, queryOne } from '../config/database.js';
 import { authenticate } from '../middleware/auth.js';
@@ -296,7 +297,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                         i,
                         ex.section,
                         ex.videoUrl || null,
-                        ex.imageUrl || null,
+                        (await publicPhoto(ex.imageUrl)) || null,
                         ex.notes || null,
                     ]
                 );
@@ -416,7 +417,7 @@ router.put('/:id', authenticate, async (req: Request, res: Response) => {
                         i,
                         ex.section,
                         ex.videoUrl || null,
-                        ex.imageUrl || null,
+                        (await publicPhoto(ex.imageUrl)) || null,
                         ex.notes || null,
                     ]
                 );

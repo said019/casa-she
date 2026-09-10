@@ -1,3 +1,4 @@
+import { publicPhotoFields } from '../lib/public-photo-fields.js';
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { query, queryOne } from '../config/database.js';
@@ -355,7 +356,7 @@ router.get('/:id', optionalAuth, async (req: Request, res: Response) => {
 // ============================================
 router.post('/', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
     try {
-        const data = CreateEventSchema.parse(req.body);
+        const data = await publicPhotoFields(CreateEventSchema.parse(req.body), ['image', 'instructor_photo']);
 
         const event = await queryOne(
             `INSERT INTO events (
@@ -417,7 +418,7 @@ router.post('/', authenticate, requireRole('admin', 'super_admin'), async (req: 
 // ============================================
 router.put('/:id', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
     try {
-        const data = UpdateEventSchema.parse(req.body);
+        const data = await publicPhotoFields(UpdateEventSchema.parse(req.body), ['image', 'instructor_photo']);
 
         // Get previous state to detect status change
         const previous = await queryOne(`SELECT status, date, start_time, end_time, title FROM events WHERE id = $1`, [req.params.id]);

@@ -1,3 +1,4 @@
+import { publicPhotoFields } from '../lib/public-photo-fields.js';
 import { Router, Request, Response } from 'express';
 import { Readable } from 'stream';
 import path from 'path';
@@ -193,7 +194,8 @@ async function makeGoogleDriveFilePublic(fileId: string, accessToken: string): P
 async function uploadBufferToGoogleDrive(
     buffer: Buffer,
     originalName: string,
-    mimeType: string
+    mimeType: string,
+    photoFolder?: string
 ): Promise<{
     fileId: string;
     webViewLink: string;
@@ -206,8 +208,9 @@ async function uploadBufferToGoogleDrive(
     const fileName = `${baseName}-${Date.now()}${ext}`;
 
     const metadata: { name: string; parents?: string[] } = { name: fileName };
-    if (process.env.GOOGLE_DRIVE_FOLDER_ID) {
-        metadata.parents = [process.env.GOOGLE_DRIVE_FOLDER_ID];
+    const uploadFolder = photoFolder || process.env.GOOGLE_DRIVE_FOLDER_ID;
+    if (uploadFolder) {
+        metadata.parents = [uploadFolder];
     }
 
     const boundary = `catarsis_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -429,7 +432,8 @@ router.post(
                 const uploadedThumb = await uploadBufferToGoogleDrive(
                     thumbnailFile.buffer,
                     thumbnailFile.originalname,
-                    thumbnailFile.mimetype
+                    thumbnailFile.mimetype,
+                    process.env.GOOGLE_DRIVE_PHOTO_FOLDER_ID
                 );
 
                 thumbnailDriveId = uploadedThumb.fileId;
@@ -1173,7 +1177,7 @@ router.post('/', authenticate, requireRole('admin', 'super_admin'), async (req: 
             return res.status(400).json({ error: 'Datos inválidos', details: validation.error.format() });
         }
 
-        const data = validation.data;
+        const data = await publicPhotoFields(validation.data, ['thumbnail_url']);
         const cloudinaryId = data.cloudinary_id || data.drive_file_id!;
         const driveFileId = data.drive_file_id || cloudinaryId;
         const slug = toSlug(data.title);
@@ -1264,7 +1268,7 @@ router.put('/:id', authenticate, requireRole('admin', 'super_admin'), async (req
             return res.status(404).json({ error: 'Video no encontrado' });
         }
 
-        const data = validation.data;
+        const data = await publicPhotoFields(validation.data, ['thumbnail_url']);
         const updates: string[] = [];
         const params: any[] = [id];
         let paramCount = 2;
