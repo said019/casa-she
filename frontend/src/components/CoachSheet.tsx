@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -27,6 +28,7 @@ interface CoachClass {
     start_time: string;
     end_time: string;
     class_type_name: string;
+    intensity?: number | null;
     class_type_color?: string | null;
     facility_name?: string | null;
     current_bookings: number;
@@ -191,6 +193,7 @@ export function CoachSheet({
                                             <div className="min-w-0 flex-1">
                                                 <p className="truncate font-body text-sm font-medium text-bmb-dark">
                                                     {c.class_type_name}
+                                                    {' '}<ClassIntensity intensity={c.intensity} />
                                                 </p>
                                                 {c.facility_name && (
                                                     <p className="flex items-center gap-1 text-[11px] text-bmb-dark/60">

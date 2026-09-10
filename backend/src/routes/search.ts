@@ -35,7 +35,7 @@ router.get('/', async (req: Request, res: Response) => {
             ),
             // Clases: programa, instructor o fecha
             query(
-                `SELECT c.id, c.date, c.start_time, c.status,
+                `SELECT c.id, c.date, c.start_time, c.status, c.intensity,
                         ct.name AS class_type_name, ct.color AS class_type_color,
                         i.display_name AS instructor_name,
                         f.name AS facility_name
@@ -69,7 +69,7 @@ router.get('/', async (req: Request, res: Response) => {
             folioNum !== null
                 ? query(
                     `SELECT b.id, b.folio, b.status,
-                            c.date AS class_date, c.start_time,
+                            c.date AS class_date, c.start_time, c.intensity,
                             ct.name AS class_type_name,
                             u.id AS user_id, u.display_name AS user_name
                      FROM bookings b

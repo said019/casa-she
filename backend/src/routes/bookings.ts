@@ -64,7 +64,7 @@ router.get('/', authenticate, requireRole('admin', 'instructor', 'reception'), a
         u.display_name as user_name,
         u.email as user_email,
         u.phone as user_phone,
-        c.id as class_id,
+        c.id as class_id, c.intensity,
         c.date as class_date,
         c.start_time as class_start_time,
         c.end_time as class_end_time,
@@ -1112,9 +1112,10 @@ router.get('/my-bookings', authenticate, async (req: Request, res: Response) => 
     const userId = req.user?.userId;
     try {
         const bookings = await query(
-            `SELECT v.*, b.is_free_booking, b.folio AS folio
+            `SELECT v.*, b.is_free_booking, b.folio AS folio, c.intensity
              FROM user_bookings_view v
              JOIN bookings b ON b.id = v.booking_id
+             JOIN classes c ON c.id = b.class_id
              WHERE v.user_id = $1`,
             [userId]
         );
@@ -1146,7 +1147,7 @@ router.get('/waitlist', authenticate, requirePermission('reservas'), async (req:
         const rows = await query(`
             SELECT b.id AS booking_id, b.waitlist_position, b.created_at, b.membership_id,
                    u.id AS user_id, u.display_name, u.phone,
-                   c.id AS class_id, c.date, c.start_time, c.end_time, c.max_capacity, c.current_bookings, c.facility_id,
+                   c.id AS class_id, c.date, c.start_time, c.end_time, c.max_capacity, c.current_bookings, c.facility_id, c.intensity,
                    ct.name AS class_type_name, ct.category, i.display_name AS instructor_name, f.name AS facility_name,
                    m.reformer_remaining, m.multi_remaining
             FROM bookings b
@@ -1168,7 +1169,7 @@ router.get('/waitlist', authenticate, requirePermission('reservas'), async (req:
             if (!byClass.has(r.class_id)) {
                 byClass.set(r.class_id, {
                     class_id: r.class_id, date: r.date, start_time: r.start_time, end_time: r.end_time,
-                    class_type_name: r.class_type_name, category: r.category,
+                    class_type_name: r.class_type_name, category: r.category, intensity: r.intensity,
                     instructor_name: r.instructor_name, facility_name: r.facility_name, facility_id: r.facility_id,
                     max_capacity: r.max_capacity, current_bookings: r.current_bookings,
                     queue: [],
@@ -1344,7 +1345,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response) => {
         u.id as user_id,
         u.display_name as user_name,
         u.email as user_email,
-        c.id as class_id,
+        c.id as class_id, c.intensity,
         c.date as class_date,
         c.start_time as class_start_time,
         c.end_time as class_end_time,

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useQuery } from '@tanstack/react-query';
 import { addDays, format, isSameDay, parseISO, startOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -132,7 +133,7 @@ export default function StudioSchedule() {
                                 {full ? 'Lleno' : `${cls.current_bookings}/${cls.max_capacity}`}
                               </Badge>
                             </div>
-                            <p className="font-medium mt-1">{cls.class_type_name || 'Clase'}</p>
+                            <p className="font-medium mt-1">{cls.class_type_name || 'Clase'} <ClassIntensity intensity={cls.intensity} /></p>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
                               <User className="h-3 w-3" />
                               {cls.instructor_name || 'Instructor'}

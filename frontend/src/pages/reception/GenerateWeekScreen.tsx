@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { startOfWeek, addDays, format } from 'date-fns';
 import api, { getErrorMessage } from '@/lib/api';
@@ -18,6 +19,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { CalendarPlus, Loader2, ShieldAlert, Sparkles } from 'lucide-react';
 
 type TemplateRow = {
+  intensity?: number | null;
   id: string;
   day_of_week: number; // 0=Dom .. 6=Sáb
   start_time: string;
@@ -220,7 +222,7 @@ export default function ReceptionGenerateWeekScreen() {
                             style={{ backgroundColor: s.class_type_color || '#7E8579' }}
                           />
                           <span className="tabular-nums font-medium text-balance-dark">{hhmm(s.start_time)}</span>
-                          <span className="truncate text-balance-dark/80">{s.class_type_name}</span>
+                          <span className="truncate text-balance-dark/80">{s.class_type_name} <ClassIntensity intensity={s.intensity} /></span>
                           <span className="ml-auto shrink-0 truncate text-xs text-balance-dark/50">
                             {s.instructor_name || 'Coach'}
                             {facility === 'all' && s.facility_name

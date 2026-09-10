@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { ClassIntensity, ClassIntensitySelector, isClassIntensity } from '@/components/classes/ClassIntensity';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -73,6 +74,7 @@ const generateSchema = z.object({
 });
 
 const classSchema = z.object({
+    intensity: z.number().int().min(1).max(3).nullable(),
     date: z.date(),
     classTypeId: z.string().uuid(),
     instructorId: z.string().uuid(),
@@ -98,6 +100,7 @@ const classSchema = z.object({
     });
 
 const editClassSchema = z.object({
+    intensity: z.number().int().min(1).max(3).nullable(),
     classTypeId: z.string().uuid(),
     instructorId: z.string().uuid(),
     facilityId: z.string().uuid().optional(),
@@ -345,6 +348,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                 startTime: data.startTime,
                 endTime: data.endTime,
                 maxCapacity: data.maxCapacity,
+                intensity: data.intensity,
             });
         },
         onSuccess: () => {
@@ -364,6 +368,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                 startTime: data.startTime,
                 endTime: data.endTime,
                 maxCapacity: data.maxCapacity,
+                intensity: data.intensity,
                 startDate: format(data.date, 'yyyy-MM-dd'),
                 endDate: format(data.endDate!, 'yyyy-MM-dd'),
                 weekdays: data.weekdays!,
@@ -395,6 +400,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                 startTime: rest.startTime,
                 endTime: rest.endTime,
                 maxCapacity: rest.maxCapacity,
+                intensity: rest.intensity,
             });
 
             // El PUT a /channels se dispara si el cupo TP cambió, o si la capacidad bajó
@@ -440,6 +446,11 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         },
         onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['classes'] });
+            queryClient.invalidateQueries({ queryKey: ['public-classes'] });
+            queryClient.invalidateQueries({ queryKey: ['landing-horario'] });
+            queryClient.invalidateQueries({ queryKey: ['bio-classes'] });
+            queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
+            queryClient.invalidateQueries({ queryKey: ['booking-detail'] });
         },
     });
 
@@ -607,7 +618,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
 
     const classForm = useForm<ClassForm>({
         resolver: zodResolver(classSchema),
-        defaultValues: { maxCapacity: 6 }
+        defaultValues: { maxCapacity: 6, intensity: null }
     });
 
     const editForm = useForm<EditClassForm>({
@@ -622,6 +633,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         classForm.reset({
             date: day,
             maxCapacity: 6,
+            intensity: null,
             startTime: '09:00',
             endTime: '10:00',
             recurring: false,
@@ -646,6 +658,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
             startTime: selectedClass.start_time,
             endTime: selectedClass.end_time,
             maxCapacity: selectedClass.max_capacity,
+            intensity: selectedClass.intensity ?? null,
             totalpassSpots: selectedClass.totalpass_spots ?? 0,
         });
         setIsEditOpen(true);
@@ -1204,6 +1217,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                 <SheetHeader className="space-y-0 text-left">
                                     <SheetTitle className="flex flex-wrap items-center gap-2 text-xl">
                                         {selectedClass?.class_type_name}
+                                        <ClassIntensity intensity={selectedClass?.intensity} />
                                         {selectedClass?.status === 'cancelled' && (
                                             <Badge variant="destructive">Cancelada</Badge>
                                         )}
@@ -1659,6 +1673,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                     <Label>Capacidad</Label>
                                     <Input type="number" {...classForm.register('maxCapacity')} />
                                 </div>
+                                <ClassIntensitySelector value={classForm.watch('intensity')} onChange={(value) => classForm.setValue('intensity', value, { shouldDirty: true, shouldValidate: true })} />
 
                                 <div className="space-y-3 rounded-lg border border-bmb-gold/30 p-3">
                                     <div className="flex items-center justify-between">
@@ -1855,6 +1870,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                     <Label>Capacidad</Label>
                                     <Input type="number" {...editForm.register('maxCapacity')} />
                                 </div>
+                                <ClassIntensitySelector value={editForm.watch('intensity')} onChange={(value) => editForm.setValue('intensity', value, { shouldDirty: true, shouldValidate: true })} />
 
                                 <div className="space-y-2">
                                     <Label>Lugares TotalPass</Label>
@@ -2298,7 +2314,7 @@ function ClassEventCard({ item, onClick, mobile = false }: { item: Class; onClic
         <button
             type="button"
             onClick={onClick}
-            aria-label={`${item.class_type_name}, ${formatClassTime(item.start_time)}, ${bookings} de ${capacity} lugares`}
+            aria-label={`${item.class_type_name}${isClassIntensity(item.intensity) ? `, Intensidad ${item.intensity} de 3` : ''}, ${formatClassTime(item.start_time)}, ${bookings} de ${capacity} lugares`}
             className={cn(
                 'group w-full overflow-hidden rounded-[1rem] border text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_-18px_rgba(51,42,34,0.28)] active:scale-[0.99]',
                 isCancelled && 'opacity-50 saturate-0'
@@ -2315,8 +2331,9 @@ function ClassEventCard({ item, onClick, mobile = false }: { item: Class; onClic
             <div className={mobile ? 'p-4' : 'p-3'}>
                 <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                        <p className={cn('truncate font-semibold leading-tight text-balance-dark', mobile ? 'text-base' : 'text-[13px]')}>
-                            {item.class_type_name}
+                        <p className={cn('flex items-center gap-1 font-semibold leading-tight text-balance-dark', mobile ? 'text-base' : 'text-[13px]')}>
+                            <span className="truncate">{item.class_type_name}</span>
+                            <ClassIntensity intensity={item.intensity} />
                         </p>
                         <p className={cn('mt-1 font-semibold tabular-nums text-balance-dark/75', mobile ? 'text-sm' : 'text-[11px]')}>
                             {formatClassTime(item.start_time)}–{formatClassTime(item.end_time)}

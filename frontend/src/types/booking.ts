@@ -1,4 +1,5 @@
 export interface BookingAdmin {
+  intensity?: number | null;
   booking_id: string;
   booking_status: 'confirmed' | 'waitlist' | 'checked_in' | 'no_show' | 'cancelled';
   created_at: string;
@@ -23,6 +24,7 @@ export interface BookingAdmin {
 }
 
 export interface BookingClient {
+  intensity?: number | null;
   booking_id: string;
   class_id: string;
   date: string;

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,6 +27,7 @@ import { useAuthStore } from '@/stores/authStore';
 const mxn = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
 
 interface UpcomingClass {
+    intensity?: number | null;
     id: string;
     start_time: string;
     end_time: string;
@@ -72,6 +74,7 @@ interface AgendaAttendee {
     payment_method?: string | null;
 }
 interface AgendaClass {
+    intensity?: number | null;
     id: string;
     start_time: string;
     end_time: string;
@@ -204,7 +207,7 @@ function CheckinAgenda({ facilityIdParam }: { facilityIdParam: string | null }) 
                                                 <div className="flex items-center gap-2 border-b bg-muted/30 px-3 py-2">
                                                     <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: c.class_type_color || '#7E8579' }} />
                                                     <span className="text-sm font-semibold tabular-nums">{c.start_time}</span>
-                                                    <span className="truncate text-sm font-medium">{c.class_type_name}</span>
+                                                    <span className="truncate text-sm font-medium">{c.class_type_name} <ClassIntensity intensity={c.intensity} /></span>
                                                     <span className="hidden truncate text-xs text-muted-foreground sm:inline">· {c.instructor_name}</span>
                                                     <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{ci}/{c.attendees.length} check-in</span>
                                                 </div>

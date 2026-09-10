@@ -35,6 +35,7 @@ export interface ClassType {
 }
 
 export interface Schedule {
+    intensity?: number | null;
     id: string;
     class_type_id: string;
     instructor_id: string;
@@ -43,7 +44,7 @@ export interface Schedule {
     end_time: string; // HH:MM
     max_capacity: number;
     is_recurring: boolean;
-    specific_date?: string;
+    specific_date?: string | null;
     is_active: boolean;
     class_type_name?: string;
     class_type_color?: string;
@@ -53,6 +54,7 @@ export interface Schedule {
 }
 
 export interface Class {
+    intensity?: number | null;
     id: string;
     schedule_id?: string;
     class_type_id: string;

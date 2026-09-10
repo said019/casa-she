@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Search, User, CalendarDays, CreditCard, Loader2, Ticket } from 'lucide-react';
@@ -13,6 +14,7 @@ interface ClientHit {
     photo_url: string | null;
 }
 interface ClassHit {
+    intensity?: number | null;
     id: string;
     date: string;
     start_time: string | null;
@@ -33,6 +35,7 @@ interface PaymentHit {
     user_name: string;
 }
 interface ReservasHit {
+    intensity?: number | null;
     id: string;
     folio: number;
     status: string;
@@ -222,6 +225,7 @@ export function AdminSearch() {
                                         <span className="min-w-0 flex-1">
                                             <span className="block truncate text-sm font-medium text-balance-dark">
                                                 {cl.class_type_name}
+                                                {' '}<ClassIntensity intensity={cl.intensity} />
                                             </span>
                                             <span className="block truncate text-xs text-balance-dark/55">
                                                 {fmtDate(cl.date)}
@@ -287,6 +291,7 @@ export function AdminSearch() {
                                             </span>
                                             <span className="block truncate text-xs text-balance-dark/55">
                                                 {r.class_type_name}
+                                                {' '}<ClassIntensity intensity={r.intensity} />
                                                 {' · '}
                                                 {fmtDate(r.class_date)}
                                                 {r.start_time ? ` · ${String(r.start_time).slice(0, 5)}` : ''}

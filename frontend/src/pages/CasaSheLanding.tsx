@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "framer-motion";
@@ -110,9 +111,10 @@ const metaFor = (name: string) => DISCIPLINE_META[name] ?? { color: GREEN, dur: 
 
 // `id` viaja hasta el CTA para poder mandar a la clienta directo a ESA clase
 // después de crear cuenta o iniciar sesión (antes se perdía y tenía que buscarla otra vez).
-type ClassSlot = { id?: string; time: string; name: string; coach?: string };
+type ClassSlot = { id?: string; time: string; name: string; coach?: string; intensity?: number | null };
 
 interface ApiClass {
+  intensity?: number | null;
   id: string;
   date: string;        // YYYY-MM-DD (día real de la clase)
   start_time: string;  // HH:MM
@@ -193,6 +195,7 @@ function useWeekSchedule(weekOffset: number) {
           id: c.id,
           time: (c.start_time || "").slice(0, 5),
           name: c.class_type_name || "Clase",
+          intensity: c.intensity,
           coach: c.instructor_name,
         });
       }
@@ -910,6 +913,7 @@ function ClassChip({ c }: { c: ClassSlot }) {
         <p className={`${body} mt-1.5 flex items-center gap-1.5 text-[13px] font-medium leading-tight`} style={{ color: GREEN }}>
           <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: m.color }} />
           {c.name}
+          <ClassIntensity intensity={c.intensity} />
         </p>
         {c.coach && (
           <p className={`${body} mt-0.5 text-[11px] leading-tight`} style={{ color: GREEN, opacity: 0.55 }}>
@@ -952,6 +956,7 @@ function ClassChip({ c }: { c: ClassSlot }) {
               </p>
               <h3 className={`${display} relative mt-1.5 text-4xl font-light leading-none`} style={{ color: CREAM }}>
                 {c.name}
+                {' '}<ClassIntensity intensity={c.intensity} />
               </h3>
             </div>
 

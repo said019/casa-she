@@ -1,4 +1,5 @@
 import { format, isSameDay, isToday, parseISO } from "date-fns";
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { es } from "date-fns/locale";
 import { ScheduleClass, classColor, getCellStatus } from "@/lib/schedule-state";
 
@@ -101,6 +102,7 @@ export function DaySpread({ weekDays, selectedDate, onSelectDate, classes, now, 
                   <span className="min-w-0">
                     <span className="flex items-start justify-between gap-2">
                       <span className="truncate font-heading text-xl leading-none text-bmb-ink">{c.name}</span>
+                      <ClassIntensity intensity={c.intensity} />
                       <span className="shrink-0 editorial-caption-sm text-right text-bmb-ink/68">
                         {statusLabel}
                       </span>

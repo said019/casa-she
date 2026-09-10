@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useQuery } from "@tanstack/react-query";
 import { addDays, addWeeks, format, isToday, parseISO, startOfWeek, subWeeks } from "date-fns";
 import { es } from "date-fns/locale";
@@ -24,6 +25,7 @@ import { NowLine } from "./schedule/NowLine";
 import { DaySpread } from "./schedule/DaySpread";
 
 interface ApiClass {
+  intensity?: number | null;
   id: string;
   date: string;
   class_date: string;
@@ -123,6 +125,7 @@ export default function Schedule({ bookedIds, defaultFirstFacility, onClassPick,
         return {
           id: c.id,
           name: c.class_type_name,
+          intensity: c.intensity,
           category,
           time: `${dateStr}T${c.start_time}`,
           endTime: c.end_time || "",
@@ -521,8 +524,9 @@ function Row({
                   {isBooked && (
                     <span className="block editorial-caption-sm text-bmb-cream">Reservada</span>
                   )}
-                  <div className={`mt-1 truncate text-[13px] font-semibold leading-tight ${isBooked ? "text-bmb-cream" : "text-bmb-ink"}`}>
-                    {c.name}
+                  <div className={`mt-1 flex items-center gap-1 text-[13px] font-semibold leading-tight ${isBooked ? "text-bmb-cream" : "text-bmb-ink"}`}>
+                    <span className="truncate">{c.name}</span>
+                    <ClassIntensity intensity={c.intensity} />
                   </div>
                   <div className={`mt-1 flex items-center justify-between gap-2 ${isBooked ? "text-bmb-cream/80" : "text-bmb-ink/72"}`}>
                     <span className="truncate text-[11px]">{c.instructor}</span>

@@ -78,10 +78,10 @@ router.get('/dashboard', authenticate, requireRole(...STAFF), async (req: Reques
 
         const upcomingClasses = await query<{
             id: string; start_time: string; end_time: string;
-            class_type_name: string; instructor_name: string;
+            class_type_name: string; instructor_name: string; intensity: number | null;
             current_bookings: number; max_capacity: number; status: string;
         }>(`
-            SELECT c.id, c.start_time::text AS start_time, c.end_time::text AS end_time,
+            SELECT c.id, c.intensity, c.start_time::text AS start_time, c.end_time::text AS end_time,
                    ct.name AS class_type_name, i.display_name AS instructor_name,
                    c.current_bookings, c.max_capacity, c.status
             FROM classes c
@@ -161,7 +161,7 @@ router.get('/dashboard', authenticate, requireRole(...STAFF), async (req: Reques
                     id: c.id,
                     start_time: c.start_time.slice(0, 5),
                     end_time: c.end_time.slice(0, 5),
-                    class_type_name: c.class_type_name,
+                    class_type_name: c.class_type_name, intensity: c.intensity,
                     instructor_name: c.instructor_name,
                     current_bookings: Number(c.current_bookings),
                     max_capacity: Number(c.max_capacity),
@@ -202,10 +202,10 @@ router.get('/checkin-agenda', authenticate, requireRole(...STAFF), async (req: R
 
         const classes = await query<{
             id: string; start_time: string; end_time: string;
-            class_type_name: string; class_type_color: string | null;
+            class_type_name: string; class_type_color: string | null; intensity: number | null;
             instructor_name: string; current_bookings: number; max_capacity: number; status: string;
         }>(`
-            SELECT c.id, c.start_time::text AS start_time, c.end_time::text AS end_time,
+            SELECT c.id, c.intensity, c.start_time::text AS start_time, c.end_time::text AS end_time,
                    ct.name AS class_type_name, ct.color AS class_type_color,
                    i.display_name AS instructor_name,
                    c.current_bookings, c.max_capacity, c.status
@@ -255,7 +255,7 @@ router.get('/checkin-agenda', authenticate, requireRole(...STAFF), async (req: R
                 id: c.id,
                 start_time: c.start_time.slice(0, 5),
                 end_time: c.end_time.slice(0, 5),
-                class_type_name: c.class_type_name,
+                class_type_name: c.class_type_name, intensity: c.intensity,
                 class_type_color: c.class_type_color,
                 instructor_name: c.instructor_name,
                 current_bookings: Number(c.current_bookings),

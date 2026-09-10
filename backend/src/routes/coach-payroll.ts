@@ -136,7 +136,7 @@ router.get('/:instructorId/classes', authenticate, requirePermission('nomina'), 
         const period = await resolvePeriod(periodInput(req));
         const facilityId = (req.query.facility_id as string | undefined) || null;
         const classes = await query<any>(
-            `SELECT c.id, c.date, c.start_time, c.status,
+            `SELECT c.id, c.date, c.start_time, c.status, c.intensity,
                     ct.name AS class_type_name,
                     f.name AS facility_name,
                     (SELECT COUNT(*) FROM bookings b WHERE b.class_id = c.id AND b.status IN ('confirmed', 'checked_in')) AS reservas,

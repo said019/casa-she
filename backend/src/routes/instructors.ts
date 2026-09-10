@@ -1125,7 +1125,7 @@ router.get('/:id/classes', authenticate, requireSelfInstructorOrStaff, async (re
 
         const classes = await query(`
             SELECT 
-                c.id,
+                c.id, c.intensity,
                 c.date,
                 c.start_time,
                 c.end_time,
@@ -1535,7 +1535,7 @@ router.get('/:id/history', authenticate, requireSelfInstructorOrStaff, async (re
 
         let queryStr = `
             SELECT 
-                c.id,
+                c.id, c.intensity,
                 c.date,
                 c.start_time,
                 c.end_time,
@@ -1695,7 +1695,7 @@ router.get('/:id/substitutions', authenticate, requireSelfInstructorOrStaff, asy
                 cs.requested_at,
                 cs.responded_at,
                 cs.response_note,
-                c.date,
+                c.date, c.intensity,
                 c.start_time,
                 c.end_time,
                 ct.name as class_type_name,
@@ -1961,7 +1961,7 @@ router.get('/substitutions/pending', authenticate, requireRole('admin', 'super_a
             `SELECT s.id, s.class_id, s.reason, s.requested_at, s.response_note,
                     s.original_instructor_id, orig.display_name AS original_coach_name,
                     s.substitute_instructor_id, sub.display_name AS substitute_coach_name,
-                    ct.name AS class_name, c.date::text AS class_date,
+                    ct.name AS class_name, c.date::text AS class_date, c.intensity,
                     c.start_time::text AS start_time, c.end_time::text AS end_time,
                     f.name AS facility_name
              FROM class_substitutions s

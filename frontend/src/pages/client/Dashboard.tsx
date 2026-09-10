@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
@@ -478,7 +479,7 @@ export default function ClientDashboard() {
                           />
                         </div>
                         <div>
-                          <p className="font-heading text-2xl font-medium tracking-[-0.025em] text-[#2E1B22]">{cls.class_type_name}</p>
+                          <p className="font-heading text-2xl font-medium tracking-[-0.025em] text-[#2E1B22]">{cls.class_type_name} <ClassIntensity intensity={cls.intensity} /></p>
                           <p className="text-sm text-[#6B554D]">
                             {format(parseISO(cls.date), 'EEEE d MMM', { locale: es })} · {cls.start_time.slice(0, 5)} · {cls.instructor_name}
                           </p>

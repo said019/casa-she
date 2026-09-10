@@ -1,5 +1,6 @@
 // frontend/src/components/bitacora/ClientBitacora.tsx
 import { useState } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +9,7 @@ import api, { getErrorMessage } from '@/lib/api';
 import { isMembershipScheduled } from '@/lib/membershipStatus';
 
 interface Asistencia {
+  intensity?: number | null;
   booking_id: string;
   class_name: string;
   class_date: string;
@@ -22,6 +24,7 @@ interface Asistencia {
 }
 
 interface Cancelacion {
+  intensity?: number | null;
   booking_id: string;
   class_name: string;
   class_date: string;
@@ -148,7 +151,7 @@ function PeriodoBlock({ periodo, defaultOpen }: { periodo: PeriodoMembresia; def
                 {(asistAll ? asistencias : asistencias.slice(0, CAP)).map(a => (
                   <li key={a.booking_id} className="text-xs">
                     <div className="flex items-start justify-between gap-2">
-                      <span className="font-medium">{a.class_name}</span>
+                      <span className="font-medium">{a.class_name} <ClassIntensity intensity={a.intensity} /></span>
                       <Badge variant={a.status === 'checked_in' ? 'default' : a.status === 'no_show' ? 'destructive' : 'secondary'} className="text-[10px] h-4 shrink-0">
                         {a.status === 'checked_in' ? 'asistió' : a.status === 'no_show' ? 'no asistió' : 'confirmada'}
                       </Badge>
@@ -200,7 +203,7 @@ function PeriodoBlock({ periodo, defaultOpen }: { periodo: PeriodoMembresia; def
               <ul className="space-y-2">
                 {(cancelAll ? cancelaciones : cancelaciones.slice(0, CAP)).map(c => (
                   <li key={c.booking_id} className="text-xs">
-                    <div className="font-medium">{c.class_name}</div>
+                    <div className="font-medium">{c.class_name} <ClassIntensity intensity={c.intensity} /></div>
                     <div className="text-muted-foreground">
                       {formatDate(c.class_date)} · {c.class_time?.slice(0,5)}
                       {c.facility_name && <span> · {c.facility_name}</span>}

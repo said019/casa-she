@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, Fragment } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -178,6 +179,7 @@ function exportXLSX(rows: Row[], periodToken: string, periodLbl: string, facilit
 }
 
 interface ClassDetailRow {
+    intensity?: number | null;
     id: string;
     date: string;
     start_time: string | null;
@@ -271,7 +273,7 @@ function ClassAttendeesDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
+                    <DialogTitle>{title} <ClassIntensity intensity={classRow?.intensity} /></DialogTitle>
                 </DialogHeader>
                 {isLoading ? (
                     <div className="space-y-2">
@@ -342,6 +344,7 @@ function CoachClassesDetail({ instructorId, period, facilityId }: { instructorId
                     >
                         <span className="w-14 shrink-0 tabular-nums font-medium">{fmtClassDate(c.date)}</span>
                         <span className="min-w-0 flex-1 truncate">{c.class_type_name}</span>
+                        <ClassIntensity intensity={c.intensity} />
                         {c.start_time && (
                             <span className="hidden shrink-0 tabular-nums text-muted-foreground sm:inline">{String(c.start_time).slice(0, 5)}</span>
                         )}

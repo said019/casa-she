@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CLIENT_TAGS, tagByKey } from '@/data/clientTags';
@@ -350,6 +351,7 @@ function SellPlanDialog({ clientId, onDone }: { clientId: string; onDone: () => 
 
 // ─── Reservar en clase para este cliente ──────────────────────────────────────
 interface DayClass {
+    intensity?: number | null;
     id: string;
     start_time: string;
     end_time: string;
@@ -431,7 +433,7 @@ function ReserveClassDialog({ clientId, clientName, onDone }: { clientId: string
                                     .filter((c) => c.status !== 'cancelled')
                                     .map((c) => (
                                         <SelectItem key={c.id} value={c.id}>
-                                            {trimTime(c.start_time)} — {c.class_type_name} · {c.instructor_name}
+                                            {trimTime(c.start_time)} — {c.class_type_name} <ClassIntensity intensity={c.intensity} /> · {c.instructor_name}
                                             {!facility && c.facility_name ? ` · ${c.facility_name}` : ''}
                                             {' '}({c.current_bookings}/{c.max_capacity})
                                         </SelectItem>
@@ -693,6 +695,7 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
     // Próximas reservas del cliente (desde hoy en adelante). Se muestran TODAS
     // (antes estaba topado a 5 y recepción no veía reservas que la clienta ya tenía).
     interface ClientBooking {
+        intensity?: number | null;
         booking_id: string; booking_status: string;
         class_id: string; class_date: string; class_start_time: string;
         class_name: string; instructor_name: string;
@@ -1264,7 +1267,7 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
                                                         {dateLabel} · {trimTime(b.class_start_time)}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground truncate">
-                                                        {b.class_name} · {b.instructor_name}
+                                                        {b.class_name} <ClassIntensity intensity={b.intensity} /> · {b.instructor_name}
                                                     </p>
                                                 </div>
                                                 {b.booking_status === 'checked_in' ? (
@@ -1312,7 +1315,7 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
                                                         {dateLabel} · {trimTime(b.class_start_time)}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground truncate">
-                                                        {b.class_name} · {b.instructor_name}
+                                                        {b.class_name} <ClassIntensity intensity={b.intensity} /> · {b.instructor_name}
                                                     </p>
                                                 </div>
                                                 {b.booking_status === 'checked_in' ? (

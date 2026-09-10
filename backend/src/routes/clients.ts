@@ -51,7 +51,7 @@ router.get('/:id/bitacora', authenticate, requireRole('admin', 'super_admin', 'r
             }>(
                 `SELECT
                    b.id as booking_id,
-                   ct.name as class_name,
+                   ct.name as class_name, c.intensity,
                    c.date::text as class_date,
                    c.start_time as class_time,
                    f.name as facility_name,
@@ -90,7 +90,7 @@ router.get('/:id/bitacora', authenticate, requireRole('admin', 'super_admin', 'r
             }>(
                 `SELECT
                    b.id as booking_id,
-                   ct.name as class_name,
+                   ct.name as class_name, c.intensity,
                    c.date::text as class_date,
                    c.start_time as class_time,
                    f.name as facility_name,

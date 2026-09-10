@@ -19,11 +19,13 @@ import { setTotalpassCap } from '../lib/totalpass/caps.js';
 import { dispararRetiroTotalpass } from '../lib/totalpass/retire.js';
 import { marcarResyncTotalpass, dispararResyncTotalpass } from '../lib/totalpass/resync.js';
 import { copiarSemana, diasEntre } from '../lib/copy-week.js';
+import { intensitySchema } from '../lib/classIntensity.js';
 
 const router = Router();
 
 // Schema for Class creation
 const ClassSchema = z.object({
+    intensity: intensitySchema,
     classTypeId: z.string().uuid(),
     instructorId: z.string().uuid(),
     facilityId: z.string().uuid().optional().nullable(),
@@ -42,6 +44,7 @@ const GenerateSchema = z.object({
 
 // Schema para tanda de clases recurrentes (acotada: desde→hasta, varios días)
 const RecurringClassSchema = z.object({
+    intensity: intensitySchema,
     classTypeId: z.string().uuid(),
     instructorId: z.string().uuid(),
     facilityId: z.string().uuid().optional().nullable(),
@@ -73,7 +76,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
       SELECT
         c.id, c.date, c.start_time, c.end_time, c.max_capacity,
         c.current_bookings, c.status, c.class_type_id, c.instructor_id,
-        c.facility_id, c.is_free, c.free_label, c.booking_closed,
+        c.facility_id, c.is_free, c.free_label, c.booking_closed, c.intensity,
         ct.name as class_type_name, ct.color as class_type_color, ct.category,
         i.display_name as instructor_name, i.user_id as instructor_user_id,
         i.photo_url as instructor_photo,
@@ -310,7 +313,7 @@ router.get('/:id', async (req: Request, res: Response) => {
             `SELECT
         c.id, c.date, c.start_time, c.end_time, c.max_capacity,
         c.current_bookings, c.status, c.class_type_id, c.instructor_id,
-        c.facility_id, c.is_free, c.free_label, c.booking_closed,
+        c.facility_id, c.is_free, c.free_label, c.booking_closed, c.intensity,
         ct.name as class_type_name, ct.color as class_type_color,
         i.display_name as instructor_name, i.photo_url as instructor_photo,
         f.name as facility_name
@@ -360,8 +363,8 @@ router.post('/', authenticate, requireElevated, async (req: Request, res: Respon
         const newClass = await queryOne(
             `INSERT INTO classes (
         class_type_id, instructor_id, facility_id, date, start_time, 
-        end_time, max_capacity
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        end_time, max_capacity, intensity
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *`,
             [
                 data.classTypeId,
@@ -371,6 +374,7 @@ router.post('/', authenticate, requireElevated, async (req: Request, res: Respon
                 data.startTime,
                 data.endTime,
                 data.maxCapacity,
+                data.intensity ?? null,
             ]
         );
 
@@ -480,9 +484,9 @@ router.post('/recurring', authenticate, requireElevated, async (req: Request, re
                             saltadas.push({ fecha: dateStr, motivo: 'ocupado' });
                         } else {
                             await client.query(
-                                `INSERT INTO classes (class_type_id, instructor_id, facility_id, date, start_time, end_time, max_capacity)
-                                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                                [data.classTypeId, data.instructorId, facilityId, dateStr, data.startTime, data.endTime, data.maxCapacity]);
+                                `INSERT INTO classes (class_type_id, instructor_id, facility_id, date, start_time, end_time, max_capacity, intensity)
+                                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                                [data.classTypeId, data.instructorId, facilityId, dateStr, data.startTime, data.endTime, data.maxCapacity, data.intensity ?? null]);
                             creadas++;
                         }
                     }
@@ -635,8 +639,8 @@ router.post('/generate', authenticate, requireElevated, async (req: Request, res
                         const inserted = await query(
                             `INSERT INTO classes (
                             schedule_id, class_type_id, instructor_id, facility_id, date,
-                            start_time, end_time, max_capacity
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                            start_time, end_time, max_capacity, intensity
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                         ON CONFLICT DO NOTHING RETURNING id`,
                             [
                                 sched.id,
@@ -647,6 +651,7 @@ router.post('/generate', authenticate, requireElevated, async (req: Request, res
                                 sched.start_time,
                                 sched.end_time,
                                 sched.max_capacity,
+                                sched.intensity ?? null,
                             ]
                         );
                         if (inserted.length > 0) classesCreated++;
@@ -778,6 +783,7 @@ router.post('/copy-week', authenticate, requireElevated, async (req: Request, re
 // PUT /api/classes/:id - Update class (Admin)
 // ============================================
 const ClassUpdateSchema = z.object({
+    intensity: intensitySchema,
     classTypeId: z.string().uuid().optional(),
     instructorId: z.string().uuid().optional(),
     facilityId: z.string().uuid().optional().nullable(),
@@ -862,6 +868,10 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
             }
             updates.push(`max_capacity = $${paramCount++}`);
             values.push(data.maxCapacity);
+        }
+        if (data.intensity !== undefined) {
+            updates.push(`intensity = $${paramCount++}`);
+            values.push(data.intensity);
         }
         if (data.status !== undefined) {
             updates.push(`status = $${paramCount++}`);

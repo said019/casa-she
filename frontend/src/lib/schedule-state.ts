@@ -1,6 +1,7 @@
 import { addDays, addMinutes, differenceInMinutes, isSameDay, parseISO, startOfWeek } from "date-fns";
 
 export interface ScheduleClass {
+  intensity?: number | null;
   id: string;
   name: string;
   category: "reformer" | "pole" | "hot" | "barre" | "yoga" | "sculpt" | "general";

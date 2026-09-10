@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { Link } from 'react-router-dom';
 import { format, isToday, isTomorrow, parseISO, differenceInMinutes } from 'date-fns';
 import { parseLocalDate } from '@/lib/date';
@@ -25,6 +26,7 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
 interface ClassItem {
+    intensity?: number | null;
     id: string;
     date: string;
     start_time: string;
@@ -293,7 +295,7 @@ export default function CoachDashboard() {
                                                         />
                                                         <div>
                                                             <div className="flex items-center gap-2">
-                                                                <p className="font-semibold font-body">{classItem.class_type_name}</p>
+                                                                <p className="font-semibold font-body">{classItem.class_type_name} <ClassIntensity intensity={classItem.intensity} /></p>
                                                                 {timeBadge}
                                                             </div>
                                                             <p className="text-sm text-muted-foreground font-body">
@@ -363,6 +365,7 @@ export default function CoachDashboard() {
                                                         <div>
                                                             <p className="font-semibold text-sm font-body">
                                                                 {classItem.class_type_name}
+                                                                {' '}<ClassIntensity intensity={classItem.intensity} />
                                                             </p>
                                                             <p className="text-xs text-muted-foreground font-body">
                                                                 {getDateLabel(classItem.date)} • {formatTime(classItem.start_time)}

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import api, { getErrorMessage } from '@/lib/api';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { AuthGuard } from '@/components/layout/AuthGuard';
@@ -7,6 +8,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Loader2, ArrowLeftRight } from 'lucide-react';
 
 interface PendingSubstitution {
+    intensity?: number | null;
     id: string;
     class_id: string;
     class_name: string;
@@ -115,7 +117,7 @@ export default function SubstitutionsAdmin() {
                                         {/* Class info */}
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0 flex-1">
-                                                <p className="font-semibold text-base leading-tight">{sub.class_name}</p>
+                                                <p className="font-semibold text-base leading-tight">{sub.class_name} <ClassIntensity intensity={sub.intensity} /></p>
                                                 <p className="text-sm text-muted-foreground mt-0.5 capitalize">
                                                     {formatDate(sub.class_date)}
                                                 </p>

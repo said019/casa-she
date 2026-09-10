@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useQuery } from '@tanstack/react-query';
 import { format, subMonths } from 'date-fns';
 import { parseLocalDate } from '@/lib/date';
@@ -28,6 +29,7 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
 interface ClassHistoryItem {
+    intensity?: number | null;
     id: string;
     date: string;
     start_time: string;
@@ -259,7 +261,7 @@ export default function CoachHistory() {
                                                 />
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
-                                                        <p className="font-medium">{cls.class_type_name}</p>
+                                                        <p className="font-medium">{cls.class_type_name} <ClassIntensity intensity={cls.intensity} /></p>
                                                         <Badge variant="outline" className="text-xs">
                                                             {cls.status === 'completed' ? 'Completada'
                                                                 : cls.status === 'scheduled' ? 'Programada'
@@ -345,7 +347,7 @@ export default function CoachHistory() {
                             <DialogDescription>
                                 {selectedClass && (
                                     <>
-                                        {selectedClass.class_type_name} -{' '}
+                                        {selectedClass.class_type_name} <ClassIntensity intensity={selectedClass.intensity} /> -{' '}
                                         {format(parseLocalDate(selectedClass.date), "d MMM yyyy", { locale: es })} a las{' '}
                                         {formatTime(selectedClass.start_time)}
                                     </>

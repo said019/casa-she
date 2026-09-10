@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { pool } from './config/database.js';
+import { classIntensityDDL } from './lib/classIntensity.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import planRoutes from './routes/plans.js';
@@ -4455,10 +4456,14 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 
 // Start server — espera a que terminen las migraciones de arranque antes de
 // aceptar tráfico (evita 500s en el primer request tras un deploy). Si las
-// migraciones fallan, igual se levanta (cada migración ya maneja su propio error).
+// migraciones legacy fallan, se continúa; el esquema requerido de intensidad sí
+// debe estar listo antes de abrir el servidor.
 runStartupMigrations()
     .catch((e) => console.error('[startup] migraciones de arranque fallaron:', e))
-    .finally(() => {
+    .then(async () => {
+        // Unlike best-effort legacy migrations, these columns are required by
+        // class reads. Never accept traffic before this succeeds.
+        await query(classIntensityDDL);
         app.listen(PORT, () => {
             console.log(`
 🚀 Casa Shé API Server
@@ -4477,6 +4482,10 @@ runStartupMigrations()
                 initializeCronJobs();
             }
         });
+    })
+    .catch((error) => {
+        console.error('[startup] Required class intensity schema failed:', error);
+        process.exit(1);
     });
 
 export default app;

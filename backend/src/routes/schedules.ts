@@ -5,11 +5,13 @@ import { requireElevated } from '../middleware/elevation.js';
 import { z } from 'zod';
 import { capacityError } from '../lib/schedule.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
+import { intensitySchema } from '../lib/classIntensity.js';
 
 const router = Router();
 
 // Schema for Schedule validation
 const ScheduleSchema = z.object({
+    intensity: intensitySchema,
     classTypeId: z.string().uuid(),
     instructorId: z.string().uuid(),
     facilityId: z.string().uuid(),
@@ -18,7 +20,7 @@ const ScheduleSchema = z.object({
     endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Formato HH:MM requerido'),
     maxCapacity: z.number().int().positive(),
     isRecurring: z.boolean().default(true),
-    specificDate: z.string().optional(), // YYYY-MM-DD for non-recurring
+    specificDate: z.string().nullable().optional(), // NULL for recurring schedules
     isActive: z.boolean().default(true),
 });
 
@@ -45,7 +47,7 @@ router.get('/', authenticate, requireRole('admin', 'super_admin', 'instructor', 
         const schedules = await query(`
       SELECT s.id, s.class_type_id, s.instructor_id, s.day_of_week,
              s.start_time, s.end_time, s.max_capacity, s.is_recurring,
-             s.specific_date, s.is_active, s.facility_id,
+             s.specific_date, s.is_active, s.facility_id, s.intensity,
              ct.name as class_type_name, ct.color as class_type_color, ct.category,
              i.display_name as instructor_name, f.name as facility_name
       FROM schedules s
@@ -91,12 +93,13 @@ router.post('/', authenticate, requireElevated, async (req: Request, res: Respon
         const newSchedule = await queryOne(
             `INSERT INTO schedules (
                 class_type_id, instructor_id, facility_id, day_of_week, start_time,
-                end_time, max_capacity, is_recurring, specific_date, is_active
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                end_time, max_capacity, is_recurring, specific_date, is_active, intensity
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *`,
             [
                 data.classTypeId, data.instructorId, data.facilityId, data.dayOfWeek, data.startTime,
                 data.endTime, data.maxCapacity, data.isRecurring, data.specificDate || null, data.isActive,
+                data.intensity ?? null,
             ]
         );
 
@@ -132,12 +135,14 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
             `UPDATE schedules SET
                 class_type_id = $1, instructor_id = $2, facility_id = $3, day_of_week = $4,
                 start_time = $5, end_time = $6, max_capacity = $7, is_recurring = $8,
-                specific_date = $9, is_active = $10
+                specific_date = $9, is_active = $10,
+                intensity = CASE WHEN $12::boolean THEN $13::smallint ELSE intensity END
              WHERE id = $11
              RETURNING *`,
             [
                 data.classTypeId, data.instructorId, data.facilityId, data.dayOfWeek, data.startTime,
                 data.endTime, data.maxCapacity, data.isRecurring, data.specificDate || null, data.isActive, id,
+                data.intensity !== undefined, data.intensity ?? null,
             ]
         );
 

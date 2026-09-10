@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -25,6 +26,7 @@ import { StudioPaymentBadge } from '@/components/bookings/StudioPaymentBadge';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TodayClass {
+  intensity?: number | null;
   id: string;
   date: string;
   start_time: string;
@@ -80,6 +82,7 @@ interface AttendanceResponse {
     start_time: string;
     end_time: string;
     class_name: string;
+    intensity?: number | null;
     instructor_name: string;
     max_capacity: number;
     current_bookings: number;
@@ -315,7 +318,7 @@ function AttendancePanel({
           Volver
         </Button>
         <div>
-          <h2 className="text-lg font-semibold leading-tight">{data.class.class_name}</h2>
+          <h2 className="text-lg font-semibold leading-tight">{data.class.class_name} <ClassIntensity intensity={data.class.intensity} /></h2>
           <p className="text-sm text-muted-foreground">
             {data.class.start_time} — {data.class.instructor_name}
           </p>
@@ -394,7 +397,7 @@ function ClassCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1 min-w-0">
-          <p className="font-semibold text-sm leading-tight truncate">{cls.class_type_name}</p>
+          <p className="font-semibold text-sm leading-tight truncate">{cls.class_type_name} <ClassIntensity intensity={cls.intensity} /></p>
           <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />

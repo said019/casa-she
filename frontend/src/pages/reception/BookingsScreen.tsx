@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     format, addDays, startOfWeek, startOfMonth, endOfMonth,
@@ -45,6 +46,7 @@ function trimTime(t: string): string {
 }
 
 interface ClassRow {
+    intensity?: number | null;
     id: string;
     date: string;
     start_time: string;
@@ -309,7 +311,7 @@ function ClassDetailDrawer({
                                         style={{ backgroundColor: classAccent(classRow), minHeight: '40px' }}
                                     />
                                     <div>
-                                        <div className="text-base font-semibold">{classRow.class_type_name}</div>
+                                        <div className="text-base font-semibold">{classRow.class_type_name} <ClassIntensity intensity={classRow.intensity} /></div>
                                         <div className="text-xs text-muted-foreground font-normal capitalize mt-1">
                                             {dateLabel} · {trimTime(classRow.start_time)}–{trimTime(classRow.end_time)} · {classRow.instructor_name}
                                         </div>
@@ -948,7 +950,7 @@ function DayView({
                                         style={{ backgroundColor: color }}
                                     />
                                     <div className="min-w-0">
-                                        <p className="text-base font-medium truncate">{c.class_type_name}</p>
+                                        <p className="text-base font-medium truncate">{c.class_type_name} <ClassIntensity intensity={c.intensity} /></p>
                                         <p className="text-xs text-muted-foreground truncate">{c.instructor_name}</p>
                                     </div>
                                 </div>
@@ -1090,7 +1092,7 @@ function WeekView({
                                                         {c.current_bookings}/{c.max_capacity}
                                                     </span>
                                                 </div>
-                                                <div className="truncate font-medium">{c.class_type_name}</div>
+                                                <div className="truncate font-medium">{c.class_type_name} <ClassIntensity intensity={c.intensity} /></div>
                                                 <div className="text-[10px] text-muted-foreground truncate">
                                                     {c.instructor_name}
                                                 </div>

@@ -862,7 +862,7 @@ router.get('/class/:classId', authenticate, requirePermission('checkin', ['instr
       current_bookings: number;
     }>(
       `SELECT
-         c.id, c.facility_id, c.date, c.start_time, c.end_time,
+         c.id, c.facility_id, c.date, c.start_time, c.end_time, c.intensity,
          ct.name as class_name,
          i.display_name as instructor_name,
          c.max_capacity, c.current_bookings

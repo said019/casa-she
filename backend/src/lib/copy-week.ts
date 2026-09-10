@@ -81,7 +81,7 @@ export async function copiarSemana(
     const origen = await client.query(
         `SELECT c.id, c.schedule_id, c.class_type_id, c.instructor_id, c.facility_id,
                 c.date::text AS date, c.start_time::text AS start_time,
-                c.end_time::text AS end_time, c.max_capacity, c.status::text AS status,
+                c.end_time::text AS end_time, c.max_capacity, c.status::text AS status, c.intensity,
                 ct.name AS class_type_name,
                 ci.max_spots AS totalpass_spots
            FROM classes c
@@ -162,13 +162,13 @@ export async function copiarSemana(
         // (dos personas apretando el botón a la vez).
         const insertada = await client.query(
             `INSERT INTO classes (schedule_id, class_type_id, instructor_id, facility_id,
-                                  date, start_time, end_time, max_capacity, status)
-             VALUES ($1, $2, $3, $4, $5::date, $6::time, $7::time, $8, $9::class_status)
+                                  date, start_time, end_time, max_capacity, status, intensity)
+             VALUES ($1, $2, $3, $4, $5::date, $6::time, $7::time, $8, $9::class_status, $10)
              ON CONFLICT (date, start_time, instructor_id, class_type_id, facility_id)
                  WHERE status = 'scheduled' DO NOTHING
              RETURNING id`,
             [c.schedule_id, c.class_type_id, c.instructor_id, c.facility_id,
-                destino, c.start_time, c.end_time, c.max_capacity, estadoDestino],
+                destino, c.start_time, c.end_time, c.max_capacity, estadoDestino, c.intensity ?? null],
         );
 
         if (insertada.rows.length === 0) { r.yaExistian++; anota('ya existía'); continue; }

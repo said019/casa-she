@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { parseISO, format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -23,6 +24,7 @@ import {
 import { Calendar, Clock, User, Sparkles, AlertTriangle } from 'lucide-react';
 
 interface BookingDetail {
+  intensity?: number | null;
   booking_id: string;
   booking_status: string;
   waitlist_position?: number | null;
@@ -144,6 +146,7 @@ export default function ClassBookingDetail() {
                       />
                     )}
                     {data.class_name}
+                    {' '}<ClassIntensity intensity={data.intensity} />
                   </CardTitle>
                   <Badge variant="outline" className="rounded-full border-balance-olive/25 bg-balance-olive/8 text-balance-olive">
                     {statusLabel[data.booking_status] || data.booking_status}

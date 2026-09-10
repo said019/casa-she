@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -208,7 +209,7 @@ export default function BookingHistoryScreen() {
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="font-medium">{b.class_name}</div>
+                                        <div className="font-medium">{b.class_name} <ClassIntensity intensity={b.intensity} /></div>
                                         <div className="text-xs text-muted-foreground">{b.instructor_name}</div>
                                     </TableCell>
                                     {showFacility && (

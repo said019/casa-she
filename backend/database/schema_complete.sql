@@ -405,6 +405,7 @@ CREATE TRIGGER update_instructors_updated_at
 -- SCHEDULES
 -- --------------------------------------------------------
 CREATE TABLE IF NOT EXISTS schedules (
+    intensity            SMALLINT CONSTRAINT schedules_intensity_range CHECK (intensity BETWEEN 1 AND 3),
     id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     class_type_id  UUID NOT NULL REFERENCES class_types(id) ON DELETE CASCADE,
     instructor_id  UUID NOT NULL REFERENCES instructors(id) ON DELETE CASCADE,
@@ -434,6 +435,7 @@ CREATE TRIGGER update_schedules_updated_at
 -- CLASSES
 -- --------------------------------------------------------
 CREATE TABLE IF NOT EXISTS classes (
+    intensity            SMALLINT CONSTRAINT classes_intensity_range CHECK (intensity BETWEEN 1 AND 3),
     id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     schedule_id          UUID REFERENCES schedules(id) ON DELETE SET NULL,
     class_type_id        UUID NOT NULL REFERENCES class_types(id) ON DELETE RESTRICT,

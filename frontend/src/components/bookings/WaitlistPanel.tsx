@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ArrowDown, ArrowUp, Clock, UserMinus, UserPlus, Users } from 'lucide-react';
@@ -20,6 +21,7 @@ interface QueueEntry {
 }
 
 interface WaitlistGroup {
+  intensity?: number | null;
   class_id: string;
   date: string;
   start_time: string;
@@ -85,7 +87,7 @@ export function WaitlistPanel() {
           <Card key={g.class_id}>
             <CardHeader className="pb-3">
               <CardTitle className="flex flex-wrap items-center gap-x-3 gap-y-1 text-base">
-                <span>{g.class_type_name}</span>
+                <span>{g.class_type_name} <ClassIntensity intensity={g.intensity} /></span>
                 <span className="flex items-center gap-1 text-sm font-normal capitalize text-muted-foreground">
                   <Clock className="h-3.5 w-3.5" />
                   {format(parseISO(String(g.date).slice(0, 10)), 'EEEE d MMM', { locale: es })} · {g.start_time.slice(0, 5)}

@@ -93,6 +93,7 @@ async function generateRecurringClasses(): Promise<void> {
             instructor_id: string;
             facility_id: string | null;
             day_of_week: number;
+            intensity: number | null;
             start_time: string;
             end_time: string;
             max_capacity: number;
@@ -139,8 +140,8 @@ async function generateRecurringClasses(): Promise<void> {
                 await query(`
                     INSERT INTO classes (
                         schedule_id, class_type_id, instructor_id, facility_id,
-                        date, start_time, end_time, max_capacity, status
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'scheduled')
+                        date, start_time, end_time, max_capacity, status, intensity
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'scheduled', $9)
                 `, [
                     schedule.id,
                     schedule.class_type_id,
@@ -150,6 +151,7 @@ async function generateRecurringClasses(): Promise<void> {
                     schedule.start_time,
                     schedule.end_time,
                     schedule.max_capacity,
+                    schedule.intensity ?? null,
                 ]);
 
                 classesCreated++;

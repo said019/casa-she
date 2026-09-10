@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay } from 'date-fns';
@@ -22,6 +23,7 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
 interface ClassItem {
+    intensity?: number | null;
     id: string;
     date: string;
     start_time: string;
@@ -207,6 +209,7 @@ export default function CoachSchedule() {
                                                         >
                                                             <p className="font-medium text-xs truncate">
                                                                 {classItem.class_type_name}
+                                                                {' '}<ClassIntensity intensity={classItem.intensity} />
                                                             </p>
                                                             {/* En "Todas": el instructor de la clase (las propias no lo necesitan). */}
                                                             {showAll && !own && classItem.instructor_name && (

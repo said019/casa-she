@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -769,7 +770,7 @@ export default function ClientDetail() {
                                                                     <Calendar className="h-4 w-4 text-balance-gold" />
                                                                 </div>
                                                                 <div>
-                                                                    <div className="font-medium font-body text-sm">{b.class_name}</div>
+                                                                    <div className="font-medium font-body text-sm">{b.class_name} <ClassIntensity intensity={b.intensity} /></div>
                                                                     <div className="text-xs text-muted-foreground font-body">
                                                                         {formatDbDate(b.date)} - {b.start_time?.substring(0, 5)}
                                                                     </div>

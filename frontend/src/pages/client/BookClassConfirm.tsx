@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -18,6 +19,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Calendar, Clock, Users, Star, MapPin } from 'lucide-react';
 
 interface ClassDetail {
+  intensity?: number | null;
   id: string;
   date: string;
   start_time: string;
@@ -194,6 +196,7 @@ export default function BookClassConfirm() {
                     style={{ color: data.is_free ? '#15803d' : (data.class_type_color || '#322A1E') }}
                   >
                     {data.class_type_name}
+                    {' '}<ClassIntensity intensity={data.intensity} />
                   </h2>
                   {data.is_free && (
                     <span className="rounded-full bg-green-600 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">

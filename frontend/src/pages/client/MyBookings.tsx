@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { format, isPast, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
@@ -10,6 +11,7 @@ import { cn } from '@/lib/utils';
 import type { BookingClient } from '@/types/booking';
 
 interface BookingRow {
+    intensity?: number | null;
     id: string;
     class_id: string;
     class_name: string;
@@ -32,6 +34,7 @@ export default function MyBookings() {
             id: b.booking_id,
             class_id: b.class_id,
             class_name: b.class_type_name,
+            intensity: b.intensity,
             class_date: b.date,
             start_time: b.start_time,
             instructor: b.instructor_name,
@@ -104,6 +107,7 @@ function Section({
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate font-semibold text-balance-dark">
                                         {b.class_name}
+                                        {' '}<ClassIntensity intensity={b.intensity} />
                                         {b.status === 'waitlist' && (
                                             <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
                                                 Lista de espera{b.waitlist_position ? ` · #${b.waitlist_position}` : ''}

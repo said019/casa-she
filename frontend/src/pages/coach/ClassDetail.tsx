@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { parseLocalDate } from '@/lib/date';
@@ -41,6 +42,7 @@ interface Attendee {
 }
 
 interface ClassDetail {
+    intensity?: number | null;
     id: string;
     date: string;
     start_time: string;
@@ -139,6 +141,7 @@ export default function CoachClassDetail() {
                                     <div>
                                         <h1 className="font-heading text-2xl font-bold">
                                             {classDetail?.class_type_name}
+                                            {' '}<ClassIntensity intensity={classDetail?.intensity} />
                                         </h1>
                                         <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
                                             <span className="flex items-center gap-1">

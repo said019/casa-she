@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { parseLocalDate } from '@/lib/date';
@@ -30,6 +31,7 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
 interface Substitution {
+    intensity?: number | null;
     id: string;
     class_id: string;
     original_instructor_id: string;
@@ -49,6 +51,7 @@ interface Substitution {
 }
 
 interface ClassForSub {
+    intensity?: number | null;
     id: string;
     date: string;
     start_time: string;
@@ -262,7 +265,7 @@ export default function CoachSubstitutions() {
                                                             style={{ backgroundColor: sub.class_type_color }}
                                                         />
                                                         <div className="flex-1 min-w-0">
-                                                            <p className="font-medium">{sub.class_type_name}</p>
+                                                            <p className="font-medium">{sub.class_type_name} <ClassIntensity intensity={sub.intensity} /></p>
                                                             <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-muted-foreground">
                                                                 <span className="flex items-center gap-1">
                                                                     <Calendar className="h-3 w-3" />
@@ -331,7 +334,7 @@ export default function CoachSubstitutions() {
                                                         />
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-2">
-                                                                <p className="font-medium">{sub.class_type_name}</p>
+                                                                <p className="font-medium">{sub.class_type_name} <ClassIntensity intensity={sub.intensity} /></p>
                                                                 {getStatusBadge(sub.status)}
                                                             </div>
                                                             <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
@@ -404,7 +407,7 @@ export default function CoachSubstitutions() {
                                                             style={{ backgroundColor: sub.class_type_color }}
                                                         />
                                                         <div className="flex-1">
-                                                            <p className="font-medium">{sub.class_type_name}</p>
+                                                            <p className="font-medium">{sub.class_type_name} <ClassIntensity intensity={sub.intensity} /></p>
                                                             <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
                                                                 <span className="flex items-center gap-1">
                                                                     <Calendar className="h-3 w-3" />
@@ -453,7 +456,7 @@ export default function CoachSubstitutions() {
                                     <SelectContent>
                                         {upcomingClasses?.filter(cls => cls.id).map((cls) => (
                                             <SelectItem key={cls.id} value={cls.id}>
-                                                {cls.class_type_name} - {format(parseLocalDate(cls.date), "EEE d MMM", { locale: es })} {formatTime(cls.start_time)}
+                                                {cls.class_type_name} <ClassIntensity intensity={cls.intensity} /> - {format(parseLocalDate(cls.date), "EEE d MMM", { locale: es })} {formatTime(cls.start_time)}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -497,7 +500,7 @@ export default function CoachSubstitutions() {
 
                         {selectedSub && (
                             <div className="p-4 rounded-lg bg-muted">
-                                <p className="font-medium">{selectedSub.class_type_name}</p>
+                                <p className="font-medium">{selectedSub.class_type_name} <ClassIntensity intensity={selectedSub.intensity} /></p>
                                 <p className="text-sm text-muted-foreground mt-1">
                                     {format(parseLocalDate(selectedSub.date), "EEEE d 'de' MMMM", { locale: es })}
                                 </p>

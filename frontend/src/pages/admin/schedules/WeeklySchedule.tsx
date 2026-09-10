@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ClassIntensity, ClassIntensitySelector } from '@/components/classes/ClassIntensity';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -30,6 +31,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Loader2, Plus, Users, X, AlertTriangle } from 'lucide-react';
 
 const scheduleSchema = z.object({
+    intensity: z.number().int().min(1).max(3).nullable(),
     dayOfWeek: z.coerce.number().int().min(0).max(6),
     classTypeId: z.string().uuid('Selecciona un tipo de clase'),
     instructorId: z.string().uuid('Selecciona un instructor'),
@@ -53,6 +55,7 @@ interface Facility {
 
 export default function WeeklySchedule({ embedded = false }: { embedded?: boolean } = {}) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
     const [selectedDay, setSelectedDay] = useState<number | null>(null);
     const [facilityFilter, setFacilityFilter] = useState('all');
     const { toast } = useToast();
@@ -98,6 +101,7 @@ export default function WeeklySchedule({ embedded = false }: { embedded?: boolea
         resolver: zodResolver(scheduleSchema),
         defaultValues: {
             maxCapacity: 6,
+            intensity: null,
             isActive: true
         }
     });
@@ -105,11 +109,16 @@ export default function WeeklySchedule({ embedded = false }: { embedded?: boolea
 
     const createMutation = useMutation({
         mutationFn: async (data: ScheduleForm) => {
+            if (editingSchedule) return await api.put(`/schedules/${editingSchedule.id}`, {
+                ...data,
+                isRecurring: editingSchedule.is_recurring,
+                specificDate: editingSchedule.specific_date,
+            });
             return await api.post('/schedules', { ...data, isRecurring: true });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['schedules'] });
-            toast({ title: 'Horario creado', description: 'La clase ha sido añadida a la plantilla semanal.' });
+            toast({ title: editingSchedule ? 'Horario actualizado' : 'Horario creado', description: 'Se guardó la plantilla semanal. Las clases ya generadas no cambian.' });
             setIsDialogOpen(false);
             reset();
         },
@@ -136,11 +145,30 @@ export default function WeeklySchedule({ embedded = false }: { embedded?: boolea
     };
 
     const handleAddClass = (day: number) => {
+        setEditingSchedule(null);
+        reset({ maxCapacity: 6, intensity: null, isActive: true, startTime: '', endTime: '', classTypeId: '', instructorId: '' });
         setSelectedDay(day);
         setValue('dayOfWeek', day);
         // Mono-sede: se asigna automáticamente la única sede (no hay selector).
         const onlyFacility = (facilities || [])[0];
         setValue('facilityId', onlyFacility ? onlyFacility.id : ('' as unknown as string));
+        setIsDialogOpen(true);
+    };
+
+    const handleEditSchedule = (schedule: Schedule) => {
+        setEditingSchedule(schedule);
+        setSelectedDay(schedule.day_of_week);
+        reset({
+            dayOfWeek: schedule.day_of_week,
+            classTypeId: schedule.class_type_id,
+            instructorId: schedule.instructor_id,
+            facilityId: schedule.facility_id || facilities?.[0]?.id || '',
+            startTime: schedule.start_time.slice(0, 5),
+            endTime: schedule.end_time.slice(0, 5),
+            maxCapacity: schedule.max_capacity,
+            isActive: schedule.is_active,
+            intensity: schedule.intensity ?? null,
+        });
         setIsDialogOpen(true);
     };
 
@@ -186,11 +214,12 @@ export default function WeeklySchedule({ embedded = false }: { embedded?: boolea
                                                         <X className="h-3 w-3" />
                                                     </button>
                                                 </div>
-                                                <div className="font-medium truncate" title={s.class_type_name}>{s.class_type_name}</div>
+                                                <div className="font-medium truncate" title={s.class_type_name}>{s.class_type_name} <ClassIntensity intensity={s.intensity} /></div>
                                                 <div className="text-xs text-muted-foreground truncate">{s.instructor_name}</div>
                                                 <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                                                     <Users className="h-3 w-3" /> {s.max_capacity}
                                                 </div>
+                                                <Button variant="ghost" size="sm" className="mt-1 h-7 text-xs" onClick={() => handleEditSchedule(s)}>Editar horario</Button>
                                             </div>
                                         ))}
                                         <Button
@@ -216,8 +245,8 @@ export default function WeeklySchedule({ embedded = false }: { embedded?: boolea
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                         <DialogContent>
                             <DialogHeader>
-                                <DialogTitle>Agregar Horario - {selectedDay !== null && DAYS_OF_WEEK[selectedDay]}</DialogTitle>
-                                <DialogDescription>Define una clase recurrente para este día.</DialogDescription>
+                                <DialogTitle>{editingSchedule ? 'Editar Horario' : 'Agregar Horario'} - {selectedDay !== null && DAYS_OF_WEEK[selectedDay]}</DialogTitle>
+                                <DialogDescription>Define una clase recurrente para este día. Los cambios solo afectan a las clases que se generen después.</DialogDescription>
                             </DialogHeader>
 
                             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -226,7 +255,7 @@ export default function WeeklySchedule({ embedded = false }: { embedded?: boolea
 
                                 <div className="space-y-2">
                                     <Label>Tipo de Clase</Label>
-                                    <Select onValueChange={(val) => setValue('classTypeId', val)}>
+                                    <Select value={watch('classTypeId')} onValueChange={(val) => setValue('classTypeId', val)}>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Seleccionar tipo..." />
                                         </SelectTrigger>
@@ -243,7 +272,7 @@ export default function WeeklySchedule({ embedded = false }: { embedded?: boolea
 
                                 <div className="space-y-2">
                                     <Label>Instructor</Label>
-                                    <Select onValueChange={(val) => setValue('instructorId', val)}>
+                                    <Select value={watch('instructorId')} onValueChange={(val) => setValue('instructorId', val)}>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Seleccionar instructor..." />
                                         </SelectTrigger>
@@ -286,10 +315,12 @@ export default function WeeklySchedule({ embedded = false }: { embedded?: boolea
                                     <Input type="number" {...register('maxCapacity')} />
                                 </div>
 
+                                <ClassIntensitySelector value={watch('intensity')} onChange={(value) => setValue('intensity', value, { shouldDirty: true, shouldValidate: true })} />
+
                                 <DialogFooter>
                                     <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-                                    <Button type="submit" disabled={isSubmitting}>
-                                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    <Button type="submit" disabled={createMutation.isPending}>
+                                        {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                         Guardar Horario
                                     </Button>
                                 </DialogFooter>

@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from "react";
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -25,6 +26,7 @@ const TERRACOTTA = "#b66049";
 const INK = "#392a25";
 
 type PublicClass = {
+  intensity?: number | null;
   id: string;
   date: string;
   start_time: string;
@@ -234,7 +236,7 @@ export function BioSchedule() {
                   <div className="flex items-start gap-3">
                     <span className="w-12 shrink-0 pt-1 text-sm font-semibold text-[#b66049]">{slot.start_time.slice(0, 5)}</span>
                     <span className="min-w-0 flex-1">
-                      <strong className={`${BASE} block text-[19px] font-normal leading-tight text-[#392a25]`}>{slot.class_type_name || "Clase"}</strong>
+                      <strong className={`${BASE} block text-[19px] font-normal leading-tight text-[#392a25]`}>{slot.class_type_name || "Clase"} <ClassIntensity intensity={slot.intensity} /></strong>
                       <small className={`${BASE} mt-1 block text-[13px] text-[#8a7066]`}>{slot.instructor_name || "Casa Shé"}</small>
                     </span>
                     {slot.max_capacity != null && (
@@ -326,7 +328,7 @@ export function BioReserve() {
       <p className={`${BASE} mt-4 text-[17px] leading-relaxed text-[#6f574e]`}>Crea tu cuenta para reservar, comprar paquetes y llevar tu progreso en Casa Shé.</p>
       <div className="mt-6 rounded-[1.4rem] bg-[#244936] p-5 text-[#fff8ef]">
         <p className={`${BASE} text-[12px] uppercase tracking-[0.2em] text-[#e6c9b6]`}>Próximas clases</p>
-        <div className="mt-3 space-y-2">{classes.slice(0, 4).map((slot) => <p key={slot.id} className={`${BASE} flex justify-between gap-4 text-[17px]`}><span>{slot.class_type_name}</span><span className="text-[#f2c9b8]">{slot.start_time.slice(0, 5)}</span></p>)}{!isLoading && !classes.length && <p className={`${BASE} text-[16px] text-[#f2ddcd]`}>Consulta el horario para ver la siguiente clase.</p>}</div>
+        <div className="mt-3 space-y-2">{classes.slice(0, 4).map((slot) => <p key={slot.id} className={`${BASE} flex justify-between gap-4 text-[17px]`}><span>{slot.class_type_name} <ClassIntensity intensity={slot.intensity} /></span><span className="text-[#f2c9b8]">{slot.start_time.slice(0, 5)}</span></p>)}{!isLoading && !classes.length && <p className={`${BASE} text-[16px] text-[#f2ddcd]`}>Consulta el horario para ver la siguiente clase.</p>}</div>
       </div>
       <Link to="/register?returnUrl=%2Fapp%2Fbook" className={`${BASE} mt-5 flex items-center justify-center rounded-full bg-[#b66049] px-5 py-4 text-[19px] text-white`}>Crear cuenta y reservar <ArrowUpRight className="ml-2 h-4 w-4" /></Link>
       <Link to="/login" className={`${BASE} mt-4 block text-center text-[16px] text-[#6f574e] underline underline-offset-4`}>Ya tengo una cuenta</Link>

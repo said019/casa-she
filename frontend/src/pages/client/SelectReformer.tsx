@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
@@ -11,6 +12,7 @@ import { ArrowLeft, Check, Info, Loader2 } from 'lucide-react';
 import { SpotIcon, type SpotIconKind } from '@/components/SpotIcon';
 
 interface BookingDetail {
+  intensity?: number | null;
   booking_id: string;
   class_id: string;
   class_name: string;
@@ -339,7 +341,7 @@ export default function SelectReformer() {
                   <div className="kicker">Tu reserva</div>
                   {booking && (
                     <>
-                      <div className="class-name">{booking.class_name}</div>
+                      <div className="class-name">{booking.class_name} <ClassIntensity intensity={booking.intensity} /></div>
                       <div className="meta-rows">
                         <span className="k">Día</span>
                         <span className="v">

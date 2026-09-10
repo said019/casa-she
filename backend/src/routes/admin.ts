@@ -198,7 +198,7 @@ router.get('/clients/:id/full-profile', async (req: Request, res: Response) => {
         const bookings = await query(`
       SELECT b.*,
              b.folio AS folio,
-             ct.name as class_name,
+             ct.name as class_name, c.intensity,
              c.date,
              c.start_time,
              i.display_name as instructor_name
