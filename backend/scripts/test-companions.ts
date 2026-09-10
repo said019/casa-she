@@ -35,6 +35,8 @@ try {
  const startup=readFileSync(new URL('../src/index.ts',import.meta.url),'utf8');
  const cancelSQL=startup.match(/CREATE OR REPLACE FUNCTION cancel_booking\([\s\S]*?\$func\$ LANGUAGE plpgsql;/)?.[0];
  assert.ok(cancelSQL);await db.query(cancelSQL);
+ const previewSQL=startup.match(/CREATE OR REPLACE FUNCTION preview_cancel_booking\([\s\S]*?\$func\$ LANGUAGE plpgsql;/)?.[0];
+ assert.ok(previewSQL);await db.query(previewSQL);
  assert.equal(companionCycle('2026-01-31','2026-02-28'),'2026-02-28');
  assert.equal(companionCycle('2026-01-31','2026-03-30'),'2026-02-28');
  const host=(await db.query('INSERT INTO users DEFAULT VALUES RETURNING id')).rows[0].id;
@@ -67,6 +69,7 @@ try {
  await receiveCompanionPayment(db,paid.id,{reference:'mp:1',amount:280,currency:'MXN',method:'card'});
  assert.equal((await db.query('SELECT count(*)::int n FROM payments')).rows[0].n,1);
  assert.equal((await db.query('SELECT status FROM booking_companions WHERE id=$1',[paid.id])).rows[0].status,'confirmed');
+ assert.equal((await db.query(`SELECT out_would_refund FROM preview_cancel_booking((SELECT guest_booking_id FROM booking_companions WHERE id=$1),$2,false)`,[paid.id,paid.guest_user_id])).rows[0].out_would_refund,false,'preview must not promise a credit to a paid guest');
  assert.equal((await companionPolicy(db,await lockCompanionHost(db,b))).remaining_slots,0);
  await receiveCompanionPayment(db,paid.id,{reference:'mp:2',amount:280,currency:'MXN',method:'card'});
  assert.equal((await db.query('SELECT fulfilled FROM companion_payments WHERE reference=$1',['mp:2'])).rows[0].fulfilled,false);

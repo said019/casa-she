@@ -2128,7 +2128,10 @@ async function runStartupMigrations(): Promise<void> {
                 -- Eligible to cancel — compute refund
                 out_can_cancel := true;
                 out_error_code := NULL;
-                IF p_is_admin THEN
+                IF v_booking.is_free_booking OR (v_booking.is_companion_booking AND v_booking.consumed_category IS NULL) THEN
+                    out_would_refund := false;
+                    out_reason := 'Esta reserva no consumió créditos. Si hubo un pago, recepción revisará su devolución.';
+                ELSIF p_is_admin THEN
                     out_would_refund := true;
                     out_reason := 'Admin siempre devuelve crédito';
                 ELSIF NOT v_refund_enabled THEN
