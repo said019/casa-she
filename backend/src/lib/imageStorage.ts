@@ -151,7 +151,7 @@ export function createImageStorage(dependencies: ImageStorageDependencies): Imag
 const productionStorage = createImageStorage({
     configured: () => isGoogleDriveConfigured,
     upload: (buffer, originalName, mimeType, options) => (
-        uploadBufferToGoogleDrive(buffer, originalName, mimeType, undefined, options)
+        uploadBufferToGoogleDrive(buffer, originalName, mimeType, options?.makePublic === false ? undefined : process.env.GOOGLE_DRIVE_PHOTO_FOLDER_ID, options)
     ),
     imageUrl: driveImageUrl,
 });
