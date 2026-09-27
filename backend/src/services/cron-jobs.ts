@@ -11,6 +11,7 @@
  */
 
 import cron from 'node-cron';
+import { isOctoberManagedDate } from '../data/october2026.js';
 import { query, queryOne } from '../config/database.js';
 import {
     notifyMembershipExpiring,
@@ -125,6 +126,9 @@ async function generateRecurringClasses(): Promise<void> {
             const daySchedules = schedules.filter(s => s.day_of_week === dayOfWeek);
 
             for (const schedule of daySchedules) {
+                // Already reconciled from the approved special agenda. Old templates
+                // must not regenerate retired slots inside this bounded period.
+                if (isOctoberManagedDate(schedule.facility_id,dateStr)) { classesSkipped++; continue; }
                 // Verificar si la clase ya existe
                 const existing = await queryOne(`
                     SELECT id FROM classes

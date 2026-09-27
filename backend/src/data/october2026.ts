@@ -1,4 +1,7 @@
 export const octoberWindow = {start:'2026-09-28',end:'2026-10-31'};
+export function isOctoberManagedDate(facilityId:string|null|undefined,date:string) {
+ return facilityId==='ca67d57b-9219-4821-b6da-b86a4bbc1f03' && date>=octoberWindow.start && date<=octoberWindow.end;
+}
 // Day 1 = Monday. Transcribed from the approved Casa Shé agenda.
 export const octoberWeek: [number,string,string,string,number?][] = [
  [1,'07:00','Yoga Dharma','Regina'],[1,'08:00','Pilates Mat','Regina'],[1,'09:00','Pilates Mat','Regina'],

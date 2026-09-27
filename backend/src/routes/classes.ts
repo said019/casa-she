@@ -20,6 +20,7 @@ import { dispararRetiroTotalpass } from '../lib/totalpass/retire.js';
 import { marcarResyncTotalpass, dispararResyncTotalpass } from '../lib/totalpass/resync.js';
 import { copiarSemana, diasEntre } from '../lib/copy-week.js';
 import { intensitySchema } from '../lib/classIntensity.js';
+import { isOctoberManagedDate } from '../data/october2026.js';
 
 const router = Router();
 
@@ -626,6 +627,7 @@ router.post('/generate', authenticate, requireElevated, async (req: Request, res
             const daySchedules = schedules.filter((s: any) => s.day_of_week === dayOfWeek);
 
             for (const sched of daySchedules) {
+                if (isOctoberManagedDate(sched.facility_id,dateStr)) { classesSkipped++; continue; }
                 try {
                     // Check if class already exists for this schedule on this date to avoid dupes
                     const existing = await queryOne(
