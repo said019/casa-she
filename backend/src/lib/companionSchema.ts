@@ -19,6 +19,17 @@ CREATE TABLE IF NOT EXISTS booking_companions (
  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS companions_host_idx ON booking_companions(host_booking_id);
+ALTER TABLE booking_companions ADD COLUMN IF NOT EXISTS campaign_id TEXT;
+ALTER TABLE booking_companions ADD COLUMN IF NOT EXISTS promotion_slot SMALLINT;
+ALTER TABLE booking_companions ADD COLUMN IF NOT EXISTS promotion_request_id UUID;
+ALTER TABLE booking_companions DROP CONSTRAINT IF EXISTS booking_companions_mode_check;
+ALTER TABLE booking_companions ADD CONSTRAINT booking_companions_mode_check CHECK (mode IN ('credit','monthly_free','paid','promo_free'));
+ALTER TABLE booking_companions DROP CONSTRAINT IF EXISTS booking_companions_promotion_check;
+ALTER TABLE booking_companions ADD CONSTRAINT booking_companions_promotion_check CHECK
+ (mode<>'promo_free' OR (campaign_id IS NOT NULL AND promotion_slot IS NOT NULL AND promotion_slot BETWEEN 1 AND 2 AND promotion_request_id IS NOT NULL));
+CREATE UNIQUE INDEX IF NOT EXISTS companions_promotion_coupon_idx
+ ON booking_companions(membership_id,campaign_id,promotion_slot) WHERE mode='promo_free' AND NOT free_released;
+CREATE INDEX IF NOT EXISTS companions_promotion_request_idx ON booking_companions(promotion_request_id);
 CREATE UNIQUE INDEX IF NOT EXISTS companions_monthly_free_idx
  ON booking_companions(membership_id,cycle_start) WHERE mode='monthly_free' AND NOT free_released;
 CREATE UNIQUE INDEX IF NOT EXISTS companions_guest_active_idx
@@ -51,7 +62,7 @@ BEGIN
     INTO timely FROM classes WHERE id=NEW.class_id;
   UPDATE booking_companions SET
     status=CASE WHEN mode='paid' THEN 'refund_review' ELSE 'cancelled' END,
-    free_released=CASE WHEN mode='monthly_free' THEN COALESCE(class_cancelled,false) OR COALESCE(timely,false) ELSE free_released END,
+    free_released=CASE WHEN mode IN ('monthly_free','promo_free') THEN COALESCE(class_cancelled,false) OR COALESCE(timely,false) ELSE free_released END,
     reason=CASE WHEN mode='paid' THEN 'Reserva cancelada: revisar devolución en recepción.' ELSE reason END
     WHERE guest_booking_id=NEW.id AND status='confirmed';
  END IF;

@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {octoberClasses,octoberWindow} from '../src/data/october2026.js';
+const response=await fetch(`https://backend-production-82cd.up.railway.app/api/classes?start=${octoberWindow.start}&end=${octoberWindow.end}`);
+assert(response.ok);
+const classes=await response.json() as any[];
+const key=(date:string,time:string,type:string,coach:string)=>[date,time,type,coach].join('|');
+const actual=classes.filter(c=>c.status==='scheduled');
+assert.deepEqual(actual.map(c=>key(c.date,c.start_time,c.class_type_name,c.instructor_name)).sort(),octoberClasses().map(c=>key(c.date,c.time,c.type,c.coach)).sort());
+const nav=actual.filter(c=>c.class_type_name==='Navakarana'&&c.start_time==='19:00');
+assert.equal(nav.length,5);assert(nav.every(c=>c.intensity===2));
+assert(actual.some(c=>c.id==='943f17a7-ecb6-4476-9fb5-346fe27eb7ff'&&c.current_bookings>=1));
+console.log('Public API: 257 exact schedule entries, 5 Tuesday Navakarana intensity2, existing reservation retained. PASS');

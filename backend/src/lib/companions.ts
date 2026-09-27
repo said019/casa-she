@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import { membershipDateOnly, membershipValidityForClassDate } from './membershipValidity.js';
+import {readCompanionPromotion} from './companionPromotion.js';
 
 export class CompanionError extends Error {}
 export const fail = (message: string): never => { throw new CompanionError(message); };
@@ -19,14 +20,15 @@ export async function lockCompanionHost(db: PoolClient, id: string) {
   const initial = (await db.query(`SELECT class_id FROM bookings WHERE id=$1`,[id])).rows[0];
   if (!initial) fail('Reserva no encontrada.');
   const cls = (await db.query(`SELECT c.*,ct.category,
-    ((c.date+c.start_time) AT TIME ZONE 'America/Mexico_City')>now() AS future
+    ((c.date+c.start_time) AT TIME ZONE 'America/Mexico_City')>now() AS future,
+    to_char(now() AT TIME ZONE 'America/Mexico_City','YYYY-MM-DD') AS studio_today
     FROM classes c JOIN class_types ct ON ct.id=c.class_type_id WHERE c.id=$1 FOR UPDATE OF c`,[initial.class_id])).rows[0];
   const host = (await db.query(`SELECT * FROM bookings WHERE id=$1 FOR UPDATE`,[id])).rows[0];
   const membership = host.membership_id ? (await db.query(`SELECT m.*,COALESCE(m.facility_id,o.facility_id) AS bound_facility_id
     FROM memberships m LEFT JOIN orders o ON o.id=m.order_id WHERE m.id=$1 FOR UPDATE OF m`,[host.membership_id])).rows[0] : null;
   return {cls,host,membership};
 }
-export async function companionPolicy(db: PoolClient, ctx: Awaited<ReturnType<typeof lockCompanionHost>>, excludeId?: string) {
+export async function companionPolicy(db: PoolClient, ctx: Awaited<ReturnType<typeof lockCompanionHost>>, excludeId?: string, options:{payment?:boolean}={}) {
   const {cls,host,membership:m} = ctx;
   const category = cls.category === 'reformer' ? 'reformer' : 'multi';
   const remaining = m?.[`${category}_remaining`];
@@ -38,17 +40,20 @@ export async function companionPolicy(db: PoolClient, ctx: Awaited<ReturnType<ty
   const nested = (await db.query(`SELECT id FROM booking_companions WHERE guest_booking_id=$1`,[host.id])).rows.length > 0;
   const holds = (await db.query(`SELECT count(*)::int n FROM bio_checkout_sessions WHERE class_id=$1
     AND status IN ('pending_payment','paid','ready') AND expires_at>now()`,[cls.id])).rows[0].n;
-  const mode = remaining === null ? (used ? 'paid' : 'monthly_free') : 'credit';
+  const promotion=options.payment ? null : await readCompanionPromotion(db,ctx);
+  const mode = promotion?.remaining ? 'promo_free' : remaining === null ? (used || promotion ? 'paid' : 'monthly_free') : 'credit';
+  const requiredGuests=mode==='promo_free'?promotion!.requiredGuests:1;
   let reason: string | undefined;
   if (!cls.future || cls.status !== 'scheduled' || cls.booking_closed) reason='Esta clase ya no admite reservas.';
   else if (host.status !== 'confirmed' || nested) reason='Necesitas una reserva confirmada como titular.';
   else if (!m || !m.start_date || m.user_id !== host.user_id) reason='La reserva debe estar vinculada a una membresía de la titular.';
   else if (!membershipValidityForClassDate(m,cls.date).ok) reason='La membresía no está vigente para esta clase.';
   else if (m.bound_facility_id && m.bound_facility_id !== cls.facility_id) reason='La membresía pertenece a otro estudio.';
-  else if (remaining !== null && !(remaining > 0)) reason='No quedan créditos para una invitada.';
-  else if (active >= 2) reason='Puedes reservar hasta 2 invitadas en esta clase.';
-  else if (Number(cls.current_bookings)+holds >= Number(cls.max_capacity)) reason='La clase ya no tiene lugares disponibles.';
-  return {eligible:!reason,reason,mode,amount:mode==='paid'?280:0,remaining_slots:Math.max(0,2-active),category,cycle};
+  else if (mode!=='promo_free' && remaining !== null && !(remaining > 0)) reason='No quedan créditos para una invitada.';
+  else if (mode==='promo_free' && !promotion!.eligible) reason=promotion!.reason;
+  else if (active+requiredGuests>2) reason='Puedes reservar hasta 2 invitadas en esta clase.';
+  else if (Number(cls.current_bookings)+holds+requiredGuests>Number(cls.max_capacity)) reason=requiredGuests===2?'Se necesitan dos lugares disponibles para confirmar ambas cortesías.':'La clase ya no tiene lugares disponibles.';
+  return {eligible:!reason,reason,mode,amount:mode==='paid'?280:0,remaining_slots:Math.max(0,2-active),category,cycle,promotion};
 }
 
 export async function confirmCompanion(db: PoolClient, companion: any, ctx: Awaited<ReturnType<typeof lockCompanionHost>>, actor: string) {
@@ -86,7 +91,7 @@ export async function receiveCompanionPayment(db: PoolClient, id: string, paymen
     payment.method,payment.method==='card'?'mercadopago':'manual',payment.reference])).rows[0];
   await db.query(`UPDATE companion_payments SET payment_id=$2 WHERE reference=$1`,[payment.reference,ledger.id]);
   }
-  const policy=await companionPolicy(db,ctx,id);
+  const policy=await companionPolicy(db,ctx,id,{payment:true});
   const reason = previous ? 'Se recibió un pago adicional: revisar devolución.'
     : payment.amount!==280 || payment.currency!=='MXN' ? 'El importe o moneda del pago no coincide con $280 MXN.'
     : c.status!=='pending_payment' ? 'Pago recibido para una solicitud que ya no está pendiente.'

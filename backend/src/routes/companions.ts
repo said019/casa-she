@@ -8,6 +8,7 @@ import { createPreference, mpConfigured } from '../lib/mercadopago.js';
 import { CompanionError, fail, lockCompanionHost, companionPolicy, confirmCompanion, receiveCompanionPayment } from '../lib/companions.js';
 import type { PoolClient } from 'pg';
 import {companionCancellationEffects} from '../lib/companionCancellationEffects.js';
+import {bookPromotionalCompanions} from '../lib/companionPromotionBooking.js';
 
 const router = Router();
 router.use(authenticate);
@@ -72,6 +73,7 @@ router.post('/booking/:bookingId',endpoint(async(req,db)=>{
   }
   const policy=await companionPolicy(db,ctx);
   if(!policy.eligible) fail(policy.reason!);
+  if(policy.mode==='promo_free') fail('Usa el formulario de cortesías para registrar tus invitadas de promoción.');
   // A nonblocking identity lock avoids duplicate walk-in users across simultaneous bookings.
   if(!(await db.query(`SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) locked`,[`companion-phone:${phone}`])).rows[0].locked) fail('Hay otra solicitud en proceso para esta invitada. Intenta nuevamente.');
   const guest=await findOrCreateGuest(db,{name:input.name,phone});
@@ -91,6 +93,13 @@ router.post('/booking/:bookingId',endpoint(async(req,db)=>{
   }
   return {companion:(await db.query(`SELECT ${publicColumns} FROM booking_companions WHERE id=$1`,[c.id])).rows[0]};
 }));
+router.post('/booking/:bookingId/promotion',endpoint(async(req,db)=>{
+  const hostId=uuid.parse(req.params.bookingId);
+  const input=z.object({requestId:uuid,guests:z.array(z.object({name:z.string().trim().min(2).max(120),phone:z.string().min(10).max(25)})).min(1).max(2)}).parse(req.body);
+  const ctx=await lockCompanionHost(db,hostId);await authorize(req,ctx);
+  const rows=await bookPromotionalCompanions(db,ctx,input,req.user!.userId);
+  return {companions:rows.map(c=>({id:c.id,guest_name:c.guest_name,mode:c.mode,status:c.status,amount:c.amount,guest_booking_id:c.guest_booking_id}))};
+}));
 router.post('/:id/receive-payment',endpoint(async(req,db)=>{
   if(!staff(req)) fail('Solo recepción puede registrar un pago recibido.');
   const id=uuid.parse(req.params.id),input=z.object({method:z.enum(['cash','transfer'])}).parse(req.body);
@@ -101,7 +110,7 @@ router.post('/:id/receive-payment',endpoint(async(req,db)=>{
   const fresh=(await db.query(`SELECT * FROM booking_companions WHERE id=$1 FOR UPDATE`,[id])).rows[0];
   if(fresh.status==='confirmed') return {success:true};
   if(fresh.status!=='pending_payment') fail('Este pago requiere revisión en recepción.');
-  const policy=await companionPolicy(db,ctx,id);if(!policy.eligible) fail(policy.reason!);
+  const policy=await companionPolicy(db,ctx,id,{payment:true});if(!policy.eligible) fail(policy.reason!);
   await receiveCompanionPayment(db,id,{reference:`manual-companion:${id}`,amount:280,currency:'MXN',method:input.method,actor:req.user!.userId});
   return {success:true};
 }));
