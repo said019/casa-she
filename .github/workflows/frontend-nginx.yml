@@ -52,11 +52,25 @@ jobs:
             assert.equal(execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim(),process.env.BUILD_GIT_SHA);
             for(const key of ["VITE_MP_PUBLIC_KEY","VITE_VAPID_PUBLIC_KEY"]) if(process.env[key]) assert.ok(process.env[key].length<=2048&&!/[\s\x00-\x1f]/.test(process.env[key]));
           '
-      - name: Build unchanged frontend and nginx runtime
+      - name: Verify default Docker build matches the published runtime
+        run: |
+          cmp Dockerfile deploy/static-nginx/Dockerfile
+          cmp Dockerfile.dockerignore deploy/static-nginx/Dockerfile.dockerignore
+          node --input-type=module -e '
+            import assert from "node:assert/strict";
+            import {readFileSync} from "node:fs";
+            const actual=JSON.parse(readFileSync("railway.json","utf8"));
+            const legacy=JSON.parse(readFileSync("deploy/static-nginx/railway.json","utf8"));
+            assert.equal(actual.build.builder,"DOCKERFILE");
+            assert.equal(actual.build.dockerfilePath,"Dockerfile");
+            legacy.build.dockerfilePath="Dockerfile";
+            assert.deepEqual(actual,legacy);
+          '
+      - name: Build unchanged frontend using default Dockerfile
         run: |
           args=(--build-arg "VITE_API_URL=$VITE_API_URL" --build-arg "RAILWAY_GIT_COMMIT_SHA=$BUILD_GIT_SHA" --build-arg "VITE_VAPID_PUBLIC_KEY=$VITE_VAPID_PUBLIC_KEY")
-          docker build --target app-builder -t static-app-builder -f deploy/static-nginx/Dockerfile "${args[@]}" .
-          docker build -t static-nginx-candidate -f deploy/static-nginx/Dockerfile "${args[@]}" .
+          docker build --target app-builder -t static-app-builder "${args[@]}" .
+          docker build -t static-nginx-candidate "${args[@]}" .
       - name: Verify full public artifact tree and existing app identity
         run: node deploy/static-nginx/test-build-artifact.mjs
       - name: Compare all assets and routes against existing Caddy configuration
