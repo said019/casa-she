@@ -1,4 +1,5 @@
-// Offline contract test: same built app behind the current Node server and Caddy.
+// Legacy compatibility contract: same built app behind Node and Caddy.
+// The default nginx image has its own artifact and HTTP contract workflow.
 // Never logs in, subscribes to push, calls an API, or changes production data.
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
@@ -13,7 +14,9 @@ import { precompress, verifyArchive } from './prepare-static-runtime.mjs';
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const runtimeCommand = './.runtime/caddy run --config Caddyfile --adapter caddyfile';
 const railway = JSON.parse(await readFile('railway.json', 'utf8'));
-assert.equal(railway.deploy.startCommand, runtimeCommand, 'Railway JSON overrides the Nixpacks start command');
+assert.deepEqual(railway.build, { builder: 'DOCKERFILE', dockerfilePath: 'Dockerfile' });
+assert.equal(railway.deploy.startCommand, '/usr/local/bin/start-static-nginx', 'Legacy JSON agrees with the default Docker runtime');
+assert.ok((await readFile('Dockerfile', 'utf8')).includes('CMD ["/usr/local/bin/start-static-nginx"]'));
 assert.ok((await readFile('nixpacks.toml', 'utf8')).includes('cmd = "' + runtimeCommand + '"'));
 assert.equal(JSON.parse(await readFile('package.json', 'utf8')).scripts.start,
     'exec node node_modules/serve/build/main.js dist -s -p ${PORT:-8080}', 'Retain npm-start rollback');
