@@ -1,0 +1,39 @@
+name: Backend timezone formatter contracts
+
+on:
+  pull_request:
+    paths: ['backend/**', '.github/workflows/backend-timezone-formatters.yml']
+  push:
+    branches: [main]
+    paths: ['backend/**', '.github/workflows/backend-timezone-formatters.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  dates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: postgresql://fixture:fixture@127.0.0.1:1/offline
+      DOTENV_CONFIG_PATH: /dev/null
+      NODE_ENV: test
+      GYM_TIMEZONE: America/Mexico_City
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.3'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - run: node --test scripts/timezone-formatters.test.cjs
+      - run: node --import tsx scripts/test-totalpass-time.ts
+      - run: node --import tsx scripts/test-totalpass-publish.ts
+      - run: node --import tsx scripts/test-totalpass-pool.ts
+      - run: node --import tsx scripts/test-totalpass-retire.ts
+      - run: node --import tsx scripts/test-membership-dates-cdmx.ts
