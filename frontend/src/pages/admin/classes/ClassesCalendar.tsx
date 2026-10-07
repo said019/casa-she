@@ -23,7 +23,10 @@ import { DialogoCancelarClase } from './calendario/DialogoCancelarClase';
 import { DialogoCambiarCoach } from './calendario/DialogoCambiarCoach';
 import { resumenDeClases, textoResumenSemana } from './calendario/lugares';
 import { tituloSemana } from './calendario/rejilla';
-import { alternar, alternarGrupo, atajosDesde, clasesSeleccionadas } from './calendario/seleccion';
+import { alternar, alternarGrupo, atajosDesde, clasesSeleccionadas, quitarBloqueadas, resumenSeleccion, textoHecho, type AccionLote } from './calendario/seleccion';
+import { BarraSeleccion } from './calendario/BarraSeleccion';
+import { DialogoLote, type LoteAplicado } from './calendario/DialogoLote';
+import { useToast } from '@/components/ui/use-toast';
 
 interface ClassesCalendarProps {
     initialGenerateOpen?: boolean;
@@ -91,6 +94,15 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         setSeleccion(new Set());
         setAncla(null);
     };
+    // La ventana de la acción en bloque abierta; la clave la vuelve a montar limpia en cada apertura.
+    const [accionLote, setAccionLote] = useState<AccionLote | null>(null);
+    const [claveLote, setClaveLote] = useState(0);
+    const { toast } = useToast();
+    const alAplicarLote = ({ accion, params, respuesta, nombres }: LoteAplicado) => {
+        setAccionLote(null);
+        setSeleccion(new Set());
+        toast({ title: textoHecho(accion, params, respuesta, nombres) });
+    };
 
     // El panel y los diálogos usan la versión más reciente de la clase abierta: después de
     // inscribir, cambiar el cupo o cerrar la clase, la lista se recarga y aquí llega ya cambiada.
@@ -127,7 +139,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     };
 
     const content = (
-        <div className="space-y-4 font-body">
+        <div className={cn('space-y-4 font-body', modoSeleccion && 'lg:pb-28')}>
             <header className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex flex-wrap items-center gap-2.5">
                     <div className="flex gap-1">
@@ -368,6 +380,33 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                 clase={claseVigente}
                 instructors={instructors}
                 onAplicado={() => setIsEditOpen(false)}
+            />
+
+            {modoSeleccion && (
+                <BarraSeleccion
+                    {...resumenSeleccion(seleccionadas)}
+                    activa={seleccionadas.length > 0}
+                    abierta={accionLote}
+                    onAccion={(a) => {
+                        setClaveLote((k) => k + 1);
+                        setAccionLote(a);
+                    }}
+                    onTerminar={terminarSeleccion}
+                />
+            )}
+            <DialogoLote
+                key={`lote-${claveLote}`}
+                accion={accionLote}
+                onOpenChange={(open) => { if (!open) setAccionLote(null); }}
+                clases={seleccionadas}
+                classTypes={classTypes}
+                instructors={instructors}
+                onQuitarBloqueadas={(r) => {
+                    const quedan = quitarBloqueadas(seleccion, r);
+                    setSeleccion(quedan);
+                    if (quedan.size === 0) setAccionLote(null);
+                }}
+                onAplicado={alAplicarLote}
             />
 
             <Dialog open={companionReviewOpen} onOpenChange={setCompanionReviewOpen}>
