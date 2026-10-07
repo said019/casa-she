@@ -23,10 +23,14 @@ import { DialogoCancelarClase } from './calendario/DialogoCancelarClase';
 import { DialogoCambiarCoach } from './calendario/DialogoCambiarCoach';
 import { resumenDeClases, textoResumenSemana } from './calendario/lugares';
 import { tituloSemana } from './calendario/rejilla';
-import { alternar, alternarGrupo, atajosDesde, clasesSeleccionadas, quitarBloqueadas, resumenSeleccion, textoHecho, type AccionLote } from './calendario/seleccion';
+import { alternar, alternarGrupo, atajosDesde, clasesSeleccionadas, inversaDe, quitarBloqueadas, resumenSeleccion, textoHecho, type AccionLote, type CuerpoLote, type RespuestaLote } from './calendario/seleccion';
 import { BarraSeleccion } from './calendario/BarraSeleccion';
 import { DialogoLote, type LoteAplicado } from './calendario/DialogoLote';
 import { useToast } from '@/components/ui/use-toast';
+import { ToastAction } from '@/components/ui/toast';
+import axios from 'axios';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import api, { getErrorMessage } from '@/lib/api';
 
 interface ClassesCalendarProps {
     initialGenerateOpen?: boolean;
@@ -98,10 +102,32 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     const [accionLote, setAccionLote] = useState<AccionLote | null>(null);
     const [claveLote, setClaveLote] = useState(0);
     const { toast } = useToast();
-    const alAplicarLote = ({ accion, params, respuesta, nombres }: LoteAplicado) => {
+    const queryClient = useQueryClient();
+    // "Deshacer": la acción inversa en una sola llamada (solo coach y mover; ver inversaDe).
+    const deshacer = useMutation({
+        mutationFn: async (cuerpo: Omit<CuerpoLote, 'vistaPrevia'>) =>
+            (await api.post('/classes/bulk', { ...cuerpo, vistaPrevia: false })).data as RespuestaLote,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['classes'] });
+            toast({ title: 'Cambio deshecho.' });
+        },
+        onError: (err) => {
+            // 409: ya no se puede (p. ej. una clase empezó). Se dice por qué, con el motivo del servidor.
+            const r = axios.isAxiosError(err) && err.response?.status === 409 ? (err.response.data as RespuestaLote) : null;
+            const motivo = r?.clases.find((c) => c.estado === 'bloqueada')?.motivo;
+            toast({ variant: 'destructive', title: 'No se pudo deshacer', description: motivo ?? getErrorMessage(err) });
+        },
+    });
+    const alAplicarLote = ({ accion, params, respuesta, antes, nombres }: LoteAplicado) => {
         setAccionLote(null);
         setSeleccion(new Set());
-        toast({ title: textoHecho(accion, params, respuesta, nombres) });
+        const inversa = inversaDe(accion, params, antes);
+        toast({
+            title: textoHecho(accion, params, respuesta, nombres),
+            action: inversa ? (
+                <ToastAction altText="Deshacer el cambio" onClick={() => deshacer.mutate(inversa)}>Deshacer</ToastAction>
+            ) : undefined,
+        });
     };
 
     // El panel y los diálogos usan la versión más reciente de la clase abierta: después de

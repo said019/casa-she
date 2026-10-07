@@ -516,4 +516,62 @@ test.describe("Calendario de recepción – varias a la vez", () => {
     expect(cuerpos.filter((c) => !c.vistaPrevia)).toHaveLength(1);
   });
 
+  test("deshacer: coach y mover sí, cancelar no; y si ya no se puede, dice por qué", async ({ adminPage: page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const clases = semanaEditable();
+    await mockSemanaCalendario(page, clases);
+    await page.route(/\/api\/instructors(\?|$)/, (route) => route.fulfill({ json: COACHES }));
+    const bloqueos: Record<string, string> = {};
+    const cuerpos = await mockLote(page, clases, { bloqueos });
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+    const barra = page.getByRole("toolbar", { name: "Acciones para las clases seleccionadas" });
+    const barre = page.getByRole("button", { name: /^Barre/ });
+    const deshacer = page.getByRole("button", { name: "Deshacer" });
+
+    // Coach: todas tenían a Ana → "Deshacer" la regresa con una sola llamada.
+    await page.getByRole("button", { name: "Seleccionar varias" }).click();
+    await barre.click();
+    await barra.getByRole("button", { name: "Cambiar coach" }).click();
+    const coach = page.getByRole("dialog", { name: "Cambiar coach" });
+    await expect(coach.getByRole("radio", { name: /Ana/ })).toBeDisabled(); // ya la da Ana
+    await coach.getByRole("radio", { name: /Sofía/ }).click();
+    await coach.getByRole("button", { name: "Cambiar a Sofía en 1 clase" }).click();
+    await expect(barre).toContainText("Sofía");
+    await deshacer.click();
+    await expect(page.getByText("Cambio deshecho.").first()).toBeVisible();
+    await expect(barre).toContainText("Ana");
+    expect(cuerpos.at(-1)).toEqual({ classIds: [ID.barre], accion: "coach", instructorId: COACHES[0].id, vistaPrevia: false });
+
+    // Mover: −minutos.
+    const mover = page.getByRole("dialog", { name: "Mover o cambiar clase" });
+    await barre.click();
+    await barra.getByRole("button", { name: "Mover o cambiar clase" }).click();
+    await mover.getByRole("radio", { name: "−1 h" }).click();
+    await mover.getByRole("button", { name: "Mover 1 clase 1 h antes" }).click();
+    await expect(page.getByRole("button", { name: /^Barre.*06:00/ })).toBeVisible();
+    await deshacer.click();
+    await expect(page.getByRole("button", { name: /^Barre.*07:00/ })).toBeVisible();
+    expect(cuerpos.at(-1)).toEqual({ classIds: [ID.barre], accion: "mover", minutos: 60, vistaPrevia: false });
+
+    // Si entre aplicar y deshacer la clase ya empezó: no se deshace y se dice por qué.
+    await barre.click();
+    await barra.getByRole("button", { name: "Mover o cambiar clase" }).click();
+    await mover.getByRole("radio", { name: "+30 min" }).click();
+    await mover.getByRole("button", { name: "Mover 1 clase 30 min más tarde" }).click();
+    await expect(page.getByRole("button", { name: /^Barre.*07:30/ })).toBeVisible();
+    bloqueos[ID.barre] = "Ya empezó.";
+    await deshacer.click();
+    await expect(page.getByText("No se pudo deshacer").first()).toBeVisible();
+    await expect(page.getByText("Ya empezó.").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Barre.*07:30/ })).toBeVisible();
+    delete bloqueos[ID.barre];
+
+    // Cancelar no se deshace.
+    await barre.click();
+    await barra.getByRole("button", { name: "Cancelar clases" }).click();
+    await page.getByRole("dialog", { name: "Cancelar 1 clase" }).getByRole("button", { name: "Cancelar 1 clase" }).click();
+    await expect(page.getByText("1 clase cancelada. Siguen en el calendario, marcadas.").first()).toBeVisible();
+    await expect(deshacer).toHaveCount(0);
+  });
+
 });
