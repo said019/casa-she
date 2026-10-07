@@ -11,7 +11,7 @@ import { requirePermission } from '../middleware/requirePermission.js';
 import { effectivePermissions, mergeRequested, validatePermissionChange, PRESETS, PresetName, PERMISSION_LABELS, isMasterPreset } from '../lib/permissions.js';
 import { UpdateProfileSchema, User } from '../types/auth.js';
 import { z } from 'zod';
-import { sendClientWelcomeEmail, sendPlainEmail, sendReceptionAssignedEmail, sendReceptionCredentials } from '../services/email.js';
+import { sendAccesoAlumnaEmail, sendClientWelcomeEmail, sendPlainEmail, sendReceptionAssignedEmail, sendReceptionCredentials } from '../services/email.js';
 import { sendClientWelcome, sendWhatsAppMessage } from '../lib/whatsapp.js';
 import { isElevated } from '../lib/elevation.js';
 import { instanceByKey, instanceForFacility } from '../lib/whatsapp-instances.js';
@@ -22,6 +22,7 @@ import { ImageStorageError, subirImagen } from '../lib/imageStorage.js';
 import { isValidTag } from '../lib/clientTags.js';
 import { findOrCreateGuest } from '../lib/guestUser.js';
 import { crearLinkAcceso } from '../lib/accessLinks.js';
+import { altaRapida, AltaRapidaSchema, AltaRapidaError } from '../lib/altaRapida.js';
 
 const router = Router();
 
@@ -856,6 +857,55 @@ router.post('/:id/resend-credentials', requireRole('admin', 'super_admin', 'rece
     } catch (error) {
         console.error('Resend credentials error:', error);
         res.status(500).json({ error: 'Error al reenviar credenciales' });
+    }
+});
+
+// ============================================
+// POST /api/users/alta-rapida - Alumna nueva + paquete + inscripción + link de acceso,
+// todo en una transacción (ver lib/altaRapida.ts). Si algo falla, no queda nada.
+// ============================================
+router.post('/alta-rapida', requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
+    const validation = AltaRapidaSchema.safeParse(req.body);
+    if (!validation.success) {
+        return res.status(400).json({ error: 'Datos inválidos', details: validation.error.flatten().fieldErrors });
+    }
+    try {
+        const r = await altaRapida(pool, validation.data, { userId: req.user!.userId });
+
+        // Después del commit, y sin que nada de esto pueda fallar la respuesta.
+        void (async () => {
+            try {
+                await logAction(query, {
+                    adminUserId: req.user!.userId,
+                    actionType: 'alta_rapida',
+                    entityType: 'user',
+                    entityId: r.user.id,
+                    description: `Alta rápida: ${r.user.display_name} inscrita${r.membership ? ' con paquete' : ' (cortesía)'}`,
+                    newData: { class_id: validation.data.classId, plan_id: validation.data.planId ?? null, booking_id: r.booking.id },
+                    req,
+                });
+                if (r.puntosBienvenida > 0) void notifyPointsEarnedExternal(r.user.id, r.puntosBienvenida, 'welcome');
+                if (r.puntosCompra > 0) void notifyPointsEarnedExternal(r.user.id, r.puntosCompra, 'package_purchase');
+                const c = await queryOne<{ nombre: string; fecha: string; hora: string }>(
+                    `SELECT ct.name AS nombre, to_char(c.date, 'YYYY-MM-DD') AS fecha, substr(c.start_time::text, 1, 5) AS hora
+                       FROM classes c JOIN class_types ct ON ct.id = c.class_type_id WHERE c.id = $1`,
+                    [validation.data.classId],
+                );
+                // Correo con el link solo si Resend está configurado (la función no lanza).
+                await sendAccesoAlumnaEmail({
+                    to: r.user.email, clientName: r.user.display_name, url: r.acceso.url,
+                    clase: c ? `${c.nombre} el ${c.fecha} a las ${c.hora}` : null,
+                });
+            } catch (e) {
+                console.error('Alta rápida post-commit (non-blocking):', e);
+            }
+        })();
+
+        res.status(201).json({ user: r.user, membership: r.membership, booking: r.booking, acceso: r.acceso });
+    } catch (error) {
+        if (error instanceof AltaRapidaError) return res.status(error.status).json(error.body);
+        console.error('Alta rápida error:', error);
+        res.status(500).json({ error: 'Error al registrar a la alumna' });
     }
 });
 

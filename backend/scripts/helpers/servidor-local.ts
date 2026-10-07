@@ -3,6 +3,7 @@
 // al terminar apaga el servidor y borra la clon. Nunca toca producción: DATABASE_URL se
 // fija aquí a localhost y se ignora cualquier PG*/DATABASE_URL heredado.
 import { execFileSync, spawn, ChildProcess } from 'node:child_process';
+import { openSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -53,7 +54,7 @@ export async function levantarServidorLocal(puerto: number): Promise<ServidorLoc
             VAPID_PUBLIC_KEY: '', VAPID_PRIVATE_KEY: '',
             TOTALPASS_PARTNER_API_KEY: '', TOTALPASS_PLACE_API_KEY: '',
         },
-        stdio: 'ignore',
+        stdio: process.env.TEST_SERVER_LOG ? ['ignore', openSync(process.env.TEST_SERVER_LOG, 'a'), openSync(process.env.TEST_SERVER_LOG, 'a')] : 'ignore',
     });
 
     const detener = async () => {

@@ -519,26 +519,29 @@ export async function reversePaymentLoyaltyPoints(params: {
  * Award the welcome bonus to a freshly registered user. Idempotent.
  * Uses the `query` helper from database.ts (no transaction needed).
  */
-export async function awardWelcomeBonus(userId: string): Promise<number> {
-  // Read config without a custom DbClient
-  const settings = await queryOne<any>(
-    `SELECT value FROM system_settings WHERE key = 'loyalty_config'`
-  );
+export async function awardWelcomeBonus(userId: string, db?: DbClient): Promise<number> {
+  // Sin `db` usa el pool (como siempre). Con `db` corre dentro de esa transacción
+  // (alta rápida: si algo falla después, el bono también se deshace).
+  const run = async (text: string, params: unknown[]): Promise<any[]> =>
+    db ? (await db.query(text, params)).rows : query(text, params);
+  const settings = (await run(
+    `SELECT value FROM system_settings WHERE key = 'loyalty_config'`, [],
+  ))[0];
   const config = normalizeConfig(parseSettingValue(settings?.value));
   if (!config.enabled || config.welcome_bonus <= 0) return 0;
 
   const desc = 'Bienvenida';
-  const exists = await queryOne(
+  const exists = (await run(
     `SELECT id FROM loyalty_points WHERE user_id = $1 AND description = $2 LIMIT 1`,
-    [userId, desc]
-  );
+    [userId, desc],
+  ))[0];
   if (exists) return 0;
 
-  await query(
+  await run(
     `INSERT INTO loyalty_points (user_id, points, type, description) VALUES ($1, $2, 'welcome', $3)`,
     [userId, config.welcome_bonus, desc]
   );
-  await query(
+  await run(
     `UPDATE users SET loyalty_points = COALESCE(loyalty_points, 0) + $1 WHERE id = $2`,
     [config.welcome_bonus, userId]
   );
