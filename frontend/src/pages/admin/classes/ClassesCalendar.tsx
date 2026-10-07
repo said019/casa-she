@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { CompanionReview } from '@/components/bookings/CompanionPanel';
-import { ClassIntensity, isClassIntensity } from '@/components/classes/ClassIntensity';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -32,7 +31,7 @@ import {
     RefreshCw, Copy as CopyIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { DAYS, formatClassTime } from './calendario/formato';
+import { DAYS } from './calendario/formato';
 import { useSemanaClases } from './calendario/useSemanaClases';
 import { DialogoGenerar } from './calendario/DialogoGenerar';
 import { DialogoNuevaClase } from './calendario/DialogoNuevaClase';
@@ -42,6 +41,8 @@ import { DialogoGratis } from './calendario/DialogoGratis';
 import { DialogoCancelarClase } from './calendario/DialogoCancelarClase';
 import { DialogoCambiarCoach } from './calendario/DialogoCambiarCoach';
 import { PanelClase } from './calendario/PanelClase';
+import { TarjetaClase } from './calendario/TarjetaClase';
+import { VistaDiaMovil } from './calendario/VistaDiaMovil';
 
 interface ClassesCalendarProps {
     initialGenerateOpen?: boolean;
@@ -278,92 +279,16 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                         </div>
                     ) : (
                     <>
-                    <div className="space-y-4 lg:hidden">
-                        <div className="grid grid-cols-7 border-y border-balance-sand/70 py-2" aria-label="Días de la semana">
-                            {weekDays.map((day, i) => {
-                                const selected = isSameDay(day, mobileSelectedDay);
-                                const today = isSameDay(day, new Date());
-                                const isClosed = closedDaySet.has(format(day, 'yyyy-MM-dd'));
-                                const dayClasses = getClassesForDay(day);
-                                return (
-                                    <button
-                                        key={format(day, 'yyyy-MM-dd')}
-                                        type="button"
-                                        onClick={() => setMobileSelectedDay(day)}
-                                        aria-pressed={selected}
-                                        className={cn(
-                                            'relative min-w-0 px-0.5 py-2 text-center transition-[color,transform] active:scale-[0.96]',
-                                            selected
-                                                ? 'text-balance-dark after:absolute after:inset-x-1 after:bottom-0 after:h-[2px] after:bg-balance-olive'
-                                                : today
-                                                    ? 'text-balance-dark'
-                                                    : 'text-balance-dark/55',
-                                            isClosed && !selected && 'text-destructive'
-                                        )}
-                                    >
-                                        <span className="block text-[9px] font-semibold uppercase tracking-[0.08em] opacity-65">{DAYS[i].slice(0, 2)}</span>
-                                        <span className={cn(
-                                            'mx-auto mt-1 flex h-8 w-8 items-center justify-center rounded-full text-lg font-semibold tabular-nums',
-                                            selected && 'bg-balance-olive text-balance-cream',
-                                            today && !selected && 'border border-balance-olive/55'
-                                        )}>{format(day, 'd')}</span>
-                                        <span className="mt-1 block text-[8px] font-semibold opacity-55">{dayClasses.length}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        <section className="overflow-hidden rounded-[1.35rem] border border-balance-sand/65 bg-[hsl(var(--admin-panel))] shadow-[0_22px_70px_-58px_rgba(51,42,34,.72)]">
-                            <header className="flex items-end justify-between gap-4 border-b border-balance-sand/60 bg-balance-cream/48 px-4 py-4">
-                                <div>
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-balance-dark/70">
-                                        {format(mobileSelectedDay, 'EEEE', { locale: es })}
-                                    </p>
-                                    <h2 className="mt-1 text-2xl font-semibold capitalize tracking-[-0.035em] text-balance-dark">
-                                        {format(mobileSelectedDay, 'd MMMM', { locale: es })}
-                                    </h2>
-                                </div>
-                                <Badge variant="outline" className="rounded-full border-balance-sand/70 bg-balance-cream/75 text-balance-dark/75">
-                                    {mobileDayClasses.length} {mobileDayClasses.length === 1 ? 'clase' : 'clases'}
-                                </Badge>
-                            </header>
-
-                            {mobileDayClosed && (
-                                <div className="m-4 rounded-[1rem] border border-destructive/20 bg-destructive/8 px-4 py-3 text-sm font-medium text-destructive">
-                                    {mobileClosedReason || 'Studio cerrado'}
-                                </div>
-                            )}
-
-                            {mobileDayClasses.length > 0 ? (
-                                <div className="space-y-3 p-3">
-                                    {mobileDayClasses.map((item) => (
-                                        <ClassEventCard key={item.id} item={item} onClick={() => handleClassClick(item)} mobile />
-                                    ))}
-                                    {!mobileDayClosed && (
-                                        <Button
-                                            variant="ghost"
-                                            className="h-11 w-full rounded-full border border-dashed border-balance-sand/70 text-balance-dark/75"
-                                            onClick={() => handleDayClick(mobileSelectedDay)}
-                                        >
-                                            <Plus className="mr-2 h-4 w-4" /> Agregar otra clase
-                                        </Button>
-                                    )}
-                                </div>
-                            ) : !mobileDayClosed ? (
-                                <button
-                                    type="button"
-                                    onClick={() => handleDayClick(mobileSelectedDay)}
-                                    className="flex min-h-[13rem] w-full flex-col items-center justify-center px-6 text-center text-balance-dark/48 transition-colors hover:bg-balance-olive/6 hover:text-balance-olive"
-                                >
-                                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-balance-olive/8 text-balance-olive">
-                                        <Plus className="h-5 w-5" />
-                                    </span>
-                                    <span className="mt-4 text-sm font-semibold">Agregar la primera clase</span>
-                                    <span className="mt-1 text-xs">No hay sesiones programadas para este día.</span>
-                                </button>
-                            ) : null}
-                        </section>
-                    </div>
+                    <VistaDiaMovil
+                        dias={weekDays}
+                        diaSeleccionado={mobileSelectedDay}
+                        onSeleccionarDia={setMobileSelectedDay}
+                        clasesDelDia={getClassesForDay}
+                        diasCerrados={closedDaySet}
+                        motivoCierre={getClosedReason}
+                        onClickClase={handleClassClick}
+                        onNuevaClase={handleDayClick}
+                    />
 
                     <div className="hidden overflow-hidden rounded-[1.35rem] border border-balance-sand/65 bg-[hsl(var(--admin-panel))] shadow-[0_22px_72px_-58px_rgba(51,42,34,0.75)] lg:block">
                         <div className="overflow-x-auto">
@@ -429,7 +354,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
 
                                                 <div className="space-y-2.5">
                                                     {dayClasses.map(c => (
-                                                        <ClassEventCard key={c.id} item={c} onClick={() => handleClassClick(c)} />
+                                                        <TarjetaClase key={c.id} clase={c} variante="rejilla" onClick={() => handleClassClick(c)} />
                                                     ))}
                                                 </div>
 
@@ -535,102 +460,3 @@ function CalendarStat({ label, value }: { label: string; value: number | string 
     );
 }
 
-function ClassEventCard({ item, onClick, mobile = false }: { item: Class; onClick: () => void; mobile?: boolean }) {
-    const baseColor = item.class_type_color || '#7E8579';
-    const isFree = !!item.is_free;
-    const color = isFree ? '#059669' : baseColor;
-    const bookings = Number(item.current_bookings || 0);
-    const capacity = Number(item.max_capacity || 0);
-    const isCancelled = item.status === 'cancelled';
-    const nearly = capacity > 0 && bookings / capacity >= 0.75;
-    const full = capacity > 0 && bookings >= capacity;
-    const progress = capacity > 0 ? Math.min((bookings / capacity) * 100, 100) : 0;
-
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            aria-label={`${item.class_type_name}${isClassIntensity(item.intensity) ? `, Intensidad ${item.intensity} de 3` : ''}, ${formatClassTime(item.start_time)}, ${bookings} de ${capacity} lugares`}
-            className={cn(
-                'group w-full overflow-hidden rounded-[1rem] border text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_-18px_rgba(51,42,34,0.28)] active:scale-[0.99]',
-                isCancelled && 'opacity-50 saturate-0'
-            )}
-            style={{
-                borderColor: `${color}32`,
-                background: isFree
-                    ? 'linear-gradient(160deg, #d1fae5 0%, rgba(243,238,226,0.6) 100%)'
-                    : `linear-gradient(160deg, ${color}14 0%, rgba(243,238,226,0.52) 100%)`,
-            }}
-        >
-            <div className="h-[3px] w-full" style={{ backgroundColor: color }} aria-hidden="true" />
-
-            <div className={mobile ? 'p-4' : 'p-3'}>
-                <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                        <p className={cn('flex items-center gap-1 font-semibold leading-tight text-balance-dark', mobile ? 'text-base' : 'text-[13px]')}>
-                            <span className="truncate">{item.class_type_name}</span>
-                            <ClassIntensity intensity={item.intensity} />
-                        </p>
-                        <p className={cn('mt-1 font-semibold tabular-nums text-balance-dark/75', mobile ? 'text-sm' : 'text-[11px]')}>
-                            {formatClassTime(item.start_time)}–{formatClassTime(item.end_time)}
-                        </p>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                        {isFree && (
-                            <span className="rounded-full bg-emerald-700 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white">
-                                Gratis
-                            </span>
-                        )}
-                        {item.booking_closed && !isCancelled && (
-                            <span className="rounded-full border border-amber-500/30 bg-amber-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-700">
-                                Cerrada
-                            </span>
-                        )}
-                        {isCancelled && (
-                            <Badge variant="destructive" className="shrink-0 rounded-full text-[9px]">Cancelada</Badge>
-                        )}
-                    </div>
-                </div>
-
-                <p className={cn('truncate text-balance-dark/70', mobile ? 'mt-3 text-sm' : 'mt-1.5 text-[11px]')}>
-                    {item.instructor_name || 'Coach por asignar'}
-                </p>
-
-                {capacity > 0 && (
-                    <div className={mobile ? 'mt-4' : 'mt-2.5'}>
-                        <div className="flex items-center justify-between gap-2 text-[10px] font-semibold text-balance-dark/70">
-                            {/* Con la marca de TotalPass presente, la palabra "Ocupación" no
-                                cabe y se cortaba a "Oc…"; como no aporta nada, se omite. */}
-                            <span className="truncate">
-                                {full ? 'Cupo lleno' : nearly ? 'Últimos lugares' : (item.totalpass_booked ?? 0) > 0 ? '' : 'Ocupación'}
-                            </span>
-                            <span className="flex shrink-0 items-center gap-1">
-                                {/* Que se vea desde la rejilla que llegó gente por TotalPass:
-                                    antes la única señal era el contador de ocupación. Va aquí y
-                                    no junto al título porque la columna es angosta y lo aplastaba. */}
-                                {(item.totalpass_booked ?? 0) > 0 && !isCancelled && (
-                                    <span
-                                        className="inline-flex items-center gap-0.5 rounded-full border border-[#2A4E36]/35 bg-[#2A4E36]/10 px-1.5 text-[9px] font-semibold text-[#2A4E36]"
-                                        title={`${item.totalpass_booked} ${item.totalpass_booked === 1 ? 'reserva' : 'reservas'} de TotalPass`}
-                                    >
-                                        TP {item.totalpass_booked}
-                                    </span>
-                                )}
-                                <span className="tabular-nums text-balance-dark/68">{bookings}/{capacity}</span>
-                            </span>
-                        </div>
-                        <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-balance-dark/8" aria-hidden="true">
-                            <div
-                                className="h-full rounded-full transition-transform"
-                                style={{
-                                    width: `${progress}%`,
-                                    backgroundColor: full ? '#dc2626' : nearly ? '#b45309' : color,
-                                }}
-                            />
-                        </div>
-                    </div>
-                )}
-            </div>
-        </button>
-    );
-}

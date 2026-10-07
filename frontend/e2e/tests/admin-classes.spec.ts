@@ -4,7 +4,7 @@
  */
 import { test, expect } from "../fixtures/auth";
 import { AdminPage } from "../pages/AdminPage";
-import { FECHA_PRUEBA, mockSemanaCalendario } from "../fixtures/calendario";
+import { AHORA_PRUEBA, FECHA_PRUEBA, mockSemanaCalendario } from "../fixtures/calendario";
 
 test.describe("Admin – Gestión de Clases y Calendario", () => {
   test("el dashboard de admin carga correctamente", async ({ adminPage: page }) => {
@@ -114,5 +114,22 @@ test.describe("Calendario de recepción – semana por horas", () => {
       await page.keyboard.press("Escape");
       await expect(encabezado).toBeHidden();
     }
+  });
+
+  test("móvil: la lista del día usa la tarjeta con los lugares", async ({ adminPage: page }) => {
+    await page.clock.setFixedTime(AHORA_PRUEBA);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockSemanaCalendario(page);
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+
+    // Hoy es miércoles: la lista arranca en ese día.
+    await expect(page.getByRole("button", { name: /^Sculpt.*18:00/ })).toContainText("Sin coach asignada");
+    await page.locator('[data-dia="2026-11-02"]').click();
+    const barre = page.getByRole("button", { name: /^Barre.*07:00/ });
+    await expect(barre.locator('[data-lugar="alumna"]')).toHaveCount(2);
+    await expect(barre.locator('[data-lugar="totalpass"]')).toHaveCount(1);
+    await expect(barre.locator('[data-lugar="libre"]')).toHaveCount(4);
+    await expect(barre).toContainText("3/7");
+    await expect(barre).not.toContainText("TP");
   });
 });
