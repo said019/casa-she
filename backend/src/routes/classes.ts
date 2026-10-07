@@ -14,6 +14,7 @@ import { cancelClassWithRefunds } from '../lib/cancel-class.js';
 import { z } from 'zod';
 import { optionalAuth } from '../middleware/auth.js';
 import { capacityError } from '../lib/schedule.js';
+import { errorDeCupoAlEditar } from '../lib/class-capacity.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { setTotalpassCap } from '../lib/totalpass/caps.js';
 import { dispararRetiroTotalpass } from '../lib/totalpass/retire.js';
@@ -818,16 +819,10 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
 
         const data = validation.data;
 
-        if (data.maxCapacity !== undefined) {
-            const ctRow = await queryOne<{ category: string }>(
-                data.classTypeId
-                    ? `SELECT category FROM class_types WHERE id = $1`
-                    : `SELECT ct.category FROM classes c JOIN class_types ct ON ct.id = c.class_type_id WHERE c.id = $1`,
-                [data.classTypeId ?? req.params.id]
-            );
-            const capErrPut = capacityError(ctRow?.category ?? 'multi', data.maxCapacity);
-            if (capErrPut) return res.status(400).json({ error: capErrPut });
-        }
+        // Cupo vs. categoría: también cuando solo cambia el tipo (el frontend manda
+        // únicamente lo que cambió, así que el cupo puede no venir).
+        const capErrPut = await errorDeCupoAlEditar(pool, id, data);
+        if (capErrPut) return res.status(400).json({ error: capErrPut });
 
         // Check class exists
         const existing = await queryOne('SELECT * FROM classes WHERE id = $1', [id]);
