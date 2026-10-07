@@ -21,6 +21,7 @@ import { notifyPointsEarnedExternal } from '../lib/notifications.js';
 import { ImageStorageError, subirImagen } from '../lib/imageStorage.js';
 import { isValidTag } from '../lib/clientTags.js';
 import { findOrCreateGuest } from '../lib/guestUser.js';
+import { crearLinkAcceso } from '../lib/accessLinks.js';
 
 const router = Router();
 
@@ -855,6 +856,52 @@ router.post('/:id/resend-credentials', requireRole('admin', 'super_admin', 'rece
     } catch (error) {
         console.error('Resend credentials error:', error);
         res.status(500).json({ error: 'Error al reenviar credenciales' });
+    }
+});
+
+// ============================================
+// POST /api/users/:id/acceso - Genera un link de acceso (crear contraseña) para una alumna.
+// Es el "Mandar / Reenviar acceso por WhatsApp" de la ficha. Revoca los links activos
+// anteriores. Mismas guardas que resend-credentials: recepción solo a clientes; a un
+// super_admin solo otro super_admin (el link permite fijar la contraseña de la cuenta).
+// ============================================
+router.post('/:id/acceso', requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
+    try {
+        const id = String(req.params.id);
+        if (!/^[0-9a-f-]{36}$/i.test(id)) return res.status(404).json({ error: 'Usuario no encontrado' });
+        const target = await queryOne<{ id: string; role: string; is_active: boolean | null }>(
+            'SELECT id, role, is_active FROM users WHERE id = $1', [id],
+        );
+        if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+        // OJO: `req.user.role` es el rol OPERATIVO (recepción se mapea a 'admin'); la cuenta
+        // real está en `accountRole`. Con `role` esta guarda dejaría pasar a recepción.
+        const cuenta = req.user?.accountRole;
+        const requesterElevated = cuenta === 'admin' || cuenta === 'super_admin';
+        if (!requesterElevated && target.role !== 'client') {
+            return res.status(403).json({ error: 'Solo puedes mandar acceso a clientes.' });
+        }
+        if (target.role === 'super_admin' && cuenta !== 'super_admin') {
+            return res.status(403).json({ error: 'No autorizado para generar acceso a un super administrador.' });
+        }
+        if (target.is_active === false) {
+            return res.status(409).json({ error: 'La cuenta está desactivada.' });
+        }
+
+        const acceso = await crearLinkAcceso(pool, id, req.user!.userId);
+        // Nunca se registra el link ni el token: solo que se generó uno.
+        await logAction(query, {
+            adminUserId: req.user!.userId,
+            actionType: 'access_link_created',
+            entityType: 'user',
+            entityId: id,
+            description: 'Link de acceso generado',
+            req,
+        }).catch(e => console.error('Audit access link error (non-blocking):', e));
+        res.status(201).json(acceso);
+    } catch (error) {
+        console.error('Create access link error:', error);
+        res.status(500).json({ error: 'Error al generar el link de acceso' });
     }
 });
 

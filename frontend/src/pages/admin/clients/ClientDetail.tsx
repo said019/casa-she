@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BotonAccesoWhatsApp } from '@/components/clients/BotonAccesoWhatsApp';
 import { ClientCrmPanel } from '@/components/clients/ClientCrmPanel';
 import { AdjustCreditsDialog } from '@/components/clients/AdjustCreditsDialog';
 import ClientBitacora from '@/components/bitacora/ClientBitacora';
@@ -357,6 +358,13 @@ export default function ClientDetail() {
                                     <Pencil className="mr-2 h-4 w-4" />
                                     Editar
                                 </Button>
+
+                                <BotonAccesoWhatsApp
+                                    userId={client.id}
+                                    nombre={client.display_name}
+                                    telefono={client.phone}
+                                    className="rounded-xl font-body border-border/60 hover:border-balance-gold/50 hover:text-balance-gold transition-colors"
+                                />
 
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>

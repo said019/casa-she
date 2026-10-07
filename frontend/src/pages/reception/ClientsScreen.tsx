@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import { BotonAccesoWhatsApp } from '@/components/clients/BotonAccesoWhatsApp';
 import api, { getErrorMessage } from '@/lib/api';
 import { useIsElevated } from '@/hooks/useIsElevated';
 import { useHasPermission } from '@/hooks/useHasPermission';
@@ -911,6 +912,13 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
                                 {resendCredentials.isPending ? 'Enviando…' : 'Reenviar credenciales por WhatsApp'}
                             </Button>
                             <p className="mt-1.5 text-[11px] text-muted-foreground">Genera una contraseña nueva y se la envía al usuario.</p>
+                            <BotonAccesoWhatsApp
+                                userId={client.id}
+                                nombre={client.display_name}
+                                telefono={client.phone}
+                                className="mt-3 w-full gap-2"
+                            />
+                            <p className="mt-1.5 text-[11px] text-muted-foreground">Un link para que cree su propia contraseña. Vence en 7 días.</p>
                         </CardContent>
                     </Card>
 
