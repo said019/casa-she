@@ -1,10 +1,10 @@
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
-    Loader2, Calendar as CalendarIcon, Plus, Minus, Users, Trash2, Check, Edit, Phone, MessageCircle, Clock, MapPin, Sparkles, X, RotateCcw, Lock, Unlock,
+    Loader2, Calendar as CalendarIcon, Plus, Minus, Users, UserRound, Trash2, Check, Edit, Phone, MessageCircle, Clock, MapPin, X, RotateCcw, Lock, Unlock,
 } from 'lucide-react';
 import api, { getErrorMessage } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -15,8 +15,9 @@ import { CancelBookingDialog } from '@/components/bookings/CancelBookingDialog';
 import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import SellPlanDialog from '@/components/memberships/SellPlanDialog';
 import { ChannelLogo } from '@/components/brands/ChannelLogo';
+import { ChannelDot, PuntoLugar } from '@/components/brands/ChannelDot';
 import { PlanLabel } from '@/components/brands/PlanLabel';
-import { CANALES, canalDePlan, esCanal } from '@/lib/canales';
+import { CANALES, canalDePlan, canalesConectados, esCanal, type Canal, type CanalClave } from '@/lib/canales';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -28,19 +29,27 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { useToast } from '@/components/ui/use-toast';
 import type { Attendee } from './tipos';
 import { attendeeBookedBy, getInitials, whatsAppDeAsistente } from './formato';
+import { estiloDeLugar, etiquetaCupoLarga, lugaresDeClase, type Lugar } from './lugares';
+import { colorPuntoAlumna } from './colores';
 
 interface PanelClaseProps {
+    /** La clase con sus datos vigentes: el padre la vuelve a leer de la lista al refrescar. */
     clase: Class | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onEditar: () => void;
+    onCambiarCoach: () => void;
     onCancelar: () => void;
-    /** Ajusta la clase seleccionada del padre (gratis, cupo cerrado, cupo TotalPass) sin esperar a recargar. */
-    onClaseCambiada: Dispatch<SetStateAction<Class | null>>;
 }
 
-/** Panel lateral de una clase: datos, acciones, inscribir, cupo, inscritas y lista de espera. Movido sin cambios de ClassesCalendar. */
-export function PanelClase({ clase, open, onOpenChange, onEditar, onCancelar, onClaseCambiada }: PanelClaseProps) {
+const claveDeLugar = (l: Lugar) => (l.tipo === 'canal' ? l.canal : l.tipo);
+
+/**
+ * Panel lateral de una clase, en el orden en que recepción lo usa: qué clase es y cómo va
+ * de lugares; acciones; inscribir alumna; cupo de cada plataforma conectada; inscritas
+ * (check-in, invitadas, lista de espera); cerrar cupo y clase gratis.
+ */
+export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach, onCancelar }: PanelClaseProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const user = useAuthStore((s) => s.user);
@@ -54,6 +63,8 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCancelar, on
     // Cliente al que se le ofrece venderle un plan (cuando reservar falló por falta de plan).
     const [sellFor, setSellFor] = useState<{ id: string; name: string } | null>(null);
     const [sellOpen, setSellOpen] = useState(false);
+    // Cancelar reserva confirmada → diálogo con switch de devolución de crédito (estilo Fitune).
+    const [cancelBookingId, setCancelBookingId] = useState<string | null>(null);
 
     const { data: attendees, isLoading: attendeesLoading, refetch: refetchAttendees } = useQuery<Attendee[]>({
         queryKey: ['attendees', clase?.id],
@@ -66,6 +77,10 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCancelar, on
         queryFn: async () => (await api.get(`/users?search=${encodeURIComponent(userSearch)}&limit=8`)).data,
         enabled: searchActive && userSearch.trim().length >= 2,
     });
+
+    // El panel lee la clase de la lista de clases: esperar a que se recargue hace que los
+    // puntos, el candado, la etiqueta de gratis y el cupo cambien en cuanto termina la acción.
+    const refrescarClases = () => queryClient.invalidateQueries({ queryKey: ['classes'] });
 
     const adminBookMutation = useMutation({
         mutationFn: async ({ classId, userId, free }: { classId: string; userId: string; userName?: string; free?: boolean }) =>
@@ -92,10 +107,9 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCancelar, on
     const toggleFreeMutation = useMutation({
         mutationFn: async ({ id, is_free, free_label, force }: { id: string; is_free: boolean; free_label?: string; force?: boolean }) =>
             api.patch(`/classes/${id}/free`, { is_free, free_label, force }),
-        onSuccess: (_, vars) => {
-            queryClient.invalidateQueries({ queryKey: ['classes'] });
+        onSuccess: async (_, vars) => {
             queryClient.invalidateQueries({ queryKey: ['attendees', clase?.id] });
-            onClaseCambiada((prev) => prev ? { ...prev, is_free: vars.is_free, free_label: vars.free_label || null } : prev);
+            await refrescarClases();
             toast({ title: vars.is_free ? 'Clase marcada como gratis' : 'Clase ya no es gratis' });
         },
         onError: (err: any) => {
@@ -114,9 +128,8 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCancelar, on
     const closeBookingsMutation = useMutation({
         mutationFn: async ({ id, closed }: { id: string; closed: boolean }) =>
             api.patch(`/classes/${id}/close-bookings`, { closed }),
-        onSuccess: (_, vars) => {
-            queryClient.invalidateQueries({ queryKey: ['classes'] });
-            onClaseCambiada((prev) => prev ? { ...prev, booking_closed: vars.closed } : prev);
+        onSuccess: async (_, vars) => {
+            await refrescarClases();
             toast({ title: vars.closed ? 'Clase cerrada para nuevas reservas' : 'Clase reabierta' });
         },
         onError: (err: any) => {
@@ -124,13 +137,14 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCancelar, on
         },
     });
 
-    // Cupo de TotalPass de la clase (lugares reservados al canal TotalPass).
-    const setTotalpassSpotsMutation = useMutation({
-        mutationFn: async (n: number) => (await api.put(`/classes/${clase!.id}/channels`, { totalpass: n })).data,
-        onSuccess: (_, n) => {
-            queryClient.invalidateQueries({ queryKey: ['classes'] });
-            onClaseCambiada((prev) => prev ? { ...prev, totalpass_spots: n } : prev);
-            toast({ title: 'Cupo TotalPass actualizado', description: `${n} lugar${n === 1 ? '' : 'es'} para TotalPass.` });
+    // Lugares que cada plataforma conectada puede vender en esta clase. El backend recibe { <canal>: lugares }.
+    const cupoCanalMutation = useMutation({
+        mutationFn: async ({ canal, lugares }: { canal: CanalClave; lugares: number }) =>
+            (await api.put(`/classes/${clase!.id}/channels`, { [canal]: lugares })).data,
+        onSuccess: async (_, { canal, lugares }) => {
+            await refrescarClases();
+            const nombre = CANALES[canal].nombre;
+            toast({ title: `Cupo de ${nombre} actualizado`, description: `${lugares} lugar${lugares === 1 ? '' : 'es'} para ${nombre}.` });
         },
         onError: (err: any) => {
             toast({ variant: 'destructive', title: 'Error', description: err?.response?.data?.error || getErrorMessage(err) });
@@ -173,9 +187,6 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCancelar, on
         onError: (err) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) }),
     });
 
-    // Cancelar reserva confirmada → diálogo con switch de devolución de crédito (estilo Fitune).
-    const [cancelBookingId, setCancelBookingId] = useState<string | null>(null);
-
     const promoteWaitlistMutation = useMutation({
         mutationFn: async (bookingId: string) => api.post(`/bookings/${bookingId}/waitlist-promote`),
         onSuccess: () => {
@@ -195,6 +206,11 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCancelar, on
             (parseInt(clase.end_time.slice(0, 2)) * 60 + parseInt(clase.end_time.slice(3, 5))) -
             (parseInt(clase.start_time.slice(0, 2)) * 60 + parseInt(clase.start_time.slice(3, 5))))
         : 0;
+
+    const cancelada = clase?.status === 'cancelled';
+    const coach = clase?.instructor_name?.trim() || '';
+    const lugares = clase ? lugaresDeClase(clase) : null;
+    const colorAlumna = colorPuntoAlumna(clase?.class_type_color);
 
     const renderAttendee = (attendee: Attendee, mode: 'reservado' | 'espera' | 'cancelado') => (
         <div
@@ -297,195 +313,93 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCancelar, on
     return (
         <>
             <Sheet open={open && !!clase} onOpenChange={onOpenChange}>
-                <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-lg">
-                    {/* ── Encabezado estilo Fitune: info de la clase ── */}
-                    <div className="border-b border-balance-sand/50 bg-balance-cream/40 p-5">
+                <SheetContent className="w-full overflow-y-auto p-0 font-body sm:max-w-lg">
+                    {/* ── Qué clase es y cómo va de lugares ── */}
+                    <div className="border-b border-casa-arena bg-casa-avena/60 p-5">
                         <SheetHeader className="space-y-0 text-left">
-                            <SheetTitle className="flex flex-wrap items-center gap-2 text-xl">
+                            <SheetTitle className="flex flex-wrap items-center gap-2 font-heading text-2xl font-normal text-casa-profundo">
                                 {clase?.class_type_name}
                                 <ClassIntensity intensity={clase?.intensity} />
-                                {clase?.status === 'cancelled' && (
-                                    <Badge variant="destructive">Cancelada</Badge>
-                                )}
-                                {clase?.is_free && (
-                                    <Badge className="bg-emerald-600 text-white">{clase.free_label || 'Gratis'}</Badge>
+                                {cancelada && <Badge variant="destructive">Cancelada</Badge>}
+                                {clase?.is_free && <Badge className="bg-emerald-600 text-white">{clase.free_label || 'Gratis'}</Badge>}
+                                {clase?.booking_closed && !cancelada && (
+                                    <Badge variant="outline" className="border-amber-400 text-amber-800"><Lock className="mr-1 h-3 w-3" />Cupo cerrado</Badge>
                                 )}
                             </SheetTitle>
                             <SheetDescription className="sr-only">Detalle de la clase y asistentes</SheetDescription>
                         </SheetHeader>
-                        <div className="mt-4 space-y-2.5 text-sm text-balance-dark">
-                            <div className="flex items-center gap-3">
-                                <CalendarIcon className="h-4 w-4 shrink-0 text-balance-olive" />
+                        <div className="mt-3 space-y-1.5 text-sm text-casa-ciruela">
+                            <p className="flex items-center gap-2.5">
+                                <CalendarIcon className="h-4 w-4 shrink-0 text-casa-verde" />
                                 <span className="capitalize">
                                     {clase && format(parseISO((clase.date || '').split('T')[0] + 'T00:00:00'), "EEEE d 'de' MMMM", { locale: es })}
                                 </span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Clock className="h-4 w-4 shrink-0 text-balance-olive" />
+                            </p>
+                            <p className="flex items-center gap-2.5">
+                                <Clock className="h-4 w-4 shrink-0 text-casa-verde" />
                                 <span>{clase?.start_time?.slice(0, 5)} – {clase?.end_time?.slice(0, 5)}</span>
                                 {classDurationMin > 0 && <span className="text-muted-foreground">· {classDurationMin} min</span>}
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Users className="h-4 w-4 shrink-0 text-balance-olive" />
-                                <span>{clase?.instructor_name || 'Coach por confirmar'}</span>
-                            </div>
+                            </p>
+                            <p className="flex items-center gap-2.5">
+                                <UserRound className="h-4 w-4 shrink-0 text-casa-verde" />
+                                {coach ? <span>Con {coach}</span> : <span className="font-semibold text-destructive">Sin coach asignada</span>}
+                            </p>
                             {clase?.facility_name && (
-                                <div className="flex items-center gap-3">
-                                    <MapPin className="h-4 w-4 shrink-0 text-balance-olive" />
+                                <p className="flex items-center gap-2.5">
+                                    <MapPin className="h-4 w-4 shrink-0 text-casa-verde" />
                                     <span>{clase.facility_name}</span>
-                                </div>
+                                </p>
                             )}
-                            <div className="flex items-center gap-3">
-                                <Sparkles className="h-4 w-4 shrink-0 text-balance-olive" />
-                                <span>{clase?.current_bookings ?? 0} / {clase?.max_capacity ?? 0} lugares</span>
-                            </div>
                         </div>
-                    </div>
-
-                    <div className="space-y-5 p-5">
-
-                        {/* Actions */}
-                        {clase?.status !== 'cancelled' && (
-                            <div className="flex gap-2">
-                                <Button variant="outline" className="flex-1" onClick={onEditar}>
-                                    <Edit className="mr-2 h-4 w-4" /> Editar
-                                </Button>
-                                <Button
-                                    variant="destructive"
-                                    className="flex-1"
-                                    onClick={() => onCancelar()}
-                                >
-                                    <Trash2 className="mr-2 h-4 w-4" /> Cancelar Clase
-                                </Button>
-                            </div>
-                        )}
-
-                        {/* Cupo de TotalPass */}
-                        {clase?.status !== 'cancelled' && (
-                            <div className="rounded-xl border border-balance-sand/55 bg-balance-cream/45 p-3">
-                                <div className="mb-2 flex items-center gap-2">
-                                    <p className="flex items-center gap-2 text-sm font-semibold">
-                                        Lugares para <ChannelLogo canal="totalpass" alto={12} />
-                                    </p>
+                        {lugares && !cancelada && (
+                            <div className="mt-4 space-y-2" data-testid="lugares-panel">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    {lugares.lugares.map((l, i) => {
+                                        const e = estiloDeLugar(l, colorAlumna);
+                                        return <PuntoLugar key={i} relleno={e.relleno} anillo={e.anillo} tamano={20} data-lugar={claveDeLugar(l)} />;
+                                    })}
+                                    <span className="ml-2 font-semibold text-casa-ciruela">{etiquetaCupoLarga(lugares)}</span>
                                 </div>
-                                <div className="flex items-center justify-center gap-4">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        className="h-9 w-9 shrink-0 rounded-full"
-                                        disabled={
-                                            setTotalpassSpotsMutation.isPending ||
-                                            (clase?.totalpass_spots ?? 0) <= 0
-                                        }
-                                        onClick={() => {
-                                            if (!clase) return;
-                                            const next = Math.max(0, (clase.totalpass_spots ?? 0) - 1);
-                                            setTotalpassSpotsMutation.mutate(next);
-                                        }}
-                                    >
-                                        <Minus className="h-4 w-4" />
-                                    </Button>
-                                    <span className="w-10 text-center text-2xl font-bold tabular-nums text-balance-dark">
-                                        {clase?.totalpass_spots ?? 0}
-                                    </span>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        className="h-9 w-9 shrink-0 rounded-full"
-                                        disabled={
-                                            setTotalpassSpotsMutation.isPending ||
-                                            (clase?.totalpass_spots ?? 0) >= (clase?.max_capacity ?? 0)
-                                        }
-                                        onClick={() => {
-                                            if (!clase) return;
-                                            const next = Math.min(
-                                                clase.max_capacity ?? 0,
-                                                (clase.totalpass_spots ?? 0) + 1
-                                            );
-                                            setTotalpassSpotsMutation.mutate(next);
-                                        }}
-                                    >
-                                        <Plus className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                                <p className="mt-1.5 text-center text-[11px] text-muted-foreground">
-                                    de {clase?.max_capacity ?? 0} · 0 = no se ofrece en TotalPass
+                                <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-casa-ciruela/75">
+                                    <span>{lugares.alumnas} {lugares.alumnas === 1 ? 'alumna' : 'alumnas'} de Casa Shé</span>
+                                    {lugares.porCanal.map((x) => (
+                                        <span key={x.canal} className="flex items-center gap-1.5">
+                                            {esCanal(x.canal) ? (
+                                                <>
+                                                    <ChannelDot canal={x.canal} />
+                                                    {x.reservados} {x.reservados === 1 ? 'socia' : 'socias'}
+                                                    <ChannelLogo canal={x.canal} alto={9} />
+                                                </>
+                                            ) : (
+                                                <>{x.reservados} de {x.canal}</>
+                                            )}
+                                        </span>
+                                    ))}
                                 </p>
                             </div>
                         )}
+                    </div>
 
-                        {/* Cerrar / reabrir el horario (candado de reservas, sin cancelar) */}
-                        {clase && clase.status !== 'cancelled' && (
-                            clase.booking_closed ? (
-                                <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3">
-                                    <div className="flex items-center gap-2 text-sm text-amber-800">
-                                        <Lock className="h-4 w-4 shrink-0" />
-                                        <span>Cerrada — no entran nuevas reservas.</span>
-                                    </div>
-                                    <Button variant="outline" size="sm" className="shrink-0" disabled={closeBookingsMutation.isPending}
-                                        onClick={() => closeBookingsMutation.mutate({ id: clase.id, closed: false })}>
-                                        <Unlock className="mr-1 h-3 w-3" /> Reabrir
-                                    </Button>
-                                </div>
-                            ) : (
-                                <Button variant="outline" className="w-full text-muted-foreground" disabled={closeBookingsMutation.isPending}
-                                    onClick={() => closeBookingsMutation.mutate({ id: clase.id, closed: true })}>
-                                    <Lock className="mr-2 h-4 w-4" /> Cerrar cupo (no entran nuevas reservas)
+                    <div className="space-y-5 p-5">
+                        {/* Acciones */}
+                        {!cancelada && (
+                            <div className="grid grid-cols-3 gap-2">
+                                <Button variant="outline" className="px-2" onClick={onEditar}>
+                                    <Edit className="mr-1.5 h-4 w-4" /> Editar clase
                                 </Button>
-                            )
-                        )}
-
-                        {/* Free class toggle (admin/super_admin) */}
-                        {isAdmin && clase?.status !== 'cancelled' && (
-                            <div className={`rounded-xl border p-3 ${clase?.is_free ? 'border-emerald-300 bg-emerald-50' : 'border-balance-sand/55 bg-balance-cream/45'}`}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <div>
-                                        <p className="text-sm font-semibold">Clase gratis</p>
-                                        <p className="text-[11px] text-muted-foreground">
-                                            Sin cobro, sin descontar crédito. Usuarios sin paquete pueden reservar.
-                                        </p>
-                                    </div>
-                                    <Switch
-                                        checked={!!clase?.is_free}
-                                        onCheckedChange={(v) => {
-                                            if (!clase) return;
-                                            toggleFreeMutation.mutate({
-                                                id: clase.id,
-                                                is_free: v,
-                                                free_label: v ? (clase.free_label || 'Clase gratis') : undefined,
-                                            });
-                                        }}
-                                        disabled={toggleFreeMutation.isPending}
-                                    />
-                                </div>
-                                {clase?.is_free && (
-                                    <div className="flex items-center gap-2 mt-2">
-                                        <Input
-                                            placeholder="Etiqueta visible (ej. Opening Day)"
-                                            defaultValue={clase.free_label || ''}
-                                            onBlur={(e) => {
-                                                const v = e.target.value.trim() || 'Clase gratis';
-                                                if (v !== clase.free_label) {
-                                                    toggleFreeMutation.mutate({
-                                                        id: clase.id,
-                                                        is_free: true,
-                                                        free_label: v,
-                                                    });
-                                                }
-                                            }}
-                                            className="h-8 text-xs"
-                                        />
-                                    </div>
-                                )}
+                                <Button variant="outline" className="px-2" onClick={onCambiarCoach}>
+                                    <Users className="mr-1.5 h-4 w-4" /> Cambiar coach
+                                </Button>
+                                <Button variant="destructive" className="px-2" onClick={onCancelar}>
+                                    <Trash2 className="mr-1.5 h-4 w-4" /> Cancelar clase
+                                </Button>
                             </div>
                         )}
 
-                        {/* Add user to class */}
-                        {clase?.status !== 'cancelled' && (
-                            <div className="rounded-xl border border-balance-sand/55 bg-balance-cream/45 p-3 space-y-2">
-                                <p className="text-sm font-semibold">Agregar usuario a la clase</p>
+                        {/* Inscribir alumna (la Entrega 4 lo rehace con créditos y venta de paquete) */}
+                        {!cancelada && (
+                            <section aria-labelledby="panel-inscribir" className="space-y-2 rounded-xl border border-casa-arena bg-casa-avena/45 p-3">
+                                <h3 id="panel-inscribir" className="text-sm font-semibold text-casa-ciruela">Inscribir alumna</h3>
                                 {sellFor && (
                                     <div className="flex items-center justify-between gap-2 rounded-lg border border-balance-gold/40 bg-balance-gold/10 p-2.5">
                                         <p className="text-xs text-balance-gold">
@@ -568,10 +482,21 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCancelar, on
                                         ))}
                                     </div>
                                 )}
-                            </div>
+                            </section>
                         )}
 
-                        {/* ── Asistentes: pestañas Reservado / Lista de espera / Cancelado ── */}
+                        {/* Cupo de cada plataforma conectada (hoy TotalPass) */}
+                        {!cancelada && clase && canalesConectados().map((canal) => (
+                            <ControlCupoCanal
+                                key={canal.clave}
+                                canal={canal}
+                                clase={clase}
+                                ocupado={cupoCanalMutation.isPending}
+                                onCambiar={(n) => cupoCanalMutation.mutate({ canal: canal.clave, lugares: n })}
+                            />
+                        ))}
+
+                        {/* ── Inscritas: pestañas Reservado / Lista de espera / Cancelado ── */}
                         <Tabs value={attendeesTab} onValueChange={(v) => setAttendeesTab(v as 'reservado' | 'espera' | 'cancelado')}>
                             <TabsList className="grid w-full grid-cols-3">
                                 <TabsTrigger value="reservado">Reservado <span className="ml-1.5 text-xs opacity-70">{reservados.length}</span></TabsTrigger>
@@ -601,6 +526,71 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCancelar, on
                                 </>
                             )}
                         </Tabs>
+
+                        {/* Cerrar / reabrir el horario (candado de reservas, sin cancelar) */}
+                        {clase && !cancelada && (
+                            clase.booking_closed ? (
+                                <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3">
+                                    <div className="flex items-center gap-2 text-sm text-amber-800">
+                                        <Lock className="h-4 w-4 shrink-0" />
+                                        <span>Cerrada — no entran nuevas reservas.</span>
+                                    </div>
+                                    <Button variant="outline" size="sm" className="shrink-0" disabled={closeBookingsMutation.isPending}
+                                        onClick={() => closeBookingsMutation.mutate({ id: clase.id, closed: false })}>
+                                        <Unlock className="mr-1 h-3 w-3" /> Reabrir
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Button variant="outline" className="w-full text-muted-foreground" disabled={closeBookingsMutation.isPending}
+                                    onClick={() => closeBookingsMutation.mutate({ id: clase.id, closed: true })}>
+                                    <Lock className="mr-2 h-4 w-4" /> Cerrar cupo (no entran nuevas reservas)
+                                </Button>
+                            )
+                        )}
+
+                        {/* Clase gratis (admin/super_admin) */}
+                        {isAdmin && clase && !cancelada && (
+                            <div className={`rounded-xl border p-3 ${clase.is_free ? 'border-emerald-300 bg-emerald-50' : 'border-casa-arena bg-casa-avena/45'}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                    <div>
+                                        <p className="text-sm font-semibold">Clase gratis</p>
+                                        <p className="text-[11px] text-muted-foreground">
+                                            Sin cobro, sin descontar crédito. Usuarios sin paquete pueden reservar.
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={!!clase.is_free}
+                                        onCheckedChange={(v) => {
+                                            toggleFreeMutation.mutate({
+                                                id: clase.id,
+                                                is_free: v,
+                                                free_label: v ? (clase.free_label || 'Clase gratis') : undefined,
+                                            });
+                                        }}
+                                        disabled={toggleFreeMutation.isPending}
+                                    />
+                                </div>
+                                {clase.is_free && (
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <Input
+                                            placeholder="Etiqueta visible (ej. Opening Day)"
+                                            defaultValue={clase.free_label || ''}
+                                            onBlur={(e) => {
+                                                const v = e.target.value.trim() || 'Clase gratis';
+                                                if (v !== clase.free_label) {
+                                                    toggleFreeMutation.mutate({
+                                                        id: clase.id,
+                                                        is_free: true,
+                                                        free_label: v,
+                                                    });
+                                                }
+                                            }}
+                                            className="h-8 text-xs"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </SheetContent>
             </Sheet>
@@ -618,5 +608,58 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCancelar, on
                 </DialogContent>
             </Dialog>
         </>
+    );
+}
+
+/**
+ * Lugares que una plataforma conectada puede vender en esta clase. No deja bajar de las
+ * socias ya inscritas (el servidor lo rechazaría) ni pasar del cupo de la clase.
+ */
+function ControlCupoCanal({ canal, clase, ocupado, onCambiar }: {
+    canal: Canal;
+    clase: Class;
+    ocupado: boolean;
+    onCambiar: (lugares: number) => void;
+}) {
+    const fila = clase.channels?.find((c) => c.channel === canal.clave);
+    const max = Number(fila?.max ?? (canal.clave === 'totalpass' ? clase.totalpass_spots ?? 0 : 0));
+    const inscritas = Number(fila?.booked ?? 0);
+    const capacidad = Number(clase.max_capacity || 0);
+    return (
+        <section aria-label={`Lugares para ${canal.nombre}`} className="flex items-center gap-3 rounded-xl border border-casa-arena bg-casa-avena/45 p-3">
+            <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-2 text-sm font-semibold text-casa-ciruela">
+                    Lugares para <ChannelLogo canal={canal.clave} alto={12} />
+                </p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {inscritas} {inscritas === 1 ? 'socia inscrita' : 'socias inscritas'} · de {capacidad} · 0 = no se ofrece en {canal.nombre}
+                </p>
+            </div>
+            <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-full"
+                aria-label="Un lugar menos"
+                disabled={ocupado || max <= Math.max(0, inscritas)}
+                onClick={() => onCambiar(max - 1)}
+            >
+                <Minus className="h-4 w-4" />
+            </Button>
+            <span data-testid={`cupo-${canal.clave}`} className="w-8 text-center text-2xl font-bold tabular-nums text-casa-profundo">
+                {max}
+            </span>
+            <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-full"
+                aria-label="Un lugar más"
+                disabled={ocupado || max >= capacidad}
+                onClick={() => onCambiar(max + 1)}
+            >
+                <Plus className="h-4 w-4" />
+            </Button>
+        </section>
     );
 }

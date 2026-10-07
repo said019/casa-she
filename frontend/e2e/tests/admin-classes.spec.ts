@@ -204,4 +204,47 @@ test.describe("Calendario de recepción – semana por horas", () => {
       return ladoALado ? "lado a lado" : `encimadas: ${JSON.stringify([a, b])}`;
     }).toBe("lado a lado");
   });
+
+  test("panel: lugares grandes, acciones, inscribir arriba y cupo por canal conectado", async ({ adminPage: page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await mockSemanaCalendario(page);
+    const cupos: unknown[] = [];
+    await page.route(/\/api\/classes\/[^/?]+\/channels$/, async (route) => {
+      cupos.push(route.request().postDataJSON());
+      await route.fulfill({ json: { ok: true } });
+    });
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+
+    await page.getByRole("button", { name: /^Barre.*07:00/ }).click();
+    const panel = page.getByRole("dialog");
+    const lugares = panel.getByTestId("lugares-panel");
+    await expect(lugares.locator('[data-lugar="alumna"]')).toHaveCount(2);
+    await expect(lugares.locator('[data-lugar="totalpass"]')).toHaveCount(1);
+    await expect(lugares).toContainText("3 de 7 · 4 libres");
+    for (const boton of ["Editar clase", "Cambiar coach", "Cancelar clase"]) {
+      await expect(panel.getByRole("button", { name: boton })).toBeVisible();
+    }
+
+    const inscribir = panel.getByRole("heading", { name: "Inscribir alumna" });
+    const cupo = panel.getByRole("region", { name: "Lugares para TotalPass" });
+    await expect.poll(async () => (await arriba(inscribir)) < (await arriba(cupo))).toBe(true);
+    await expect(cupo.getByTestId("cupo-totalpass")).toHaveText("2");
+    await cupo.getByRole("button", { name: "Un lugar menos" }).click();
+    await expect.poll(() => cupos).toEqual([{ totalpass: 1 }]);
+
+    await panel.getByRole("button", { name: "Cambiar coach" }).click();
+    const coach = page.getByRole("heading", { name: "Cambiar coach" });
+    await expect(coach).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(coach).toBeHidden();
+    // Con un aviso en pantalla, Escape cierra el aviso y no el panel: se cierra con su botón.
+    await panel.getByRole("button", { name: "Close" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
+    // Pilates Mat: 2 socias ya inscritas con cupo 2 → no se puede bajar.
+    await page.getByRole("button", { name: /^Pilates Mat.*08:00/ }).click();
+    await expect(
+      page.getByRole("dialog").getByRole("region", { name: "Lugares para TotalPass" }).getByRole("button", { name: "Un lugar menos" }),
+    ).toBeDisabled();
+  });
 });

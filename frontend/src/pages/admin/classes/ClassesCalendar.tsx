@@ -66,10 +66,14 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         setCurrentDate, weekStart, mobileSelectedDay, setMobileSelectedDay,
         classTypeFilter, setClassTypeFilter, programFilter, setProgramFilter, instructorFilter, setInstructorFilter,
         classTypes, instructors, facilities,
-        classesLoading, classesError, refetchClasses,
+        classes, classesLoading, classesError, refetchClasses,
         closedDaySet, getClosedReason, getClassesForDay, weekDays,
         handlePrevWeek, handleNextWeek, handleToday,
     } = useSemanaClases();
+
+    // El panel y los diálogos usan la versión más reciente de la clase abierta: después de
+    // inscribir, cambiar el cupo o cerrar la clase, la lista se recarga y aquí llega ya cambiada.
+    const claseVigente = (selectedClass && classes?.find((c) => c.id === selectedClass.id)) || selectedClass;
 
     const resumenSemana = textoResumenSemana(resumenDeClases(weekDays.flatMap((dia) => getClassesForDay(dia))));
 
@@ -255,12 +259,12 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
             )}
 
             <PanelClase
-                clase={selectedClass}
+                clase={claseVigente}
                 open={isAttendeesOpen}
                 onOpenChange={(open) => { setIsAttendeesOpen(open); if (!open) setSelectedClass(null); }}
                 onEditar={handleEditClass}
+                onCambiarCoach={handleChangeCoach}
                 onCancelar={() => setCancelChoiceOpen(true)}
-                onClaseCambiada={setSelectedClass}
             />
 
             <DialogoGenerar open={isGenerateOpen} onOpenChange={setIsGenerateOpen} onGenerado={setCurrentDate} />
@@ -277,7 +281,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                 key={`editar-${claveEdicion}`}
                 open={isEditOpen}
                 onOpenChange={setIsEditOpen}
-                clase={selectedClass}
+                clase={claseVigente}
                 classTypes={classTypes}
                 instructors={instructors}
                 facilities={facilities}
@@ -286,12 +290,12 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
             />
             <DialogoCopiarSemana key={`copia-${claveCopia}`} open={isCopyWeekOpen} onOpenChange={setIsCopyWeekOpen} weekStart={weekStart} />
             <DialogoGratis open={isBulkFreeOpen} onOpenChange={setIsBulkFreeOpen} />
-            <DialogoCancelarClase open={cancelChoiceOpen} onOpenChange={setCancelChoiceOpen} clase={selectedClass} onCancelada={cerrarPanel} />
+            <DialogoCancelarClase open={cancelChoiceOpen} onOpenChange={setCancelChoiceOpen} clase={claseVigente} onCancelada={cerrarPanel} />
             <DialogoCambiarCoach
                 key={`coach-${claveCoach}`}
                 open={isChangeCoachOpen}
                 onOpenChange={setIsChangeCoachOpen}
-                clase={selectedClass}
+                clase={claseVigente}
                 instructors={instructors}
                 onAplicado={() => setIsEditOpen(false)}
             />
