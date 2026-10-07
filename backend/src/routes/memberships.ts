@@ -14,6 +14,7 @@ import { isElevated } from '../lib/elevation.js';
 import { openShiftForUser } from '../lib/openShift.js';
 import { manualDiscountNote, resolveManualPriceAdjustment } from '../lib/manual-price-adjustment.js';
 import { addDaysToDate, cdmxToday } from '../lib/schedule.js';
+import { asignarMembresiaEnTx } from '../lib/asignarMembresia.js';
 import { civilDate, MembershipDateInputError, resolveStaffMembershipDates } from '../lib/membershipActivation.js';
 
 const router = Router();
@@ -427,102 +428,18 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
         let end = endDate || addDaysToDate(startDate, Number(plan.duration_days || 0));
         try {
             await client.query('BEGIN');
-            let purchasePointsAwarded = 0;
 
-            if (status === 'active') {
-                const dates = await resolveStaffMembershipDates(client, {
-                    userId,
-                    durationDays: Number(plan.duration_days || 0),
-                    requestedStartDate: startDate,
-                    requestedEndDate: endDate,
-                });
-                start = dates.startDate;
-                end = dates.endDate;
-            }
-
-            // 1. Create membership
-            const normalizedPaymentMethod = paymentMethod === 'bank_transfer' ? 'transfer' : (paymentMethod || null);
-
-            const policyRowAdmin = await client.query(`SELECT value FROM system_settings WHERE key = 'cancellation_policy'`);
-            const cancellationLimit = Number(policyRowAdmin.rows[0]?.value?.cancellations_per_membership ?? 2);
-
-            const membershipResult = await client.query(
-                `INSERT INTO memberships (
-          user_id, plan_id, start_date, end_date, status, classes_remaining, reformer_remaining, multi_remaining, payment_method, payment_reference, cancellation_limit, activated_by, activated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
-        RETURNING *`,
-                [
-                    userId,
-                    planId,
-                    status === 'active' ? start : null,
-                    status === 'active' ? end : null,
-                    status,
-                    plan.class_limit ?? null,
-                    plan.reformer_credits ?? null,
-                    plan.multi_credits ?? null,
-                    normalizedPaymentMethod,
-                    notes || null,
-                    cancellationLimit,
-                    req.user?.userId ?? null,
-                ]
-            );
-            const membership = membershipResult.rows[0];
-
-            // 2. Record payment if method provided
-            if (normalizedPaymentMethod) {
-                // Cortesía $0: amount=0 (no da puntos ni suma a caja), sin descuento founder.
-                const discount = isGratis
-                    ? { amount: 0, applied: false, discountAmount: 0 }
-                    : manualAdjustment.applied
-                        ? manualAdjustment
-                    : await consumeFounderFirstPackageDiscount({
-                        db: client,
-                        userId,
-                        listPrice: Number(plan.price),
-                    });
-                const paymentAmount = discount.amount;
-                const paymentNotes = isGratis
-                    ? [notes, `Cortesía gratis. Motivo: ${gratisReason}`].filter(Boolean).join(' | ')
-                    : manualAdjustment.applied
-                        ? [notes, manualDiscountNote(manualAdjustment)].filter(Boolean).join(' | ')
-                    : discount.applied
-                        ? [notes, `Descuento founder 10% aplicado (-$${discount.discountAmount})`].filter(Boolean).join(' | ')
-                        : (notes || null);
-
-                const shiftA = await openShiftForUser(req.user?.userId || '');
-                const payResult = await client.query(
-                    `INSERT INTO payments (
-            user_id, membership_id, amount, currency,
-            payment_method, reference, notes, status, processed_by, shift_id, facility_id
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', $8, $9, $10)
-          RETURNING id`,
-                    [
-                        userId,
-                        membership.id,
-                        paymentAmount,
-                        plan.currency,
-                        normalizedPaymentMethod,
-                        null,
-                        paymentNotes,
-                        req.user?.userId || null,
-                        shiftA?.id || null,
-                        shiftA?.facility_id || null,
-                    ]
-                );
-
-                // Award loyalty points for payment — puntos por precio
-                // (computePaymentPoints; efectivo 2×). classLimit ya no se usa.
-                if (payResult.rows[0]?.id) {
-                    purchasePointsAwarded = await awardPaymentLoyaltyPoints({
-                        db: client,
-                        userId,
-                        paymentId: payResult.rows[0].id,
-                        amount: paymentAmount,
-                        paymentMethod: normalizedPaymentMethod,
-                        classLimit: plan.class_limit ?? null,
-                    }).catch(e => { console.error('Loyalty points error:', e); return 0; });
-                }
-            }
+            // Membresía + pago + puntos: lógica compartida con el alta rápida (lib/asignarMembresia.ts).
+            const asignada = await asignarMembresiaEnTx(client, {
+                userId, plan, startDate, endDate, status,
+                paymentMethod: paymentMethod === 'bank_transfer' ? 'transfer' : (paymentMethod || null),
+                isGratis, gratisReason, notes, manualAdjustment,
+                actorUserId: req.user?.userId ?? null,
+            });
+            const membership = asignada.membership;
+            const purchasePointsAwarded = asignada.purchasePointsAwarded;
+            start = asignada.start;
+            end = asignada.end;
 
             await client.query('COMMIT');
 

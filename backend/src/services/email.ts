@@ -13,6 +13,10 @@ import { isPlatformMemberByEmail } from '../lib/platformMember.js';
 
 let resendClient: Resend | null = null;
 
+function escapeHtml(v: string): string {
+    return v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function getResend(): Resend {
     if (!resendClient) {
         const apiKey = process.env.RESEND_API_KEY;
@@ -862,6 +866,46 @@ export async function sendClientWelcomeEmail({
         return { id: data?.id };
     } catch (err) {
         console.error('[email] sendClientWelcomeEmail:', err);
+        return null;
+    }
+}
+
+/**
+ * Bienvenida con el link para crear contraseña (alta rápida desde recepción). Solo sale si
+ * Resend está configurado y NUNCA lanza: la alumna ya quedó registrada.
+ */
+export async function sendAccesoAlumnaEmail({ to, clientName, url, clase }: {
+    to: string;
+    clientName: string;
+    url: string;
+    /** Ej. "Barre el miércoles 7 de octubre a las 8:00". */
+    clase?: string | null;
+}) {
+    if (!process.env.RESEND_API_KEY) return null;
+    try {
+        const nombre = escapeHtml(clientName.trim().split(/\s+/)[0] || clientName);
+        const html = wrapEmail({
+            title: `Bienvenida a ${brand.name}`,
+            body: `
+                <h1 style="margin:0 0 12px;font-size:26px;line-height:1.2;letter-spacing:-0.02em;color:${brand.dark};">Bienvenida, ${nombre}</h1>
+                <p style="margin:0 0 20px;color:${brand.text};">${clase ? `Ya tienes tu lugar en ${escapeHtml(clase)}. ` : ''}Crea tu contraseña para ver tus clases y reservar desde tu celular.</p>
+                <div style="text-align:center;margin:28px 0 8px;">${emailButton({ label: 'Crear mi contraseña', href: url })}</div>
+                ${alertBox('Este link vence en 7 días y solo se puede usar una vez.')}
+            `,
+        });
+        const { data, error } = await getResend().emails.send({
+            from: getEmailFrom(),
+            to: [to],
+            subject: `Bienvenida a ${brand.name} — Crea tu contraseña`,
+            html,
+        });
+        if (error) {
+            console.error('[email] sendAccesoAlumnaEmail:', error);
+            return null;
+        }
+        return { id: data?.id };
+    } catch (err) {
+        console.error('[email] sendAccesoAlumnaEmail:', err);
         return null;
     }
 }

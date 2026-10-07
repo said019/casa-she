@@ -22,8 +22,49 @@ import {
 import { sendInstructorMagicLink, sendPasswordResetEmail, sendClientWelcomeEmail } from '../services/email.js';
 import { sendClientWelcome, sendWhatsAppMessage } from '../lib/whatsapp.js';
 import { z } from 'zod';
+import { consultarLinkAcceso, usarLinkAcceso } from '../lib/accessLinks.js';
 
 const router = Router();
+
+// Respuesta de sesión compartida por POST /login y POST /acceso/:token: mismo token
+// (JWT de sesión, sin `purpose`) y mismo cuerpo, para que la clienta entre directo.
+const SELECT_USUARIO_SESION = `SELECT
+        id, email, phone, display_name, photo_url, role,
+        emergency_contact_name, emergency_contact_phone, health_notes,
+        accepts_communications, date_of_birth, receive_reminders,
+        receive_promotions, receive_weekly_summary, created_at, updated_at,
+        is_reception_master, permissions, is_active, temp_password,
+        password_hash
+      FROM users`;
+
+async function emitirSesion(user: User & { password_hash: string; is_active: boolean }) {
+    // Si es coach, incluir su instructorId en el token (igual que el coach login) para que
+    // su portal funcione aunque entre por el login del studio (antes faltaba → 403/0 datos).
+    let instructorId: string | undefined;
+    if (user.role === 'instructor') {
+        const inst = await queryOne<{ id: string }>('SELECT id FROM instructors WHERE user_id = $1', [user.id]);
+        instructorId = inst?.id;
+    }
+
+    // Generate JWT token
+    const tokenPayload: JwtPayload = {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        instructorId,
+        isReceptionMaster: user.is_reception_master === true,
+    };
+    const token = generateToken(tokenPayload);
+
+    // Remove password hash from response
+    const { password_hash, ...userWithoutPassword } = user;
+
+    return {
+        message: 'Inicio de sesión exitoso',
+        user: userWithoutPassword,
+        token,
+    };
+}
 
 // ============================================
 // POST /api/auth/register - Register new user
@@ -230,32 +271,7 @@ router.post('/login', async (req: Request, res: Response) => {
             });
         }
 
-        // Si es coach, incluir su instructorId en el token (igual que el coach login) para que
-        // su portal funcione aunque entre por el login del studio (antes faltaba → 403/0 datos).
-        let instructorId: string | undefined;
-        if (user.role === 'instructor') {
-            const inst = await queryOne<{ id: string }>('SELECT id FROM instructors WHERE user_id = $1', [user.id]);
-            instructorId = inst?.id;
-        }
-
-        // Generate JWT token
-        const tokenPayload: JwtPayload = {
-            userId: user.id,
-            email: user.email,
-            role: user.role,
-            instructorId,
-            isReceptionMaster: user.is_reception_master === true,
-        };
-        const token = generateToken(tokenPayload);
-
-        // Remove password hash from response
-        const { password_hash, ...userWithoutPassword } = user;
-
-        res.json({
-            message: 'Inicio de sesión exitoso',
-            user: userWithoutPassword,
-            token,
-        });
+        res.json(await emitirSesion(user));
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Error al iniciar sesión' });
@@ -446,6 +462,58 @@ router.post('/reset-password', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Reset password error:', error);
         res.status(500).json({ error: 'Error al restablecer contraseña' });
+    }
+});
+
+// ============================================
+// Links de acceso (alta de alumna desde recepción). Públicos; /api/auth ya lleva authLimiter
+// (el mismo límite que reset-password). El token es opaco, no un JWT.
+// ============================================
+const MENSAJES_LINK: Record<string, string> = {
+    LINK_VENCIDO: 'Este link ya no sirve. Pide uno nuevo en recepción.',
+    LINK_USADO: 'Este link ya se usó. Pide uno nuevo en recepción.',
+    LINK_INVALIDO: 'Este link ya no sirve. Pide uno nuevo en recepción.',
+};
+
+// El token viaja en la URL y las respuestas pueden traer sesión: nada de cachés intermedios.
+const sinCache = (_req: Request, res: Response, next: () => void) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+};
+
+router.get('/acceso/:token', sinCache, async (req: Request, res: Response) => {
+    try {
+        const r = await consultarLinkAcceso(String(req.params.token));
+        if (!r.ok) return res.status(410).json({ code: r.code, error: MENSAJES_LINK[r.code] });
+        res.json({ nombre: r.nombre, email: r.email });
+    } catch (error) {
+        console.error('Consultar link de acceso error:', error);
+        res.status(500).json({ error: 'Error al consultar el link' });
+    }
+});
+
+const AccesoSchema = ResetPasswordSchema.pick({ password: true });
+
+router.post('/acceso/:token', sinCache, async (req: Request, res: Response) => {
+    try {
+        const validation = AccesoSchema.safeParse(req.body);
+        if (!validation.success) {
+            return res.status(400).json({
+                error: 'Datos inválidos',
+                details: validation.error.flatten().fieldErrors,
+            });
+        }
+        const r = await usarLinkAcceso(String(req.params.token), validation.data.password);
+        if (!r.ok) return res.status(410).json({ code: r.code, error: MENSAJES_LINK[r.code] });
+
+        const user = await queryOne<User & { password_hash: string; is_active: boolean }>(
+            `${SELECT_USUARIO_SESION} WHERE id = $1`, [r.userId],
+        );
+        if (!user) return res.status(410).json({ code: 'LINK_INVALIDO', error: MENSAJES_LINK.LINK_INVALIDO });
+        res.json(await emitirSesion(user));
+    } catch (error) {
+        console.error('Usar link de acceso error:', error);
+        res.status(500).json({ error: 'Error al crear tu contraseña' });
     }
 });
 

@@ -19,6 +19,7 @@ import { DialogoNuevaClase } from './calendario/DialogoNuevaClase';
 import { DialogoEditarClase } from './calendario/DialogoEditarClase';
 import { DialogoCopiarSemana } from './calendario/DialogoCopiarSemana';
 import { DialogoGratis } from './calendario/DialogoGratis';
+import { DialogoAlumnaNueva } from './calendario/DialogoAlumnaNueva';
 import { DialogoCancelarClase } from './calendario/DialogoCancelarClase';
 import { DialogoCambiarCoach } from './calendario/DialogoCambiarCoach';
 import { resumenDeClases, textoResumenSemana } from './calendario/lugares';
@@ -65,6 +66,9 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     const [claveCoach, setClaveCoach] = useState(0);
     const [isAttendeesOpen, setIsAttendeesOpen] = useState(false);
     const [selectedClass, setSelectedClass] = useState<Class | null>(null);
+    // Alta rápida (Entrega 5): alumna nueva desde el buscador del panel.
+    const [altaNueva, setAltaNueva] = useState<{ open: boolean; nombre: string; clave: number }>({ open: false, nombre: '', clave: 0 });
+    const [resaltarId, setResaltarId] = useState<string | null>(null);
     // "Gratis" en bloque solo admin estricto; la recepción master (elevated) ve el resto pero no esto.
     const user = useAuthStore((s) => s.user);
     const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
@@ -389,6 +393,16 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                 onEditar={handleEditClass}
                 onCambiarCoach={handleChangeCoach}
                 onCancelar={() => setCancelChoiceOpen(true)}
+                onRegistrarNueva={(nombre) => setAltaNueva((a) => ({ open: true, nombre, clave: a.clave + 1 }))}
+                resaltarId={resaltarId}
+            />
+            <DialogoAlumnaNueva
+                key={`alta-${altaNueva.clave}`}
+                open={altaNueva.open}
+                onOpenChange={(open) => setAltaNueva((a) => ({ ...a, open }))}
+                clase={claseVigente}
+                nombreInicial={altaNueva.nombre}
+                onInscrita={setResaltarId}
             />
 
             <DialogoGenerar open={isGenerateOpen} onOpenChange={setIsGenerateOpen} onGenerado={setCurrentDate} />

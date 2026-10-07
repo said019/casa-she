@@ -39,6 +39,7 @@ import SellPlanDialog from '@/components/memberships/SellPlanDialog';
 import { formatFolio } from '@/lib/folio';
 import { StudioPaymentBadge } from '@/components/bookings/StudioPaymentBadge';
 import { ChannelLogo } from '@/components/brands/ChannelLogo';
+import { PlanLabel } from '@/components/brands/PlanLabel';
 import { CANALES } from '@/lib/canales';
 
 const WEEK_DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -249,7 +250,7 @@ function ClassDetailDrawer({
     // Las socias de TotalPass nunca tienen plan de Casa Shé: marcarlas "Sin plan"
     // (en ámbar, como una alerta) hacía pensar que algo estaba mal.
     const planLabel = (b: BookingRow): ReactNode =>
-        esTotalPass(b) ? <ChannelLogo canal="totalpass" alto={9} /> : b.is_free_booking ? 'Invitada' : (b.plan_name || 'Sin plan');
+        esTotalPass(b) ? <ChannelLogo canal="totalpass" alto={9} /> : b.is_free_booking ? 'Invitada' : (b.plan_name ? <PlanLabel nombre={b.plan_name} /> : 'Sin plan');
 
     // Mini "Reservar a cliente" inline para esta clase específica
     const [clientSearch, setClientSearch] = useState('');

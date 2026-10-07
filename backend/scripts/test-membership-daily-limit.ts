@@ -15,7 +15,10 @@ await assert.rejects(
   (e: any) => e instanceof MembershipDailyLimitError && e.code === 'BOOKING_IN_PROGRESS',
 );
 const routes = readFileSync(new URL('../src/routes/bookings.ts', import.meta.url), 'utf8');
-assert.equal((routes.match(/await assertMembershipDailyLimit\(/g) ?? []).length, 3, 'self-service, admin and bulk must enforce');
+assert.equal((routes.match(/await assertMembershipDailyLimit\(/g) ?? []).length, 2, 'self-service and bulk must enforce');
+assert.match(routes, /evaluarInscripcion\(toDbClient\(client\)/, 'admin-book enforces through evaluarInscripcion');
+const inscripcion = readFileSync(new URL('../src/lib/inscripcion.ts', import.meta.url), 'utf8');
+assert.equal((inscripcion.match(/await assertMembershipDailyLimit\(/g) ?? []).length, 1, 'evaluarInscripcion must enforce');
 const waitlist = readFileSync(new URL('../src/lib/waitlist.ts', import.meta.url), 'utf8');
 assert.equal((waitlist.match(/await assertMembershipDailyLimit\(/g) ?? []).length, 2, 'join and promotion must enforce');
 

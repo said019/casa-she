@@ -6,14 +6,14 @@ import multer from 'multer';
 import { query, queryOne, pool } from '../config/database.js';
 import { logAction } from '../lib/audit.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
+import { isElevated } from '../lib/elevation.js';
 import { requireElevated } from '../middleware/elevation.js';
 import { requirePermission } from '../middleware/requirePermission.js';
 import { effectivePermissions, mergeRequested, validatePermissionChange, PRESETS, PresetName, PERMISSION_LABELS, isMasterPreset } from '../lib/permissions.js';
 import { UpdateProfileSchema, User } from '../types/auth.js';
 import { z } from 'zod';
-import { sendClientWelcomeEmail, sendPlainEmail, sendReceptionAssignedEmail, sendReceptionCredentials } from '../services/email.js';
+import { sendAccesoAlumnaEmail, sendClientWelcomeEmail, sendPlainEmail, sendReceptionAssignedEmail, sendReceptionCredentials } from '../services/email.js';
 import { sendClientWelcome, sendWhatsAppMessage } from '../lib/whatsapp.js';
-import { isElevated } from '../lib/elevation.js';
 import { instanceByKey, instanceForFacility } from '../lib/whatsapp-instances.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { awardWelcomeBonus } from '../lib/loyalty.js';
@@ -21,6 +21,8 @@ import { notifyPointsEarnedExternal } from '../lib/notifications.js';
 import { ImageStorageError, subirImagen } from '../lib/imageStorage.js';
 import { isValidTag } from '../lib/clientTags.js';
 import { findOrCreateGuest } from '../lib/guestUser.js';
+import { crearLinkAcceso } from '../lib/accessLinks.js';
+import { altaRapida, AltaRapidaSchema, AltaRapidaError } from '../lib/altaRapida.js';
 
 const router = Router();
 
@@ -777,11 +779,14 @@ router.post('/:id/resend-credentials', requireRole('admin', 'super_admin', 'rece
         // clientes (la dueña pidió que recepción reseteara CLIENTES, 2026-06-23). Sin esto, una
         // recepcionista podía resetear a un admin, recibir su contraseña temporal en la respuesta
         // y tomar la cuenta. Además, nadie por debajo de super_admin puede resetear a un super_admin.
-        const requesterElevated = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+        // OJO: `req.user.role` es el rol OPERATIVO (recepción se mapea a 'admin'); la cuenta real
+        // está en `accountRole`. Con `role` esta guarda dejaba pasar a recepción.
+        const cuentaSolicitante = req.user?.accountRole;
+        const requesterElevated = cuentaSolicitante === 'admin' || cuentaSolicitante === 'super_admin';
         if (!requesterElevated && target.role !== 'client') {
             return res.status(403).json({ error: 'Solo puedes reenviar credenciales a clientes.' });
         }
-        if (target.role === 'super_admin' && req.user?.role !== 'super_admin') {
+        if (target.role === 'super_admin' && cuentaSolicitante !== 'super_admin') {
             return res.status(403).json({ error: 'No autorizado para resetear a un super administrador.' });
         }
 
@@ -804,7 +809,7 @@ router.post('/:id/resend-credentials', requireRole('admin', 'super_admin', 'rece
         const whatsappKey = typeof req.body?.whatsappKey === 'string' ? req.body.whatsappKey : null;
         if (whatsappKey && isElevated(req.user)) {
             waInstance = instanceByKey(whatsappKey);
-        } else if (req.user?.role === 'reception') {
+        } else if (cuentaSolicitante === 'reception') {
             const scope = await resolveRequestFacility(req.user);
             if (scope.kind === 'facility') {
                 const fac = await queryOne<{ name: string }>('SELECT name FROM facilities WHERE id = $1', [scope.facilityId]);
@@ -855,6 +860,98 @@ router.post('/:id/resend-credentials', requireRole('admin', 'super_admin', 'rece
     } catch (error) {
         console.error('Resend credentials error:', error);
         res.status(500).json({ error: 'Error al reenviar credenciales' });
+    }
+});
+
+// ============================================
+// POST /api/users/alta-rapida - Alumna nueva + paquete + inscripción + link de acceso,
+// todo en una transacción (ver lib/altaRapida.ts). Si algo falla, no queda nada.
+// ============================================
+router.post('/alta-rapida', requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
+    const validation = AltaRapidaSchema.safeParse(req.body);
+    if (!validation.success) {
+        return res.status(400).json({ error: 'Datos inválidos', details: validation.error.flatten().fieldErrors });
+    }
+    try {
+        const r = await altaRapida(pool, validation.data, { userId: req.user!.userId });
+
+        // Después del commit, y sin que nada de esto pueda fallar la respuesta.
+        void (async () => {
+            try {
+                await logAction(query, {
+                    adminUserId: req.user!.userId,
+                    actionType: 'alta_rapida',
+                    entityType: 'user',
+                    entityId: r.user.id,
+                    description: `Alta rápida: ${r.user.display_name} inscrita${r.membership ? ' con paquete' : ' (cortesía)'}`,
+                    newData: { class_id: validation.data.classId, plan_id: validation.data.planId ?? null, booking_id: r.booking.id },
+                    req,
+                });
+                if (r.puntosBienvenida > 0) void notifyPointsEarnedExternal(r.user.id, r.puntosBienvenida, 'welcome');
+                if (r.puntosCompra > 0) void notifyPointsEarnedExternal(r.user.id, r.puntosCompra, 'package_purchase');
+                const c = await queryOne<{ nombre: string; fecha: string; hora: string }>(
+                    `SELECT ct.name AS nombre, to_char(c.date, 'YYYY-MM-DD') AS fecha, substr(c.start_time::text, 1, 5) AS hora
+                       FROM classes c JOIN class_types ct ON ct.id = c.class_type_id WHERE c.id = $1`,
+                    [validation.data.classId],
+                );
+                // Correo con el link solo si Resend está configurado (la función no lanza).
+                await sendAccesoAlumnaEmail({
+                    to: r.user.email, clientName: r.user.display_name, url: r.acceso.url,
+                    clase: c ? `${c.nombre} el ${c.fecha} a las ${c.hora}` : null,
+                });
+            } catch (e) {
+                console.error('Alta rápida post-commit (non-blocking):', e);
+            }
+        })();
+
+        res.status(201).json({ user: r.user, membership: r.membership, booking: r.booking, acceso: r.acceso });
+    } catch (error) {
+        if (error instanceof AltaRapidaError) return res.status(error.status).json(error.body);
+        console.error('Alta rápida error:', error);
+        res.status(500).json({ error: 'Error al registrar a la alumna' });
+    }
+});
+
+// ============================================
+// POST /api/users/:id/acceso - Genera un link de acceso (crear contraseña) para una alumna.
+// Es el "Mandar / Reenviar acceso por WhatsApp" de la ficha. Revoca los links activos
+// anteriores. Solo a clientes; un super_admin puede a cualquier rol.
+// ============================================
+router.post('/:id/acceso', requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
+    try {
+        const id = String(req.params.id);
+        if (!/^[0-9a-f-]{36}$/i.test(id)) return res.status(404).json({ error: 'Usuario no encontrado' });
+        const target = await queryOne<{ id: string; role: string; is_active: boolean | null }>(
+            'SELECT id, role, is_active FROM users WHERE id = $1', [id],
+        );
+        if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+        // OJO: `req.user.role` es el rol OPERATIVO (recepción se mapea a 'admin'); la cuenta
+        // real está en `accountRole`. Con `role` esta guarda dejaría pasar a recepción.
+        const cuenta = req.user?.accountRole;
+        // Solo a clientes (el link permite fijar la contraseña de la cuenta); únicamente un
+        // super_admin puede generarlo para cualquier otro rol.
+        if (target.role !== 'client' && cuenta !== 'super_admin') {
+            return res.status(403).json({ error: 'Solo puedes mandar acceso a clientes.' });
+        }
+        if (target.is_active === false) {
+            return res.status(409).json({ error: 'La cuenta está desactivada.' });
+        }
+
+        const acceso = await crearLinkAcceso(pool, id, req.user!.userId);
+        // Nunca se registra el link ni el token: solo que se generó uno.
+        await logAction(query, {
+            adminUserId: req.user!.userId,
+            actionType: 'access_link_created',
+            entityType: 'user',
+            entityId: id,
+            description: 'Link de acceso generado',
+            req,
+        }).catch(e => console.error('Audit access link error (non-blocking):', e));
+        res.status(201).json(acceso);
+    } catch (error) {
+        console.error('Create access link error:', error);
+        res.status(500).json({ error: 'Error al generar el link de acceso' });
     }
 });
 

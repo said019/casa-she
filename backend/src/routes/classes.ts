@@ -22,6 +22,8 @@ import { marcarResyncTotalpass, dispararResyncTotalpass } from '../lib/totalpass
 import { copiarSemana, diasEntre } from '../lib/copy-week.js';
 import { CANALES_DE_CLASE_SQL } from '../lib/class-channels.js';
 import { intensitySchema } from '../lib/classIntensity.js';
+import { buscarCandidatas, ClaseNoEncontradaError } from '../lib/inscripcion.js';
+import { toDbClient } from '../lib/membershipSelection.js';
 import { isOctoberManagedDate } from '../data/october2026.js';
 import { LoteSchema, procesarLote, enviarAvisosDelLote, ErrorLote } from '../lib/classes-bulk.js';
 import { avisarAlumnasDeLaApp, avisoCambioDeHorario, horarioDeClase } from '../lib/avisos-clase.js';
@@ -339,6 +341,31 @@ router.post('/bulk', authenticate, requireElevated, async (req: Request, res: Re
         return res.status(500).json({ error: 'No se aplicó ningún cambio: falló el servidor.' });
     } finally {
         client.release();
+    }
+});
+
+// GET /api/classes/:id/candidatas?q= - Buscador de alumnas para inscribir (staff).
+// Misma regla que admin-book (lib/inscripcion.ts). Recepción solo en clases de su sucursal.
+router.get('/:id/candidatas', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
+    try {
+        const idOk = z.string().uuid().safeParse(req.params.id);
+        if (!idOk.success) return res.status(404).json({ error: 'Clase no encontrada' });
+        const cls = await queryOne<{ facility_id: string | null }>(`SELECT facility_id FROM classes WHERE id = $1`, [req.params.id]);
+        if (!cls) return res.status(404).json({ error: 'Clase no encontrada' });
+        if (req.user?.role === 'reception') {
+            const scope = await resolveRequestFacility(req.user, null);
+            if (scope.kind === 'error') return res.status(scope.status).json({ error: scope.message });
+            if (scope.kind === 'facility' && cls.facility_id !== scope.facilityId) {
+                return res.status(403).json({ error: 'Esa clase no es de tu sucursal asignada.' });
+            }
+        }
+        const q = typeof req.query.q === 'string' ? req.query.q : '';
+        if (q.trim().length < 2) return res.json([]);
+        res.json(await buscarCandidatas(toDbClient(query), req.params.id, q));
+    } catch (e: any) {
+        if (e instanceof ClaseNoEncontradaError) return res.status(404).json({ error: e.message });
+        console.error('GET /classes/:id/candidatas error:', e.message);
+        res.status(500).json({ error: 'Error al buscar alumnas' });
     }
 });
 

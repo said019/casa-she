@@ -123,8 +123,13 @@ export async function selectMembershipForBooking(params: {
    * por ese lado. Así una membresía que arranca el lunes NO sirve para el sábado.
    */
   classDate: string;
+  /**
+   * true (por defecto) = FOR UPDATE: para usarse dentro de la transacción de la reserva.
+   * false = consulta sin bloquear filas (búsquedas / vistas previas; no reserva nada).
+   */
+  bloquear?: boolean;
 }): Promise<MembershipRow | null> {
-  const { db, userId, category, classFacilityId, requiredCredits, classDate } = params;
+  const { db, userId, category, classFacilityId, requiredCredits, classDate, bloquear = true } = params;
   // `col` se interpola en SQL: el ternario lo restringe a dos literales fijos
   // (nunca entra input del usuario), así que es seguro frente a inyección.
   const col = category === 'reformer' ? 'reformer_remaining' : 'multi_remaining';
@@ -138,7 +143,7 @@ export async function selectMembershipForBooking(params: {
         AND (m.start_date IS NULL OR m.start_date <= $3::date)
         AND (m.end_date IS NULL OR m.end_date >= $3::date)
         AND (m.${col} IS NULL OR m.${col} >= $2)
-      FOR UPDATE OF m`,
+      ${bloquear ? 'FOR UPDATE OF m' : ''}`,
     [userId, requiredCredits, classDate],
   );
 

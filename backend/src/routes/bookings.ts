@@ -14,6 +14,7 @@ import { studioBookingError } from '../lib/membershipStudio.js';
 import { selectMembershipForBooking, toDbClient, pickBestMembership } from '../lib/membershipSelection.js';
 import { membershipDateOnly, membershipValidityForClassDate } from '../lib/membershipValidity.js';
 import { assertMembershipDailyLimit, MembershipDailyLimitError } from '../lib/membershipDailyLimit.js';
+import { evaluarInscripcion, inscribirEnClase, SinCreditosAlInscribirError } from '../lib/inscripcion.js';
 import { awardCheckinPoints } from '../lib/loyalty.js';
 import { joinWaitlist, waitlistOffer, compactWaitlist, promoteNextFromWaitlist } from '../lib/waitlist.js';
 import { cdmxWallClockToUtc } from '../lib/schedule.js';
@@ -979,7 +980,8 @@ router.post('/admin-book', authenticate, requireRole('admin', 'super_admin', 're
     const { classId, userId, force } = req.body;
     // Forzar sobrecupo (meter a alguien aunque la clase esté llena) es SOLO admin/super_admin
     // (decisión de la dueña: "solo admin"). Recepción NO puede forzar.
-    const canForce = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+    // OJO: `role` es el rol operativo (recepción → 'admin'); la cuenta real es `accountRole`.
+    const canForce = req.user?.accountRole === 'admin' || req.user?.accountRole === 'super_admin';
     const forcing = force === true && canForce;
 
     if (!classId || !userId) {
@@ -1008,87 +1010,37 @@ router.post('/admin-book', authenticate, requireRole('admin', 'super_admin', 're
         // y sin descontar crédito, aunque la clase no sea gratis para todas.
         const freeBooking = isFreeClass || req.body.free === true;
 
-        // Fecha de la clase (YYYY-MM-DD, en hora local para no recorrer un día por UTC),
-        // para que el motor compare la vigencia de la membresía contra el día de la clase.
-        let adminClassDateStr: string;
-        if (classDetails.date instanceof Date) {
-            const d = classDetails.date;
-            adminClassDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        } else {
-            adminClassDateStr = String(classDetails.date).split('T')[0];
-        }
-
         // Igual que la reserva del cliente: consume 1 crédito (por categoría) de la mejor
         // membresía del usuario. Transacción + FOR UPDATE para evitar carreras.
         const client = await pool.connect();
         let released = false;
         const release = () => { if (!released) { released = true; client.release(); } };
         let newBooking: any;
-        let membershipId: string | null = null;
-        let consumedCategory: 'reformer' | 'multi' | null = null;
         try {
             await client.query('BEGIN');
 
-            const existing = await client.query(
-                `SELECT id FROM bookings WHERE class_id = $1 AND user_id = $2 AND status != 'cancelled'`,
-                [classId, userId]
-            );
-            if (existing.rows.length > 0) {
-                await client.query('ROLLBACK'); release();
-                return res.status(400).json({ error: 'Este usuario ya tiene una reserva para esta clase' });
-            }
-
-            // Bloquea la clase y revalida cupo DENTRO de la tx (misma corrección que POST /).
-            // Doble propósito: (1) cierra el sobrecupo por carrera también en esta ruta de staff;
-            // (2) UNIFICA el orden de locks clase→membresía con la ruta de la clienta — sin esto,
-            // admin-book bloqueaba membresía (selectMembershipForBooking) y luego clase (trigger),
-            // orden inverso que provocaba deadlock ABBA con una auto-reserva concurrente. El bypass
+            // Misma regla que el buscador de candidatas (lib/inscripcion.ts). Bloquea la clase y
+            // revalida cupo DENTRO de la tx (cierra el sobrecupo por carrera y unifica el orden de
+            // locks clase→membresía con la ruta de la clienta; sin eso había deadlock ABBA).
             // `forcing` (solo admin/super_admin) permite sobrecupo deliberado.
-            const capRes = await client.query(
-                `SELECT current_bookings, max_capacity FROM classes WHERE id = $1 FOR UPDATE`,
-                [classId]
-            );
-            const capRow = capRes.rows[0];
-            if (capRow && Number(capRow.current_bookings) >= Number(capRow.max_capacity) && !forcing) {
+            const evaluacion = await evaluarInscripcion(toDbClient(client), {
+                userId: userId as string, classId, cortesia: freeBooking, bloquear: true, ignorarCupo: forcing,
+            });
+            if (evaluacion.estado !== 'puede') {
                 await client.query('ROLLBACK'); release();
-                return res.status(400).json({ error: 'Clase llena' });
-            }
-
-            if (!freeBooking) {
-                const picked = await selectMembershipForBooking({
-                    db: toDbClient(client),
-                    userId: userId as string,
-                    category: classDetails.class_category,
-                    classFacilityId: classDetails.facility_id ?? null,
-                    requiredCredits: 1,
-                    classDate: adminClassDateStr,
-                });
-                if (!picked) {
-                    await client.query('ROLLBACK'); release();
+                if (evaluacion.estado === 'limite_diario') {
+                    return res.status(409).json({ error: evaluacion.mensaje, code: evaluacion.code });
+                }
+                if (evaluacion.estado === 'sin_membresia' || evaluacion.estado === 'sin_creditos' || evaluacion.estado === 'otro_estudio') {
                     return res.status(400).json({ error: 'El cliente no tiene una membresía válida con créditos para una clase en este estudio.' });
                 }
-                membershipId = picked.id;
-                const cat: 'reformer' | 'multi' = classDetails.class_category;
-                const col = cat === 'reformer' ? 'reformer_remaining' : 'multi_remaining';
-                const creditRes = await client.query(`SELECT ${col} AS remaining FROM memberships WHERE id = $1`, [membershipId]);
-                if (creditRes.rows[0]) await assertMembershipDailyLimit({ db: toDbClient(client), userId, classId, remaining: creditRes.rows[0].remaining });
-                if (creditRes.rows[0] && creditRes.rows[0].remaining !== null) {
-                    const dec = await client.query(`UPDATE memberships SET ${col} = ${col} - 1 WHERE id = $1 AND ${col} > 0`, [membershipId]);
-                    if (dec.rowCount === 0) {
-                        await client.query('ROLLBACK'); release();
-                        return res.status(400).json({ error: 'El cliente no tiene créditos disponibles en esta membresía.' });
-                    }
-                    consumedCategory = cat;
-                }
+                return res.status(400).json({ error: evaluacion.mensaje });
             }
 
-            const ins = await client.query(
-                `INSERT INTO bookings (class_id, user_id, membership_id, status, is_free_booking, consumed_category, booked_by)
-                 VALUES ($1, $2, $3, 'confirmed', $4, $5, $6)
-                 RETURNING *`,
-                [classId, userId, membershipId, freeBooking, consumedCategory, req.user?.userId ?? null]
-            );
-            newBooking = ins.rows[0];
+            newBooking = await inscribirEnClase(toDbClient(client), {
+                userId: userId as string, classId, membresiaId: evaluacion.membresia?.id ?? null,
+                cortesia: freeBooking, reservadaPor: req.user?.userId ?? null,
+            });
             await client.query('COMMIT');
         } catch (txErr) {
             try { await client.query('ROLLBACK'); } catch { /* ignore */ }
@@ -1100,6 +1052,7 @@ router.post('/admin-book', authenticate, requireRole('admin', 'super_admin', 're
         res.status(201).json(newBooking);
     } catch (error) {
         if (error instanceof MembershipDailyLimitError) return res.status(error.status).json({ error: error.message, code: error.code });
+        if (error instanceof SinCreditosAlInscribirError) return res.status(400).json({ error: error.message });
         console.error('Admin book error:', error);
         res.status(500).json({ error: 'Error al crear la reserva' });
     }
