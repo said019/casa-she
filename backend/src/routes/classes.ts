@@ -24,6 +24,7 @@ import { CANALES_DE_CLASE_SQL } from '../lib/class-channels.js';
 import { intensitySchema } from '../lib/classIntensity.js';
 import { isOctoberManagedDate } from '../data/october2026.js';
 import { LoteSchema, procesarLote, enviarAvisosDelLote, ErrorLote } from '../lib/classes-bulk.js';
+import { avisarAlumnasDeLaApp, avisoCambioDeHorario, horarioDeClase } from '../lib/avisos-clase.js';
 
 const router = Router();
 
@@ -154,9 +155,6 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
     }
 });
 
-// ============================================
-// POST /api/classes/bulk-delete - Delete empty classes in a date range
-// ============================================
 // ============================================
 // FREE CLASSES — Opening Day & cortesías
 // ============================================
@@ -339,30 +337,6 @@ router.post('/bulk', authenticate, requireElevated, async (req: Request, res: Re
         return res.status(500).json({ error: 'No se aplicó ningún cambio: falló el servidor.' });
     } finally {
         client.release();
-    }
-});
-
-router.post('/bulk-delete', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
-    try {
-        const { startDate, endDate } = req.body;
-
-        if (!startDate || !endDate) {
-            return res.status(400).json({ error: 'Se requieren startDate y endDate' });
-        }
-
-        const result = await query<{ id: string }>(
-            `DELETE FROM classes
-             WHERE date >= $1 AND date <= $2
-               AND current_bookings = 0
-               AND status != 'cancelled'
-             RETURNING id`,
-            [startDate, endDate]
-        );
-
-        res.json({ deleted: result.length, message: `${result.length} clases eliminadas` });
-    } catch (error) {
-        console.error('Bulk delete classes error:', error);
-        res.status(500).json({ error: 'Error al eliminar clases' });
     }
 });
 
@@ -941,11 +915,18 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
         }
 
         values.push(id);
+        const horarioAntes = await horarioDeClase(id);
         const result = await queryOne(
             `UPDATE classes SET ${updates.join(', ')}, updated_at = NOW()
              WHERE id = $${paramCount} RETURNING *`,
             values
         );
+
+        // Cambió el día o la hora: avisar a las alumnas de la app (in-app + push), igual
+        // que los cambios en bloque. Sin esto la alumna llegaba a la hora vieja.
+        const horarioDespues = await horarioDeClase(id);
+        const avisoHorario = horarioAntes && horarioDespues ? avisoCambioDeHorario(horarioAntes, horarioDespues) : null;
+        if (avisoHorario) void avisarAlumnasDeLaApp(id, avisoHorario);
 
         // Propagar a TotalPass lo que la socia ve en su app: tipo (título), coach
         // (responsable), fecha y hora. Sin esto la socia seguía viendo los datos
