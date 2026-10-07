@@ -20,6 +20,7 @@
  * porque le cambiaron el coach a la clase.
  */
 import { query } from '../../config/database.js';
+import { filas, type ClienteTx } from '../db-tx.js';
 import { GYM_DEFAULT_COACH } from '../gym-config.js';
 import {
     totalPassOfficialFromDb,
@@ -91,9 +92,10 @@ export function decidirResync(local: ClaseLocalTp, occ: OcurrenciaTp): AccionRes
  * Solo aplica a clases ya publicadas: si nunca se publicó no hay nada que
  * resincronizar, y si está marcada para retiro NO se toca — retirarla gana.
  */
-export async function marcarResyncTotalpass(classIds: string[]): Promise<number> {
+export async function marcarResyncTotalpass(classIds: string[], db?: ClienteTx): Promise<number> {
     if (!classIds.length) return 0;
-    const rows = await query<{ class_id: string }>(
+    const marcar = filas<{ class_id: string }>(
+        db,
         `UPDATE partner_class_mappings
             SET sync_status = 'pending_resync', updated_at = NOW()
           WHERE channel = 'totalpass'
@@ -101,7 +103,10 @@ export async function marcarResyncTotalpass(classIds: string[]): Promise<number>
             AND sync_status IN ('published', 'pending_resync')
           RETURNING class_id`,
         [classIds],
-    ).catch((e: any) => {
+    );
+    // Dentro de una transacción (`db`) el error se propaga para que se revierta todo.
+    if (db) return (await marcar).length;
+    const rows = await marcar.catch((e: any) => {
         // Nunca romper la edición por esto: el cambio local YA quedó guardado.
         console.error('[tp-resync] no se pudo marcar la resincronización:', e?.message);
         return [] as { class_id: string }[];
