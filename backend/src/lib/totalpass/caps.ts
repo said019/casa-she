@@ -1,4 +1,5 @@
-import { query, queryOne } from '../../config/database.js';
+import { queryOne } from '../../config/database.js';
+import { filas, type ClienteTx } from '../db-tx.js';
 import { marcarRetiroTotalpass, desmarcarRetiroTotalpass } from './retire.js';
 
 // Matemática de cupo por canal (portada de Hundred partner-pool.ts). Fórmula ÚNICA de todo el sistema.
@@ -43,31 +44,32 @@ export async function getChannelCaps(classId: string): Promise<{ totalpass: numb
 }
 
 // Fija (o apaga con 0) el cupo TotalPass de una clase. UPSERT sobre channel_inventory.
-export async function setTotalpassCap(classId: string, maxSpots: number): Promise<{ max_spots: number; booked_spots: number }> {
-  const cls = await queryOne<{ max_capacity: number }>(
+// Con `db` corre dentro de esa transacción (cambios en bloque); sin `db`, en el pool.
+export async function setTotalpassCap(classId: string, maxSpots: number, db?: ClienteTx): Promise<{ max_spots: number; booked_spots: number }> {
+  const [cls] = await filas<{ max_capacity: number }>(db,
     `SELECT max_capacity FROM classes WHERE id = $1`, [classId]);
   if (!cls) throw Object.assign(new Error('Clase no encontrada'), { code: 'CLASS_NOT_FOUND' });
-  const inv = await queryOne<{ booked_spots: number }>(
+  const [inv] = await filas<{ booked_spots: number }>(db,
     `SELECT booked_spots FROM channel_inventory WHERE class_id = $1 AND channel = 'totalpass'`, [classId]);
   const booked = inv ? Number(inv.booked_spots) : 0;
   const err = validateCap(maxSpots, booked, Number(cls.max_capacity));
   if (err) throw Object.assign(new Error(err), { code: err, booked });
   if (maxSpots === 0) {
     // Apagar el canal: borra la fila solo si no hay reservas activas (booked_spots = 0).
-    await query(`DELETE FROM channel_inventory WHERE class_id = $1 AND channel = 'totalpass' AND booked_spots = 0`, [classId]);
+    await filas(db, `DELETE FROM channel_inventory WHERE class_id = $1 AND channel = 'totalpass' AND booked_spots = 0`, [classId]);
     // …y RETIRAR la clase de TotalPass. Sin esto quedaba fantasma: el reconcile de
     // cupo hace JOIN con `max_spots > 0`, así que al borrar la fila dejaba de tocar
     // esa clase y el evento se quedaba vivo en TP con su cupo viejo, para siempre.
-    await marcarRetiroTotalpass(classId);
+    await marcarRetiroTotalpass(classId, db);
     return { max_spots: 0, booked_spots: booked };
   }
-  const saved = await queryOne<{ max_spots: number; booked_spots: number }>(
+  const [saved] = await filas<{ max_spots: number; booked_spots: number }>(db,
     `INSERT INTO channel_inventory (class_id, channel, max_spots) VALUES ($1, 'totalpass', $2)
      ON CONFLICT (class_id, channel) DO UPDATE SET max_spots = EXCLUDED.max_spots, updated_at = NOW()
      RETURNING max_spots, booked_spots`, [classId, maxSpots]);
   // Volver a prender el canal cancela un retiro pendiente: si el barrido todavía no
   // corría, dejarlo en 'pending_delete' haría que el publicador creara un evento
   // NUEVO (busca mappings 'published') mientras el barrido borra el viejo.
-  await desmarcarRetiroTotalpass(classId);
+  await desmarcarRetiroTotalpass(classId, db);
   return saved!;
 }

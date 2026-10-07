@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, CSSProperties } from 'react';
-import { Lock } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 import { ClassIntensity, isClassIntensity } from '@/components/classes/ClassIntensity';
 import { PuntoLugar } from '@/components/brands/ChannelDot';
 import { cn } from '@/lib/utils';
@@ -17,6 +17,9 @@ export interface TarjetaClaseProps extends Omit<ButtonHTMLAttributes<HTMLButtonE
     variante: 'rejilla' | 'lista';
     /** Solo en rejilla: cabe completa (nombre, coach y lugares). Si no, va en una sola línea. */
     completa?: boolean;
+    /** Modo "Seleccionar varias": la tarjeta muestra su casilla y es un botón que se marca. */
+    seleccionable?: boolean;
+    seleccionada?: boolean;
 }
 
 const claveDeLugar = (l: Lugar) => (l.tipo === 'canal' ? l.canal : l.tipo);
@@ -24,9 +27,9 @@ const claveDeLugar = (l: Lugar) => (l.tipo === 'canal' ? l.canal : l.tipo);
 /**
  * Tarjeta de una clase: nombre con intensidad, hora, coach y los lugares como puntos
  * (alumnas de Casa Shé con el color del tipo, cada plataforma con el suyo, libres huecos).
- * Los props de botón pasan tal cual, para que la Entrega 3 agregue selección sin reescribirla.
+ * Los props de botón pasan tal cual. En modo "Seleccionar varias" muestra su casilla (`seleccionable`, `seleccionada`).
  */
-export function TarjetaClase({ clase, variante, completa = true, className, style, ...boton }: TarjetaClaseProps) {
+export function TarjetaClase({ clase, variante, completa = true, seleccionable = false, seleccionada = false, className, style, ...boton }: TarjetaClaseProps) {
     const lugares = lugaresDeClase(clase);
     const cancelada = clase.status === 'cancelled';
     const oscura = clase.category === 'reformer';
@@ -36,7 +39,9 @@ export function TarjetaClase({ clase, variante, completa = true, className, styl
     const hora = formatClassTime(clase.start_time);
     const colorAlumna = oscura ? SALSA.alumna : colorPuntoAlumna(clase.class_type_color);
     const fondo = oscura ? 'oscuro' : 'claro';
-    const tamanoPunto = enLista ? 10 : 8;
+    // En la rejilla los puntos van de 7 px con 2 px de aire: así caben 7 lugares y "Lleno"
+    // en una columna de 120 px (laptop de 1280 con la barra lateral abierta).
+    const tamanoPunto = enLista ? 10 : 7;
     const colorSinCoach = oscura ? SALSA.sinCoach : 'hsl(var(--destructive))';
 
     const aria = [
@@ -57,7 +62,7 @@ export function TarjetaClase({ clase, variante, completa = true, className, styl
     };
 
     const cupo = (
-        <span className={cn('ml-auto shrink-0 tabular-nums', enLista ? 'text-sm' : 'text-[11px]', lugares.lleno ? 'font-bold' : 'font-medium')}>
+        <span data-cupo className={cn('ml-auto shrink-0 tabular-nums', enLista ? 'text-sm' : 'text-[11px] leading-[14px]', lugares.lleno ? 'font-bold' : 'font-medium')}>
             {etiquetaCupo(lugares)}
         </span>
     );
@@ -67,34 +72,51 @@ export function TarjetaClase({ clase, variante, completa = true, className, styl
             type="button"
             {...boton}
             aria-label={aria}
+            aria-pressed={seleccionable ? seleccionada : undefined}
             data-clase={clase.id}
             data-oscura={oscura ? 'true' : undefined}
             className={cn(
-                'flex w-full min-w-0 flex-col overflow-hidden rounded-[10px] border text-left font-body transition-shadow duration-150',
+                'relative flex w-full min-w-0 flex-col overflow-hidden rounded-[10px] border text-left font-body transition-shadow duration-150',
                 'hover:shadow-[0_10px_24px_-16px_rgba(22,38,26,.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-casa-verde focus-visible:ring-offset-1',
-                enLista ? 'gap-2 p-4' : unaLinea ? 'justify-center px-2 py-0.5' : 'justify-between gap-px px-2 py-1.5',
+                // Rejilla: cada renglón con su alto fijo y sin encogerse; antes el de la coach
+                // (truncate = overflow oculto) se aplastaba a 0 en las clases de 50 min.
+                enLista ? 'gap-2 p-4' : unaLinea ? 'justify-center px-1.5 py-0.5' : 'justify-between px-1.5 py-1',
                 oscura ? 'text-casa-avena' : 'text-casa-ciruela',
                 cancelada && 'opacity-50',
+                seleccionada && 'ring-2 ring-casa-verde ring-offset-1',
                 className,
             )}
             style={marco}
         >
-            <span className="flex w-full min-w-0 items-baseline gap-1.5">
+            {seleccionable && (
+                <span
+                    aria-hidden="true"
+                    data-casilla
+                    className={cn(
+                        'absolute right-1 top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border',
+                        seleccionada ? 'border-casa-verde bg-casa-verde text-casa-avena' : 'border-[#9C8E80] bg-[#FCF8EF]',
+                    )}
+                >
+                    {seleccionada && <Check className="h-2.5 w-2.5" strokeWidth={3.5} />}
+                </span>
+            )}
+            <span className={cn('flex w-full min-w-0 shrink-0 items-baseline gap-1.5', seleccionable && !enLista && 'pr-4')}>
                 <span
                     data-nombre-clase
-                    className={cn('flex min-w-0 items-center gap-1 font-heading leading-tight', enLista ? 'text-lg' : 'text-[15px]', cancelada && 'line-through')}
+                    className={cn('flex min-w-0 items-center gap-1 font-heading', enLista ? 'text-lg leading-tight' : 'text-[14px] leading-[18px]', cancelada && 'line-through')}
                 >
                     <span className="truncate">{clase.class_type_name}</span>
                     <ClassIntensity intensity={clase.intensity} />
                     {clase.booking_closed && !cancelada && <Lock className="h-3 w-3 shrink-0 opacity-70" aria-hidden="true" />}
                 </span>
-                <span className={cn('shrink-0 tabular-nums opacity-75', enLista ? 'text-sm' : 'text-[11px]')}>{hora}</span>
+                <span data-hora className={cn('shrink-0 tabular-nums opacity-75', enLista ? 'text-sm' : 'text-[11px]')}>{hora}</span>
                 {unaLinea && !cancelada && cupo}
             </span>
 
             {!unaLinea && (
                 <span
-                    className={cn('w-full truncate', enLista ? 'text-sm' : 'text-[11.5px] leading-4', !coach && 'font-semibold')}
+                    data-coach
+                    className={cn('w-full shrink-0 truncate', enLista ? 'text-sm' : 'text-[11px] leading-[14px]', !coach && 'font-semibold')}
                     style={coach ? undefined : { color: colorSinCoach }}
                 >
                     {coach || 'Sin coach asignada'}
@@ -102,12 +124,12 @@ export function TarjetaClase({ clase, variante, completa = true, className, styl
             )}
 
             {!unaLinea && (cancelada ? (
-                <span className="text-[11px] font-semibold">Cancelada</span>
+                <span className="shrink-0 text-[11px] font-semibold leading-[14px]">Cancelada</span>
             ) : (
-                <span className="flex w-full min-w-0 items-center gap-[3px]">
+                <span className={cn('flex w-full min-w-0 shrink-0 items-center', enLista ? 'gap-[3px]' : 'gap-[2px]')}>
                     {lugares.lugares.length <= MAX_PUNTOS_TARJETA ? (
-                        // En columnas angostas los puntos se recortan; el cupo ("3/7") siempre se ve.
-                        <span className="flex min-w-0 items-center gap-[3px] overflow-hidden">
+                        // Con muchos lugares en columnas angostas los puntos se recortan; el cupo ("3/7") siempre se ve.
+                        <span data-puntos className={cn('flex min-w-0 items-center overflow-hidden', enLista ? 'gap-[3px]' : 'gap-[2px]')}>
                             {lugares.lugares.map((l, i) => {
                                 const e = estiloDeLugar(l, colorAlumna, fondo);
                                 return <PuntoLugar key={i} relleno={e.relleno} anillo={e.anillo} tamano={tamanoPunto} data-lugar={claveDeLugar(l)} />;

@@ -17,6 +17,15 @@ export interface RejillaSemanaProps {
     motivoCierre: (dia: Date) => string | undefined;
     onClickClase: (clase: Class) => void;
     onClickDia: (dia: Date) => void;
+    /**
+     * Modo "Seleccionar varias": clic en una tarjeta la marca o desmarca (las canceladas no
+     * se seleccionan) y clic en el encabezado del día marca o desmarca todo el día.
+     */
+    seleccion?: {
+        ids: ReadonlySet<string>;
+        onAlternarClase: (clase: Class) => void;
+        onAlternarDia: (dia: Date, clases: Class[]) => void;
+    };
 }
 
 /** Fecha y minuto actuales en CDMX; se refresca cada minuto para mover la línea de "ahora". */
@@ -37,7 +46,7 @@ const RAYADO_FRANJA = 'repeating-linear-gradient(135deg, #F1E9D8 0, #F1E9D8 5px,
  * Cada clase va a la altura de su hora de inicio y mide lo que dura; las horas sin
  * clases en toda la semana se compactan en una franja. Línea de "ahora" en el día de hoy.
  */
-export function RejillaSemana({ dias, clasesDelDia, diasCerrados, motivoCierre, onClickClase, onClickDia }: RejillaSemanaProps) {
+export function RejillaSemana({ dias, clasesDelDia, diasCerrados, motivoCierre, onClickClase, onClickDia, seleccion }: RejillaSemanaProps) {
     const ahora = useAhoraCdmx();
     const columnas = dias.map((dia) => ({ dia, clave: format(dia, 'yyyy-MM-dd'), clases: clasesDelDia(dia) }));
     const rejilla = construirRejilla(columnas.flatMap((c) => c.clases));
@@ -90,7 +99,8 @@ export function RejillaSemana({ dias, clasesDelDia, diasCerrados, motivoCierre, 
                                 cerrado={cerrado}
                                 motivoCierre={motivoCierre(dia)}
                                 resumen={textoResumenDia(resumenDeClases(clases))}
-                                onClick={() => onClickDia(dia)}
+                                modoSeleccion={!!seleccion}
+                                onClick={() => (seleccion ? seleccion.onAlternarDia(dia, clases) : onClickDia(dia))}
                             />
                             <div data-testid={`columna-${clave}`} className="relative" style={{ height: rejilla.altoTotal }}>
                                 {rejilla.tramos.map((t) => (
@@ -115,13 +125,19 @@ export function RejillaSemana({ dias, clasesDelDia, diasCerrados, motivoCierre, 
                                     const pos = posicionDeClase(rejilla, c);
                                     if (!pos) return null;
                                     const carril = lanes.get(c.id) ?? { carril: 0, total: 1 };
+                                    const seleccionable = !!seleccion && c.status !== 'cancelled';
                                     return (
                                         <TarjetaClase
                                             key={c.id}
                                             clase={c}
                                             variante="rejilla"
                                             completa={pos.completa}
-                                            onClick={() => onClickClase(c)}
+                                            seleccionable={seleccionable}
+                                            seleccionada={seleccionable && seleccion!.ids.has(c.id)}
+                                            onClick={() => {
+                                                if (!seleccion) onClickClase(c);
+                                                else if (seleccionable) seleccion.onAlternarClase(c);
+                                            }}
                                             className="absolute z-[2]"
                                             style={{
                                                 top: pos.top,

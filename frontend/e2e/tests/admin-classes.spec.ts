@@ -5,7 +5,7 @@
 import { test, expect } from "../fixtures/auth";
 import type { Locator } from "@playwright/test";
 import { AdminPage } from "../pages/AdminPage";
-import { AHORA_PRUEBA, FECHA_PRUEBA, ID, SEMANA_PRUEBA, clasePrueba, mockSemanaCalendario } from "../fixtures/calendario";
+import { AHORA_PRUEBA, FECHA_PRUEBA, ID, SEMANA_PRUEBA, clasePrueba, mockLote, mockSemanaCalendario } from "../fixtures/calendario";
 
 test.describe("Admin – Gestión de Clases y Calendario", () => {
   test("el dashboard de admin carga correctamente", async ({ adminPage: page }) => {
@@ -319,4 +319,259 @@ test.describe("Calendario de recepción – semana por horas", () => {
     await expect(page.getByText("Sin cambios", { exact: true })).toBeVisible();
     expect(puts).toEqual([]);
   });
+});
+
+/** Copia de la semana de prueba que las acciones en bloque pueden cambiar. */
+const semanaEditable = () => SEMANA_PRUEBA.map((c) => ({ ...c, channels: c.channels.map((k) => ({ ...k })) }));
+/** Coaches fijas para la ventana "Cambiar coach" (ids iguales a los del fixture). */
+const COACHES = [
+  { id: "00000000-0000-4000-8000-00000000b001", display_name: "Ana", is_active: true },
+  { id: "00000000-0000-4000-8000-00000000b002", display_name: "Sofía", is_active: true },
+  { id: "00000000-0000-4000-8000-00000000b003", display_name: "Pau", is_active: true },
+];
+
+test.describe("Calendario de recepción – varias a la vez", () => {
+  test("seleccionar: casillas, atajos de la última clase y día completo", async ({ adminPage: page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await mockSemanaCalendario(page);
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+    const barre = page.getByRole("button", { name: /^Barre.*07:00/ });
+    const mat = page.getByRole("button", { name: /^Pilates Mat.*08:00/ });
+    const sculpt = page.getByRole("button", { name: /^Sculpt.*18:00/ });
+    const cancelada = page.getByRole("button", { name: /^Sculpt.*19:00/ });
+    await expect(barre).toBeVisible();
+
+    await page.getByRole("button", { name: "Seleccionar varias" }).click();
+    await barre.click();
+    await expect(barre).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("dialog")).toHaveCount(0); // en modo selección no abre el panel
+
+    const atajos = page.getByRole("group", { name: "Atajos de selección" });
+    await expect(atajos.getByRole("button")).toHaveText(["Mismo horario (7:00)", "Las de Ana", "Todas las Barre", "Todo el lunes", "Quitar selección"]);
+    await atajos.getByRole("button", { name: "Todo el lunes" }).click();
+    await expect(mat).toHaveAttribute("aria-pressed", "true");
+
+    // Encabezado del miércoles: marca la activa y nunca la cancelada; otro clic la quita.
+    const miercoles = page.getByTestId("encabezado-2026-11-04");
+    await expect(miercoles).toHaveAttribute("aria-label", "Seleccionar todo el miércoles");
+    await miercoles.click();
+    await expect(sculpt).toHaveAttribute("aria-pressed", "true");
+    expect(await cancelada.getAttribute("aria-pressed")).toBeNull();
+    await miercoles.click();
+    await expect(sculpt).toHaveAttribute("aria-pressed", "false");
+
+    await atajos.getByRole("button", { name: "Quitar selección" }).click();
+    await expect(barre).toHaveAttribute("aria-pressed", "false");
+    await expect(mat).toHaveAttribute("aria-pressed", "false");
+
+    // Cambiar de semana limpia la selección (nunca se aplica a clases que ya no se ven).
+    await barre.click();
+    await page.getByRole("button", { name: "Semana siguiente" }).click();
+    await page.getByRole("button", { name: "Semana anterior" }).click();
+    await expect(barre).toHaveAttribute("aria-pressed", "false");
+
+    // Al terminar, la tarjeta vuelve a abrir el panel y el encabezado a crear clase.
+    await page.getByRole("button", { name: "Terminar selección" }).first().click();
+    await expect(atajos).toHaveCount(0);
+    await barre.click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+  });
+
+  test("tarjeta de 50 min: nombre, coach, 7 puntos y cupo a 120 y 140 px de columna", async ({ adminPage: page }) => {
+    await mockSemanaCalendario(page);
+    await page.setViewportSize({ width: 1100, height: 900 });
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+    await page.getByRole("button", { name: "Seleccionar varias" }).click(); // con la casilla visible
+
+    for (const [ancho, columnaMaxima] of [[1100, 125], [1366, 150]] as const) {
+      await page.setViewportSize({ width: ancho, height: 900 });
+      const columna = page.getByTestId("columna-2026-11-02");
+      await expect.poll(async () => (await columna.boundingBox())?.width ?? 0).toBeLessThanOrEqual(columnaMaxima);
+      for (const nombre of [/^Barre.*07:00/, /^Pilates Mat.*08:00/]) {
+        const tarjeta = page.getByRole("button", { name: nombre });
+        const caja = (await tarjeta.boundingBox())!;
+        const coach = (await tarjeta.locator("[data-coach]").boundingBox())!;
+        const nombreClase = (await tarjeta.locator("[data-nombre-clase]").boundingBox())!;
+        const hora = (await tarjeta.locator("[data-hora]").boundingBox())!;
+        const casilla = (await tarjeta.locator("[data-casilla]").boundingBox())!;
+        const puntos = tarjeta.locator("[data-puntos]");
+        const ultimo = (await puntos.locator("[data-lugar]").last().boundingBox())!;
+        const cupo = (await tarjeta.locator("[data-cupo]").boundingBox())!;
+        const dentro = (b: { y: number; height: number }) => b.y >= caja.y && b.y + b.height <= caja.y + caja.height + 0.5;
+        await expect(puntos.locator("[data-lugar]")).toHaveCount(7);
+        expect(nombreClase.height, `nombre visible a ${ancho}px`).toBeGreaterThanOrEqual(14);
+        expect(coach.height, `coach visible a ${ancho}px`).toBeGreaterThanOrEqual(12);
+        expect(dentro(coach) && dentro(cupo) && dentro(ultimo), `todo dentro de la tarjeta a ${ancho}px`).toBe(true);
+        expect(ultimo.x + ultimo.width, `el 7.º punto no se recorta a ${ancho}px`).toBeLessThanOrEqual((await puntos.boundingBox())!.x + (await puntos.boundingBox())!.width + 0.5);
+        expect(ultimo.x + ultimo.width).toBeLessThanOrEqual(cupo.x);
+        expect(cupo.x + cupo.width).toBeLessThanOrEqual(caja.x + caja.width);
+        expect(casilla.x >= hora.x + hora.width || casilla.y >= hora.y + hora.height, `la casilla no tapa la hora a ${ancho}px`).toBe(true);
+      }
+      await columna.screenshot({ path: test.info().outputPath(`tarjetas-${ancho}.png`) });
+    }
+  });
+
+  test("atajo → cancelar → las tarjetas se quedan, canceladas", async ({ adminPage: page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const clases = semanaEditable();
+    await mockSemanaCalendario(page, clases);
+    const cuerpos = await mockLote(page, clases);
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+    const barre = page.getByRole("button", { name: /^Barre.*07:00/ });
+    const mat = page.getByRole("button", { name: /^Pilates Mat.*08:00/ });
+
+    await page.getByRole("button", { name: "Seleccionar varias" }).click();
+    const barra = page.getByRole("toolbar", { name: "Acciones para las clases seleccionadas" });
+    await expect(barra.getByRole("button", { name: "Cancelar clases" })).toBeDisabled();
+    await barre.click();
+    await page.getByRole("group", { name: "Atajos de selección" }).getByRole("button", { name: "Todo el lunes" }).click();
+    await expect(barra.getByTestId("resumen-seleccion")).toContainText("2 clases");
+    await expect(barra.getByTestId("resumen-seleccion")).toContainText("10 inscritas · 3 de TotalPass");
+
+    await barra.getByRole("button", { name: "Cancelar clases" }).click();
+    const dialogo = page.getByRole("dialog", { name: "Cancelar 2 clases" });
+    await expect(dialogo).toContainText("Barre lun 7:00, Pilates Mat lun 8:00");
+    await expect(dialogo).toContainText("7 alumnas recuperan su crédito y reciben aviso.");
+    await expect(dialogo).toContainText("Se retiran de TotalPass para que nadie más reserve.");
+    await dialogo.getByLabel("Motivo que verán las alumnas").fill("Puente");
+    await dialogo.getByRole("button", { name: "Cancelar 2 clases" }).click();
+
+    await expect(page.getByText("2 clases canceladas. Siguen en el calendario, marcadas.").first()).toBeVisible();
+    await expect(barre).toContainText("Cancelada");
+    await expect(mat).toContainText("Cancelada");
+    await expect(barra.getByTestId("resumen-seleccion")).toContainText("Ninguna clase");
+    expect(cuerpos.map((c) => [c.accion, c.vistaPrevia])).toEqual([["cancelar", true], ["cancelar", false]]);
+    expect(cuerpos[1]).toMatchObject({ classIds: [ID.barre, ID.mat], motivo: "Puente" });
+  });
+
+  test("bloqueadas: se ven con su motivo y se quitan de la selección", async ({ adminPage: page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const clases = semanaEditable();
+    await mockSemanaCalendario(page, clases);
+    await page.route(/\/api\/instructors(\?|$)/, (route) => route.fulfill({ json: COACHES }));
+    const cuerpos = await mockLote(page, clases, { bloqueos: { [ID.mat]: "Ya empezó." } });
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+    const barre = page.getByRole("button", { name: /^Barre.*07:00/ });
+    const mat = page.getByRole("button", { name: /^Pilates Mat.*08:00/ });
+
+    await page.getByRole("button", { name: "Seleccionar varias" }).click();
+    await barre.click();
+    await mat.click();
+    await page.getByRole("toolbar", { name: "Acciones para las clases seleccionadas" }).getByRole("button", { name: "Cambiar coach" }).click();
+    const dialogo = page.getByRole("dialog", { name: "Cambiar coach" });
+    await dialogo.getByRole("radio", { name: /Pau/ }).click();
+    await expect(dialogo.getByRole("list", { name: "Clases bloqueadas" })).toContainText("Pilates Mat 02/11 8:00: Ya empezó.");
+    await expect(dialogo.getByRole("button", { name: "Cambiar a Pau en 2 clases" })).toBeDisabled();
+
+    await dialogo.getByRole("button", { name: "Quitar la bloqueada de la selección" }).click();
+    // La ventana es modal (el calendario queda oculto a lectores): se ve en su lista de clases.
+    await expect(dialogo.getByText("Barre · lun 7:00", { exact: true })).toBeVisible();
+    await expect(dialogo.getByRole("button", { name: "Cambiar a Pau en 1 clase" })).toBeEnabled();
+    await expect(dialogo).toContainText("Avisamos del cambio a 2 alumnas por la app.");
+    await dialogo.getByRole("button", { name: "Cambiar a Pau en 1 clase" }).click();
+    await expect(page.getByText("Listo: 1 clase ahora con Pau. Avisamos a 2 alumnas.").first()).toBeVisible();
+    await expect(barre).toContainText("Pau");
+    expect(cuerpos.at(-1)).toMatchObject({ accion: "coach", vistaPrevia: false, classIds: [ID.barre], instructorId: COACHES[2].id });
+  });
+
+  test("mover: avisa cuántas socias de TotalPass pierden su lugar", async ({ adminPage: page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const clases = semanaEditable();
+    await mockSemanaCalendario(page, clases);
+    const cuerpos = await mockLote(page, clases);
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+
+    await page.getByRole("button", { name: "Seleccionar varias" }).click();
+    await page.getByRole("button", { name: /^Barre.*07:00/ }).click();
+    await page.getByRole("toolbar", { name: "Acciones para las clases seleccionadas" }).getByRole("button", { name: "Mover o cambiar clase" }).click();
+    const dialogo = page.getByRole("dialog", { name: "Mover o cambiar clase" });
+    await expect(dialogo.getByRole("button", { name: "Elige un cambio" })).toBeDisabled();
+    await dialogo.getByRole("radio", { name: "+30 min" }).click();
+    await expect(dialogo.getByRole("alert")).toContainText("1 socia pierde su lugar");
+    // Doble clic: se aplica UNA vez (dos serían +1 h).
+    await dialogo.getByRole("button", { name: "Mover 1 clase 30 min más tarde" }).dblclick();
+    await expect(page.getByText("Listo: 1 clase actualizada. Avisamos a 2 alumnas.").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Barre.*07:30/ })).toBeVisible();
+    expect(cuerpos.filter((c) => !c.vistaPrevia)).toEqual([{ classIds: [ID.barre], accion: "mover", minutos: 30, vistaPrevia: false }]);
+  });
+
+  test("si algo cambia entre la vista previa y aplicar, no se aplica nada y se ve por qué", async ({ adminPage: page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const clases = semanaEditable();
+    await mockSemanaCalendario(page, clases);
+    const cuerpos = await mockLote(page, clases, { bloqueosAlAplicar: { [ID.mat]: "Ya empezó." } });
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+
+    await page.getByRole("button", { name: "Seleccionar varias" }).click();
+    await page.getByRole("button", { name: /^Barre.*07:00/ }).click();
+    await page.getByRole("button", { name: /^Pilates Mat.*08:00/ }).click();
+    await page.getByRole("toolbar", { name: "Acciones para las clases seleccionadas" }).getByRole("button", { name: "Cancelar clases" }).click();
+    const dialogo = page.getByRole("dialog", { name: "Cancelar 2 clases" });
+    await dialogo.getByRole("button", { name: "Cancelar 2 clases" }).click();
+
+    await expect(page.getByText("Algunas clases cambiaron mientras tanto. Revisa las bloqueadas.").first()).toBeVisible();
+    await expect(dialogo.getByRole("list", { name: "Clases bloqueadas" })).toContainText("Ya empezó.");
+    await expect(dialogo.getByRole("button", { name: "Cancelar 2 clases" })).toBeDisabled();
+    expect(clases.filter((c) => c.status === "cancelled").map((c) => c.id)).toEqual([ID.sculptCancelada]);
+    expect(cuerpos.filter((c) => !c.vistaPrevia)).toHaveLength(1);
+  });
+
+  test("deshacer: coach y mover sí, cancelar no; y si ya no se puede, dice por qué", async ({ adminPage: page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const clases = semanaEditable();
+    await mockSemanaCalendario(page, clases);
+    await page.route(/\/api\/instructors(\?|$)/, (route) => route.fulfill({ json: COACHES }));
+    const bloqueos: Record<string, string> = {};
+    const cuerpos = await mockLote(page, clases, { bloqueos });
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+    const barra = page.getByRole("toolbar", { name: "Acciones para las clases seleccionadas" });
+    const barre = page.getByRole("button", { name: /^Barre/ });
+    const deshacer = page.getByRole("button", { name: "Deshacer" });
+
+    // Coach: todas tenían a Ana → "Deshacer" la regresa con una sola llamada.
+    await page.getByRole("button", { name: "Seleccionar varias" }).click();
+    await barre.click();
+    await barra.getByRole("button", { name: "Cambiar coach" }).click();
+    const coach = page.getByRole("dialog", { name: "Cambiar coach" });
+    await expect(coach.getByRole("radio", { name: /Ana/ })).toBeDisabled(); // ya la da Ana
+    await coach.getByRole("radio", { name: /Sofía/ }).click();
+    await coach.getByRole("button", { name: "Cambiar a Sofía en 1 clase" }).click();
+    await expect(barre).toContainText("Sofía");
+    await deshacer.click();
+    await expect(page.getByText("Cambio deshecho.").first()).toBeVisible();
+    await expect(barre).toContainText("Ana");
+    expect(cuerpos.at(-1)).toEqual({ classIds: [ID.barre], accion: "coach", instructorId: COACHES[0].id, vistaPrevia: false });
+
+    // Mover: −minutos.
+    const mover = page.getByRole("dialog", { name: "Mover o cambiar clase" });
+    await barre.click();
+    await barra.getByRole("button", { name: "Mover o cambiar clase" }).click();
+    await mover.getByRole("radio", { name: "−1 h" }).click();
+    await mover.getByRole("button", { name: "Mover 1 clase 1 h antes" }).click();
+    await expect(page.getByRole("button", { name: /^Barre.*06:00/ })).toBeVisible();
+    await deshacer.click();
+    await expect(page.getByRole("button", { name: /^Barre.*07:00/ })).toBeVisible();
+    expect(cuerpos.at(-1)).toEqual({ classIds: [ID.barre], accion: "mover", minutos: 60, vistaPrevia: false });
+
+    // Si entre aplicar y deshacer la clase ya empezó: no se deshace y se dice por qué.
+    await barre.click();
+    await barra.getByRole("button", { name: "Mover o cambiar clase" }).click();
+    await mover.getByRole("radio", { name: "+30 min" }).click();
+    await mover.getByRole("button", { name: "Mover 1 clase 30 min más tarde" }).click();
+    await expect(page.getByRole("button", { name: /^Barre.*07:30/ })).toBeVisible();
+    bloqueos[ID.barre] = "Ya empezó.";
+    await deshacer.click();
+    await expect(page.getByText("No se pudo deshacer").first()).toBeVisible();
+    await expect(page.getByText("Ya empezó.").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Barre.*07:30/ })).toBeVisible();
+    delete bloqueos[ID.barre];
+
+    // Cancelar no se deshace.
+    await barre.click();
+    await barra.getByRole("button", { name: "Cancelar clases" }).click();
+    await page.getByRole("dialog", { name: "Cancelar 1 clase" }).getByRole("button", { name: "Cancelar 1 clase" }).click();
+    await expect(page.getByText("1 clase cancelada. Siguen en el calendario, marcadas.").first()).toBeVisible();
+    await expect(deshacer).toHaveCount(0);
+  });
+
 });

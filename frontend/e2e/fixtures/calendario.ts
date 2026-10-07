@@ -117,3 +117,83 @@ export async function mockSemanaCalendario(page: Page, clases: ClasePrueba[] = S
   await page.route(/\/api\/closed-days\/range/, (route) => route.fulfill({ json: [] }));
   await page.route(/\/api\/bookings\/class\//, (route) => route.fulfill({ json: [] }));
 }
+
+/** Un cuerpo de POST /api/classes/bulk tal como lo mandó la página. */
+export interface CuerpoLotePrueba {
+  classIds: string[];
+  accion: "coach" | "cupo_canal" | "mover" | "cancelar";
+  vistaPrevia: boolean;
+  instructorId?: string;
+  lugares?: number;
+  minutos?: number;
+  classTypeId?: string;
+  motivo?: string;
+}
+
+const COACHES_PRUEBA: Record<string, string> = { [uuid("b001")]: "Ana", [uuid("b002")]: "Sofía", [uuid("b003")]: "Pau" };
+const sumarMinutos = (hora: string, minutos: number) => {
+  const total = Number(hora.slice(0, 2)) * 60 + Number(hora.slice(3, 5)) + minutos;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+};
+
+/**
+ * Imita POST /api/classes/bulk sobre las mismas clases que sirve `mockSemanaCalendario`:
+ * la vista previa cuenta; aplicar cambia el arreglo (y la página, al recargar, lo ve).
+ * `bloqueos` fuerza clases bloqueadas con su motivo (también se pueden agregar después);
+ * `bloqueosAlAplicar` solo bloquea al aplicar (algo cambió después de la vista previa).
+ * Devuelve los cuerpos recibidos.
+ */
+export async function mockLote(
+  page: Page,
+  clases: ClasePrueba[],
+  opciones: { bloqueos?: Record<string, string>; bloqueosAlAplicar?: Record<string, string> } = {},
+): Promise<CuerpoLotePrueba[]> {
+  const bloqueos = opciones.bloqueos ?? {};
+  const cuerpos: CuerpoLotePrueba[] = [];
+  await page.route(/\/api\/classes\/bulk$/, async (route) => {
+    const cuerpo = route.request().postDataJSON() as CuerpoLotePrueba;
+    cuerpos.push(cuerpo);
+    const resultado = cuerpo.classIds.map((id) => {
+      const c = clases.find((x) => x.id === id);
+      const tp = c?.channels.find((x) => x.channel === "totalpass")?.booked ?? 0;
+      const motivo = !c ? "Esta clase ya no existe." : c.status === "cancelled" ? "Ya está cancelada."
+        : bloqueos[id] ?? (cuerpo.vistaPrevia ? undefined : opciones.bloqueosAlAplicar?.[id]);
+      return {
+        classId: id,
+        estado: motivo ? "bloqueada" : "ok",
+        ...(motivo ? { motivo } : {}),
+        alumnasAvisadas: motivo || cuerpo.accion === "cupo_canal" ? 0 : Math.max(0, (c?.current_bookings ?? 0) - tp),
+        sociasPorCanal: tp ? { totalpass: tp } : {},
+        sociasPierdenLugar: !motivo && cuerpo.accion === "mover" && cuerpo.minutos ? tp : 0,
+        advertencias: [] as string[],
+      };
+    });
+    const ok = resultado.filter((r) => r.estado === "ok");
+    const respuesta = {
+      clases: resultado,
+      resumen: {
+        ok: ok.length,
+        bloqueadas: resultado.length - ok.length,
+        alumnasAvisadas: ok.reduce((t, r) => t + r.alumnasAvisadas, 0),
+        sociasPierdenLugar: ok.reduce((t, r) => t + r.sociasPierdenLugar, 0),
+      },
+      aplicado: false,
+    };
+    if (cuerpo.vistaPrevia) return route.fulfill({ json: respuesta });
+    if (respuesta.resumen.bloqueadas > 0) return route.fulfill({ status: 409, json: respuesta });
+    for (const id of cuerpo.classIds) {
+      const c = clases.find((x) => x.id === id)!;
+      if (cuerpo.accion === "cancelar") c.status = "cancelled";
+      if (cuerpo.accion === "coach") {
+        c.instructor_id = cuerpo.instructorId!;
+        c.instructor_name = COACHES_PRUEBA[cuerpo.instructorId!] ?? "Otra";
+      }
+      if (cuerpo.accion === "mover" && cuerpo.minutos) {
+        c.start_time = sumarMinutos(c.start_time, cuerpo.minutos);
+        c.end_time = sumarMinutos(c.end_time, cuerpo.minutos);
+      }
+    }
+    return route.fulfill({ json: { ...respuesta, aplicado: true } });
+  });
+  return cuerpos;
+}

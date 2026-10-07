@@ -30,6 +30,7 @@
  * externalReference y luego a título|fecha|hora, igual que hace el publicador.
  */
 import { query } from '../../config/database.js';
+import { filas, type ClienteTx } from '../db-tx.js';
 import {
     totalPassOfficialFromDb,
     totalPassOccurrenceUuid,
@@ -163,16 +164,25 @@ export function valeLaPenaBorrarEnTp(date: string, hhmm: string, ahora: Date = n
  *
  * Devuelve true si había algo publicado que retirar. Si la clase nunca se
  * publicó en TotalPass no hace nada (y devuelve false).
+ *
+ * Una clase que esperaba resincronizarse ('pending_resync': la movieron o le
+ * cambiaron coach) y luego se cancela también se retira: el barrido de resync
+ * solo toma clases 'scheduled', así que sin esto quedaba viva en TotalPass.
  */
-export async function marcarRetiroTotalpass(classId: string): Promise<boolean> {
-    const rows = await query<{ class_id: string }>(
+export async function marcarRetiroTotalpass(classId: string, db?: ClienteTx): Promise<boolean> {
+    const marcar = filas<{ class_id: string }>(
+        db,
         `UPDATE partner_class_mappings
             SET sync_status = 'pending_delete', updated_at = NOW()
           WHERE class_id = $1 AND channel = 'totalpass'
-            AND sync_status IN ('published', 'pending_delete')
+            AND sync_status IN ('published', 'pending_resync', 'pending_delete')
           RETURNING class_id`,
         [classId],
-    ).catch((e: any) => {
+    );
+    // Dentro de una transacción (`db`) el error se propaga: la transacción ya quedó
+    // abortada y quien la abrió debe revertir TODO, no seguir como si nada.
+    if (db) return (await marcar).length > 0;
+    const rows = await marcar.catch((e: any) => {
         // Nunca romper la cancelación por esto: la clase local YA se canceló y eso
         // es lo que le importa a la clienta. El barrido por cron lo recupera.
         console.error(`[tp-retire] no se pudo marcar el retiro de ${classId}:`, e?.message);
@@ -190,13 +200,16 @@ export async function marcarRetiroTotalpass(classId: string): Promise<boolean> {
  * publicación creaba un evento NUEVO en TotalPass mientras el barrido borraba el
  * viejo — dos eventos peleándose por la misma clase.
  */
-export async function desmarcarRetiroTotalpass(classId: string): Promise<void> {
-    await query(
+export async function desmarcarRetiroTotalpass(classId: string, db?: ClienteTx): Promise<void> {
+    const desmarcar = filas(
+        db,
         `UPDATE partner_class_mappings
             SET sync_status = 'published', sync_error = NULL, updated_at = NOW()
           WHERE class_id = $1 AND channel = 'totalpass' AND sync_status = 'pending_delete'`,
         [classId],
-    ).catch((e: any) => console.error(`[tp-retire] no se pudo desmarcar el retiro de ${classId}:`, e?.message));
+    );
+    if (db) { await desmarcar; return; } // en transacción, el error se propaga
+    await desmarcar.catch((e: any) => console.error(`[tp-retire] no se pudo desmarcar el retiro de ${classId}:`, e?.message));
 }
 
 // ── Barrido de retiros pendientes (red + BD) ─────────────────────────────────
