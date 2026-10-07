@@ -126,6 +126,7 @@ export function DialogoAlumnaNueva({ clase, open, onOpenChange, nombreInicial = 
             });
             queryClient.invalidateQueries({ queryKey: ['classes'] });
             queryClient.invalidateQueries({ queryKey: ['candidatas', clase?.id] });
+            queryClient.invalidateQueries({ queryKey: ['attendees', clase?.id] });
             queryClient.invalidateQueries({ queryKey: ['reception-clients'] });
             onInscrita?.(r.user.id);
         },

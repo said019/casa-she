@@ -42,6 +42,8 @@ interface PanelClaseProps {
     onCancelar: () => void;
     /** Entrega 5: abre el alta rápida con el nombre buscado. Sin esto no aparece el botón. */
     onRegistrarNueva?: (nombreBuscado: string) => void;
+    /** Alumna a resaltar en "Inscritas" (la que acaba de registrar el alta rápida). */
+    resaltarId?: string | null;
 }
 
 const claveDeLugar = (l: Lugar) => (l.tipo === 'canal' ? l.canal : l.tipo);
@@ -51,7 +53,7 @@ const claveDeLugar = (l: Lugar) => (l.tipo === 'canal' ? l.canal : l.tipo);
  * de lugares; acciones; inscribir alumna; cupo de cada plataforma conectada; inscritas
  * (check-in, invitadas, lista de espera); cerrar cupo y clase gratis.
  */
-export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach, onCancelar, onRegistrarNueva }: PanelClaseProps) {
+export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach, onCancelar, onRegistrarNueva, resaltarId }: PanelClaseProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const user = useAuthStore((s) => s.user);
@@ -60,6 +62,7 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
     const [attendeesTab, setAttendeesTab] = useState<'reservado' | 'espera' | 'cancelado'>('reservado');
     // Alumna recién inscrita: se resalta unos segundos en "Inscritas".
     const [resaltada, setResaltada] = useState<string | null>(null);
+    useEffect(() => { if (resaltarId) setResaltada(resaltarId); }, [resaltarId]);
     // Cancelar reserva confirmada → diálogo con switch de devolución de crédito (estilo Fitune).
     const [cancelBookingId, setCancelBookingId] = useState<string | null>(null);
 

@@ -95,11 +95,11 @@ test.describe("Calendario de recepción – inscribir alumna", () => {
     await expect(panel.locator('[data-resaltada="true"]')).toHaveCount(0);
   });
 
-  test("el botón Inscribir y la cortesía mandan free correcto; sin onRegistrarNueva no hay botón de alta", async ({ adminPage: page }) => {
+  test("el botón Inscribir y la cortesía mandan free correcto; con el alta rápida conectada aparece "Registrar alumna nueva"", async ({ adminPage: page }) => {
     const { llamadas, panel } = await prepararPanel(page);
     await panel.getByRole("combobox", { name: /Buscar alumna/ }).fill("carla");
     await expect(panel.getByTestId(`candidata-${CARLA}`)).toBeVisible();
-    await expect(panel.getByRole("button", { name: /Registrar alumna nueva/ })).toHaveCount(0);
+    await expect(panel.getByRole("button", { name: /Registrar alumna nueva/ })).toHaveCount(1); // Entrega 5
     await panel.getByLabel(/Cortesía: inscribir sin descontar crédito/).check();
     await panel.getByTestId(`candidata-${CARLA}`).getByRole("button", { name: "Inscribir (cortesía)" }).click();
     await expect.poll(() => llamadas.find((l) => l.url === "admin-book")?.cuerpo).toEqual({ classId: ID.barre, userId: CARLA, free: true });
