@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CheckSquare, ChevronLeft, ChevronRight, Copy as CopyIcon, Loader2, Plus, RefreshCw, Repeat, Sparkles, Users } from 'lucide-react';
 import type { Class } from '@/types/class';
 import { AdminLayout } from '@/components/layout/AdminLayout';
@@ -104,6 +104,8 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     const { toast } = useToast();
     const queryClient = useQueryClient();
     // "Deshacer": la acción inversa en una sola llamada (solo coach y mover; ver inversaDe).
+    // Candado contra doble envío: una inversa relativa (−minutos) aplicada dos veces movería de más.
+    const deshaciendo = useRef(false);
     const deshacer = useMutation({
         mutationFn: async (cuerpo: Omit<CuerpoLote, 'vistaPrevia'>) =>
             (await api.post('/classes/bulk', { ...cuerpo, vistaPrevia: false })).data as RespuestaLote,
@@ -122,10 +124,24 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         setAccionLote(null);
         setSeleccion(new Set());
         const inversa = inversaDe(accion, params, antes);
-        toast({
+        // Cada aviso se puede deshacer UNA sola vez: al primer clic se cierra y ya no hace nada.
+        let usado = false;
+        const aviso = toast({
             title: textoHecho(accion, params, respuesta, nombres),
             action: inversa ? (
-                <ToastAction altText="Deshacer el cambio" onClick={() => deshacer.mutate(inversa)}>Deshacer</ToastAction>
+                <ToastAction
+                    altText="Deshacer el cambio"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        if (usado || deshaciendo.current || deshacer.isPending) return;
+                        usado = true;
+                        deshaciendo.current = true;
+                        aviso.dismiss();
+                        deshacer.mutate(inversa, { onSettled: () => { deshaciendo.current = false; } });
+                    }}
+                >
+                    Deshacer
+                </ToastAction>
             ) : undefined,
         });
     };
