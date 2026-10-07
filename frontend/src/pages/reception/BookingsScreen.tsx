@@ -74,7 +74,7 @@ function MarcaTotalPass({ n }: { n: number }) {
     return (
         <span
             className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full"
-            style={{ backgroundColor: CANALES.totalpass.punto }}
+            style={{ backgroundColor: CANALES.totalpass.punto, boxShadow: `0 0 0 1px ${CANALES.totalpass.anillo}` }}
             title={`${n} ${n === 1 ? 'reserva' : 'reservas'} de TotalPass`}
             aria-label={`${n} ${n === 1 ? 'reserva' : 'reservas'} de TotalPass`}
         />

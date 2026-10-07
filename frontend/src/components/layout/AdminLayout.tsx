@@ -390,13 +390,20 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                                                         to={child.href!}
                                                         onClick={() => setMobileMenuOpen(false)}
                                                         className={cn(
-                                                            'block rounded-[0.85rem] px-3 py-2 text-sm transition-[background,color,transform] duration-200 active:scale-[0.99]',
+                                                            'group block rounded-[0.85rem] px-3 py-2 text-sm transition-[background,color,transform] duration-200 active:scale-[0.99]',
                                                             isActive(child.href!)
                                                                 ? 'bg-balance-cream/12 font-semibold text-balance-cream'
                                                                 : 'text-[rgba(246,240,228,0.58)] hover:bg-balance-cream/8 hover:text-balance-cream'
                                                         )}
                                                     >
-                                                        {child.logo ? <ChannelLogo canal={child.logo} fondo="oscuro" alto={11} /> : child.label}
+                                                        {child.logo ? (
+                                                            <ChannelLogo
+                                                                canal={child.logo}
+                                                                fondo="oscuro"
+                                                                alto={11}
+                                                                className={isActive(child.href!) ? undefined : 'opacity-60 transition-opacity group-hover:opacity-100'}
+                                                            />
+                                                        ) : child.label}
                                                     </Link>
                                                 );
                                             })}
