@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
@@ -13,7 +13,6 @@ import { useAuthStore } from '@/stores/authStore';
 import { CompanionPanel } from '@/components/bookings/CompanionPanel';
 import { CancelBookingDialog } from '@/components/bookings/CancelBookingDialog';
 import { ClassIntensity } from '@/components/classes/ClassIntensity';
-import SellPlanDialog from '@/components/memberships/SellPlanDialog';
 import { ChannelLogo } from '@/components/brands/ChannelLogo';
 import { ChannelDot, PuntoLugar } from '@/components/brands/ChannelDot';
 import { PlanLabel } from '@/components/brands/PlanLabel';
@@ -31,6 +30,7 @@ import type { Attendee } from './tipos';
 import { attendeeBookedBy, getInitials, whatsAppDeAsistente } from './formato';
 import { estiloDeLugar, etiquetaCupoLarga, lugaresDeClase, type Lugar } from './lugares';
 import { colorPuntoAlumna } from './colores';
+import { InscribirAlumna } from './InscribirAlumna';
 
 interface PanelClaseProps {
     /** La clase con sus datos vigentes: el padre la vuelve a leer de la lista al refrescar. */
@@ -40,6 +40,8 @@ interface PanelClaseProps {
     onEditar: () => void;
     onCambiarCoach: () => void;
     onCancelar: () => void;
+    /** Entrega 5: abre el alta rápida con el nombre buscado. Sin esto no aparece el botón. */
+    onRegistrarNueva?: (nombreBuscado: string) => void;
 }
 
 const claveDeLugar = (l: Lugar) => (l.tipo === 'canal' ? l.canal : l.tipo);
@@ -49,22 +51,23 @@ const claveDeLugar = (l: Lugar) => (l.tipo === 'canal' ? l.canal : l.tipo);
  * de lugares; acciones; inscribir alumna; cupo de cada plataforma conectada; inscritas
  * (check-in, invitadas, lista de espera); cerrar cupo y clase gratis.
  */
-export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach, onCancelar }: PanelClaseProps) {
+export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach, onCancelar, onRegistrarNueva }: PanelClaseProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const user = useAuthStore((s) => s.user);
     const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
     const [companionHost, setCompanionHost] = useState<Attendee | null>(null);
     const [attendeesTab, setAttendeesTab] = useState<'reservado' | 'espera' | 'cancelado'>('reservado');
-    const [userSearch, setUserSearch] = useState('');
-    const [searchActive, setSearchActive] = useState(false);
-    // Invitada (gratis): reserva de cortesía sin plan ni consumo de crédito.
-    const [guestFree, setGuestFree] = useState(false);
-    // Cliente al que se le ofrece venderle un plan (cuando reservar falló por falta de plan).
-    const [sellFor, setSellFor] = useState<{ id: string; name: string } | null>(null);
-    const [sellOpen, setSellOpen] = useState(false);
+    // Alumna recién inscrita: se resalta unos segundos en "Inscritas".
+    const [resaltada, setResaltada] = useState<string | null>(null);
     // Cancelar reserva confirmada → diálogo con switch de devolución de crédito (estilo Fitune).
     const [cancelBookingId, setCancelBookingId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!resaltada) return;
+        const t = setTimeout(() => setResaltada(null), 6000);
+        return () => clearTimeout(t);
+    }, [resaltada]);
 
     const { data: attendees, isLoading: attendeesLoading, refetch: refetchAttendees } = useQuery<Attendee[]>({
         queryKey: ['attendees', clase?.id],
@@ -72,37 +75,9 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
         enabled: !!clase?.id && open,
     });
 
-    const { data: userSearchResults, isFetching: userSearchLoading } = useQuery<{ users: { id: string; display_name: string; email: string; photo_url: string | null }[] }>({
-        queryKey: ['user-search', userSearch],
-        queryFn: async () => (await api.get(`/users?search=${encodeURIComponent(userSearch)}&limit=8`)).data,
-        enabled: searchActive && userSearch.trim().length >= 2,
-    });
-
     // El panel lee la clase de la lista de clases: esperar a que se recargue hace que los
     // puntos, el candado, la etiqueta de gratis y el cupo cambien en cuanto termina la acción.
     const refrescarClases = () => queryClient.invalidateQueries({ queryKey: ['classes'] });
-
-    const adminBookMutation = useMutation({
-        mutationFn: async ({ classId, userId, free }: { classId: string; userId: string; userName?: string; free?: boolean }) =>
-            api.post('/bookings/admin-book', { classId, userId, free: free ?? false }),
-        onSuccess: () => {
-            refetchAttendees();
-            queryClient.invalidateQueries({ queryKey: ['classes'] });
-            toast({ title: 'Usuario agregado a la clase' });
-            setUserSearch('');
-            setSearchActive(false);
-            setSellFor(null);
-            setGuestFree(false);
-        },
-        onError: (err, vars) => {
-            const msg = getErrorMessage(err);
-            // Si falló por falta de plan/créditos, ofrecemos venderle un plan ahí mismo.
-            if (/membres|cr[eé]dito/i.test(msg)) {
-                setSellFor({ id: vars.userId, name: vars.userName ?? '' });
-            }
-            toast({ variant: 'destructive', title: 'Error', description: msg });
-        },
-    });
 
     const toggleFreeMutation = useMutation({
         mutationFn: async ({ id, is_free, free_label, force }: { id: string; is_free: boolean; free_label?: string; force?: boolean }) =>
@@ -215,8 +190,10 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
     const renderAttendee = (attendee: Attendee, mode: 'reservado' | 'espera' | 'cancelado') => (
         <div
             key={attendee.booking_id}
+            data-resaltada={attendee.user_id === resaltada ? 'true' : undefined}
             className={cn(
-                "flex items-center justify-between gap-2 rounded-lg border p-3",
+                "flex items-center justify-between gap-2 rounded-lg border p-3 transition-colors duration-500",
+                attendee.user_id === resaltada && "border-casa-verde bg-casa-verde/10 ring-2 ring-casa-verde/40",
                 attendee.status === 'checked_in' && "border-success/30 bg-success/10",
                 mode === 'cancelado' && "opacity-70",
             )}
@@ -396,93 +373,18 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
                             </div>
                         )}
 
-                        {/* Inscribir alumna (la Entrega 4 lo rehace con créditos y venta de paquete) */}
-                        {!cancelada && (
-                            <section aria-labelledby="panel-inscribir" className="space-y-2 rounded-xl border border-casa-arena bg-casa-avena/45 p-3">
-                                <h3 id="panel-inscribir" className="text-sm font-semibold text-casa-ciruela">Inscribir alumna</h3>
-                                {sellFor && (
-                                    <div className="flex items-center justify-between gap-2 rounded-lg border border-balance-gold/40 bg-balance-gold/10 p-2.5">
-                                        <p className="text-xs text-balance-gold">
-                                            {sellFor.name || 'Esta clienta'} no tiene plan con créditos.
-                                        </p>
-                                        <Button size="sm" className="h-7 shrink-0" onClick={() => setSellOpen(true)}>
-                                            Vender plan
-                                        </Button>
-                                    </div>
-                                )}
-                                <SellPlanDialog
-                                    userId={sellFor?.id ?? ''}
-                                    userName={sellFor?.name}
-                                    open={sellOpen}
-                                    onOpenChange={setSellOpen}
-                                    onSold={() => {
-                                        if (sellFor && clase) {
-                                            adminBookMutation.mutate({ classId: clase.id, userId: sellFor.id, userName: sellFor.name });
-                                        }
-                                    }}
-                                />
-                                <label className="flex items-start gap-2 cursor-pointer select-none">
-                                    <input
-                                        type="checkbox"
-                                        checked={guestFree}
-                                        onChange={(e) => setGuestFree(e.target.checked)}
-                                        className="mt-0.5 h-3.5 w-3.5 rounded border-input accent-balance-gold"
-                                    />
-                                    <span className="text-[11px] leading-tight">
-                                        <span className="font-medium text-balance-dark">Invitada (gratis, sin descontar crédito)</span>
-                                        <span className="block text-muted-foreground">No requiere plan.</span>
-                                    </span>
-                                </label>
-                                <div className="relative">
-                                    <Input
-                                        placeholder="Buscar por nombre o email..."
-                                        value={userSearch}
-                                        onChange={(e) => {
-                                            setUserSearch(e.target.value);
-                                            setSearchActive(true);
-                                        }}
-                                        className="h-8 text-xs"
-                                    />
-                                </div>
-                                {searchActive && userSearch.trim().length >= 2 && (
-                                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                                        {userSearchLoading && (
-                                            <div className="flex justify-center py-3">
-                                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                            </div>
-                                        )}
-                                        {!userSearchLoading && userSearchResults?.users?.length === 0 && (
-                                            <p className="py-2 text-center text-xs text-muted-foreground">Sin resultados</p>
-                                        )}
-                                        {userSearchResults?.users?.map(u => (
-                                            <button
-                                                key={u.id}
-                                                type="button"
-                                                disabled={adminBookMutation.isPending}
-                                                onClick={() => {
-                                                    if (!clase) return;
-                                                    adminBookMutation.mutate({ classId: clase.id, userId: u.id, userName: u.display_name, free: guestFree });
-                                                }}
-                                                className="flex w-full items-center gap-3 rounded-lg border border-transparent px-2 py-1.5 text-left text-xs hover:border-balance-olive/30 hover:bg-balance-olive/8 disabled:opacity-50"
-                                            >
-                                                <Avatar className="h-6 w-6 shrink-0">
-                                                    <AvatarImage src={u.photo_url || undefined} />
-                                                    <AvatarFallback className="text-[9px]">{getInitials(u.display_name)}</AvatarFallback>
-                                                </Avatar>
-                                                <div className="min-w-0">
-                                                    <p className="font-medium truncate">{u.display_name}</p>
-                                                    <p className="text-muted-foreground truncate">{u.email}</p>
-                                                </div>
-                                                {adminBookMutation.isPending ? (
-                                                    <Loader2 className="ml-auto h-3 w-3 animate-spin shrink-0" />
-                                                ) : (
-                                                    <Plus className="ml-auto h-3 w-3 shrink-0 text-balance-olive opacity-0 group-hover:opacity-100" />
-                                                )}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </section>
+                        {/* Inscribir alumna: busca, muestra créditos de la bolsa de la clase, inscribe o vende */}
+                        {!cancelada && clase && (
+                            <InscribirAlumna
+                                clase={clase}
+                                onInscrita={(userId) => {
+                                    setAttendeesTab('reservado');
+                                    setResaltada(userId);
+                                    refetchAttendees();
+                                }}
+                                onDeshecha={() => { setResaltada(null); refetchAttendees(); }}
+                                onRegistrarNueva={onRegistrarNueva}
+                            />
                         )}
 
                         {/* Cupo de cada plataforma conectada. Solo TotalPass: PUT /classes/:id/channels
