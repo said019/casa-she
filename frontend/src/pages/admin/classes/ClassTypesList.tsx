@@ -45,6 +45,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, Plus, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { ChannelLogo } from '@/components/brands/ChannelLogo';
 
 // Schema
 const classTypeSchema = z.object({
@@ -317,7 +318,9 @@ export default function ClassTypesList() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="totalpassDefaultSpots">Lugares TotalPass por defecto</Label>
+                                    <Label htmlFor="totalpassDefaultSpots" className="flex items-center gap-1.5">
+                                        Lugares para <ChannelLogo canal="totalpass" alto={10} /> por defecto
+                                    </Label>
                                     <Input type="number" id="totalpassDefaultSpots" min={0} {...register('totalpass_default_spots')} />
                                     <p className="text-xs text-muted-foreground">
                                         Cupo TotalPass sugerido al crear clases de esta disciplina. 0 = no ofrecida en TotalPass por defecto.

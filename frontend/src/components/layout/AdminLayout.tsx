@@ -48,6 +48,8 @@ import { AdminBreadcrumbs } from '@/components/layout/AdminBreadcrumbs';
 import { AdminSearch } from '@/components/admin/AdminSearch';
 import api from '@/lib/api';
 import { isReceptionAccount } from '@/lib/operationalAccess';
+import { ChannelLogo } from '@/components/brands/ChannelLogo';
+import type { CanalClave } from '@/lib/canales';
 
 interface AdminLayoutProps {
     children: ReactNode;
@@ -57,6 +59,8 @@ type SidebarChild = {
     href?: string;
     label: string;
     kind?: 'header';
+    /** Si el destino es de una plataforma, se pinta su logo en lugar del texto. */
+    logo?: CanalClave;
 };
 
 type SidebarItem = {
@@ -180,7 +184,7 @@ const sidebarItems: SidebarItem[] = [
             { href: '/admin/settings/whatsapp', label: 'WhatsApp' },
             { href: '/admin/settings/closed-days', label: 'Días cerrados' },
             { href: '/admin/settings/onboarding', label: 'Perfilador' },
-            { href: '/admin/settings/totalpass', label: 'TotalPass' },
+            { href: '/admin/settings/totalpass', label: 'TotalPass', logo: 'totalpass' },
             { href: '/admin/audit', label: 'Bitácora' },
         ],
     },
@@ -392,7 +396,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                                                                 : 'text-[rgba(246,240,228,0.58)] hover:bg-balance-cream/8 hover:text-balance-cream'
                                                         )}
                                                     >
-                                                        {child.label}
+                                                        {child.logo ? <ChannelLogo canal={child.logo} fondo="oscuro" alto={11} /> : child.label}
                                                     </Link>
                                                 );
                                             })}

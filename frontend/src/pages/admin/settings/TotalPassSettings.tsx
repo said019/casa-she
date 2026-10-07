@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { ChannelLogo } from '@/components/brands/ChannelLogo';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -124,7 +125,7 @@ export default function TotalPassSettings() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-heading font-bold" style={{ color: '#2A4E36' }}>
-                TotalPass
+                <ChannelLogo canal="totalpass" alto={28} />
               </h1>
               <p className="text-muted-foreground">
                 Credenciales de la API oficial de TotalPass (Partner) para publicar clases.
