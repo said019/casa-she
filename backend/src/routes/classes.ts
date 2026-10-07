@@ -19,6 +19,7 @@ import { setTotalpassCap } from '../lib/totalpass/caps.js';
 import { dispararRetiroTotalpass } from '../lib/totalpass/retire.js';
 import { marcarResyncTotalpass, dispararResyncTotalpass } from '../lib/totalpass/resync.js';
 import { copiarSemana, diasEntre } from '../lib/copy-week.js';
+import { CANALES_DE_CLASE_SQL } from '../lib/class-channels.js';
 import { intensitySchema } from '../lib/classIntensity.js';
 import { isOctoberManagedDate } from '../data/october2026.js';
 
@@ -85,7 +86,9 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
         ci.max_spots AS totalpass_spots,
         -- Cuántos de esos lugares ya ocupó TotalPass: permite marcar la clase en
         -- la rejilla sin tener que abrirla una por una.
-        COALESCE(ci.booked_spots, 0) AS totalpass_booked
+        COALESCE(ci.booked_spots, 0) AS totalpass_booked,
+        -- Una entrada por plataforma (channel_inventory): pinta los lugares de cada una.
+        ${CANALES_DE_CLASE_SQL} AS channels
       FROM classes c
       JOIN class_types ct ON c.class_type_id = ct.id
       JOIN instructors i ON c.instructor_id = i.id
