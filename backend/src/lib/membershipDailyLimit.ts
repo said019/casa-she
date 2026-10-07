@@ -20,10 +20,12 @@ export async function assertMembershipDailyLimit(params: {
   classId: string;
   remaining: number | null;
   excludeBookingId?: string;
+  /** false = solo consulta (sin advisory lock): para vistas previas fuera de una transacción de reserva. */
+  bloquear?: boolean;
 }): Promise<void> {
-  const { db, userId, classId, remaining, excludeBookingId } = params;
+  const { db, userId, classId, remaining, excludeBookingId, bloquear = true } = params;
   if (remaining !== null) return;
-  const lock = await db.query(
+  const lock = !bloquear ? { rows: [{ locked: true }] } : await db.query(
     `SELECT pg_try_advisory_xact_lock(hashtextextended('membership-daily:' || $1::text, 0)) AS locked`,
     [userId],
   );
