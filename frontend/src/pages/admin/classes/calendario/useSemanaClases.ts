@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfWeek, addDays, isSameDay, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
 import api from '@/lib/api';
 import type { Class, ClassType, Instructor } from '@/types/class';
 import type { Facility } from './tipos';
@@ -102,7 +101,6 @@ export function useSemanaClases() {
     };
 
     const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
-    const activeClasses = classes?.filter((c) => c.status !== 'cancelled') || [];
 
     // Sede única (de facilities). Sin selector visible: el filtro se fija a la única sede.
     const bmbStudios = useMemo(
@@ -119,24 +117,12 @@ export function useSemanaClases() {
         }
     }, [bmbStudios, studioFilter]);
 
-    const totalBookings = activeClasses.reduce((sum, c) => sum + Number(c.current_bookings || 0), 0);
-    const totalCapacity = activeClasses.reduce((sum, c) => sum + Number(c.max_capacity || 0), 0);
-    const openSpots = Math.max(totalCapacity - totalBookings, 0);
-    const weekRange = `${format(weekStart, 'd MMM', { locale: es })} al ${format(addDays(weekStart, 6), 'd MMM yyyy', { locale: es })}`;
-    const occupancy = totalCapacity > 0 ? Math.round((totalBookings / totalCapacity) * 100) : 0;
-    const mobileDayClasses = getClassesForDay(mobileSelectedDay)
-        .slice()
-        .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
-    const mobileDayClosed = closedDaySet.has(format(mobileSelectedDay, 'yyyy-MM-dd'));
-    const mobileClosedReason = getClosedReason(mobileSelectedDay);
-
     return {
         currentDate, setCurrentDate, weekStart, mobileSelectedDay, setMobileSelectedDay,
         classTypeFilter, setClassTypeFilter, programFilter, setProgramFilter, instructorFilter, setInstructorFilter,
         classTypes, instructors, facilities,
         classes, classesLoading, classesError, refetchClasses,
-        startStr, endStr, closedDaySet, getClosedReason, getClassesForDay, weekDays, activeClasses,
-        totalBookings, openSpots, weekRange, occupancy, mobileDayClasses, mobileDayClosed, mobileClosedReason,
+        startStr, endStr, closedDaySet, getClosedReason, getClassesForDay, weekDays,
         handlePrevWeek, handleNextWeek, handleToday,
     };
 }
