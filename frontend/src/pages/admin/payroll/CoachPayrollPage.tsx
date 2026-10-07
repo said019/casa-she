@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { PeriodPicker } from '@/components/payroll/PeriodPicker';
 import { currentPeriodToken, normalizeFrequency, periodLabel, type PayFrequency } from '@/lib/payrollPeriod';
+import { PlanLabel } from '@/components/brands/PlanLabel';
 
 const mxn = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
 
@@ -253,7 +254,7 @@ function ClassAttendeesDialog({
                 <div className="min-w-0">
                     <p className="truncate font-medium text-sm">{a.display_name}</p>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                        {a.plan_name && <Badge variant="outline" className="text-[10px]">{a.plan_name}</Badge>}
+                        {a.plan_name && <Badge variant="outline" className="text-[10px]"><PlanLabel nombre={a.plan_name} /></Badge>}
                         {a.status === 'waitlist' && a.waitlist_position != null && (
                             <span className="font-medium text-amber-600">#{a.waitlist_position} en espera</span>
                         )}
