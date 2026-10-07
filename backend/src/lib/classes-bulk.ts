@@ -450,7 +450,13 @@ async function aplicarLote(db: ClienteTx, e: EntradaLote, actor: ActorLote, ctx:
  */
 export async function enviarAvisosDelLote(t: TrasCommitLote): Promise<void> {
     for (const a of t.avisosCancelacion) void sendWebPushToUser(a.userId, a.payload);
-    for (const a of t.avisosAlumnas) await writeInAppNotification(a);
+    for (const a of t.avisosAlumnas) {
+        try {
+            await writeInAppNotification(a);
+        } catch (err) {
+            console.error('[classes-bulk] aviso en la app falló:', err);
+        }
+    }
     for (const correo of t.correosCoach) {
         try {
             const coach = await queryOne<{ email: string | null; display_name: string }>(
