@@ -10,8 +10,9 @@ export function PlatformBadge({ name, color }: { name?: string | null; color?: s
   if (!name || !color) return null;
   const canal = canalDePlan(name);
   if (canal) {
+    // h-4: el mismo alto que la pastilla de texto, para que el logo no quede pegado al renglón de abajo.
     return (
-      <span className="inline-flex items-center" title={`Plataforma: ${CANALES[canal].nombre}`}>
+      <span className="inline-flex h-4 items-center" title={`Plataforma: ${CANALES[canal].nombre}`}>
         <ChannelLogo canal={canal} alto={9} />
       </span>
     );
