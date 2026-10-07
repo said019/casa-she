@@ -23,6 +23,7 @@ import { copiarSemana, diasEntre } from '../lib/copy-week.js';
 import { CANALES_DE_CLASE_SQL } from '../lib/class-channels.js';
 import { intensitySchema } from '../lib/classIntensity.js';
 import { isOctoberManagedDate } from '../data/october2026.js';
+import { LoteSchema, procesarLote, ErrorLote } from '../lib/classes-bulk.js';
 
 const router = Router();
 
@@ -281,6 +282,47 @@ router.post('/bulk-mark-free', authenticate, requireRole('admin', 'super_admin')
     } catch (e: any) {
         console.error('Bulk-mark-free error:', e.message);
         res.status(500).json({ error: 'Error al marcar clases', detail: e.message });
+    }
+});
+
+// ============================================
+// POST /api/classes/bulk - Cambios en bloque: coach, cupo de TotalPass, mover/cambiar
+// tipo, cancelar. `vistaPrevia: true` evalúa sin escribir. Al aplicar, cualquier clase
+// bloqueada → 409 con la misma respuesta y sin cambios. Todo en UNA transacción; avisos,
+// correos y barridos de TotalPass corren una sola vez después del COMMIT.
+// ============================================
+router.post('/bulk', authenticate, requireElevated, async (req: Request, res: Response) => {
+    const validation = LoteSchema.safeParse(req.body);
+    if (!validation.success) {
+        return res.status(400).json({ error: 'Datos inválidos', details: validation.error.flatten().fieldErrors });
+    }
+    const entrada = validation.data;
+
+    // Recepción queda limitada a su sucursal asignada (si tiene una).
+    let sucursalPermitida: string | null = null;
+    if (req.user?.role === 'reception') {
+        const fila = await queryOne<{ default_facility_id: string | null }>(
+            `SELECT default_facility_id FROM users WHERE id = $1`, [req.user.userId]);
+        sucursalPermitida = fila?.default_facility_id ?? null;
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const { respuesta } = await procesarLote(client, entrada, { userId: req.user!.userId, sucursalPermitida });
+        if (!respuesta.aplicado) {
+            await client.query('ROLLBACK');
+            return res.status(entrada.vistaPrevia ? 200 : 409).json(respuesta);
+        }
+        await client.query('COMMIT');
+        return res.json(respuesta);
+    } catch (error) {
+        await client.query('ROLLBACK').catch(() => { /* best-effort */ });
+        if (error instanceof ErrorLote) return res.status(error.status).json({ error: error.message });
+        console.error('Bulk classes error:', error);
+        return res.status(500).json({ error: 'No se aplicó ningún cambio: falló el servidor.' });
+    } finally {
+        client.release();
     }
 });
 
