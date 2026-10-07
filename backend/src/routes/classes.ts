@@ -23,7 +23,7 @@ import { copiarSemana, diasEntre } from '../lib/copy-week.js';
 import { CANALES_DE_CLASE_SQL } from '../lib/class-channels.js';
 import { intensitySchema } from '../lib/classIntensity.js';
 import { isOctoberManagedDate } from '../data/october2026.js';
-import { LoteSchema, procesarLote, ErrorLote } from '../lib/classes-bulk.js';
+import { LoteSchema, procesarLote, enviarAvisosDelLote, ErrorLote } from '../lib/classes-bulk.js';
 
 const router = Router();
 
@@ -309,12 +309,28 @@ router.post('/bulk', authenticate, requireElevated, async (req: Request, res: Re
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        const { respuesta } = await procesarLote(client, entrada, { userId: req.user!.userId, sucursalPermitida });
+        const { respuesta, trasCommit } = await procesarLote(client, entrada, { userId: req.user!.userId, sucursalPermitida });
         if (!respuesta.aplicado) {
             await client.query('ROLLBACK');
             return res.status(entrada.vistaPrevia ? 200 : 409).json(respuesta);
         }
         await client.query('COMMIT');
+
+        void enviarAvisosDelLote(trasCommit).catch((e) => console.error('[classes-bulk] avisos fallaron:', e));
+        if (trasCommit.retiro) dispararRetiroTotalpass();
+        if (trasCommit.resync) dispararResyncTotalpass();
+        await logAction(query, {
+            adminUserId: req.user!.userId,
+            actionType: `classes_bulk_${entrada.accion}`,
+            entityType: 'class',
+            description: `Cambio en bloque (${entrada.accion}) en ${entrada.classIds.length} clases`,
+            oldData: { clases: trasCommit.antes },
+            newData: {
+                classIds: entrada.classIds, instructorId: entrada.instructorId, canal: entrada.canal, lugares: entrada.lugares,
+                minutos: entrada.minutos, classTypeId: entrada.classTypeId, motivo: entrada.motivo, resumen: respuesta.resumen,
+            },
+            req,
+        });
         return res.json(respuesta);
     } catch (error) {
         await client.query('ROLLBACK').catch(() => { /* best-effort */ });

@@ -11,6 +11,13 @@ import { z } from 'zod';
 import type { ClienteTx } from './db-tx.js';
 import { localDateTimeUtc } from './mx-time.js';
 import { capacityError } from './schedule.js';
+import { queryOne } from '../config/database.js';
+import { cancelClassWithRefunds } from './cancel-class.js';
+import { setTotalpassCap } from './totalpass/caps.js';
+import { marcarResyncTotalpass } from './totalpass/resync.js';
+import { writeInAppNotification } from './in-app-notifications.js';
+import { sendWebPushToUser } from './web-push.js';
+import { sendClassAssignmentNotification } from '../services/email.js';
 
 // ── Entrada ──────────────────────────────────────────────────────────────────
 
@@ -355,6 +362,106 @@ export async function procesarLote(db: ClienteTx, e: EntradaLote, actor: ActorLo
     const clases = e.classIds.map((id) => evaluarClase(id, ctx, e, actor, ahora));
     const respuesta = armarRespuesta(clases, ctx, false);
     if (e.vistaPrevia || respuesta.resumen.bloqueadas > 0) return { respuesta, trasCommit: SIN_CAMBIOS() };
-    // Aplicar cada acción llega en el siguiente cambio de esta rama.
-    throw new ErrorLote(501, 'Todavía no se pueden aplicar cambios en bloque.');
+    const trasCommit = await aplicarLote(db, e, actor, ctx);
+    return { respuesta: { ...respuesta, aplicado: true }, trasCommit };
+}
+
+// ── Aplicar (todo con el cliente de la transacción) ──────────────────────────
+
+async function aplicarLote(db: ClienteTx, e: EntradaLote, actor: ActorLote, ctx: ContextoLote): Promise<TrasCommitLote> {
+    const t = SIN_CAMBIOS();
+    const clases = e.classIds.map((id) => ctx.clases.get(id)!);
+    t.antes = clases.map((c) => ({
+        id: c.id, instructor_id: c.instructor_id, class_type_id: c.class_type_id, inicio: c.inicio, fin: c.fin, status: c.status,
+    }));
+    const avisar = (c: FilaClase, title: string, body: string) => {
+        for (const userId of ctx.alumnas.get(c.id) ?? []) {
+            t.avisosAlumnas.push({ userId, title, body, type: 'class_updated', data: { classId: c.id } });
+        }
+    };
+
+    if (e.accion === 'coach') {
+        const coach = ctx.coachNueva!;
+        const cambian = clases.filter((c) => c.instructor_id !== coach.id);
+        if (cambian.length === 0) return t;
+        const ids = cambian.map((c) => c.id);
+        await db.query(`UPDATE classes SET instructor_id = $1, updated_at = NOW() WHERE id = ANY($2::uuid[])`, [coach.id, ids]);
+        // Editar en TotalPass: las socias conservan su lugar.
+        t.resync = (await marcarResyncTotalpass(ids, db)) > 0;
+        for (const c of cambian) {
+            avisar(c, 'Cambio de coach', `${c.tipo} del ${fechaLarga(c.fecha)} a las ${horaLegible(c.inicio)} ahora la da ${coach.nombre}.`);
+            t.correosCoach.push({
+                instructorId: coach.id, className: c.tipo, classDate: c.fecha, startTime: c.inicio, endTime: c.fin, capacity: c.max_capacity,
+            });
+        }
+        return t;
+    }
+
+    if (e.accion === 'cupo_canal') {
+        for (const c of clases) await setTotalpassCap(c.id, e.lugares!, db);
+        // 0 marca el retiro (dentro de setTotalpassCap); > 0 lo desmarca.
+        t.retiro = e.lugares === 0;
+        return t;
+    }
+
+    if (e.accion === 'mover') {
+        const minutos = e.minutos ?? 0;
+        const tipo = ctx.tipoNuevo;
+        const ids = clases.map((c) => c.id);
+        await db.query(
+            `UPDATE classes
+                SET start_time = start_time + make_interval(mins => $2::int),
+                    end_time = end_time + make_interval(mins => $2::int),
+                    class_type_id = COALESCE($3::uuid, class_type_id),
+                    updated_at = NOW()
+              WHERE id = ANY($1::uuid[])`,
+            [ids, minutos, tipo?.id ?? null],
+        );
+        // Con minutos ≠ 0 TotalPass la borra y la republica (las socias pierden lugar);
+        // solo con el tipo, se edita.
+        t.resync = (await marcarResyncTotalpass(ids, db)) > 0;
+        for (const c of clases) {
+            const dia = fechaLarga(c.fecha);
+            const horaNueva = horaLegible(deMin(aMin(c.inicio) + minutos));
+            const cambiaTipo = tipo && tipo.id !== c.class_type_id;
+            if (minutos !== 0 && cambiaTipo) avisar(c, 'Tu clase cambió', `${c.tipo} del ${dia} ahora es ${tipo!.nombre} a las ${horaNueva}.`);
+            else if (minutos !== 0) avisar(c, 'Tu clase cambió de hora', `${c.tipo} del ${dia} ahora es a las ${horaNueva} (antes ${horaLegible(c.inicio)}).`);
+            else if (cambiaTipo) avisar(c, 'Tu clase cambió', `${c.tipo} del ${dia} a las ${horaLegible(c.inicio)} ahora es ${tipo!.nombre}.`);
+        }
+        return t;
+    }
+
+    // cancelar
+    const motivo = e.motivo?.trim() || 'Cancelada por el estudio';
+    for (const c of clases) {
+        const r = await cancelClassWithRefunds(c.id, actor.userId, motivo, { db, diferirAvisos: true });
+        t.avisosCancelacion.push(...r.avisos);
+    }
+    t.retiro = true;
+    return t;
+}
+
+// ── Después del COMMIT ───────────────────────────────────────────────────────
+
+/**
+ * Manda lo que el lote dejó pendiente: avisos a alumnas (in-app + push) y correos a la
+ * coach nueva. Nunca lanza: los cambios ya están guardados y un aviso que falla no los
+ * deshace. Los barridos de TotalPass los dispara la ruta.
+ */
+export async function enviarAvisosDelLote(t: TrasCommitLote): Promise<void> {
+    for (const a of t.avisosCancelacion) void sendWebPushToUser(a.userId, a.payload);
+    for (const a of t.avisosAlumnas) await writeInAppNotification(a);
+    for (const correo of t.correosCoach) {
+        try {
+            const coach = await queryOne<{ email: string | null; display_name: string }>(
+                `SELECT email, display_name FROM instructors WHERE id = $1`, [correo.instructorId]);
+            if (!coach?.email) continue;
+            await sendClassAssignmentNotification({
+                to: coach.email, coachName: coach.display_name, className: correo.className,
+                classDate: correo.classDate, startTime: correo.startTime, endTime: correo.endTime, capacity: correo.capacity,
+            });
+        } catch (err) {
+            console.error('[classes-bulk] correo a la coach falló:', err);
+        }
+    }
 }

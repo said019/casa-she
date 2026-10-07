@@ -164,6 +164,73 @@ async function main() {
         assert.deepEqual(conBloqueada.trasCommit.avisosCancelacion, []);
         console.log('  aplicar con una bloqueada: nada cambia · OK');
 
+        // ── 7. Aplicar mover: corre la hora, marca resync y avisa ────────────
+        const movida = await procesarLote(client, { classIds: [siete], accion: 'mover', minutos: -60, vistaPrevia: false }, admin);
+        assert.equal(movida.respuesta.aplicado, true);
+        assert.deepEqual({ inicio: (await fila(siete)).inicio, fin: (await fila(siete)).fin }, { inicio: '06:00', fin: '06:50' });
+        assert.equal(await estadoMapping(client, siete), 'pending_resync');
+        assert.equal(movida.trasCommit.resync, true);
+        assert.deepEqual(movida.trasCommit.avisosAlumnas.map((a) => [a.userId, a.type]), [[alumna.userId, 'class_updated']]);
+        assert.match(movida.trasCommit.avisosAlumnas[0].body, /ahora es a las 6:00 \(antes 7:00\)/);
+        assert.deepEqual(movida.trasCommit.antes.map((a) => a.inicio), ['07:00'], 'guarda cómo estaba para la auditoría');
+        // De regreso (lo que haría "Deshacer").
+        const deVuelta = await procesarLote(client, { classIds: [siete], accion: 'mover', minutos: 60, vistaPrevia: false }, admin);
+        assert.equal(deVuelta.respuesta.aplicado, true);
+        assert.equal((await fila(siete)).inicio, '07:00');
+        console.log('  aplicar mover: hora, pending_resync y aviso · OK');
+
+        // ── 8. Aplicar coach ─────────────────────────────────────────────────
+        const conCoach = await procesarLote(client, { classIds: [ocho], accion: 'coach', instructorId: base.coachB, vistaPrevia: false }, admin);
+        assert.equal(conCoach.respuesta.aplicado, true);
+        assert.equal((await fila(ocho)).instructor_id, base.coachB);
+        assert.deepEqual(conCoach.trasCommit.correosCoach.map((c) => [c.instructorId, c.startTime]), [[base.coachB, '08:00']]);
+        console.log('  aplicar coach: cambia y prepara el correo a la coach nueva · OK');
+
+        // ── 9. Aplicar cupo_canal: respeta CAP_BELOW_BOOKED y 0 marca retiro ──
+        const vacia = await crearClase(client, base, { fecha, hora: '13:00' });
+        await publicada(client, vacia);
+        await conTotalpass(client, base, vacia, 2, 0);
+        const bajo = await procesarLote(client, { classIds: [siete, vacia], accion: 'cupo_canal', canal: 'totalpass', lugares: 0, vistaPrevia: false }, admin);
+        assert.equal(bajo.respuesta.aplicado, false, 'la 7:00 tiene 1 socia: no baja a 0');
+        assert.equal(await estadoMapping(client, vacia), 'published', 'y la otra tampoco se tocó');
+        const apagada = await procesarLote(client, { classIds: [vacia], accion: 'cupo_canal', canal: 'totalpass', lugares: 0, vistaPrevia: false }, admin);
+        assert.equal(apagada.trasCommit.retiro, true);
+        assert.equal(await estadoMapping(client, vacia), 'pending_delete');
+        await procesarLote(client, { classIds: [siete], accion: 'cupo_canal', canal: 'totalpass', lugares: 4, vistaPrevia: false }, admin);
+        assert.equal((await client.query(`SELECT max_spots FROM channel_inventory WHERE class_id = $1 AND channel = 'totalpass'`, [siete])).rows[0].max_spots, 4);
+        console.log('  aplicar cupo_canal: no baja de las socias; 0 retira · OK');
+
+        // ── 10. Una falla a la mitad no deja nada ────────────────────────────
+        // Un trigger de prueba truena al cancelar la SEGUNDA clase (la de las 8:00).
+        await client.query(`CREATE FUNCTION pg_temp.falla_a_la_mitad() RETURNS trigger AS $$
+            BEGIN IF NEW.id = '${ocho}'::uuid AND NEW.status = 'cancelled' THEN RAISE EXCEPTION 'falla de prueba'; END IF; RETURN NEW; END $$ LANGUAGE plpgsql`);
+        await client.query(`CREATE TRIGGER falla_a_la_mitad BEFORE UPDATE ON classes FOR EACH ROW EXECUTE FUNCTION pg_temp.falla_a_la_mitad()`);
+        await client.query('SAVEPOINT antes_del_lote'); // la ruta hace ROLLBACK de toda su transacción; aquí, hasta este punto
+        await assert.rejects(procesarLote(client, { classIds: [siete, ocho], accion: 'cancelar', vistaPrevia: false }, admin), /falla de prueba/);
+        await client.query('ROLLBACK TO SAVEPOINT antes_del_lote');
+        assert.equal((await fila(siete)).status, 'scheduled', 'la primera NO quedó cancelada');
+        assert.equal((await client.query(`SELECT status::text FROM bookings WHERE id = $1`, [reserva])).rows[0].status, 'confirmed');
+        assert.equal((await client.query(`SELECT multi_remaining FROM memberships WHERE id = $1`, [alumna.membershipId])).rows[0].multi_remaining, 4);
+        assert.equal(await estadoMapping(client, siete), 'pending_resync', 'el mapping sigue como estaba');
+        await client.query(`DROP TRIGGER falla_a_la_mitad ON classes`);
+        console.log('  falla a la mitad: no queda nada · OK');
+
+        // ── 11. Aplicar cancelar: cancela, devuelve créditos, marca retiro ───
+        const motivo = 'Puente del 2 de noviembre';
+        const canceladas = await procesarLote(client, { classIds: [siete, ocho], accion: 'cancelar', motivo, vistaPrevia: false }, admin);
+        assert.equal(canceladas.respuesta.aplicado, true);
+        assert.deepEqual(canceladas.respuesta.resumen, { ok: 2, bloqueadas: 0, alumnasAvisadas: 1, sociasPierdenLugar: 0 });
+        for (const id of [siete, ocho]) {
+            const c = (await client.query(`SELECT status::text, cancellation_reason FROM classes WHERE id = $1`, [id])).rows[0];
+            assert.deepEqual(c, { status: 'cancelled', cancellation_reason: motivo }, 'cancelada, nunca borrada');
+        }
+        assert.equal((await client.query(`SELECT status::text FROM bookings WHERE id = $1`, [reserva])).rows[0].status, 'cancelled');
+        assert.equal((await client.query(`SELECT multi_remaining FROM memberships WHERE id = $1`, [alumna.membershipId])).rows[0].multi_remaining, 5, 'crédito devuelto');
+        assert.equal(await estadoMapping(client, siete), 'pending_delete');
+        assert.equal(canceladas.trasCommit.retiro, true);
+        assert.ok(canceladas.trasCommit.avisosCancelacion.some((a) => a.userId === alumna.userId), 'el aviso se manda después del COMMIT');
+        console.log('  aplicar cancelar: canceladas, créditos devueltos, pending_delete · OK');
+
         await client.query('ROLLBACK');
         console.log('test-classes-bulk: OK');
     } catch (e) {

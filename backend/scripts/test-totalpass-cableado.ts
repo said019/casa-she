@@ -88,6 +88,22 @@ assert.match(
     'debe existir el job TOTALPASS_RESYNC',
 );
 
+// ── (c3) Los cambios en bloque también llegan a TotalPass ───────────────────
+// POST /api/classes/bulk marca dentro de su transacción y dispara los dos barridos
+// UNA vez después del COMMIT. Si alguien quita un disparo, las clases quedan
+// marcadas pero no se retiran/republican hasta el cron (o nunca, con crons apagados).
+const inicioBulk = clases.indexOf("router.post('/bulk',");
+assert.ok(inicioBulk >= 0, 'debe existir POST /api/classes/bulk');
+const bulk = clases.slice(inicioBulk, clases.indexOf('\n});\n', inicioBulk));
+assert.match(bulk, /COMMIT[\s\S]*dispararRetiroTotalpass\(\)/, '/bulk debe disparar el retiro después del COMMIT');
+assert.match(bulk, /COMMIT[\s\S]*dispararResyncTotalpass\(\)/, '/bulk debe disparar la resincronización después del COMMIT');
+const lote = leer('lib/classes-bulk.ts');
+assert.match(lote, /cancelClassWithRefunds\([^)]*\{\s*db/, 'cancelar en bloque pasa por cancelClassWithRefunds dentro de la transacción');
+assert.match(lote, /marcarResyncTotalpass\([^)]*,\s*db\)/, 'coach y mover en bloque marcan resync dentro de la transacción');
+assert.match(lote, /setTotalpassCap\([^)]*,\s*db\)/, 'el cupo en bloque usa setTotalpassCap dentro de la transacción');
+assert.doesNotMatch(lote, /DELETE FROM classes/, 'los cambios en bloque nunca borran clases');
+
+
 // ── (d) El estado 'pending_delete' tiene que ser válido en la BD ────────────
 // partner_class_mappings.sync_status tiene un CHECK; sin migración, el UPDATE
 // del marcado truena y el retiro se pierde en silencio.
