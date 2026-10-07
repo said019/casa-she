@@ -106,10 +106,13 @@ export function TarjetaClase({ clase, variante, completa = true, className, styl
             ) : (
                 <span className="flex w-full min-w-0 items-center gap-[3px]">
                     {lugares.lugares.length <= MAX_PUNTOS_TARJETA ? (
-                        lugares.lugares.map((l, i) => {
-                            const e = estiloDeLugar(l, colorAlumna, fondo);
-                            return <PuntoLugar key={i} relleno={e.relleno} anillo={e.anillo} tamano={tamanoPunto} data-lugar={claveDeLugar(l)} />;
-                        })
+                        // En columnas angostas los puntos se recortan; el cupo ("3/7") siempre se ve.
+                        <span className="flex min-w-0 items-center gap-[3px] overflow-hidden">
+                            {lugares.lugares.map((l, i) => {
+                                const e = estiloDeLugar(l, colorAlumna, fondo);
+                                return <PuntoLugar key={i} relleno={e.relleno} anillo={e.anillo} tamano={tamanoPunto} data-lugar={claveDeLugar(l)} />;
+                            })}
+                        </span>
                     ) : (
                         // Cupo grande: los puntos no caben; se cuentan por tipo.
                         <span className="flex items-center gap-1 text-[11px] tabular-nums">

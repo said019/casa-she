@@ -45,8 +45,11 @@ export function RejillaSemana({ dias, clasesDelDia, diasCerrados, motivoCierre, 
 
     return (
         <div className="overflow-x-auto rounded-[18px] border border-casa-arena bg-[hsl(var(--admin-panel))]">
-            <div className="flex min-w-[1040px]">
-                <div className="w-[60px] flex-none border-r border-casa-arena/60">
+            {/* 60 px de eje + 7 días de ~120 px: cabe en una laptop de 1280 con la barra lateral
+                abierta. Si aun así hay scroll, el eje de horas se queda fijo a la izquierda
+                (fondo opaco del panel; por encima de las tarjetas, por debajo de los diálogos). */}
+            <div className="flex min-w-[900px]">
+                <div className="sticky left-0 z-[5] w-[60px] flex-none border-r border-casa-arena/60 bg-[hsl(var(--admin-panel))]">
                     <div className="h-[68px] border-b border-casa-arena" />
                     <div className="relative" style={{ height: rejilla.altoTotal }}>
                         {rejilla.horas.map((h) => (
