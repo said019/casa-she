@@ -21,7 +21,7 @@ export function ChannelLogo({ canal, fondo = 'claro', alto = 12, className }: Ch
                 className,
             )}
         >
-            <img src={logo.src} alt={logo.alt} draggable={false} className="block w-auto" style={{ height: logo.altoPx }} />
+            <img src={logo.src} alt={logo.alt} draggable={false} className="block w-auto max-w-none" style={{ height: logo.altoPx }} />
         </span>
     );
 }
