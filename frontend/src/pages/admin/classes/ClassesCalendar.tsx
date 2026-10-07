@@ -13,15 +13,6 @@ import { CancelBookingDialog } from '@/components/bookings/CancelBookingDialog';
 import type { Class, ClassType, Instructor } from '@/types/class';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useAuthStore } from '@/stores/authStore';
-
-// Type for Facility
-interface Facility {
-    id: string;
-    name: string;
-    description: string | null;
-    capacity: number;
-    is_active: boolean;
-}
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { Button } from '@/components/ui/button';
 import SellPlanDialog from '@/components/memberships/SellPlanDialog';
@@ -69,8 +60,9 @@ import { enlaceWhatsApp } from '@/lib/whatsapp';
 import { ChannelLogo } from '@/components/brands/ChannelLogo';
 import { PlanLabel } from '@/components/brands/PlanLabel';
 import { CANALES, canalDePlan, esCanal } from '@/lib/canales';
-
-const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+import type { Attendee, CopiaSemanaResumen } from './calendario/tipos';
+import { DAYS, attendeeBookedBy, formatClassTime, getInitials, whatsAppDeAsistente } from './calendario/formato';
+import { useSemanaClases } from './calendario/useSemanaClases';
 
 const generateSchema = z.object({
     startDate: z.date(),
@@ -119,55 +111,6 @@ type GenerateForm = z.infer<typeof generateSchema>;
 type ClassForm = z.infer<typeof classSchema>;
 type EditClassForm = z.infer<typeof editClassSchema>;
 
-interface Attendee {
-    booking_id: string;
-    status: string;
-    checked_in_at: string | null;
-    waitlist_position: number | null;
-    user_id: string;
-    display_name: string;
-    email: string;
-    photo_url: string | null;
-    phone: string;
-    plan_name: string | null;
-    is_free_booking?: boolean;
-    booked_by?: string | null;
-    booked_by_name?: string | null;
-    booked_by_role?: string | null;
-    /** 'app' | 'totalpass' | 'wellhub' | 'fitpass' — de dónde vino la reserva. */
-    channel?: string | null;
-}
-
-/** Lo que devuelve /classes/copy-week, en vista previa y en la copia real. */
-interface CopiaSemanaResumen {
-    creadas: number;
-    yaExistian: number;
-    enDiaCerrado: number;
-    enElPasado: number;
-    canceladasConservadas: number;
-    canceladasOmitidas: number;
-    includeCancelled: boolean;
-    dryRun: boolean;
-    mensaje?: string;
-    detalle: Array<{ fecha: string; hora: string; clase: string; resultado: string }>;
-}
-
-const whatsAppDeAsistente = (attendee: Attendee, clase?: Class | null) => enlaceWhatsApp({
-    telefono: attendee.phone,
-    nombre: attendee.display_name,
-    clase: clase?.class_type_name,
-    fecha: clase?.date,
-    hora: clase?.start_time ? formatClassTime(clase.start_time) : null,
-});
-
-// "Reservó": si booked_by es la propia alumna (o null) se reservó sola; si difiere, lo hizo ese staff.
-function attendeeBookedBy(a: Attendee): string {
-    if (!a.booked_by || a.booked_by === a.user_id) return 'la alumna';
-    const r = a.booked_by_role;
-    const roleEs = r === 'reception' ? 'recepción' : (r === 'admin' || r === 'super_admin') ? 'admin' : r === 'instructor' ? 'coach' : (r || 'staff');
-    return `${a.booked_by_name || 'staff'} · ${roleEs}`;
-}
-
 interface ClassesCalendarProps {
     initialGenerateOpen?: boolean;
     /** Embebido en otro shell (recepción): no envuelve AuthGuard/AdminLayout. */
@@ -177,9 +120,6 @@ interface ClassesCalendarProps {
 export default function ClassesCalendar({ initialGenerateOpen = false, embedded = false }: ClassesCalendarProps) {
     const [companionHost, setCompanionHost] = useState<Attendee | null>(null);
     const [companionReviewOpen, setCompanionReviewOpen] = useState(false);
-    const [currentDate, setCurrentDate] = useState(new Date());
-    const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
-    const [mobileSelectedDay, setMobileSelectedDay] = useState(new Date());
     const [isGenerateOpen, setIsGenerateOpen] = useState(initialGenerateOpen);
     const [isBulkFreeOpen, setIsBulkFreeOpen] = useState(false);
     // Copiar semana: nunca se escribe sin haber mostrado antes la vista previa.
@@ -202,10 +142,6 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     const [isAttendeesOpen, setIsAttendeesOpen] = useState(false);
     const [selectedClass, setSelectedClass] = useState<Class | null>(null);
     const [attendeesTab, setAttendeesTab] = useState<'reservado' | 'espera' | 'cancelado'>('reservado');
-    const [classTypeFilter, setClassTypeFilter] = useState<string>('all');
-    const [studioFilter, setStudioFilter] = useState<string>('all');
-    const [programFilter, setProgramFilter] = useState<string>('all');
-    const [instructorFilter, setInstructorFilter] = useState<string>('all');
     const [userSearch, setUserSearch] = useState('');
     const [searchActive, setSearchActive] = useState(false);
     // Invitada (gratis): reserva de cortesía sin plan ni consumo de crédito.
@@ -220,45 +156,15 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     const user = useAuthStore((s) => s.user);
     const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
-    // Deep-link: ?date=YYYY-MM-DD posiciona el calendario en la semana que contiene esa fecha.
-    // Se aplica UNA sola vez al entrar (no pelea con la navegación manual del usuario después).
-    const [searchParams] = useSearchParams();
-    const dateParamApplied = useRef(false);
-    useEffect(() => {
-        if (dateParamApplied.current) return;
-        const param = searchParams.get('date');
-        if (!param || !/^\d{4}-\d{2}-\d{2}$/.test(param)) return;
-        const [y, m, d] = param.split('-').map(Number);
-        const parsed = new Date(y, m - 1, d); // LOCAL, no UTC: evita correrse un día
-        if (Number.isNaN(parsed.getTime())) return;
-        dateParamApplied.current = true;
-        setCurrentDate(parsed);
-    }, [searchParams]);
-
-    useEffect(() => {
-        setWeekStart(startOfWeek(currentDate, { weekStartsOn: 1 }));
-    }, [currentDate]);
-
-    useEffect(() => {
-        const today = new Date();
-        const currentWeekStart = startOfWeek(today, { weekStartsOn: 1 });
-        setMobileSelectedDay(isSameDay(weekStart, currentWeekStart) ? today : weekStart);
-    }, [weekStart]);
-
-    const { data: classTypes } = useQuery<ClassType[]>({
-        queryKey: ['class-types'],
-        queryFn: async () => (await api.get('/class-types')).data,
-    });
-
-    const { data: instructors } = useQuery<Instructor[]>({
-        queryKey: ['instructors'],
-        queryFn: async () => (await api.get('/instructors')).data,
-    });
-
-    const { data: facilities } = useQuery<Facility[]>({
-        queryKey: ['facilities'],
-        queryFn: async () => (await api.get('/facilities')).data,
-    });
+    const {
+        currentDate, setCurrentDate, weekStart, mobileSelectedDay, setMobileSelectedDay,
+        classTypeFilter, setClassTypeFilter, programFilter, setProgramFilter, instructorFilter, setInstructorFilter,
+        classTypes, instructors, facilities,
+        classesLoading, classesError, refetchClasses,
+        startStr, endStr, closedDaySet, getClosedReason, getClassesForDay, weekDays, activeClasses,
+        totalBookings, openSpots, weekRange, occupancy, mobileDayClasses, mobileDayClosed, mobileClosedReason,
+        handlePrevWeek, handleNextWeek, handleToday,
+    } = useSemanaClases();
 
     const { data: attendees, isLoading: attendeesLoading, refetch: refetchAttendees } = useQuery<Attendee[]>({
         queryKey: ['attendees', selectedClass?.id],
@@ -293,31 +199,6 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
             toast({ variant: 'destructive', title: 'Error', description: msg });
         },
     });
-
-    const startStr = format(weekStart, 'yyyy-MM-dd');
-    const endStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
-
-    const { data: classes, isLoading: classesLoading, isError: classesError, refetch: refetchClasses } = useQuery<Class[]>({
-        queryKey: ['classes', startStr, endStr, studioFilter, programFilter],
-        queryFn: async () => {
-            const params = new URLSearchParams({ start: startStr, end: endStr });
-            if (studioFilter !== 'all') params.set('facility_id', studioFilter);
-            if (programFilter !== 'all') params.set('category', programFilter);
-            const { data } = await api.get(`/classes?${params.toString()}`);
-            return data;
-        },
-        retry: 3,
-        retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
-        refetchOnWindowFocus: true,
-    });
-
-    // Closed days for visual indicator
-    const { data: closedDays = [] } = useQuery<{ id: string; date: string; reason: string }[]>({
-        queryKey: ['closed-days-range', startStr, endStr],
-        queryFn: async () => (await api.get(`/closed-days/range?start=${startStr}&end=${endStr}`)).data,
-    });
-    const closedDaySet = new Set(closedDays.map(d => d.date));
-    const getClosedReason = (day: Date) => closedDays.find(d => d.date === format(day, 'yyyy-MM-dd'))?.reason;
 
     // Mutations
     const generateMutation = useMutation({
@@ -631,10 +512,6 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         resolver: zodResolver(editClassSchema),
     });
 
-    const handlePrevWeek = () => setCurrentDate(addDays(currentDate, -7));
-    const handleNextWeek = () => setCurrentDate(addDays(currentDate, 7));
-    const handleToday = () => setCurrentDate(new Date());
-
     const handleDayClick = (day: Date) => {
         classForm.reset({
             date: day,
@@ -676,21 +553,6 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         setCoachScope('this');
         setSelectedSeriesDates(new Set());
         setIsChangeCoachOpen(true);
-    };
-
-    const getClassesForDay = (day: Date) => {
-        return classes?.filter(c => {
-            const dateStr = (c.date || '').split('T')[0];
-            const dateMatch = isSameDay(parseISO(dateStr + 'T00:00:00'), day);
-            const typeMatch = classTypeFilter === 'all' || c.class_type_id === classTypeFilter;
-            const studioMatch = studioFilter === 'all' || c.facility_id === studioFilter;
-            const instructorMatch = instructorFilter === 'all' || c.instructor_id === instructorFilter;
-            return dateMatch && typeMatch && studioMatch && instructorMatch;
-        }) || [];
-    };
-
-    const getInitials = (name: string) => {
-        return name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??';
     };
 
     // Asistentes divididos por estado para las pestañas estilo Fitune.
@@ -846,35 +708,6 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         },
         onError: (err) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) }),
     });
-
-    const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
-    const activeClasses = classes?.filter((c) => c.status !== 'cancelled') || [];
-
-    // Sede única (de facilities). Sin selector visible: el filtro se fija a la única sede.
-    const bmbStudios = useMemo(
-        () => (facilities || [])
-            .filter((f) => /^casa sh/i.test(f.name))
-            .map((f) => ({ id: f.id, name: f.name, short: f.name.replace(/^Casa Shé\s*/i, '') })),
-        [facilities]
-    );
-
-    // Fija el filtro a la única sede en cuanto carga (en vez de 'all').
-    useEffect(() => {
-        if (bmbStudios.length && !bmbStudios.some((s) => s.id === studioFilter)) {
-            setStudioFilter(bmbStudios[0].id);
-        }
-    }, [bmbStudios, studioFilter]);
-
-    const totalBookings = activeClasses.reduce((sum, c) => sum + Number(c.current_bookings || 0), 0);
-    const totalCapacity = activeClasses.reduce((sum, c) => sum + Number(c.max_capacity || 0), 0);
-    const openSpots = Math.max(totalCapacity - totalBookings, 0);
-    const weekRange = `${format(weekStart, 'd MMM', { locale: es })} al ${format(addDays(weekStart, 6), 'd MMM yyyy', { locale: es })}`;
-    const occupancy = totalCapacity > 0 ? Math.round((totalBookings / totalCapacity) * 100) : 0;
-    const mobileDayClasses = getClassesForDay(mobileSelectedDay)
-        .slice()
-        .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
-    const mobileDayClosed = closedDaySet.has(format(mobileSelectedDay, 'yyyy-MM-dd'));
-    const mobileClosedReason = getClosedReason(mobileSelectedDay);
 
     const content = (
                 <div className="space-y-5">
@@ -2410,8 +2243,4 @@ function ClassEventCard({ item, onClick, mobile = false }: { item: Class; onClic
             </div>
         </button>
     );
-}
-
-function formatClassTime(value?: string) {
-    return value?.slice(0, 5) || '--:--';
 }
