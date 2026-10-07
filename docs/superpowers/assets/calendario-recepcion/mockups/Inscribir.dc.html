@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Panel de clase: inscribir alumna</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&amp;family=Instrument+Serif&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<aside aria-label="Clase seleccionada" style="width: 480px; height: 1040px; box-sizing: border-box; overflow: hidden; background: #FCF8EF; color: #2E1B22; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 14px; line-height: 1.4; border-left: 1px solid #D6D5C2; display: flex; flex-direction: column">
+
+  <div style="padding: 22px 24px 18px; background: #F4E6EB; border-bottom: 1px solid #E3C9D3">
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px">
+      <div>
+        <h2 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 40px; line-height: 1; color: #2E1B22">Barre</h2>
+        <p style="margin: 6px 0 0; font-size: 15px">Miércoles 7 de octubre · 8:00 – 8:50</p>
+        <p style="margin: 2px 0 0; color: #6B554D">Con Ana</p>
+      </div>
+      <button type="button" aria-label="Cerrar panel" style="width: 44px; height: 44px; flex: none; border-radius: 12px; border: 1px solid #E3C9D3; background: #FCF8EF; color: #2E1B22; font: inherit; cursor: pointer; display: grid; place-items: center">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+    </div>
+    <div style="display: flex; align-items: center; gap: 6px; margin-top: 16px">
+      <sc-for list="{{seats}}" as="s" hint-placeholder-count="7"><span style="width: 20px; height: 20px; border-radius: 50%; background: {{s.fill}}; box-shadow: inset 0 0 0 2px {{s.ring}}"></span></sc-for>
+      <span style="margin-left: 10px; font-weight: 600">{{seatLabel}}</span>
+    </div>
+    <div style="display: flex; gap: 6px; margin-top: 16px; flex-wrap: wrap">
+      <button type="button" style="height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #E3C9D3; background: #FCF8EF; color: #2E1B22; font: inherit; font-weight: 500; cursor: pointer">Editar clase</button>
+      <button type="button" style="height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #E3C9D3; background: #FCF8EF; color: #2E1B22; font: inherit; font-weight: 500; cursor: pointer">Cambiar coach</button>
+      <button type="button" style="height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #E3C9D3; background: #FCF8EF; color: #8E3426; font: inherit; font-weight: 500; cursor: pointer">Cancelar clase</button>
+    </div>
+  </div>
+
+  <div style="flex: 1; overflow: auto; padding: 18px 24px 24px; display: flex; flex-direction: column; gap: 18px">
+
+    <section aria-labelledby="ins-title" style="display: flex; flex-direction: column; gap: 10px">
+      <h3 id="ins-title" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 24px; line-height: 1; color: #16261A">Inscribir alumna</h3>
+      <label style="position: relative; display: block">
+        <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Buscar alumna</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B554D" stroke-width="2" stroke-linecap="round" style="position: absolute; left: 14px; top: 15px"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <input type="search" value="dan" placeholder="Nombre, teléfono o correo" style="width: 100%; box-sizing: border-box; height: 48px; padding: 0 14px 0 42px; border-radius: 14px; border: 2px solid #2A4E36; background: #FFFFFF; color: #2E1B22; font: inherit; font-size: 15px">
+      </label>
+
+      <sc-if value="{{showResults}}" hint-placeholder-val="{{true}}">
+        <div role="listbox" aria-label="Alumnas encontradas" style="border: 1px solid #D6D5C2; border-radius: 14px; background: #FFFFFF; overflow: hidden; box-shadow: 0 16px 38px -22px rgba(42,33,24,.42)">
+          <sc-for list="{{results}}" as="r" hint-placeholder-count="3">
+            <div role="option" aria-selected="false" style="padding: 12px 14px; border-bottom: 1px solid #ECE6D6">
+              <div style="display: flex; align-items: center; gap: 12px">
+                <span style="width: 36px; height: 36px; flex: none; border-radius: 50%; background: #EFE8D8; color: #2E1B22; display: grid; place-items: center; font-weight: 600">{{r.ini}}</span>
+                <span style="flex: 1; min-width: 0">
+                  <span style="display: block; font-weight: 600">{{r.name}}</span>
+                  <span style="display: block; font-size: 12.5px; color: {{r.planInk}}">{{r.plan}}</span>
+                </span>
+                <sc-if value="{{r.canBook}}" hint-placeholder-val="{{true}}">
+                  <button type="button" onClick="{{r.book}}" style="height: 40px; padding: 0 14px; border-radius: 11px; border: 1px solid #2A4E36; background: #2A4E36; color: #FCF8EF; font: inherit; font-weight: 600; cursor: pointer">Inscribir</button>
+                </sc-if>
+                <sc-if value="{{r.needsSale}}" hint-placeholder-val="{{false}}">
+                  <button type="button" onClick="{{r.sell}}" aria-expanded="{{r.selling}}" style="height: 40px; padding: 0 12px; border-radius: 11px; border: 1px solid #AE4836; background: #FCF8EF; color: #8E3426; font: inherit; font-weight: 600; cursor: pointer">Vender paquete</button>
+                </sc-if>
+              </div>
+              <sc-if value="{{r.selling}}" hint-placeholder-val="{{false}}">
+                <div style="margin: 12px 0 2px 48px; display: flex; flex-direction: column; gap: 10px">
+                  <div role="radiogroup" aria-label="Paquete" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px">
+                    <sc-for list="{{packs}}" as="p" hint-placeholder-count="4">
+                      <button type="button" role="radio" aria-checked="{{p.on}}" onClick="{{p.pick}}" style="padding: 8px 10px; border-radius: 10px; border: 1px solid {{p.border}}; background: {{p.bg}}; color: #2E1B22; font: inherit; text-align: left; cursor: pointer">
+                        <span style="display: block; font-weight: 600; font-size: 13px">{{p.name}}</span>
+                        <span style="display: block; font-size: 12px; color: #6B554D">{{p.price}}</span>
+                      </button>
+                    </sc-for>
+                  </div>
+                  <div role="radiogroup" aria-label="Forma de pago" style="display: flex; gap: 6px; flex-wrap: wrap">
+                    <sc-for list="{{pays}}" as="p" hint-placeholder-count="3">
+                      <button type="button" role="radio" aria-checked="{{p.on}}" onClick="{{p.pick}}" style="height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid {{p.border}}; background: {{p.bg}}; color: {{p.ink}}; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer">{{p.name}}</button>
+                    </sc-for>
+                  </div>
+                  <button type="button" onClick="{{r.sellAndBook}}" style="height: 42px; border-radius: 11px; border: 1px solid #2A4E36; background: #2A4E36; color: #FCF8EF; font: inherit; font-weight: 600; cursor: pointer">{{sellCta}}</button>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+          <a href="AltaRapida.dc.html" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #F6F0E4; color: #2A4E36; font-weight: 600; text-decoration: none">
+            <span style="width: 36px; height: 36px; flex: none; border-radius: 50%; border: 1.5px dashed #2A4E36; display: grid; place-items: center">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+            </span>
+            <span>¿No está? Registrar alumna nueva</span>
+          </a>
+        </div>
+      </sc-if>
+
+      <label style="display: flex; align-items: center; gap: 10px; color: #6B554D; font-size: 13px">
+        <input type="checkbox" style="width: 18px; height: 18px; accent-color: #2A4E36; margin: 0">
+        Cortesía: inscribir sin descontar crédito
+      </label>
+
+      <sc-if value="{{hasToast}}" hint-placeholder-val="{{false}}">
+        <div role="status" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: #EBF0DA; color: #34420F; font-size: 13.5px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4E6018" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+          <span style="flex: 1">{{toast}}</span>
+          <button type="button" onClick="{{reset}}" style="border: 0; background: transparent; color: #34420F; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; padding: 6px">Deshacer</button>
+        </div>
+      </sc-if>
+    </section>
+
+    <section aria-labelledby="tp-title" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #D6D5C2; border-radius: 14px">
+      <div style="flex: 1">
+        <h3 id="tp-title" style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600">Lugares para <img src="/_blob/ed48d6778ac4054ef90b068af847d1e1" alt="TotalPass" style="height: 11px; width: auto; display: block"></h3>
+        <p style="margin: 2px 0 0; font-size: 12.5px; color: #6B554D">1 socia inscrita · 0 la quita de TotalPass</p>
+      </div>
+      <button type="button" aria-label="Uno menos" style="width: 40px; height: 40px; border-radius: 11px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit; font-size: 18px; cursor: pointer">−</button>
+      <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 30px; line-height: 1; min-width: 22px; text-align: center">6</span>
+      <button type="button" aria-label="Uno más" style="width: 40px; height: 40px; border-radius: 11px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit; font-size: 18px; cursor: pointer">+</button>
+    </section>
+
+    <section aria-labelledby="list-title" style="display: flex; flex-direction: column; gap: 4px">
+      <div style="display: flex; align-items: baseline; justify-content: space-between">
+        <h3 id="list-title" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 24px; line-height: 1; color: #16261A">Inscritas</h3>
+        <span style="font-size: 13px; color: #6B554D">{{arrived}}</span>
+      </div>
+      <ul style="list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column">
+        <sc-for list="{{attendees}}" as="a" hint-placeholder-count="5">
+          <li style="display: flex; align-items: center; gap: 12px; padding: 10px 8px; border-radius: 12px; background: {{a.bg}}">
+            <span style="width: 34px; height: 34px; flex: none; border-radius: 50%; background: {{a.avBg}}; color: {{a.avInk}}; display: grid; place-items: center; font-weight: 600">{{a.ini}}</span>
+            <span style="flex: 1; min-width: 0">
+              <span style="display: block; font-weight: 600">{{a.name}}</span>
+              <span style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #6B554D">
+                <sc-if value="{{a.isTp}}" hint-placeholder-val="{{false}}"><span style="display: inline-flex; align-items: center; padding: 3px 7px; border-radius: 999px; background: #000000"><img src="/_blob/cc0c619f9fca05910cb6a88577c88465" alt="TotalPass" style="height: 8px; width: auto; display: block"></span></sc-if>
+                {{a.plan}}
+              </span>
+            </span>
+            <button type="button" onClick="{{a.toggle}}" aria-pressed="{{a.in}}" style="height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid {{a.btnBorder}}; background: {{a.btnBg}}; color: {{a.btnInk}}; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">{{a.btnLabel}}</button>
+          </li>
+        </sc-for>
+      </ul>
+    </section>
+  </div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":480,"height":1040}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.state || {};
+    const booked = s.booked || null;
+    const selling = s.selling ?? null;
+    const pack = s.pack ?? 1;
+    const pay = s.pay ?? 0;
+    const arrivedSet = new Set(s.arrived || ['Regina Salas', 'Lucía Herrera']);
+
+    const base = [
+      { name: 'Regina Salas', plan: 'Paquete 8 Clases · le quedan 4' },
+      { name: 'Lucía Herrera', plan: 'Ilimitado Clases · vence 30 oct' },
+      { name: 'Fernanda Ruiz', plan: 'Clase suelta' },
+      { name: 'Andrea Campos', plan: 'Paquete 4 Clases · le quedan 1' },
+      { name: 'Paola Ibarra', plan: 'Socia, reservó desde la app de TotalPass', tp: true }
+    ];
+    const list = booked ? base.concat([{ name: booked.name, plan: booked.plan, fresh: true }]) : base;
+
+    const app = list.filter(a => !a.tp).length;
+    const tp = list.filter(a => a.tp).length;
+    const seats = [];
+    for (let i = 0; i < 7; i++) {
+      if (i < app) seats.push({ fill: '#7A3550', ring: '#7A3550' });
+      else if (i < app + tp) seats.push({ fill: '#26D07C', ring: '#0F7A45' });
+      else seats.push({ fill: 'transparent', ring: '#C493A7' });
+    }
+    const free = 7 - app - tp;
+
+    const PACKS = [['Clase suelta', '[precio]'], ['Paquete 4 Clases', '[precio]'], ['Paquete 8 Clases', '[precio]'], ['Ilimitado mensual', '[precio]']];
+    const PAYS = ['Efectivo', 'Transferencia', 'Tarjeta'];
+
+    const results = [
+      { name: 'Daniela Ortiz', plan: 'Paquete 8 Clases · le quedan 3', after: 'le quedan 2 clases', ok: true },
+      { name: 'Dana Fuentes', plan: 'Ilimitado Clases · vence 30 oct', after: 'tiene ilimitado hasta el 30 de octubre', ok: true },
+      { name: 'Daniella Ríos', plan: 'Sin créditos de Clases · venció 2 oct', ok: false }
+    ].map((r, i) => ({
+      name: r.name, ini: r.name[0], plan: r.plan,
+      planInk: r.ok ? '#6B554D' : '#8E3426',
+      canBook: r.ok, needsSale: !r.ok, selling: selling === i,
+      book: () => this.setState({ booked: { name: r.name, plan: r.plan }, toast: r.name + ' quedó inscrita; ' + r.after + '.' }),
+      sell: () => this.setState({ selling: selling === i ? null : i }),
+      sellAndBook: () => this.setState({ booked: { name: r.name, plan: PACKS[pack][0] + ' · pagó en ' + PAYS[pay].toLowerCase() }, selling: null, toast: 'Cobrado (' + PAYS[pay].toLowerCase() + ') e inscrita: ' + r.name + '.' })
+    }));
+
+    return {
+      seats, seatLabel: (app + tp) + ' de 7 · ' + (free === 0 ? 'llena' : free + (free === 1 ? ' libre' : ' libres')),
+      showResults: !booked, results,
+      packs: PACKS.map((p, i) => ({ name: p[0], price: p[1], on: pack === i, border: pack === i ? '#2A4E36' : '#D6D5C2', bg: pack === i ? '#EEF3EC' : '#FCF8EF', pick: () => this.setState({ pack: i }) })),
+      pays: PAYS.map((p, i) => ({ name: p, on: pay === i, border: pay === i ? '#2A4E36' : '#D6D5C2', bg: pay === i ? '#2A4E36' : '#FCF8EF', ink: pay === i ? '#FCF8EF' : '#2E1B22', pick: () => this.setState({ pay: i }) })),
+      sellCta: 'Cobrar ' + PACKS[pack][0].toLowerCase() + ' e inscribir',
+      hasToast: !!s.toast, toast: s.toast || '',
+      reset: () => this.setState({ booked: null, toast: null }),
+      arrived: arrivedSet.size + ' de ' + list.length + ' llegaron',
+      attendees: list.map(a => {
+        const inn = arrivedSet.has(a.name);
+        return {
+          name: a.name, ini: a.name[0], plan: a.plan, isTp: !!a.tp, in: inn,
+          bg: a.fresh ? '#EBF0DA' : 'transparent',
+          avBg: a.tp ? '#DDF6E9' : '#F4E6EB', avInk: a.tp ? '#0F5A34' : '#7A3550',
+          btnLabel: inn ? 'Llegó' : 'Marcar llegada',
+          btnBg: inn ? '#2A4E36' : '#FCF8EF', btnInk: inn ? '#FCF8EF' : '#2A4E36', btnBorder: inn ? '#2A4E36' : '#AFC9B7',
+          toggle: () => {
+            const next = new Set(arrivedSet);
+            if (next.has(a.name)) next.delete(a.name); else next.add(a.name);
+            this.setState({ arrived: Array.from(next) });
+          }
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

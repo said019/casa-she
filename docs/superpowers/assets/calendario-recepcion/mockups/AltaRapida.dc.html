@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Alumna nueva con acceso por WhatsApp</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&amp;family=Instrument+Serif&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1040px; height: 1040px; box-sizing: border-box; background: #EFE8D8; color: #2E1B22; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 14px; line-height: 1.4; display: flex; gap: 80px">
+
+  <div style="width: 480px; display: flex; flex-direction: column">
+    <p style="margin: 0; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 4px; color: #6B554D; font-size: 13px"><span style="width: 24px; height: 24px; border-radius: 50%; background: #2A4E36; color: #FCF8EF; display: grid; place-items: center; font-weight: 600; font-size: 12px">1</span>Datos, paquete y pago en una sola pantalla</p>
+    <aside aria-label="Alumna nueva" style="flex: 1; box-sizing: border-box; background: #FCF8EF; border: 1px solid #D6D5C2; border-radius: 20px; padding: 22px 24px; display: flex; flex-direction: column; gap: 16px">
+      <a href="Inscribir.dc.html" style="display: inline-flex; align-items: center; gap: 6px; color: #2A4E36; font-weight: 600; text-decoration: none; font-size: 13px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+        Barre · mié 7 oct · 8:00
+      </a>
+      <h2 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 38px; line-height: 1; color: #16261A">Alumna nueva</h2>
+
+      <label style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-weight: 600">Nombre completo</span>
+        <input type="text" value="Daniela Ortiz" style="height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FFFFFF; color: #2E1B22; font: inherit; font-size: 15px">
+      </label>
+      <label style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-weight: 600">WhatsApp</span>
+        <span style="display: flex; gap: 6px">
+          <span style="height: 46px; padding: 0 12px; border-radius: 12px; border: 1px solid #D6D5C2; background: #F6F0E4; display: flex; align-items: center; color: #6B554D">+52</span>
+          <input type="tel" value="55 3187 2240" style="flex: 1; min-width: 0; height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FFFFFF; color: #2E1B22; font: inherit; font-size: 15px">
+        </span>
+        <span style="font-size: 12.5px; color: #6B554D">Ahí le llega su acceso. Si el número o el correo ya existen, te ofrecemos su ficha.</span>
+      </label>
+      <label style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-weight: 600">Correo</span>
+        <input type="email" required value="daniela.ortiz@gmail.com" style="height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FFFFFF; color: #2E1B22; font: inherit; font-size: 15px">
+        <span style="font-size: 12.5px; color: #6B554D">Con este correo entra a la app.</span>
+      </label>
+
+      <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+        <legend style="font-weight: 600; padding: 0; margin-bottom: 8px">Paquete</legend>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px">
+          <button type="button" role="radio" aria-checked="false" style="padding: 10px 12px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit; text-align: left"><span style="display: block; font-weight: 600">Clase suelta</span><span style="display: block; font-size: 12.5px; color: #6B554D">[precio]</span></button>
+          <button type="button" role="radio" aria-checked="false" style="padding: 10px 12px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit; text-align: left"><span style="display: block; font-weight: 600">Paquete 4 Clases</span><span style="display: block; font-size: 12.5px; color: #6B554D">[precio]</span></button>
+          <button type="button" role="radio" aria-checked="true" style="padding: 10px 12px; border-radius: 12px; border: 2px solid #2A4E36; background: #EEF3EC; color: #2E1B22; font: inherit; text-align: left"><span style="display: block; font-weight: 600">Paquete 8 Clases</span><span style="display: block; font-size: 12.5px; color: #6B554D">[precio]</span></button>
+          <button type="button" role="radio" aria-checked="false" style="padding: 10px 12px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit; text-align: left"><span style="display: block; font-weight: 600">Ilimitado mensual</span><span style="display: block; font-size: 12.5px; color: #6B554D">[precio]</span></button>
+        </div>
+      </fieldset>
+
+      <fieldset style="border: 0; margin: 0; padding: 0">
+        <legend style="font-weight: 600; padding: 0; margin-bottom: 8px">Pago</legend>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap">
+          <button type="button" role="radio" aria-checked="true" style="height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid #2A4E36; background: #2A4E36; color: #FCF8EF; font: inherit; font-weight: 500">Efectivo</button>
+          <button type="button" role="radio" aria-checked="false" style="height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit; font-weight: 500">Transferencia</button>
+          <button type="button" role="radio" aria-checked="false" style="height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit; font-weight: 500">Tarjeta</button>
+        </div>
+      </fieldset>
+
+      <label style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #EEF3EC">
+        <input type="checkbox" checked style="width: 20px; height: 20px; margin: 1px 0 0; accent-color: #2A4E36; flex: none">
+        <span>
+          <span style="display: block; font-weight: 600; color: #16261A">Mandarle su acceso por WhatsApp</span>
+          <span style="display: block; font-size: 12.5px; color: #3C6B4C">Recibe un link para crear su contraseña y ver sus clases.</span>
+        </span>
+      </label>
+
+      <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px">
+        <p style="margin: 0; font-size: 13px; color: #6B554D">Paquete 8 Clases · efectivo · usa 1 clase hoy</p>
+        <button type="button" style="height: 52px; border-radius: 14px; border: 1px solid #2A4E36; background: #2A4E36; color: #FCF8EF; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer">Registrar, cobrar e inscribir</button>
+      </div>
+    </aside>
+  </div>
+
+  <div style="width: 480px; display: flex; flex-direction: column">
+    <p style="margin: 0; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 4px; color: #6B554D; font-size: 13px"><span style="width: 24px; height: 24px; border-radius: 50%; background: #2A4E36; color: #FCF8EF; display: grid; place-items: center; font-weight: 600; font-size: 12px">2</span>Inscrita y con su acceso listo para enviar</p>
+    <aside aria-label="Alumna registrada" style="flex: 1; box-sizing: border-box; background: #FCF8EF; border: 1px solid #D6D5C2; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column">
+      <div style="padding: 24px; background: #EBF0DA; display: flex; flex-direction: column; gap: 10px">
+        <span style="width: 44px; height: 44px; border-radius: 50%; background: #4E6018; display: grid; place-items: center">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FCF8EF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+        </span>
+        <h2 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 36px; line-height: 1.02; color: #16261A">Daniela quedó inscrita</h2>
+        <p style="margin: 0; color: #34420F">Barre · miércoles 7 de octubre · 8:00</p>
+        <p style="margin: 0; color: #34420F">Paquete 8 Clases cobrado en efectivo · le quedan 7</p>
+      </div>
+
+      <div style="padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; flex: 1">
+        <h3 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 24px; line-height: 1; color: #16261A">Su acceso a la app</h3>
+        <p style="margin: 0; color: #6B554D">Se abre WhatsApp con este mensaje ya escrito. Solo tienes que enviarlo.</p>
+
+        <div style="background: #E9E4D6; border-radius: 16px; padding: 16px">
+          <div style="margin-left: auto; max-width: 340px; background: #FFFFFF; border-radius: 14px 14px 4px 14px; padding: 12px 14px; box-shadow: 0 1px 1px rgba(42,33,24,.12); font-size: 14px; line-height: 1.5; color: #1F1F1F">
+            <p style="margin: 0">Hola Daniela, te escribimos de Casa Shé. Ya tienes tu lugar en Barre el miércoles 7 de octubre a las 8:00.</p>
+            <p style="margin: 8px 0 0">Crea tu contraseña aquí para ver tus clases y reservar desde tu celular:</p>
+            <p style="margin: 8px 0 0; color: #2A4E36; font-weight: 600; text-decoration: underline">[link de acceso]</p>
+            <p style="margin: 8px 0 0; color: #6B554D; font-size: 12.5px">El link vence en 7 días.</p>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px">
+          <button type="button" style="flex: 1; height: 50px; border-radius: 14px; border: 1px solid #2A4E36; background: #2A4E36; color: #FCF8EF; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.5A8.4 8.4 0 1 1 21 11.5z"></path></svg>
+            Abrir WhatsApp
+          </button>
+          <button type="button" style="height: 50px; padding: 0 16px; border-radius: 14px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit; font-weight: 600; cursor: pointer">Copiar link</button>
+        </div>
+        <p style="margin: 0; font-size: 12.5px; color: #6B554D">Si lo pierde o vence, lo reenvías desde su ficha en Alumnas.</p>
+
+        <a href="Inscribir.dc.html" style="margin-top: auto; align-self: flex-start; color: #2A4E36; font-weight: 600; text-decoration: none; padding: 10px 0">Volver a la clase</a>
+      </div>
+    </aside>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1040,"height":1040}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
