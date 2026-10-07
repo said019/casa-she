@@ -32,10 +32,15 @@ for (const purpose of ['', null, 'session']) {
   assert.throws(() => decodeSessionToken(t, SECRET), jwt.JsonWebTokenError, `purpose=${String(purpose)}`);
 }
 
-// 5. Sin userId: rechazado.
+// 5. Sin userId, o userId que no es string no vacío: rechazado.
 {
   const t = jwt.sign({ email: 'a@b.mx', role: 'client' }, SECRET, { expiresIn: '1h' });
   assert.throws(() => decodeSessionToken(t, SECRET), jwt.JsonWebTokenError);
+
+  for (const userId of ['', 123]) {
+    const t2 = jwt.sign({ ...sesion, userId }, SECRET, { expiresIn: '1h' });
+    assert.throws(() => decodeSessionToken(t2, SECRET), jwt.JsonWebTokenError, `userId=${JSON.stringify(userId)}`);
+  }
 }
 
 // 6. Expirado: sigue siendo TokenExpiredError (el middleware responde "Sesión expirada").
