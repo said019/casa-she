@@ -63,53 +63,13 @@ import { CANALES, canalDePlan, esCanal } from '@/lib/canales';
 import type { Attendee, CopiaSemanaResumen } from './calendario/tipos';
 import { DAYS, attendeeBookedBy, formatClassTime, getInitials, whatsAppDeAsistente } from './calendario/formato';
 import { useSemanaClases } from './calendario/useSemanaClases';
-
-const generateSchema = z.object({
-    startDate: z.date(),
-    endDate: z.date(),
-});
-
-const classSchema = z.object({
-    intensity: z.number().int().min(1).max(3).nullable(),
-    date: z.date(),
-    classTypeId: z.string().uuid(),
-    instructorId: z.string().uuid(),
-    facilityId: z.string().uuid().optional(),
-    startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
-    endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
-    maxCapacity: z.coerce.number().int().positive(),
-    recurring: z.boolean().optional(),
-    endDate: z.date().optional(),
-    weekdays: z.array(z.number().int().min(0).max(6)).optional(),
-})
-    .refine((d) => !d.recurring || (!!d.weekdays && d.weekdays.length > 0), {
-        message: 'Elige al menos un día de la semana.',
-        path: ['weekdays'],
-    })
-    .refine((d) => !d.recurring || !!d.endDate, {
-        message: 'Selecciona la fecha "hasta".',
-        path: ['endDate'],
-    })
-    .refine((d) => !d.recurring || !d.endDate || d.endDate >= d.date, {
-        message: 'La fecha "hasta" debe ser igual o posterior a "desde".',
-        path: ['endDate'],
-    });
-
-const editClassSchema = z.object({
-    intensity: z.number().int().min(1).max(3).nullable(),
-    classTypeId: z.string().uuid(),
-    instructorId: z.string().uuid(),
-    facilityId: z.string().uuid().optional(),
-    date: z.date(),
-    startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
-    endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
-    maxCapacity: z.coerce.number().int().positive(),
-    totalpassSpots: z.coerce.number().int().min(0).optional(),
-});
-
-type GenerateForm = z.infer<typeof generateSchema>;
-type ClassForm = z.infer<typeof classSchema>;
-type EditClassForm = z.infer<typeof editClassSchema>;
+import { DialogoGenerar } from './calendario/DialogoGenerar';
+import { DialogoNuevaClase } from './calendario/DialogoNuevaClase';
+import { DialogoEditarClase } from './calendario/DialogoEditarClase';
+import { DialogoCopiarSemana } from './calendario/DialogoCopiarSemana';
+import { DialogoGratis } from './calendario/DialogoGratis';
+import { DialogoCancelarClase } from './calendario/DialogoCancelarClase';
+import { DialogoCambiarCoach } from './calendario/DialogoCambiarCoach';
 
 interface ClassesCalendarProps {
     initialGenerateOpen?: boolean;
@@ -124,21 +84,16 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
     const [isBulkFreeOpen, setIsBulkFreeOpen] = useState(false);
     // Copiar semana: nunca se escribe sin haber mostrado antes la vista previa.
     const [isCopyWeekOpen, setIsCopyWeekOpen] = useState(false);
-    const [copiaPrevia, setCopiaPrevia] = useState<CopiaSemanaResumen | null>(null);
-    const [conservarCanceladas, setConservarCanceladas] = useState<boolean | null>(null);
-    const [bulkFreeForm, setBulkFreeForm] = useState({
-        from_date: '', to_date: '', from_time: '00:00', to_time: '23:59',
-        free_label: 'Opening Day - Gratis',
-        preview: null as null | number,
-    });
+    // Cada apertura vuelve a montar el diálogo (key): arranca sin vista previa ni opción elegida.
+    const [claveCopia, setClaveCopia] = useState(0);
     const [isClassOpen, setIsClassOpen] = useState(false);
+    const [nuevaClase, setNuevaClase] = useState<{ dia: Date; clave: number }>({ dia: new Date(), clave: 0 });
     const [cancelChoiceOpen, setCancelChoiceOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     // "Cambiar coach": diálogo enfocado para reasignar el instructor con alcance (este día / serie / fechas).
     const [isChangeCoachOpen, setIsChangeCoachOpen] = useState(false);
-    const [coachToAssign, setCoachToAssign] = useState<string>('');
-    const [coachScope, setCoachScope] = useState<'this' | 'series' | 'dates'>('this');
-    const [selectedSeriesDates, setSelectedSeriesDates] = useState<Set<string>>(new Set());
+    const [claveCoach, setClaveCoach] = useState(0);
+    const [claveEdicion, setClaveEdicion] = useState(0);
     const [isAttendeesOpen, setIsAttendeesOpen] = useState(false);
     const [selectedClass, setSelectedClass] = useState<Class | null>(null);
     const [attendeesTab, setAttendeesTab] = useState<'reservado' | 'espera' | 'cancelado'>('reservado');
@@ -200,185 +155,6 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         },
     });
 
-    // Mutations
-    const generateMutation = useMutation({
-        mutationFn: async (data: GenerateForm) => {
-            return await api.post('/classes/generate', {
-                startDate: format(data.startDate, 'yyyy-MM-dd'),
-                endDate: format(data.endDate, 'yyyy-MM-dd'),
-            });
-        },
-        onSuccess: (data, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['classes'] });
-            const { count, skipped, warnings } = data.data;
-            const parts: string[] = [`${count} clases creadas.`];
-            if (skipped > 0) parts.push(`${skipped} ya existían.`);
-            if (warnings?.length) parts.push(warnings.join(' · '));
-            toast({
-                title: 'Generación completada',
-                description: parts.join(' '),
-                variant: warnings?.length ? 'destructive' : 'default',
-            });
-            setIsGenerateOpen(false);
-            setCurrentDate(variables.startDate);
-        },
-        onError: (err) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) }),
-    });
-
-    const createMutation = useMutation({
-        mutationFn: async (data: ClassForm) => {
-            return await api.post('/classes', {
-                classTypeId: data.classTypeId,
-                instructorId: data.instructorId,
-                facilityId: data.facilityId || null,
-                date: format(data.date, 'yyyy-MM-dd'),
-                startTime: data.startTime,
-                endTime: data.endTime,
-                maxCapacity: data.maxCapacity,
-                intensity: data.intensity,
-            });
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['classes'] });
-            toast({ title: 'Clase creada', description: 'La clase se agrego al calendario.' });
-            setIsClassOpen(false);
-        },
-        onError: (err) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) }),
-    });
-
-    const recurringMutation = useMutation({
-        mutationFn: async (data: ClassForm) => {
-            return await api.post('/classes/recurring', {
-                classTypeId: data.classTypeId,
-                instructorId: data.instructorId,
-                facilityId: data.facilityId || null,
-                startTime: data.startTime,
-                endTime: data.endTime,
-                maxCapacity: data.maxCapacity,
-                intensity: data.intensity,
-                startDate: format(data.date, 'yyyy-MM-dd'),
-                endDate: format(data.endDate!, 'yyyy-MM-dd'),
-                weekdays: data.weekdays!,
-            });
-        },
-        onSuccess: (res: any) => {
-            queryClient.invalidateQueries({ queryKey: ['classes'] });
-            const creadas: number = res?.data?.creadas ?? 0;
-            const saltadas: number = res?.data?.saltadas?.length ?? 0;
-            toast({
-                title: 'Clases recurrentes creadas',
-                description: saltadas > 0
-                    ? `Se crearon ${creadas} clases. Se saltaron ${saltadas} (ocupadas o días cerrados).`
-                    : `Se crearon ${creadas} clases.`,
-            });
-            setIsClassOpen(false);
-        },
-        onError: (err) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) }),
-    });
-
-    const editMutation = useMutation({
-        mutationFn: async (data: EditClassForm & { id: string; originalTotalpassSpots?: number; originalMaxCapacity?: number }) => {
-            const { id, originalTotalpassSpots, originalMaxCapacity, ...rest } = data;
-            const res = await api.put(`/classes/${id}`, {
-                classTypeId: rest.classTypeId,
-                instructorId: rest.instructorId,
-                facilityId: rest.facilityId || null,
-                date: format(rest.date, 'yyyy-MM-dd'),
-                startTime: rest.startTime,
-                endTime: rest.endTime,
-                maxCapacity: rest.maxCapacity,
-                intensity: rest.intensity,
-            });
-
-            // El PUT a /channels se dispara si el cupo TP cambió, o si la capacidad bajó
-            // (con cupo TP > 0 vigente) para que el backend revalide CAP_EXCEEDS_CAPACITY.
-            const newTotalpassSpots = rest.totalpassSpots ?? 0;
-            const totalpassChanged = newTotalpassSpots !== (originalTotalpassSpots ?? 0);
-            const capacityDecreased = originalMaxCapacity != null && rest.maxCapacity < originalMaxCapacity;
-            const shouldSyncChannels = totalpassChanged || (capacityDecreased && newTotalpassSpots > 0);
-
-            if (shouldSyncChannels) {
-                try {
-                    await api.put(`/classes/${id}/channels`, { totalpass: newTotalpassSpots });
-                } catch (channelsError) {
-                    // La clase (PUT #1) ya se guardó; solo falló la sincronización del cupo TotalPass.
-                    // Etiquetamos el error para distinguirlo en onError sin perder el error original.
-                    throw Object.assign(new Error('CHANNELS_UPDATE_FAILED'), { classSaved: true, channelsError });
-                }
-            }
-
-            return res;
-        },
-        onSuccess: (res: any) => {
-            const warning = res?.data?.payrollWarning;
-            if (warning) {
-                toast({ variant: 'destructive', title: 'Clase actualizada — revisa la nómina', description: warning });
-            } else {
-                toast({ title: 'Clase actualizada', description: 'Los cambios se guardaron correctamente.' });
-            }
-            setIsAttendeesOpen(false);
-            setIsEditOpen(false);
-            setSelectedClass(null);
-        },
-        onError: (err: any) => {
-            if (err?.classSaved) {
-                toast({
-                    variant: 'destructive',
-                    title: 'Cupo de TotalPass no actualizado',
-                    description: `La clase se guardó, pero no se pudo actualizar el cupo de TotalPass: ${getErrorMessage(err.channelsError)}`,
-                });
-                return;
-            }
-            toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) });
-        },
-        onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['classes'] });
-            queryClient.invalidateQueries({ queryKey: ['public-classes'] });
-            queryClient.invalidateQueries({ queryKey: ['landing-horario'] });
-            queryClient.invalidateQueries({ queryKey: ['bio-classes'] });
-            queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
-            queryClient.invalidateQueries({ queryKey: ['booking-detail'] });
-        },
-    });
-
-    // Fechas FUTURAS de la misma recurrencia (para el selector de "fechas específicas").
-    const { data: seriesDates = [], isLoading: seriesDatesLoading } = useQuery<{ id: string; date: string; instructor_id: string; instructor_name: string }[]>({
-        queryKey: ['series-dates', selectedClass?.id],
-        queryFn: async () => (await api.get(`/classes/${selectedClass?.id}/series-dates`)).data,
-        enabled: !!selectedClass?.id && isChangeCoachOpen && coachScope === 'dates',
-    });
-
-    // Reasigna el coach con el alcance elegido. El backend ya NO notifica a nadie.
-    const changeInstructorMutation = useMutation({
-        mutationFn: async ({ id, instructor_id, scope, dates }: { id: string; instructor_id: string; scope: 'this' | 'series' | 'dates'; dates?: string[] }) =>
-            api.post(`/classes/${id}/change-instructor`, { instructor_id, scope, ...(scope === 'dates' ? { dates } : {}) }),
-        onSuccess: (res: any) => {
-            queryClient.invalidateQueries({ queryKey: ['classes'] });
-            queryClient.invalidateQueries({ queryKey: ['series-dates', selectedClass?.id] });
-            toast({ title: 'Coach actualizado', description: res?.data?.message });
-            setIsChangeCoachOpen(false);
-            setIsEditOpen(false);
-        },
-        onError: (err) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) }),
-    });
-
-    const cancelMutation = useMutation({
-        mutationFn: async ({ id, scope }: { id: string; scope: 'one' | 'series' }) =>
-            api.delete(`/classes/${id}`, { data: { scope } }),
-        onSuccess: (response) => {
-            queryClient.invalidateQueries({ queryKey: ['classes'] });
-            const data = response.data;
-            const desc = data.cancelledClasses != null
-                ? `${data.cancelledClasses} clases canceladas · ${data.cancelledBookings || 0} reservas · ${data.refundedCredits || 0} créditos reembolsados.`
-                : `${data.cancelledBookings || 0} reservas canceladas, ${data.refundedCredits || 0} créditos reembolsados.`;
-            toast({ title: 'Clase cancelada', description: desc });
-            setIsAttendeesOpen(false);
-            setSelectedClass(null);
-            setCancelChoiceOpen(false);
-        },
-        onError: (err) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) }),
-    });
-
     const toggleFreeMutation = useMutation({
         mutationFn: async ({ id, is_free, free_label, force }: { id: string; is_free: boolean; free_label?: string; force?: boolean }) =>
             api.patch(`/classes/${id}/free`, { is_free, free_label, force }),
@@ -425,20 +201,6 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         onError: (err: any) => {
             toast({ variant: 'destructive', title: 'Error', description: err?.response?.data?.error || getErrorMessage(err) });
         },
-    });
-
-    const bulkMarkFreeMutation = useMutation({
-        mutationFn: async (payload: any) => api.post('/classes/bulk-mark-free', payload),
-        onSuccess: (response, variables: any) => {
-            queryClient.invalidateQueries({ queryKey: ['classes'] });
-            const affected = response.data.affected ?? 0;
-            if (variables.dry_run) {
-                toast({ title: `${response.data.would_affect} clases serán marcadas` });
-            } else {
-                toast({ title: `${affected} clases marcadas como gratis` });
-            }
-        },
-        onError: (err) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) }),
     });
 
     const checkInMutation = useMutation({
@@ -490,39 +252,9 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         onError: (err) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) }),
     });
 
-    // Forms
-    // La operación de Casa Shé trabaja semanas completas de lunes a domingo.
-    const nextMonday = startOfWeek(addDays(new Date(), 7), { weekStartsOn: 1 });
-    const nextSunday = addDays(nextMonday, 6);
-
-    const generateForm = useForm<GenerateForm>({
-        resolver: zodResolver(generateSchema),
-        defaultValues: {
-            startDate: nextMonday,
-            endDate: nextSunday
-        }
-    });
-
-    const classForm = useForm<ClassForm>({
-        resolver: zodResolver(classSchema),
-        defaultValues: { maxCapacity: 6, intensity: null }
-    });
-
-    const editForm = useForm<EditClassForm>({
-        resolver: zodResolver(editClassSchema),
-    });
-
     const handleDayClick = (day: Date) => {
-        classForm.reset({
-            date: day,
-            maxCapacity: 6,
-            intensity: null,
-            startTime: '09:00',
-            endTime: '10:00',
-            recurring: false,
-            weekdays: [day.getDay()],
-            endDate: undefined,
-        });
+        // Clave nueva = el diálogo se vuelve a montar con la fecha de ese día.
+        setNuevaClase((prev) => ({ dia: day, clave: prev.clave + 1 }));
         setIsClassOpen(true);
     };
 
@@ -533,25 +265,13 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
 
     const handleEditClass = () => {
         if (!selectedClass) return;
-        editForm.reset({
-            classTypeId: selectedClass.class_type_id || '',
-            instructorId: selectedClass.instructor_id || '',
-            facilityId: selectedClass.facility_id || undefined,
-            date: parseISO((selectedClass.date || '').split('T')[0] + 'T00:00:00'),
-            startTime: selectedClass.start_time,
-            endTime: selectedClass.end_time,
-            maxCapacity: selectedClass.max_capacity,
-            intensity: selectedClass.intensity ?? null,
-            totalpassSpots: selectedClass.totalpass_spots ?? 0,
-        });
+        setClaveEdicion((k) => k + 1);
         setIsEditOpen(true);
     };
 
     const handleChangeCoach = () => {
         if (!selectedClass) return;
-        setCoachToAssign(selectedClass.instructor_id || '');
-        setCoachScope('this');
-        setSelectedSeriesDates(new Set());
+        setClaveCoach((k) => k + 1);
         setIsChangeCoachOpen(true);
     };
 
@@ -662,35 +382,6 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
             </div>
         </div>
     );
-
-    // Copiar semana. Son dos llamadas al MISMO endpoint: la primera con
-    // dryRun para enseñar qué va a pasar, la segunda para hacerlo. Así el
-    // conteo que se muestra y el que se ejecuta salen de la misma lógica —
-    // no de dos cálculos que pueden desincronizarse.
-    const semanaDestinoStr = format(addDays(weekStart, 7), 'yyyy-MM-dd');
-    const copiarSemanaMutation = useMutation({
-        mutationFn: async ({ dryRun, includeCancelled }: { dryRun: boolean; includeCancelled: boolean }) => (await api.post('/classes/copy-week', {
-            fromWeekStart: startStr,
-            toWeekStart: semanaDestinoStr,
-            includeCancelled,
-            dryRun,
-        })).data as CopiaSemanaResumen,
-        onSuccess: (data) => {
-            if (data.dryRun) { setCopiaPrevia(data); return; }
-            setIsCopyWeekOpen(false);
-            setCopiaPrevia(null);
-            queryClient.invalidateQueries({ queryKey: ['classes'] });
-            toast({
-                title: data.creadas > 0 ? 'Semana copiada' : 'No había nada que copiar',
-                description: data.creadas > 0
-                    ? `${data.creadas} ${data.creadas === 1 ? 'clase creada' : 'clases creadas'}${data.canceladasConservadas ? ` · ${data.canceladasConservadas} cancelada${data.canceladasConservadas === 1 ? '' : 's'} conservada${data.canceladasConservadas === 1 ? '' : 's'}` : ''}${data.yaExistian ? ` · ${data.yaExistian} ya existían` : ''}`
-                    : data.canceladasOmitidas > 0
-                        ? `${data.canceladasOmitidas} ${data.canceladasOmitidas === 1 ? 'clase cancelada no se copió' : 'clases canceladas no se copiaron'}.`
-                        : data.mensaje || 'Todas las clases ya existían en la semana destino.',
-            });
-        },
-        onError: (err) => toast({ variant: 'destructive', title: 'Error', description: getErrorMessage(err) }),
-    });
 
     const bulkDeleteMutation = useMutation({
         mutationFn: async () => {
@@ -822,8 +513,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                         // La vista previa se pide aquí y no en onOpenChange: Radix
                                         // no dispara onOpenChange cuando el diálogo se abre por
                                         // estado del padre, así que ahí nunca llegaba a pedirse.
-                                        setCopiaPrevia(null);
-                                        setConservarCanceladas(null);
+                                        setClaveCopia((k) => k + 1);
                                         setIsCopyWeekOpen(true);
                                     }}
                                     title="Copiar esta semana a la siguiente"
@@ -1369,595 +1059,43 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                         </SheetContent>
                     </Sheet>
 
-                    {/* Generate Dialog */}
-                    <Dialog open={isGenerateOpen} onOpenChange={setIsGenerateOpen}>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Generar Clases</DialogTitle>
-                                <DialogDescription>
-                                    Crea clases masivamente usando la Plantilla Semanal.
-                                    Las clases existentes no se duplicaran.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <form onSubmit={generateForm.handleSubmit(d => generateMutation.mutate(d))} className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Fecha Inicio</Label>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {format(generateForm.watch('startDate'), 'P', { locale: es })}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={generateForm.watch('startDate')}
-                                                    onSelect={(d) => d && generateForm.setValue('startDate', d)}
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Fecha Fin</Label>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {format(generateForm.watch('endDate'), 'P', { locale: es })}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={generateForm.watch('endDate')}
-                                                    onSelect={(d) => d && generateForm.setValue('endDate', d)}
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
-                                    </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button type="button" variant="ghost" onClick={() => setIsGenerateOpen(false)}>Cancelar</Button>
-                                    <Button type="submit" disabled={generateMutation.isPending}>
-                                        {generateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Generar
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-
-                    {/* Create Class Dialog */}
-                    <Dialog open={isClassOpen} onOpenChange={setIsClassOpen}>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Nueva Clase</DialogTitle>
-                                <DialogDescription>{classForm.watch('recurring') ? 'Crea una tanda de clases recurrentes.' : 'Agrega una clase individual al calendario.'}</DialogDescription>
-                            </DialogHeader>
-                            <form onSubmit={classForm.handleSubmit(d => (d.recurring ? recurringMutation.mutate(d) : createMutation.mutate(d)))} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label>{classForm.watch('recurring') ? 'Desde' : 'Fecha'}</Label>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                                {classForm.watch('date') ? format(classForm.watch('date'), 'P', { locale: es }) : 'Seleccionar'}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0">
-                                            <Calendar
-                                                mode="single"
-                                                selected={classForm.watch('date')}
-                                                onSelect={(d) => d && classForm.setValue('date', d)}
-                                            />
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Tipo de Clase</Label>
-                                    <Select onValueChange={(val) => classForm.setValue('classTypeId', val)}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Seleccionar tipo..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {classTypes?.map(ct => (
-                                                <SelectItem key={ct.id} value={ct.id}>
-                                                    {ct.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Instructor</Label>
-                                    <Select onValueChange={(val) => classForm.setValue('instructorId', val)}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Seleccionar instructor..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {instructors?.map(inst => (
-                                                <SelectItem key={inst.id} value={inst.id}>
-                                                    {inst.display_name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Sala</Label>
-                                    <Select onValueChange={(val) => classForm.setValue('facilityId', val)}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Seleccionar sala (opcional)..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {facilities?.map(f => (
-                                                <SelectItem key={f.id} value={f.id}>
-                                                    {f.name} ({f.capacity} lugares)
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Inicio</Label>
-                                        <Input type="time" {...classForm.register('startTime')} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Fin</Label>
-                                        <Input type="time" {...classForm.register('endTime')} />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Capacidad</Label>
-                                    <Input type="number" {...classForm.register('maxCapacity')} />
-                                </div>
-                                <ClassIntensitySelector value={classForm.watch('intensity')} onChange={(value) => classForm.setValue('intensity', value, { shouldDirty: true, shouldValidate: true })} />
-
-                                <div className="space-y-3 rounded-lg border border-bmb-gold/30 p-3">
-                                    <div className="flex items-center justify-between">
-                                        <Label className="flex items-center gap-2">
-                                            <Repeat className="h-4 w-4" /> Repetir semanalmente
-                                        </Label>
-                                        <Switch
-                                            checked={!!classForm.watch('recurring')}
-                                            onCheckedChange={(v) => {
-                                                classForm.setValue('recurring', v);
-                                                if (v && (classForm.watch('weekdays')?.length ?? 0) === 0) {
-                                                    const d = classForm.watch('date');
-                                                    classForm.setValue('weekdays', d ? [d.getDay()] : []);
-                                                }
-                                            }}
-                                        />
-                                    </div>
-
-                                    {classForm.watch('recurring') && (
-                                        <>
-                                            <div className="space-y-2">
-                                                <Label>Días</Label>
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {DAYS.map((label, idx) => {
-                                                        const selected = (classForm.watch('weekdays') ?? []).includes(idx);
-                                                        return (
-                                                            <Button
-                                                                key={idx}
-                                                                type="button"
-                                                                size="sm"
-                                                                variant={selected ? 'default' : 'outline'}
-                                                                className="w-11"
-                                                                onClick={() => {
-                                                                    const cur = classForm.watch('weekdays') ?? [];
-                                                                    const next = cur.includes(idx)
-                                                                        ? cur.filter((x) => x !== idx)
-                                                                        : [...cur, idx];
-                                                                    classForm.setValue('weekdays', next, { shouldValidate: true });
-                                                                }}
-                                                            >
-                                                                {label}
-                                                            </Button>
-                                                        );
-                                                    })}
-                                                </div>
-                                                {classForm.formState.errors.weekdays && (
-                                                    <p className="text-xs text-destructive">{classForm.formState.errors.weekdays.message as string}</p>
-                                                )}
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <Label>Repetir hasta</Label>
-                                                <Popover>
-                                                    <PopoverTrigger asChild>
-                                                        <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                                            {classForm.watch('endDate') ? format(classForm.watch('endDate')!, 'P', { locale: es }) : 'Seleccionar'}
-                                                        </Button>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-auto p-0">
-                                                        <Calendar
-                                                            mode="single"
-                                                            selected={classForm.watch('endDate')}
-                                                            onSelect={(d) => d && classForm.setValue('endDate', d, { shouldValidate: true })}
-                                                        />
-                                                    </PopoverContent>
-                                                </Popover>
-                                                {classForm.formState.errors.endDate && (
-                                                    <p className="text-xs text-destructive">{classForm.formState.errors.endDate.message as string}</p>
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-
-                                <DialogFooter>
-                                    <Button type="button" variant="ghost" onClick={() => setIsClassOpen(false)}>Cancelar</Button>
-                                    <Button type="submit" disabled={createMutation.isPending || recurringMutation.isPending}>
-                                        {(createMutation.isPending || recurringMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        {classForm.watch('recurring') ? 'Crear clases' : 'Crear Clase'}
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-
-                    {/* Edit Class Dialog */}
-                    <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Editar Clase</DialogTitle>
-                                <DialogDescription>Modifica los detalles de la clase.</DialogDescription>
-                            </DialogHeader>
-                            <form onSubmit={editForm.handleSubmit(d => selectedClass && editMutation.mutate({ ...d, id: selectedClass.id, originalTotalpassSpots: selectedClass.totalpass_spots ?? 0, originalMaxCapacity: selectedClass.max_capacity }))} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label>Fecha</Label>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                                {editForm.watch('date') ? format(editForm.watch('date'), 'P', { locale: es }) : 'Seleccionar'}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0">
-                                            <Calendar
-                                                mode="single"
-                                                selected={editForm.watch('date')}
-                                                onSelect={(d) => d && editForm.setValue('date', d)}
-                                            />
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Tipo de Clase</Label>
-                                    <Select
-                                        value={editForm.watch('classTypeId')}
-                                        onValueChange={(val) => editForm.setValue('classTypeId', val)}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Seleccionar tipo..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {classTypes?.map(ct => (
-                                                <SelectItem key={ct.id} value={ct.id}>
-                                                    {ct.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <Label>Instructor</Label>
-                                        <Button
-                                            type="button"
-                                            variant="link"
-                                            size="sm"
-                                            className="h-auto p-0 text-balance-gold"
-                                            onClick={handleChangeCoach}
-                                        >
-                                            Cambiar coach…
-                                        </Button>
-                                    </div>
-                                    <Select
-                                        value={editForm.watch('instructorId')}
-                                        onValueChange={(val) => editForm.setValue('instructorId', val)}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Seleccionar instructor..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {instructors?.map(inst => (
-                                                <SelectItem key={inst.id} value={inst.id}>
-                                                    {inst.display_name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Sala</Label>
-                                    <Select
-                                        value={editForm.watch('facilityId') || ''}
-                                        onValueChange={(val) => editForm.setValue('facilityId', val || undefined)}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Seleccionar sala (opcional)..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {facilities?.map(f => (
-                                                <SelectItem key={f.id} value={f.id}>
-                                                    {f.name} ({f.capacity} lugares)
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Inicio</Label>
-                                        <Input type="time" {...editForm.register('startTime')} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Fin</Label>
-                                        <Input type="time" {...editForm.register('endTime')} />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Capacidad</Label>
-                                    <Input type="number" {...editForm.register('maxCapacity')} />
-                                </div>
-                                <ClassIntensitySelector value={editForm.watch('intensity')} onChange={(value) => editForm.setValue('intensity', value, { shouldDirty: true, shouldValidate: true })} />
-
-                                <div className="space-y-2">
-                                    <Label className="flex items-center gap-1.5">Lugares para <ChannelLogo canal="totalpass" alto={10} /></Label>
-                                    <Input type="number" min={0} {...editForm.register('totalpassSpots', { valueAsNumber: true })} />
-                                    <p className="text-xs text-muted-foreground">0 = clase no ofrecida en TotalPass</p>
-                                </div>
-
-                                <DialogFooter>
-                                    <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancelar</Button>
-                                    <Button type="submit" disabled={editMutation.isPending}>
-                                        {editMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Guardar Cambios
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-
-                    {/* Copiar semana — siempre con vista previa antes de escribir */}
-                    <Dialog
-                        open={isCopyWeekOpen}
-                        onOpenChange={(abierto) => {
-                            setIsCopyWeekOpen(abierto);
-                            if (!abierto) {
-                                setCopiaPrevia(null);
-                                setConservarCanceladas(null);
-                            }
-                        }}
-                    >
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2">
-                                    <CopyIcon className="h-5 w-5 text-balance-olive" />
-                                    Copiar semana
-                                </DialogTitle>
-                                <DialogDescription>
-                                    Se copian las clases del <strong>{format(weekStart, "d 'de' MMMM", { locale: es })}</strong> al{' '}
-                                    <strong>{format(addDays(weekStart, 6), "d 'de' MMMM", { locale: es })}</strong> a la semana que empieza el{' '}
-                                    <strong>{format(addDays(weekStart, 7), "d 'de' MMMM", { locale: es })}</strong>.
-                                </DialogDescription>
-                            </DialogHeader>
-
-                            <div className="space-y-3 py-2">
-                                <p className="text-sm font-medium text-balance-dark">¿Quieres conservar las clases canceladas?</p>
-                                <RadioGroup
-                                    value={conservarCanceladas === null ? undefined : (conservarCanceladas ? 'si' : 'no')}
-                                    disabled={copiarSemanaMutation.isPending}
-                                    onValueChange={(value) => {
-                                        const conservar = value === 'si';
-                                        setConservarCanceladas(conservar);
-                                        setCopiaPrevia(null);
-                                        copiarSemanaMutation.mutate({ dryRun: true, includeCancelled: conservar });
-                                    }}
-                                    className="grid gap-2 sm:grid-cols-2"
-                                >
-                                    <Label htmlFor="copy-cancelled-no" className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 hover:bg-muted/40">
-                                        <RadioGroupItem id="copy-cancelled-no" value="no" className="mt-0.5" />
-                                        <span>
-                                            <span className="block font-medium">No conservarlas</span>
-                                            <span className="mt-0.5 block text-xs font-normal text-muted-foreground">Las canceladas no se copiarán.</span>
-                                        </span>
-                                    </Label>
-                                    <Label htmlFor="copy-cancelled-si" className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 hover:bg-muted/40">
-                                        <RadioGroupItem id="copy-cancelled-si" value="si" className="mt-0.5" />
-                                        <span>
-                                            <span className="block font-medium">Sí, conservarlas</span>
-                                            <span className="mt-0.5 block text-xs font-normal text-muted-foreground">Se copiarán y seguirán canceladas.</span>
-                                        </span>
-                                    </Label>
-                                </RadioGroup>
-                            </div>
-
-                            {conservarCanceladas === null ? (
-                                <p className="text-sm text-muted-foreground">Elige una opción para revisar la copia.</p>
-                            ) : copiarSemanaMutation.isPending && !copiaPrevia ? (
-                                <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-                                    <Loader2 className="h-4 w-4 animate-spin" /> Revisando qué haría…
-                                </div>
-                            ) : copiaPrevia ? (
-                                <div className="space-y-3 py-2">
-                                    <div className="rounded-lg border bg-card p-3">
-                                        <p className="text-2xl font-semibold text-balance-olive">
-                                            {copiaPrevia.creadas}
-                                            <span className="ml-2 text-sm font-normal text-muted-foreground">
-                                                {copiaPrevia.creadas === 1 ? 'clase se creará' : 'clases se crearán'}
-                                            </span>
-                                        </p>
-                                    </div>
-                                    {/* Lo que NO se va a hacer importa tanto como lo que sí: evita
-                                        que alguien apriete el botón dos veces "por si acaso". */}
-                                    <ul className="space-y-1 text-sm text-muted-foreground">
-                                        {copiaPrevia.yaExistian > 0 && (
-                                            <li>· <strong>{copiaPrevia.yaExistian}</strong> ya existen en esa semana y no se duplicarán.</li>
-                                        )}
-                                        {copiaPrevia.enDiaCerrado > 0 && (
-                                            <li>· <strong>{copiaPrevia.enDiaCerrado}</strong> caen en un día de descanso del estudio y se omiten.</li>
-                                        )}
-                                        {copiaPrevia.enElPasado > 0 && (
-                                            <li>· <strong>{copiaPrevia.enElPasado}</strong> quedarían en el pasado y se omiten.</li>
-                                        )}
-                                        {copiaPrevia.canceladasConservadas > 0 && (
-                                            <li>· <strong>{copiaPrevia.canceladasConservadas}</strong> cancelada{copiaPrevia.canceladasConservadas === 1 ? '' : 's'} se copiará{copiaPrevia.canceladasConservadas === 1 ? '' : 'n'} y seguirá{copiaPrevia.canceladasConservadas === 1 ? '' : 'n'} cancelada{copiaPrevia.canceladasConservadas === 1 ? '' : 's'}.</li>
-                                        )}
-                                        {copiaPrevia.canceladasOmitidas > 0 && (
-                                            <li>· <strong>{copiaPrevia.canceladasOmitidas}</strong> cancelada{copiaPrevia.canceladasOmitidas === 1 ? '' : 's'} no se copiará{copiaPrevia.canceladasOmitidas === 1 ? '' : 'n'}.</li>
-                                        )}
-                                        <li>· No se copian reservas, clases gratis ni cupos cerrados.</li>
-                                        <li>· El cupo de TotalPass de cada clase sí se conserva.</li>
-                                    </ul>
-                                    {copiaPrevia.mensaje && (
-                                        <p className="text-sm text-amber-700">{copiaPrevia.mensaje}</p>
-                                    )}
-                                </div>
-                            ) : null}
-
-                            <DialogFooter>
-                                <Button variant="ghost" onClick={() => setIsCopyWeekOpen(false)}>Cancelar</Button>
-                                <Button
-                                    onClick={() => conservarCanceladas !== null && copiarSemanaMutation.mutate({ dryRun: false, includeCancelled: conservarCanceladas })}
-                                    disabled={copiarSemanaMutation.isPending || conservarCanceladas === null || !copiaPrevia || copiaPrevia.creadas === 0}
-                                >
-                                    {copiarSemanaMutation.isPending && copiaPrevia ? (
-                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Copiando…</>
-                                    ) : (
-                                        <>Copiar {copiaPrevia?.creadas ?? 0} {copiaPrevia?.creadas === 1 ? 'clase' : 'clases'}</>
-                                    )}
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-
-                    {/* Bulk mark free dialog */}
-                    <Dialog open={isBulkFreeOpen} onOpenChange={setIsBulkFreeOpen}>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2">
-                                    <Sparkles className="h-5 w-5 text-emerald-600" />
-                                    Marcar clases como gratis
-                                </DialogTitle>
-                                <DialogDescription>
-                                    Útil para opening day o cortesías. Las clases en el rango quedan sin cobro y permiten reservar sin paquete.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-3">
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <Label className="text-xs">Desde fecha</Label>
-                                        <Input
-                                            type="date"
-                                            value={bulkFreeForm.from_date}
-                                            onChange={(e) => setBulkFreeForm(p => ({ ...p, from_date: e.target.value, preview: null }))}
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label className="text-xs">Hasta fecha</Label>
-                                        <Input
-                                            type="date"
-                                            value={bulkFreeForm.to_date}
-                                            onChange={(e) => setBulkFreeForm(p => ({ ...p, to_date: e.target.value, preview: null }))}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="rounded-lg border border-balance-sand/55 bg-balance-cream/40 p-3 space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <Label className="text-xs font-semibold">Filtro de horario de clase</Label>
-                                        <button
-                                            type="button"
-                                            className="text-[11px] font-semibold text-emerald-700 underline underline-offset-2"
-                                            onClick={() => setBulkFreeForm(p => ({ ...p, from_time: '00:00', to_time: '23:59', preview: null }))}
-                                        >
-                                            Todo el día
-                                        </button>
-                                    </div>
-                                    <p className="text-[11px] text-balance-dark/55">Solo las clases cuyo horario de inicio esté dentro de este rango quedarán gratis.</p>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <Label className="text-xs">Clase empieza desde</Label>
-                                            <Input
-                                                type="time"
-                                                value={bulkFreeForm.from_time}
-                                                onChange={(e) => setBulkFreeForm(p => ({ ...p, from_time: e.target.value, preview: null }))}
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs">Clase empieza hasta</Label>
-                                            <Input
-                                                type="time"
-                                                value={bulkFreeForm.to_time}
-                                                onChange={(e) => setBulkFreeForm(p => ({ ...p, to_time: e.target.value, preview: null }))}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <Label className="text-xs">Etiqueta visible</Label>
-                                    <Input
-                                        value={bulkFreeForm.free_label}
-                                        onChange={(e) => setBulkFreeForm(p => ({ ...p, free_label: e.target.value }))}
-                                        placeholder="Ej. Opening Day"
-                                    />
-                                </div>
-                                {bulkFreeForm.preview !== null && (
-                                    <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-900">
-                                        <strong>{bulkFreeForm.preview}</strong> clase{bulkFreeForm.preview === 1 ? '' : 's'} {bulkFreeForm.preview === 1 ? 'será marcada' : 'serán marcadas'} como gratis.
-                                    </div>
-                                )}
-                            </div>
-                            <DialogFooter>
-                                <Button variant="outline" onClick={() => setIsBulkFreeOpen(false)}>Cancelar</Button>
-                                {bulkFreeForm.preview === null ? (
-                                    <Button
-                                        onClick={async () => {
-                                            if (!bulkFreeForm.from_date || !bulkFreeForm.to_date) {
-                                                toast({ variant: 'destructive', title: 'Falta fecha' });
-                                                return;
-                                            }
-                                            const res = await api.post('/classes/bulk-mark-free', {
-                                                ...bulkFreeForm, dry_run: true,
-                                            });
-                                            setBulkFreeForm(p => ({ ...p, preview: res.data.would_affect ?? 0 }));
-                                        }}
-                                    >
-                                        Ver preview
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        className="bg-emerald-600 text-white hover:bg-emerald-700"
-                                        onClick={() => {
-                                            bulkMarkFreeMutation.mutate({ ...bulkFreeForm, dry_run: false });
-                                            setIsBulkFreeOpen(false);
-                                            setBulkFreeForm(p => ({ ...p, preview: null }));
-                                        }}
-                                        disabled={bulkMarkFreeMutation.isPending}
-                                    >
-                                        Confirmar y marcar {bulkFreeForm.preview} clase{bulkFreeForm.preview === 1 ? '' : 's'}
-                                    </Button>
-                                )}
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-
+                    <DialogoGenerar open={isGenerateOpen} onOpenChange={setIsGenerateOpen} onGenerado={setCurrentDate} />
+                    <DialogoNuevaClase
+                        key={`nueva-${nuevaClase.clave}`}
+                        open={isClassOpen}
+                        onOpenChange={setIsClassOpen}
+                        dia={nuevaClase.dia}
+                        classTypes={classTypes}
+                        instructors={instructors}
+                        facilities={facilities}
+                    />
+                    <DialogoEditarClase
+                        key={`editar-${claveEdicion}`}
+                        open={isEditOpen}
+                        onOpenChange={setIsEditOpen}
+                        clase={selectedClass}
+                        classTypes={classTypes}
+                        instructors={instructors}
+                        facilities={facilities}
+                        onCambiarCoach={handleChangeCoach}
+                        onGuardada={() => { setIsAttendeesOpen(false); setSelectedClass(null); }}
+                    />
+                    <DialogoCopiarSemana key={`copia-${claveCopia}`} open={isCopyWeekOpen} onOpenChange={setIsCopyWeekOpen} weekStart={weekStart} />
+                    <DialogoGratis open={isBulkFreeOpen} onOpenChange={setIsBulkFreeOpen} />
+                    <DialogoCancelarClase
+                        open={cancelChoiceOpen}
+                        onOpenChange={setCancelChoiceOpen}
+                        clase={selectedClass}
+                        onCancelada={() => { setIsAttendeesOpen(false); setSelectedClass(null); }}
+                    />
+                    <DialogoCambiarCoach
+                        key={`coach-${claveCoach}`}
+                        open={isChangeCoachOpen}
+                        onOpenChange={setIsChangeCoachOpen}
+                        clase={selectedClass}
+                        instructors={instructors}
+                        onAplicado={() => setIsEditOpen(false)}
+                    />
                     <CancelBookingDialog
                         bookingId={cancelBookingId}
                         open={!!cancelBookingId}
@@ -1965,165 +1103,6 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                         onCancelled={() => { refetchAttendees(); queryClient.invalidateQueries({ queryKey: ['classes'] }); }}
                     />
 
-                    {/* Cancelar: solo esta clase o toda la serie del horario */}
-                    <Dialog open={cancelChoiceOpen} onOpenChange={setCancelChoiceOpen}>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Cancelar clase</DialogTitle>
-                                <DialogDescription>
-                                    Se cancelan las reservas y se reembolsan los créditos. Las clases canceladas dejan de verse para los usuarios.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-2">
-                                <Button
-                                    variant="outline"
-                                    className="w-full justify-start"
-                                    disabled={cancelMutation.isPending}
-                                    onClick={() => selectedClass && cancelMutation.mutate({ id: selectedClass.id, scope: 'one' })}
-                                >
-                                    Solo esta clase
-                                </Button>
-                                <Button
-                                    variant="destructive"
-                                    className="w-full justify-start"
-                                    disabled={cancelMutation.isPending}
-                                    onClick={() => selectedClass && cancelMutation.mutate({ id: selectedClass.id, scope: 'series' })}
-                                >
-                                    {cancelMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Todas las de este horario (mismo día y hora, en adelante)
-                                </Button>
-                            </div>
-                            <DialogFooter>
-                                <Button variant="ghost" onClick={() => setCancelChoiceOpen(false)}>Cerrar</Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-
-                    {/* Cambiar coach: elige el alcance (solo este día / toda la serie / fechas específicas). No notifica. */}
-                    <Dialog open={isChangeCoachOpen} onOpenChange={setIsChangeCoachOpen}>
-                        <DialogContent className="max-h-[85vh] overflow-y-auto">
-                            <DialogHeader>
-                                <DialogTitle>Cambiar coach</DialogTitle>
-                                <DialogDescription>
-                                    {selectedClass?.class_type_name || 'Clase'} · coach actual: {selectedClass?.instructor_name || 'sin asignar'}
-                                </DialogDescription>
-                            </DialogHeader>
-
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label>Coach</Label>
-                                    <Select value={coachToAssign} onValueChange={setCoachToAssign}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Seleccionar coach..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {instructors?.filter(i => i.is_active).map(inst => (
-                                                <SelectItem key={inst.id} value={inst.id}>
-                                                    {inst.display_name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>¿A qué clases aplica?</Label>
-                                    <RadioGroup
-                                        value={coachScope}
-                                        onValueChange={(v) => setCoachScope(v as 'this' | 'series' | 'dates')}
-                                        className="space-y-2"
-                                    >
-                                        <label htmlFor="coach-scope-this" className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 has-[:checked]:border-balance-gold has-[:checked]:bg-balance-gold/5">
-                                            <RadioGroupItem value="this" id="coach-scope-this" className="mt-0.5" />
-                                            <div>
-                                                <p className="text-sm font-medium">Solo este día</p>
-                                            </div>
-                                        </label>
-                                        <label htmlFor="coach-scope-series" className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 has-[:checked]:border-balance-gold has-[:checked]:bg-balance-gold/5">
-                                            <RadioGroupItem value="series" id="coach-scope-series" className="mt-0.5" />
-                                            <div>
-                                                <p className="text-sm font-medium">Todos los días de esta clase</p>
-                                                <p className="text-xs text-muted-foreground">Cambia toda la serie recurrente y el horario base.</p>
-                                            </div>
-                                        </label>
-                                        <label htmlFor="coach-scope-dates" className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 has-[:checked]:border-balance-gold has-[:checked]:bg-balance-gold/5">
-                                            <RadioGroupItem value="dates" id="coach-scope-dates" className="mt-0.5" />
-                                            <div>
-                                                <p className="text-sm font-medium">Fechas específicas</p>
-                                            </div>
-                                        </label>
-                                    </RadioGroup>
-                                </div>
-
-                                {coachScope === 'dates' && (
-                                    <div className="space-y-2">
-                                        <Label>Elige las fechas</Label>
-                                        {seriesDatesLoading ? (
-                                            <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
-                                                <Loader2 className="h-4 w-4 animate-spin" /> Cargando fechas…
-                                            </div>
-                                        ) : seriesDates.length === 0 ? (
-                                            <p className="py-3 text-sm text-muted-foreground">No hay más fechas futuras en esta serie.</p>
-                                        ) : (
-                                            <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-lg border p-2">
-                                                {seriesDates.map(sd => {
-                                                    const checked = selectedSeriesDates.has(sd.date);
-                                                    return (
-                                                        <label
-                                                            key={sd.id}
-                                                            htmlFor={`series-date-${sd.id}`}
-                                                            className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-balance-cream/40"
-                                                        >
-                                                            <Checkbox
-                                                                id={`series-date-${sd.id}`}
-                                                                checked={checked}
-                                                                onCheckedChange={(c) => {
-                                                                    setSelectedSeriesDates(prev => {
-                                                                        const next = new Set(prev);
-                                                                        if (c) next.add(sd.date); else next.delete(sd.date);
-                                                                        return next;
-                                                                    });
-                                                                }}
-                                                            />
-                                                            <div className="min-w-0">
-                                                                <p className="text-sm font-medium capitalize">
-                                                                    {format(parseLocalDate(sd.date), "EEE d MMM", { locale: es })}
-                                                                    {selectedClass?.start_time && (
-                                                                        <span className="ml-2 font-normal text-muted-foreground">{formatClassTime(selectedClass.start_time)}</span>
-                                                                    )}
-                                                                </p>
-                                                                <p className="text-xs text-muted-foreground">Coach actual: {sd.instructor_name || 'sin asignar'}</p>
-                                                            </div>
-                                                        </label>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            <DialogFooter>
-                                <Button variant="ghost" onClick={() => setIsChangeCoachOpen(false)}>Cancelar</Button>
-                                <Button
-                                    disabled={
-                                        changeInstructorMutation.isPending ||
-                                        !coachToAssign ||
-                                        (coachScope === 'dates' && selectedSeriesDates.size === 0)
-                                    }
-                                    onClick={() => selectedClass && changeInstructorMutation.mutate({
-                                        id: selectedClass.id,
-                                        instructor_id: coachToAssign,
-                                        scope: coachScope,
-                                        dates: coachScope === 'dates' ? Array.from(selectedSeriesDates) : undefined,
-                                    })}
-                                >
-                                    {changeInstructorMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Aplicar
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
                 </div>
     );
 
