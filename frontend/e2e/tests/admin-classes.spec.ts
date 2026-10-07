@@ -3,7 +3,9 @@
  * Covers: GenerateClasses, WorkoutTemplates, admin class management
  */
 import { test, expect } from "../fixtures/auth";
+import type { Locator } from "@playwright/test";
 import { AdminPage } from "../pages/AdminPage";
+import { AHORA_PRUEBA, FECHA_PRUEBA, ID, SEMANA_PRUEBA, clasePrueba, mockSemanaCalendario } from "../fixtures/calendario";
 
 test.describe("Admin – Gestión de Clases y Calendario", () => {
   test("el dashboard de admin carga correctamente", async ({ adminPage: page }) => {
@@ -75,5 +77,246 @@ test.describe("Admin – Gestión de Clases y Calendario", () => {
         await admin.assertSaved();
       }
     }
+  });
+});
+
+/** Borde superior en px; NaN si todavía no se ve (expect.poll vuelve a intentar). */
+const arriba = async (l: Locator) => (await l.boundingBox())?.y ?? Number.NaN;
+
+test.describe("Calendario de recepción – semana por horas", () => {
+  test("abre el panel de una clase y los diálogos de la barra", async ({ adminPage: page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await mockSemanaCalendario(page);
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+
+    const barre = page.getByRole("button", { name: /^Barre.*07:00/ });
+    await expect(barre).toBeVisible();
+    await barre.click();
+    const panel = page.getByRole("dialog");
+    await expect(panel.getByRole("tab", { name: /Reservado/ })).toBeVisible();
+    await expect(panel.getByText("Sin reservas todavía.")).toBeVisible();
+    await expect(panel.getByRole("img", { name: "TotalPass" }).first()).toBeVisible();
+
+    await panel.getByRole("button", { name: /^Editar/ }).click();
+    const editar = page.getByRole("heading", { name: "Editar Clase" });
+    await expect(editar).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(editar).toBeHidden();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
+    const dialogos: Array<[string, string]> = [
+      ["Generar", "Generar Clases"],
+      ["Copiar semana", "Copiar semana"],
+      ["Nueva clase", "Nueva Clase"],
+      ["Gratis", "Marcar clases como gratis"],
+    ];
+    for (const [boton, titulo] of dialogos) {
+      await page.getByRole("button", { name: boton, exact: true }).click();
+      const encabezado = page.getByRole("heading", { name: titulo });
+      await expect(encabezado).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(encabezado).toBeHidden();
+    }
+  });
+
+  test("móvil: la lista del día usa la tarjeta con los lugares", async ({ adminPage: page }) => {
+    await page.clock.setFixedTime(AHORA_PRUEBA);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockSemanaCalendario(page);
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+
+    // Hoy es miércoles: la lista arranca en ese día.
+    await expect(page.getByRole("button", { name: /^Sculpt.*18:00/ })).toContainText("Sin coach asignada");
+    await page.locator('[data-dia="2026-11-02"]').click();
+    const barre = page.getByRole("button", { name: /^Barre.*07:00/ });
+    await expect(barre.locator('[data-lugar="alumna"]')).toHaveCount(2);
+    await expect(barre.locator('[data-lugar="totalpass"]')).toHaveCount(1);
+    await expect(barre.locator('[data-lugar="libre"]')).toHaveCount(4);
+    await expect(barre).toContainText("3/7");
+    await expect(barre).not.toContainText("TP");
+  });
+
+  test("semana por horas: compacta las horas vacías, posiciona por hora y pinta los lugares por canal", async ({ adminPage: page }) => {
+    await page.clock.setFixedTime(AHORA_PRUEBA);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await mockSemanaCalendario(page);
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+
+    const tarjeta = (nombre: RegExp) => page.getByRole("button", { name: nombre });
+    const barre = tarjeta(/^Barre.*07:00/);
+    const mat = tarjeta(/^Pilates Mat.*08:00/);
+    const salsa = tarjeta(/^Salsa.*10:00/);
+    const sculpt = tarjeta(/^Sculpt.*18:00/);
+    const cancelada = tarjeta(/^Sculpt.*19:00/);
+    await expect(barre).toBeVisible();
+
+    // De 11 a 18 no hay clases en toda la semana: se ve como una franja de 32 px.
+    await expect(page.getByTestId("franja-compactada")).toHaveText("11 – 18");
+    // expect.poll: al cargar, la página vuelve a pedir las clases cuando fija la sucursal
+    // y la rejilla se redibuja; se mide cuando ya está quieta.
+    await expect.poll(async () => Math.abs((await arriba(mat)) - (await arriba(barre)) - 76)).toBeLessThanOrEqual(1);
+    // Salsa 10:00 (sábado) y Sculpt 18:00 (miércoles): 1 h (76 px) + franja (32 px).
+    await expect.poll(async () => Math.abs((await arriba(sculpt)) - (await arriba(salsa)) - 108)).toBeLessThanOrEqual(1);
+
+    await expect(barre.locator('[data-lugar="alumna"]')).toHaveCount(2);
+    await expect(barre.locator('[data-lugar="totalpass"]')).toHaveCount(1);
+    await expect(barre.locator('[data-lugar="libre"]')).toHaveCount(4);
+    await expect(barre).toContainText("3/7");
+    await expect(barre).not.toContainText("TP");
+    await expect(mat).toContainText("Lleno");
+    await expect(sculpt).toContainText("Sin coach asignada");
+    await expect(cancelada).toContainText("Cancelada");
+    await expect(cancelada.locator("[data-nombre-clase]")).toHaveClass(/line-through/);
+    await expect(salsa).toHaveAttribute("data-oscura", "true");
+
+    await expect(page.getByTestId("encabezado-2026-11-02")).toContainText("2 clases · 4 libres");
+    await expect(page.getByTestId("encabezado-2026-11-03")).toContainText("Sin clases");
+    await expect(page.getByTestId("encabezado-2026-11-04")).toContainText("Hoy");
+    await expect(page.getByTestId("encabezado-2026-11-04")).toContainText("1 clase · 6 libres");
+    await expect(page.getByTestId("resumen-semana")).toHaveText("4 clases · 11 lugares libres · 3 socias");
+    await expect(page.getByRole("list", { name: "Leyenda de lugares" }).getByRole("img", { name: "TotalPass" })).toBeVisible();
+
+    // "Ahora" = miércoles 08:25 en CDMX → 85 min después de las 7:00 = 108 px.
+    const columna = page.getByTestId("columna-2026-11-04");
+    const linea = columna.getByTestId("linea-ahora");
+    await expect.poll(async () => Math.abs((await arriba(linea)) - (await arriba(columna)) - 108)).toBeLessThanOrEqual(2);
+
+    await expect(page.getByRole("button", { name: /Limpiar semana/ })).toHaveCount(0);
+  });
+
+  test("dos clases a la misma hora se ven lado a lado", async ({ adminPage: page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await mockSemanaCalendario(page, [
+      clasePrueba({ id: ID.sculptCancelada, date: "2026-11-04", start_time: "19:00", end_time: "19:50", class_type_name: "Sculpt", status: "cancelled" }),
+      clasePrueba({ id: ID.sculpt, date: "2026-11-04", start_time: "19:00", end_time: "19:50", class_type_name: "Flex", class_type_color: "#3F5C59" }),
+    ]);
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+
+    const sculpt = page.getByRole("button", { name: /^Sculpt.*19:00/ });
+    const flex = page.getByRole("button", { name: /^Flex.*19:00/ });
+    await expect.poll(async () => {
+      const a = await sculpt.boundingBox();
+      const b = await flex.boundingBox();
+      if (!a || !b) return "sin dibujar";
+      const [izquierda, derecha] = [a, b].sort((p, q) => p.x - q.x);
+      const ladoALado = Math.abs(a.y - b.y) <= 1 && izquierda.x + izquierda.width <= derecha.x + 1 && izquierda.width > 40;
+      return ladoALado ? "lado a lado" : `encimadas: ${JSON.stringify([a, b])}`;
+    }).toBe("lado a lado");
+  });
+
+  test("panel: lugares grandes, acciones, inscribir arriba y cupo por canal conectado", async ({ adminPage: page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await mockSemanaCalendario(page);
+    const cupos: unknown[] = [];
+    await page.route(/\/api\/classes\/[^/?]+\/channels$/, async (route) => {
+      cupos.push(route.request().postDataJSON());
+      await route.fulfill({ json: { ok: true } });
+    });
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+
+    await page.getByRole("button", { name: /^Barre.*07:00/ }).click();
+    const panel = page.getByRole("dialog");
+    const lugares = panel.getByTestId("lugares-panel");
+    await expect(lugares.locator('[data-lugar="alumna"]')).toHaveCount(2);
+    await expect(lugares.locator('[data-lugar="totalpass"]')).toHaveCount(1);
+    await expect(lugares).toContainText("3 de 7 · 4 libres");
+    for (const boton of ["Editar clase", "Cambiar coach", "Cancelar clase"]) {
+      await expect(panel.getByRole("button", { name: boton })).toBeVisible();
+    }
+
+    const inscribir = panel.getByRole("heading", { name: "Inscribir alumna" });
+    const cupo = panel.getByRole("region", { name: "Lugares para TotalPass" });
+    await expect.poll(async () => (await arriba(inscribir)) < (await arriba(cupo))).toBe(true);
+    await expect(cupo.getByTestId("cupo-totalpass")).toHaveText("2");
+    await cupo.getByRole("button", { name: "Un lugar menos" }).click();
+    await expect.poll(() => cupos).toEqual([{ totalpass: 1 }]);
+
+    await panel.getByRole("button", { name: "Cambiar coach" }).click();
+    const coach = page.getByRole("heading", { name: "Cambiar coach" });
+    await expect(coach).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(coach).toBeHidden();
+    // Con un aviso en pantalla, Escape cierra el aviso y no el panel: se cierra con su botón.
+    await panel.getByRole("button", { name: "Close" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
+    // Pilates Mat: 2 socias ya inscritas con cupo 2 → no se puede bajar.
+    await page.getByRole("button", { name: /^Pilates Mat.*08:00/ }).click();
+    await expect(
+      page.getByRole("dialog").getByRole("region", { name: "Lugares para TotalPass" }).getByRole("button", { name: "Un lugar menos" }),
+    ).toBeDisabled();
+  });
+
+  test("editar manda solo lo que cambió", async ({ adminPage: page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await mockSemanaCalendario(page);
+    const puts: Array<{ ruta: string; cuerpo: unknown }> = [];
+    await page.route(/\/api\/classes\/[^/?]+(\/channels)?$/, async (route) => {
+      if (route.request().method() !== "PUT") return route.fallback();
+      puts.push({ ruta: new URL(route.request().url()).pathname, cuerpo: route.request().postDataJSON() });
+      await route.fulfill({ json: { ok: true } });
+    });
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+    const editar = page.getByRole("dialog", { name: "Editar Clase" });
+    const guardar = () => editar.getByRole("button", { name: "Guardar Cambios" }).click();
+
+    // 1) Guardar sin tocar nada: no se manda nada y el panel sigue abierto.
+    await page.getByRole("button", { name: /^Barre.*07:00/ }).click();
+    await page.getByRole("button", { name: "Editar clase" }).click();
+    await guardar();
+    await expect(page.getByText("Sin cambios", { exact: true })).toBeVisible();
+    await expect(editar).toBeHidden();
+    expect(puts).toEqual([]);
+
+    // 2) Solo subir la capacidad: solo maxCapacity. Al guardar se cierra el panel.
+    //    (Bajarla con cupo de TotalPass también reenvía ese cupo para que el servidor lo revalide; así era antes.)
+    await page.getByRole("button", { name: "Editar clase" }).click();
+    await editar.getByRole("spinbutton", { name: "Capacidad" }).fill("8");
+    await guardar();
+    await expect.poll(() => puts).toEqual([{ ruta: `/api/classes/${ID.barre}`, cuerpo: { maxCapacity: 8 } }]);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
+    // 3) Solo el cupo de TotalPass: la clase no se toca, solo /channels.
+    puts.length = 0;
+    await page.getByRole("button", { name: /^Barre.*07:00/ }).click();
+    await page.getByRole("button", { name: "Editar clase" }).click();
+    await editar.getByRole("spinbutton", { name: "Lugares para TotalPass" }).fill("1");
+    await guardar();
+    await expect.poll(() => puts).toEqual([{ ruta: `/api/classes/${ID.barre}/channels`, cuerpo: { totalpass: 1 } }]);
+  });
+
+  test("editar compara contra la clase como estaba al abrir el diálogo", async ({ adminPage: page }) => {
+    // Si la clase cambia en otro lado con el diálogo abierto (la lista se recarga al volver a la
+    // ventana), guardar sin tocar nada no debe mandar los valores viejos y deshacer ese cambio.
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.clock.install({ time: AHORA_PRUEBA });
+    const clases = SEMANA_PRUEBA.map((c) => ({ ...c, channels: c.channels.map((k) => ({ ...k })) }));
+    await mockSemanaCalendario(page, clases);
+    const puts: Array<{ ruta: string; cuerpo: unknown }> = [];
+    await page.route(/\/api\/classes\/[^/?]+(\/channels)?$/, async (route) => {
+      if (route.request().method() !== "PUT") return route.fallback();
+      puts.push({ ruta: new URL(route.request().url()).pathname, cuerpo: route.request().postDataJSON() });
+      await route.fulfill({ json: { ok: true } });
+    });
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+
+    await page.getByRole("button", { name: /^Barre.*07:00/ }).click();
+    const lugares = page.getByTestId("lugares-panel");
+    await expect(lugares).toContainText("3 de 7 · 4 libres");
+    await page.getByRole("button", { name: "Editar clase" }).click();
+    const editar = page.getByRole("dialog", { name: "Editar Clase" });
+    await expect(editar.getByRole("spinbutton", { name: "Capacidad" })).toHaveValue("7");
+
+    // Otra persona sube la capacidad a 9; la lista se recarga al volver a la ventana.
+    const barre = clases.find((c) => c.id === ID.barre)!;
+    barre.max_capacity = 9;
+    await page.clock.fastForward(61_000);
+    await page.evaluate(() => window.dispatchEvent(new Event("visibilitychange")));
+    await expect(lugares).toContainText("3 de 9 · 6 libres");
+
+    await editar.getByRole("button", { name: "Guardar Cambios" }).click();
+    await expect(page.getByText("Sin cambios", { exact: true })).toBeVisible();
+    expect(puts).toEqual([]);
   });
 });

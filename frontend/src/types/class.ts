@@ -53,6 +53,13 @@ export interface Schedule {
     facility_name?: string | null;
 }
 
+/** Cupo y reservas de una plataforma en una clase (una fila de channel_inventory). */
+export interface ClassChannel {
+    channel: string;
+    max: number;
+    booked: number;
+}
+
 export interface Class {
     intensity?: number | null;
     id: string;
@@ -79,4 +86,6 @@ export interface Class {
     totalpass_spots?: number | null;
     /** Cuántos de esos lugares ya ocupó TotalPass (para marcar la clase en la rejilla). */
     totalpass_booked?: number;
+    /** Una entrada por canal con fila en channel_inventory (hoy TotalPass; Fitpass después). */
+    channels: ClassChannel[];
 }
