@@ -50,4 +50,27 @@ for (const purpose of ['', null, 'session']) {
   assert.throws(() => decodeSessionToken(t, SECRET), jwt.JsonWebTokenError);
 }
 
+// 8. Cableado: ambos middlewares usan decodeSessionToken y ya no verifican a mano.
+{
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const ruta = fileURLToPath(new URL('../src/middleware/auth.ts', import.meta.url));
+  const src = readFileSync(ruta, 'utf8');
+
+  const cuerpo = (nombre: string) => {
+    const inicio = src.indexOf(`export async function ${nombre}(`) >= 0
+      ? src.indexOf(`export async function ${nombre}(`)
+      : src.indexOf(`export function ${nombre}(`);
+    assert.ok(inicio >= 0, `no encontré ${nombre}`);
+    const fin = src.indexOf('\nexport ', inicio + 1);
+    return src.slice(inicio, fin === -1 ? undefined : fin);
+  };
+
+  for (const nombre of ['authenticate', 'optionalAuth']) {
+    const c = cuerpo(nombre);
+    assert.ok(c.includes('decodeSessionToken(token, secret)'), `${nombre} debe usar decodeSessionToken`);
+    assert.ok(!c.includes('jwt.verify('), `${nombre} no debe llamar jwt.verify directo`);
+  }
+}
+
 console.log('✅ test-auth-token-purpose: decodeSessionToken OK');

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { JwtPayload, UserRole } from '../types/auth.js';
 import { queryOne } from '../config/database.js';
 import { operationalRole } from '../lib/operationalAccess.js';
+import { decodeSessionToken } from '../lib/sessionToken.js';
 
 // Extend Express Request to include user
 declare global {
@@ -33,7 +34,9 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
             return res.status(500).json({ error: 'Error de configuración del servidor' });
         }
 
-        const decoded = jwt.verify(token, secret) as JwtPayload;
+        // Solo tokens de SESIÓN: un token de reset o de magic-link (llevan `purpose`)
+        // se rechaza aquí con 401, antes de tocar la base.
+        const decoded = decodeSessionToken(token, secret);
 
         // Revalida is_active en BD en cada request. El JWT vive hasta 7 días (JWT_EXPIRES_IN)
         // y, sin este chequeo, req.user se arma solo con lo que dice el token: un staff dado
@@ -136,7 +139,8 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
         const secret = process.env.JWT_SECRET;
 
         if (secret) {
-            const decoded = jwt.verify(token, secret) as JwtPayload;
+            // Un token que no es de sesión cae al catch y la petición sigue como anónima.
+            const decoded = decodeSessionToken(token, secret);
             const accountRole = decoded.role;
             req.user = {
                 userId: decoded.userId,
