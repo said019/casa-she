@@ -383,7 +383,7 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
                     <div className="space-y-5 p-5">
                         {/* Acciones */}
                         {!cancelada && (
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                                 <Button variant="outline" className="px-2" onClick={onEditar}>
                                     <Edit className="mr-1.5 h-4 w-4" /> Editar clase
                                 </Button>

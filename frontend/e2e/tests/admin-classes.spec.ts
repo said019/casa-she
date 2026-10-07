@@ -5,7 +5,7 @@
 import { test, expect } from "../fixtures/auth";
 import type { Locator } from "@playwright/test";
 import { AdminPage } from "../pages/AdminPage";
-import { AHORA_PRUEBA, FECHA_PRUEBA, ID, clasePrueba, mockSemanaCalendario } from "../fixtures/calendario";
+import { AHORA_PRUEBA, FECHA_PRUEBA, ID, SEMANA_PRUEBA, clasePrueba, mockSemanaCalendario } from "../fixtures/calendario";
 
 test.describe("Admin – Gestión de Clases y Calendario", () => {
   test("el dashboard de admin carga correctamente", async ({ adminPage: page }) => {
@@ -286,4 +286,37 @@ test.describe("Calendario de recepción – semana por horas", () => {
     await expect.poll(() => puts).toEqual([{ ruta: `/api/classes/${ID.barre}/channels`, cuerpo: { totalpass: 1 } }]);
   });
 
+  test("editar compara contra la clase como estaba al abrir el diálogo", async ({ adminPage: page }) => {
+    // Si la clase cambia en otro lado con el diálogo abierto (la lista se recarga al volver a la
+    // ventana), guardar sin tocar nada no debe mandar los valores viejos y deshacer ese cambio.
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.clock.install({ time: AHORA_PRUEBA });
+    const clases = SEMANA_PRUEBA.map((c) => ({ ...c, channels: c.channels.map((k) => ({ ...k })) }));
+    await mockSemanaCalendario(page, clases);
+    const puts: Array<{ ruta: string; cuerpo: unknown }> = [];
+    await page.route(/\/api\/classes\/[^/?]+(\/channels)?$/, async (route) => {
+      if (route.request().method() !== "PUT") return route.fallback();
+      puts.push({ ruta: new URL(route.request().url()).pathname, cuerpo: route.request().postDataJSON() });
+      await route.fulfill({ json: { ok: true } });
+    });
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+
+    await page.getByRole("button", { name: /^Barre.*07:00/ }).click();
+    const lugares = page.getByTestId("lugares-panel");
+    await expect(lugares).toContainText("3 de 7 · 4 libres");
+    await page.getByRole("button", { name: "Editar clase" }).click();
+    const editar = page.getByRole("dialog", { name: "Editar Clase" });
+    await expect(editar.getByRole("spinbutton", { name: "Capacidad" })).toHaveValue("7");
+
+    // Otra persona sube la capacidad a 9; la lista se recarga al volver a la ventana.
+    const barre = clases.find((c) => c.id === ID.barre)!;
+    barre.max_capacity = 9;
+    await page.clock.fastForward(61_000);
+    await page.evaluate(() => window.dispatchEvent(new Event("visibilitychange")));
+    await expect(lugares).toContainText("3 de 9 · 6 libres");
+
+    await editar.getByRole("button", { name: "Guardar Cambios" }).click();
+    await expect(page.getByText("Sin cambios", { exact: true })).toBeVisible();
+    expect(puts).toEqual([]);
+  });
 });

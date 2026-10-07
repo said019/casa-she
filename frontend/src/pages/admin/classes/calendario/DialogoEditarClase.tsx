@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -37,7 +38,10 @@ type EditClassForm = z.infer<typeof editClassSchema>;
 interface DialogoEditarClaseProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    /** La clase a editar. El padre vuelve a montar el diálogo (key) en cada apertura. */
+    /**
+     * La clase a editar. El padre vuelve a montar el diálogo (key) en cada apertura; el diálogo
+     * se queda con la clase como estaba al abrirse aunque luego llegue una versión más nueva.
+     */
     clase: Class | null;
     classTypes?: ClassType[];
     instructors?: Instructor[];
@@ -49,9 +53,13 @@ interface DialogoEditarClaseProps {
 }
 
 /** "Editar clase". Movido sin cambios de ClassesCalendar. */
-export function DialogoEditarClase({ open, onOpenChange, clase, classTypes, instructors, facilities, onCambiarCoach, onGuardada }: DialogoEditarClaseProps) {
+export function DialogoEditarClase({ open, onOpenChange, clase: claseVigente, classTypes, instructors, facilities, onCambiarCoach, onGuardada }: DialogoEditarClaseProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
+    // Foto de la clase al abrir: de ella salen los valores del formulario y contra ella se
+    // compara al guardar. Si la lista se recarga con el diálogo abierto (otra persona cambió
+    // la clase), guardar sin tocar nada no debe mandar los valores viejos y deshacer ese cambio.
+    const [clase] = useState(claseVigente);
     const editForm = useForm<EditClassForm>({
         resolver: zodResolver(editClassSchema),
         // Los mismos valores que ponía handleEditClass con editForm.reset() al abrir.
