@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Copy as CopyIcon, Loader2, Plus, RefreshCw, Repeat, Sparkles, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { CheckSquare, ChevronLeft, ChevronRight, Copy as CopyIcon, Loader2, Plus, RefreshCw, Repeat, Sparkles, Users } from 'lucide-react';
 import type { Class } from '@/types/class';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { AuthGuard } from '@/components/layout/AuthGuard';
@@ -23,6 +23,7 @@ import { DialogoCancelarClase } from './calendario/DialogoCancelarClase';
 import { DialogoCambiarCoach } from './calendario/DialogoCambiarCoach';
 import { resumenDeClases, textoResumenSemana } from './calendario/lugares';
 import { tituloSemana } from './calendario/rejilla';
+import { alternar, alternarGrupo, atajosDesde, clasesSeleccionadas } from './calendario/seleccion';
 
 interface ClassesCalendarProps {
     initialGenerateOpen?: boolean;
@@ -71,11 +72,31 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
         handlePrevWeek, handleNextWeek, handleToday,
     } = useSemanaClases();
 
+    // "Seleccionar varias" (solo escritorio): qué clases están marcadas y la última tocada,
+    // de la que salen los atajos. Cambiar de semana limpia la selección.
+    const [modoSeleccion, setModoSeleccion] = useState(false);
+    const [seleccion, setSeleccion] = useState<Set<string>>(() => new Set());
+    const [ancla, setAncla] = useState<string | null>(null);
+    const claveSemana = weekStart.getTime();
+    useEffect(() => {
+        setSeleccion(new Set());
+        setAncla(null);
+    }, [claveSemana]);
+    const clasesVisibles = weekDays.flatMap((dia) => getClassesForDay(dia));
+    const seleccionadas = clasesSeleccionadas(seleccion, clasesVisibles);
+    const claseAncla = clasesVisibles.find((c) => c.id === ancla) ?? seleccionadas[seleccionadas.length - 1] ?? null;
+    const atajos = atajosDesde(claseAncla, clasesVisibles);
+    const terminarSeleccion = () => {
+        setModoSeleccion(false);
+        setSeleccion(new Set());
+        setAncla(null);
+    };
+
     // El panel y los diálogos usan la versión más reciente de la clase abierta: después de
     // inscribir, cambiar el cupo o cerrar la clase, la lista se recarga y aquí llega ya cambiada.
     const claseVigente = (selectedClass && classes?.find((c) => c.id === selectedClass.id)) || selectedClass;
 
-    const resumenSemana = textoResumenSemana(resumenDeClases(weekDays.flatMap((dia) => getClassesForDay(dia))));
+    const resumenSemana = textoResumenSemana(resumenDeClases(clasesVisibles));
 
     const handleDayClick = (day: Date) => {
         // Clave nueva = el diálogo se vuelve a montar con la fecha de ese día.
@@ -124,6 +145,18 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                        variant="outline"
+                        aria-pressed={modoSeleccion}
+                        className={cn(
+                            BOTON_BARRA,
+                            'hidden lg:inline-flex',
+                            modoSeleccion && 'border-casa-verde bg-casa-verde text-casa-avena hover:bg-casa-profundo hover:text-casa-avena',
+                        )}
+                        onClick={() => (modoSeleccion ? terminarSeleccion() : setModoSeleccion(true))}
+                    >
+                        <CheckSquare className="mr-2 h-4 w-4" /> {modoSeleccion ? 'Terminar selección' : 'Seleccionar varias'}
+                    </Button>
                     {veInvitadas && (
                         <Button variant="ghost" className="h-11 rounded-xl text-casa-ciruela" onClick={() => setCompanionReviewOpen(true)}>
                             <Users className="mr-2 h-4 w-4" /> Invitadas: revisión de recepción
@@ -219,6 +252,35 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                 </div>
             </div>
 
+            {modoSeleccion && (
+                <div
+                    role="group"
+                    aria-label="Atajos de selección"
+                    className="hidden min-h-12 flex-wrap items-center gap-2 rounded-[14px] bg-casa-verde/10 py-1.5 pl-4 pr-2 lg:flex"
+                >
+                    <span className="mr-1 font-semibold text-casa-profundo">Toca las clases que quieras cambiar.</span>
+                    {atajos.length > 0 && <span className="text-casa-verde">Atajos:</span>}
+                    {atajos.map((a) => (
+                        <button
+                            key={a.etiqueta}
+                            type="button"
+                            onClick={() => setSeleccion(new Set(a.ids))}
+                            className="h-9 rounded-full border border-casa-verde/30 bg-[hsl(var(--admin-panel))] px-3 text-sm font-medium text-casa-verde hover:bg-casa-verde/5"
+                        >
+                            {a.etiqueta}
+                        </button>
+                    ))}
+                    <button
+                        type="button"
+                        onClick={() => setSeleccion(new Set())}
+                        className="ml-auto h-9 rounded-[10px] px-3 text-sm font-semibold text-casa-verde underline"
+                    >
+                        Quitar selección
+                    </button>
+                </div>
+            )}
+
+
             {classesLoading ? (
                 <div className="flex min-h-64 flex-col items-center justify-center rounded-[18px] border border-casa-arena bg-[hsl(var(--admin-panel))]" aria-live="polite">
                     <Loader2 className="h-6 w-6 animate-spin text-casa-verde" aria-hidden="true" />
@@ -253,6 +315,14 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                             motivoCierre={getClosedReason}
                             onClickClase={handleClassClick}
                             onClickDia={handleDayClick}
+                            seleccion={modoSeleccion ? {
+                                ids: seleccion,
+                                onAlternarClase: (c) => {
+                                    setSeleccion((actual) => alternar(actual, c.id));
+                                    setAncla(c.id);
+                                },
+                                onAlternarDia: (_dia, clasesDia) => setSeleccion((actual) => alternarGrupo(actual, clasesDia)),
+                            } : undefined}
                         />
                     </div>
                 </>

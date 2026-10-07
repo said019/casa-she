@@ -320,3 +320,85 @@ test.describe("Calendario de recepción – semana por horas", () => {
     expect(puts).toEqual([]);
   });
 });
+
+test.describe("Calendario de recepción – varias a la vez", () => {
+  test("seleccionar: casillas, atajos de la última clase y día completo", async ({ adminPage: page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await mockSemanaCalendario(page);
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+    const barre = page.getByRole("button", { name: /^Barre.*07:00/ });
+    const mat = page.getByRole("button", { name: /^Pilates Mat.*08:00/ });
+    const sculpt = page.getByRole("button", { name: /^Sculpt.*18:00/ });
+    const cancelada = page.getByRole("button", { name: /^Sculpt.*19:00/ });
+    await expect(barre).toBeVisible();
+
+    await page.getByRole("button", { name: "Seleccionar varias" }).click();
+    await barre.click();
+    await expect(barre).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("dialog")).toHaveCount(0); // en modo selección no abre el panel
+
+    const atajos = page.getByRole("group", { name: "Atajos de selección" });
+    await expect(atajos.getByRole("button")).toHaveText(["Mismo horario (7:00)", "Las de Ana", "Todas las Barre", "Todo el lunes", "Quitar selección"]);
+    await atajos.getByRole("button", { name: "Todo el lunes" }).click();
+    await expect(mat).toHaveAttribute("aria-pressed", "true");
+
+    // Encabezado del miércoles: marca la activa y nunca la cancelada; otro clic la quita.
+    const miercoles = page.getByTestId("encabezado-2026-11-04");
+    await expect(miercoles).toHaveAttribute("aria-label", "Seleccionar todo el miércoles");
+    await miercoles.click();
+    await expect(sculpt).toHaveAttribute("aria-pressed", "true");
+    expect(await cancelada.getAttribute("aria-pressed")).toBeNull();
+    await miercoles.click();
+    await expect(sculpt).toHaveAttribute("aria-pressed", "false");
+
+    await atajos.getByRole("button", { name: "Quitar selección" }).click();
+    await expect(barre).toHaveAttribute("aria-pressed", "false");
+    await expect(mat).toHaveAttribute("aria-pressed", "false");
+
+    // Cambiar de semana limpia la selección (nunca se aplica a clases que ya no se ven).
+    await barre.click();
+    await page.getByRole("button", { name: "Semana siguiente" }).click();
+    await page.getByRole("button", { name: "Semana anterior" }).click();
+    await expect(barre).toHaveAttribute("aria-pressed", "false");
+
+    // Al terminar, la tarjeta vuelve a abrir el panel y el encabezado a crear clase.
+    await page.getByRole("button", { name: "Terminar selección" }).first().click();
+    await expect(atajos).toHaveCount(0);
+    await barre.click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+  });
+
+  test("tarjeta de 50 min: nombre, coach, 7 puntos y cupo a 120 y 140 px de columna", async ({ adminPage: page }) => {
+    await mockSemanaCalendario(page);
+    await page.setViewportSize({ width: 1100, height: 900 });
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+    await page.getByRole("button", { name: "Seleccionar varias" }).click(); // con la casilla visible
+
+    for (const [ancho, columnaMaxima] of [[1100, 125], [1366, 150]] as const) {
+      await page.setViewportSize({ width: ancho, height: 900 });
+      const columna = page.getByTestId("columna-2026-11-02");
+      await expect.poll(async () => (await columna.boundingBox())?.width ?? 0).toBeLessThanOrEqual(columnaMaxima);
+      for (const nombre of [/^Barre.*07:00/, /^Pilates Mat.*08:00/]) {
+        const tarjeta = page.getByRole("button", { name: nombre });
+        const caja = (await tarjeta.boundingBox())!;
+        const coach = (await tarjeta.locator("[data-coach]").boundingBox())!;
+        const nombreClase = (await tarjeta.locator("[data-nombre-clase]").boundingBox())!;
+        const hora = (await tarjeta.locator("[data-hora]").boundingBox())!;
+        const casilla = (await tarjeta.locator("[data-casilla]").boundingBox())!;
+        const puntos = tarjeta.locator("[data-puntos]");
+        const ultimo = (await puntos.locator("[data-lugar]").last().boundingBox())!;
+        const cupo = (await tarjeta.locator("[data-cupo]").boundingBox())!;
+        const dentro = (b: { y: number; height: number }) => b.y >= caja.y && b.y + b.height <= caja.y + caja.height + 0.5;
+        await expect(puntos.locator("[data-lugar]")).toHaveCount(7);
+        expect(nombreClase.height, `nombre visible a ${ancho}px`).toBeGreaterThanOrEqual(14);
+        expect(coach.height, `coach visible a ${ancho}px`).toBeGreaterThanOrEqual(12);
+        expect(dentro(coach) && dentro(cupo) && dentro(ultimo), `todo dentro de la tarjeta a ${ancho}px`).toBe(true);
+        expect(ultimo.x + ultimo.width, `el 7.º punto no se recorta a ${ancho}px`).toBeLessThanOrEqual((await puntos.boundingBox())!.x + (await puntos.boundingBox())!.width + 0.5);
+        expect(ultimo.x + ultimo.width).toBeLessThanOrEqual(cupo.x);
+        expect(cupo.x + cupo.width).toBeLessThanOrEqual(caja.x + caja.width);
+        expect(casilla.x >= hora.x + hora.width || casilla.y >= hora.y + hora.height, `la casilla no tapa la hora a ${ancho}px`).toBe(true);
+      }
+      await columna.screenshot({ path: test.info().outputPath(`tarjetas-${ancho}.png`) });
+    }
+  });
+});
