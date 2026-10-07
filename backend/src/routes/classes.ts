@@ -298,10 +298,12 @@ router.post('/bulk', authenticate, requireElevated, async (req: Request, res: Re
 
     // Recepción queda limitada a su sucursal asignada (si tiene una).
     let sucursalPermitida: string | null = null;
-    if (req.user?.role === 'reception') {
-        const fila = await queryOne<{ default_facility_id: string | null }>(
-            `SELECT default_facility_id FROM users WHERE id = $1`, [req.user.userId]);
-        sucursalPermitida = fila?.default_facility_id ?? null;
+    // OJO: `authenticate` mapea recepción → rol 'admin'; el rol real es `accountRole`.
+    // La recepción maestra ve todas las sucursales (igual que en el resto del panel).
+    if (req.user?.accountRole === 'reception') {
+        const fila = await queryOne<{ default_facility_id: string | null; is_reception_master: boolean }>(
+            `SELECT default_facility_id, is_reception_master FROM users WHERE id = $1`, [req.user.userId]);
+        sucursalPermitida = fila?.is_reception_master ? null : (fila?.default_facility_id ?? null);
     }
 
     const client = await pool.connect();
