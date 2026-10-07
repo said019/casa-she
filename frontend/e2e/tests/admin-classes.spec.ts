@@ -247,4 +247,43 @@ test.describe("Calendario de recepción – semana por horas", () => {
       page.getByRole("dialog").getByRole("region", { name: "Lugares para TotalPass" }).getByRole("button", { name: "Un lugar menos" }),
     ).toBeDisabled();
   });
+
+  test("editar manda solo lo que cambió", async ({ adminPage: page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await mockSemanaCalendario(page);
+    const puts: Array<{ ruta: string; cuerpo: unknown }> = [];
+    await page.route(/\/api\/classes\/[^/?]+(\/channels)?$/, async (route) => {
+      if (route.request().method() !== "PUT") return route.fallback();
+      puts.push({ ruta: new URL(route.request().url()).pathname, cuerpo: route.request().postDataJSON() });
+      await route.fulfill({ json: { ok: true } });
+    });
+    await page.goto(`/admin/calendar?date=${FECHA_PRUEBA}`);
+    const editar = page.getByRole("dialog", { name: "Editar Clase" });
+    const guardar = () => editar.getByRole("button", { name: "Guardar Cambios" }).click();
+
+    // 1) Guardar sin tocar nada: no se manda nada y el panel sigue abierto.
+    await page.getByRole("button", { name: /^Barre.*07:00/ }).click();
+    await page.getByRole("button", { name: "Editar clase" }).click();
+    await guardar();
+    await expect(page.getByText("Sin cambios", { exact: true })).toBeVisible();
+    await expect(editar).toBeHidden();
+    expect(puts).toEqual([]);
+
+    // 2) Solo subir la capacidad: solo maxCapacity. Al guardar se cierra el panel.
+    //    (Bajarla con cupo de TotalPass también reenvía ese cupo para que el servidor lo revalide; así era antes.)
+    await page.getByRole("button", { name: "Editar clase" }).click();
+    await editar.getByRole("spinbutton", { name: "Capacidad" }).fill("8");
+    await guardar();
+    await expect.poll(() => puts).toEqual([{ ruta: `/api/classes/${ID.barre}`, cuerpo: { maxCapacity: 8 } }]);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
+    // 3) Solo el cupo de TotalPass: la clase no se toca, solo /channels.
+    puts.length = 0;
+    await page.getByRole("button", { name: /^Barre.*07:00/ }).click();
+    await page.getByRole("button", { name: "Editar clase" }).click();
+    await editar.getByRole("spinbutton", { name: "Lugares para TotalPass" }).fill("1");
+    await guardar();
+    await expect.poll(() => puts).toEqual([{ ruta: `/api/classes/${ID.barre}/channels`, cuerpo: { totalpass: 1 } }]);
+  });
+
 });

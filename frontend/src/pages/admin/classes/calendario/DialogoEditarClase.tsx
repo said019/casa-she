@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import type { Facility } from './tipos';
+import { cambiosDeClase, datosEditablesDeClase, type DatosClaseEditables } from './cambiosClase';
 
 const editClassSchema = z.object({
     intensity: z.number().int().min(1).max(3).nullable(),
@@ -68,9 +69,11 @@ export function DialogoEditarClase({ open, onOpenChange, clase, classTypes, inst
     });
 
     const editMutation = useMutation({
-        mutationFn: async (data: EditClassForm & { id: string; originalTotalpassSpots?: number; originalMaxCapacity?: number }) => {
-            const { id, originalTotalpassSpots, originalMaxCapacity, ...rest } = data;
-            const res = await api.put(`/classes/${id}`, {
+        mutationFn: async (data: EditClassForm & { id: string; antes: DatosClaseEditables; originalTotalpassSpots?: number; originalMaxCapacity?: number }) => {
+            const { id, antes, originalTotalpassSpots, originalMaxCapacity, ...rest } = data;
+            // Solo lo que cambió: el backend marca resincronización con TotalPass si recibe
+            // tipo, coach, fecha u hora, aunque sean los mismos de antes.
+            const cambios = cambiosDeClase(antes, {
                 classTypeId: rest.classTypeId,
                 instructorId: rest.instructorId,
                 facilityId: rest.facilityId || null,
@@ -80,6 +83,8 @@ export function DialogoEditarClase({ open, onOpenChange, clase, classTypes, inst
                 maxCapacity: rest.maxCapacity,
                 intensity: rest.intensity,
             });
+            const huboCambiosEnClase = Object.keys(cambios).length > 0;
+            const res = huboCambiosEnClase ? await api.put(`/classes/${id}`, cambios) : null;
 
             // El PUT a /channels se dispara si el cupo TP cambió, o si la capacidad bajó
             // (con cupo TP > 0 vigente) para que el backend revalide CAP_EXCEEDS_CAPACITY.
@@ -98,9 +103,14 @@ export function DialogoEditarClase({ open, onOpenChange, clase, classTypes, inst
                 }
             }
 
-            return res;
+            return { res, guardoAlgo: huboCambiosEnClase || shouldSyncChannels };
         },
-        onSuccess: (res: any) => {
+        onSuccess: ({ res, guardoAlgo }: { res: any; guardoAlgo: boolean }) => {
+            if (!guardoAlgo) {
+                toast({ title: 'Sin cambios', description: 'No había nada que guardar.' });
+                onOpenChange(false);
+                return;
+            }
             const warning = res?.data?.payrollWarning;
             if (warning) {
                 toast({ variant: 'destructive', title: 'Clase actualizada — revisa la nómina', description: warning });
@@ -138,7 +148,7 @@ export function DialogoEditarClase({ open, onOpenChange, clase, classTypes, inst
                     <DialogTitle>Editar Clase</DialogTitle>
                     <DialogDescription>Modifica los detalles de la clase.</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={editForm.handleSubmit(d => clase && editMutation.mutate({ ...d, id: clase.id, originalTotalpassSpots: clase.totalpass_spots ?? 0, originalMaxCapacity: clase.max_capacity }))} className="space-y-4">
+                <form onSubmit={editForm.handleSubmit(d => clase && editMutation.mutate({ ...d, id: clase.id, antes: datosEditablesDeClase(clase), originalTotalpassSpots: clase.totalpass_spots ?? 0, originalMaxCapacity: clase.max_capacity }))} className="space-y-4">
                     <div className="space-y-2">
                         <Label>Fecha</Label>
                         <Popover>
@@ -238,14 +248,14 @@ export function DialogoEditarClase({ open, onOpenChange, clase, classTypes, inst
                     </div>
 
                     <div className="space-y-2">
-                        <Label>Capacidad</Label>
-                        <Input type="number" {...editForm.register('maxCapacity')} />
+                        <Label htmlFor="editar-capacidad">Capacidad</Label>
+                        <Input id="editar-capacidad" type="number" {...editForm.register('maxCapacity')} />
                     </div>
                     <ClassIntensitySelector value={editForm.watch('intensity')} onChange={(value) => editForm.setValue('intensity', value, { shouldDirty: true, shouldValidate: true })} />
 
                     <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5">Lugares para <ChannelLogo canal="totalpass" alto={10} /></Label>
-                        <Input type="number" min={0} {...editForm.register('totalpassSpots', { valueAsNumber: true })} />
+                        <Label htmlFor="editar-cupo-totalpass" className="flex items-center gap-1.5">Lugares para <ChannelLogo canal="totalpass" alto={10} /></Label>
+                        <Input id="editar-cupo-totalpass" type="number" min={0} {...editForm.register('totalpassSpots', { valueAsNumber: true })} />
                         <p className="text-xs text-muted-foreground">0 = clase no ofrecida en TotalPass</p>
                     </div>
 
