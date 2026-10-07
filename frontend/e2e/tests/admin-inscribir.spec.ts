@@ -95,7 +95,7 @@ test.describe("Calendario de recepción – inscribir alumna", () => {
     await expect(panel.locator('[data-resaltada="true"]')).toHaveCount(0);
   });
 
-  test("el botón Inscribir y la cortesía mandan free correcto; con el alta rápida conectada aparece "Registrar alumna nueva"", async ({ adminPage: page }) => {
+  test("el botón Inscribir y la cortesía mandan free correcto; con el alta rápida conectada aparece \"Registrar alumna nueva\"", async ({ adminPage: page }) => {
     const { llamadas, panel } = await prepararPanel(page);
     await panel.getByRole("combobox", { name: /Buscar alumna/ }).fill("carla");
     await expect(panel.getByTestId(`candidata-${CARLA}`)).toBeVisible();
