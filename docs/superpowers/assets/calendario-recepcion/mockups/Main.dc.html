@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Calendario semanal por horas</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&amp;family=Instrument+Serif&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; min-height: 1000px; box-sizing: border-box; background: #F6F0E4; color: #2E1B22; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 14px; line-height: 1.4; padding-bottom: 150px">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 12px 32px; background: #FCF8EF; border-bottom: 1px solid #D6D5C2">
+    <div style="display: flex; align-items: baseline; gap: 12px">
+      <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 26px; line-height: 1; color: #2A4E36">Casa Shé</span>
+      <span style="font-size: 13px; color: #6B554D">Recepción</span>
+    </div>
+    <nav aria-label="Secciones" style="display: flex; gap: 4px; flex-wrap: wrap">
+      <a href="#" style="padding: 8px 12px; border-radius: 8px; color: #6B554D; text-decoration: none">Hoy</a>
+      <a href="#" aria-current="page" style="padding: 8px 12px; border-radius: 8px; background: #E6EDE4; color: #2A4E36; font-weight: 600; text-decoration: none">Calendario</a>
+      <a href="#" style="padding: 8px 12px; border-radius: 8px; color: #6B554D; text-decoration: none">Alumnas</a>
+      <a href="#" style="padding: 8px 12px; border-radius: 8px; color: #6B554D; text-decoration: none">Check-in</a>
+    </nav>
+  </header>
+
+  <div style="max-width: 1440px; margin: 0 auto; padding: 22px 32px 0; box-sizing: border-box">
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap">
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+        <div style="display: flex; gap: 4px">
+          <button type="button" aria-label="Semana anterior" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; cursor: pointer; display: grid; place-items: center; font: inherit">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+          </button>
+          <button type="button" aria-label="Semana siguiente" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; cursor: pointer; display: grid; place-items: center; font: inherit">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
+          </button>
+        </div>
+        <button type="button" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; cursor: pointer; font: inherit; font-weight: 500">Hoy</button>
+        <h1 style="margin: 0 0 0 10px; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 40px; line-height: 1; color: #16261A">5 – 11 de octubre</h1>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+        <div role="group" aria-label="Vista" style="display: flex; background: #EFE8D8; border-radius: 12px; padding: 3px">
+          <span aria-current="true" style="padding: 9px 16px; border-radius: 9px; background: #FCF8EF; font-weight: 600; box-shadow: 0 1px 2px rgba(42,33,24,.14)">Horas</span>
+          <a href="Lista.dc.html" style="padding: 9px 16px; border-radius: 9px; color: #6B554D; text-decoration: none">Lista</a>
+        </div>
+        <button type="button" onClick="{{selectBtn.run}}" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid {{selectBtn.border}}; background: {{selectBtn.bg}}; color: {{selectBtn.ink}}; cursor: pointer; font: inherit; font-weight: 600; display: flex; align-items: center; gap: 8px">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M8 12.5l3 3 5-6"></path></svg>
+          {{selectBtn.label}}
+        </button>
+        <button type="button" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; cursor: pointer; font: inherit; font-weight: 500; display: flex; align-items: center; gap: 8px">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="3"></rect><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"></path></svg>
+          Copiar semana
+        </button>
+        <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #2A4E36; background: #2A4E36; color: #FCF8EF; cursor: pointer; font: inherit; font-weight: 600; display: flex; align-items: center; gap: 8px">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+          Nueva clase
+        </button>
+      </div>
+    </div>
+
+    <sc-if value="{{isNormal}}" hint-placeholder-val="{{true}}">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 18px; min-height: 48px">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+          <div role="group" aria-label="Programa" style="display: flex; background: #EFE8D8; border-radius: 999px; padding: 3px">
+            <sc-for list="{{progOpts}}" as="p" hint-placeholder-count="3">
+              <button type="button" aria-pressed="{{p.on}}" onClick="{{p.pick}}" style="padding: 8px 16px; border-radius: 999px; border: 0; background: {{p.bg}}; color: #2E1B22; font: inherit; font-weight: {{p.weight}}; cursor: pointer; box-shadow: {{p.shadow}}">{{p.label}}</button>
+            </sc-for>
+          </div>
+          <label style="display: flex; align-items: center; gap: 8px; color: #6B554D">
+            Coach
+            <select value="{{coachF}}" onChange="{{onCoachF}}" style="height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit">
+              <sc-for list="{{coachFilterOpts}}" as="o" hint-placeholder-count="6"><option value="{{o}}">{{o}}</option></sc-for>
+            </select>
+          </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 13px; color: #6B554D">
+          <span style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 50%; background: #2A4E36"></span>Alumna</span>
+          <span style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 50%; background: #26D07C; box-shadow: inset 0 0 0 1.25px #0F7A45"></span>Socia <img src="/_blob/ed48d6778ac4054ef90b068af847d1e1" alt="TotalPass" style="height: 10px; width: auto; display: block"></span>
+          <span style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 50%; background: #5A8AD0; box-shadow: inset 0 0 0 1.25px #2F5BA8"></span>Socia <img src="/_blob/61182865d67e39f42b8b692202a99016" alt="Fitpass" style="height: 18px; width: auto; display: block; margin: -4px 0"></span>
+          <span style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 50%; box-shadow: inset 0 0 0 1.25px #9C8E80"></span>Libre</span>
+          <span style="color: #2E1B22; font-weight: 600">{{stats}}</span>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isSelect}}" hint-placeholder-val="{{false}}">
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 18px; min-height: 48px; box-sizing: border-box; padding: 6px 8px 6px 16px; background: #E6EDE4; border-radius: 14px">
+        <span style="font-weight: 600; color: #16261A; margin-right: 4px">Toca las clases que quieras cambiar.</span>
+        <span style="color: #3C6B4C">Atajos:</span>
+        <sc-for list="{{shortcuts}}" as="k" hint-placeholder-count="4">
+          <button type="button" onClick="{{k.run}}" style="height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid #AFC9B7; background: #FCF8EF; color: #2A4E36; font: inherit; font-weight: 500; cursor: pointer">{{k.label}}</button>
+        </sc-for>
+        <button type="button" onClick="{{clearSel}}" style="margin-left: auto; height: 36px; padding: 0 12px; border-radius: 10px; border: 0; background: transparent; color: #2A4E36; font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline">Quitar selección</button>
+      </div>
+    </sc-if>
+
+    <div style="margin-top: 16px; overflow-x: auto; border: 1px solid #D6D5C2; border-radius: 18px; background: #FCF8EF">
+      <div style="min-width: 1040px; display: flex">
+
+        <div style="width: 60px; flex: none; border-right: 1px solid #E7E2D2">
+          <div style="height: 68px; border-bottom: 1px solid #D6D5C2"></div>
+          <div style="position: relative; height: 564px">
+            <sc-for list="{{hours}}" as="h" hint-placeholder-count="7">
+              <span style="position: absolute; right: 10px; top: {{h.top}}px; padding-top: 4px; font-size: 12px; color: #6B554D; font-variant-numeric: tabular-nums">{{h.label}}</span>
+            </sc-for>
+            <span style="position: absolute; left: 0; right: 0; top: 304px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #9C8E80">11 – 18</span>
+          </div>
+        </div>
+
+        <sc-for list="{{days}}" as="day" hint-placeholder-count="7">
+          <div style="flex: 1 1 0; min-width: 0; border-right: 1px solid #E7E2D2; background: {{day.colBg}}">
+            <button type="button" onClick="{{day.pick}}" aria-label="{{day.aria}}" style="width: 100%; height: 68px; box-sizing: border-box; margin: 0; border: 0; border-bottom: 1px solid #D6D5C2; background: {{day.headBg}}; color: #2E1B22; font: inherit; cursor: {{day.cursor}}; padding: 8px 10px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; text-align: left">
+              <span style="display: flex; align-items: baseline; gap: 6px">
+                <span style="font-size: 12px; color: #6B554D">{{day.dow}}</span>
+                <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 26px; line-height: 1; color: {{day.numInk}}">{{day.num}}</span>
+                <sc-if value="{{day.isToday}}" hint-placeholder-val="{{false}}"><span style="font-size: 11px; font-weight: 600; color: #FCF8EF; background: #2A4E36; border-radius: 999px; padding: 2px 8px">Hoy</span></sc-if>
+              </span>
+              <span style="font-size: 11.5px; color: #6B554D">{{day.summary}}</span>
+            </button>
+            <div style="position: relative; height: 564px">
+              <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 0; height: 304px; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 75px, #ECE6D6 75px, #ECE6D6 76px)"></div>
+              <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 304px; height: 32px; box-sizing: border-box; border-top: 1px solid #E2DCCB; border-bottom: 1px solid #E2DCCB; background-image: repeating-linear-gradient(135deg, #F1E9D8 0, #F1E9D8 5px, transparent 5px, transparent 11px)"></div>
+              <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 336px; height: 228px; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 75px, #ECE6D6 75px, #ECE6D6 76px)"></div>
+              <sc-if value="{{day.isToday}}" hint-placeholder-val="{{false}}">
+                <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: {{day.nowTop}}px; height: 0; border-top: 2px solid #AE4836; z-index: 3; pointer-events: none">
+                  <span style="position: absolute; left: -1px; top: -6px; width: 10px; height: 10px; border-radius: 50%; background: #AE4836"></span>
+                </div>
+              </sc-if>
+              <sc-for list="{{day.classes}}" as="c" hint-placeholder-count="5">
+                <button type="button" onClick="{{c.toggle}}" aria-pressed="{{c.pressed}}" aria-label="{{c.aria}}" style="position: absolute; left: 5px; right: 5px; top: {{c.top}}px; height: {{c.h}}px; box-sizing: border-box; margin: 0; border: 1px solid {{c.line}}; border-radius: 10px; background: {{c.bg}}; color: {{c.ink}}; padding: 6px 8px; text-align: left; display: flex; flex-direction: column; justify-content: space-between; gap: 1px; font: inherit; cursor: pointer; opacity: {{c.op}}; box-shadow: {{c.ring}}">
+                  <span style="display: flex; align-items: baseline; justify-content: space-between; gap: 6px; width: 100%">
+                    <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 17px; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-decoration: {{c.strike}}">{{c.name}}</span>
+                    <span style="font-size: 11px; font-variant-numeric: tabular-nums; opacity: .75; flex: none">{{c.time}}</span>
+                  </span>
+                  <span style="font-size: 11.5px; color: {{c.coachInk}}; font-weight: {{c.coachWeight}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%">{{c.coachLabel}}</span>
+                  <sc-if value="{{c.isActive}}" hint-placeholder-val="{{true}}">
+                    <span style="display: flex; align-items: center; gap: 3px; width: 100%">
+                      <sc-for list="{{c.seats}}" as="s" hint-placeholder-count="7"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{s.fill}}; box-shadow: inset 0 0 0 1.25px {{s.ring}}"></span></sc-for>
+                      <span style="margin-left: auto; font-size: 11px; font-weight: {{c.countWeight}}; font-variant-numeric: tabular-nums">{{c.count}}</span>
+                    </span>
+                  </sc-if>
+                  <sc-if value="{{c.isCancelled}}" hint-placeholder-val="{{false}}"><span style="font-size: 11px; font-weight: 600">Cancelada</span></sc-if>
+                  <sc-if value="{{c.showCheck}}" hint-placeholder-val="{{false}}">
+                    <span aria-hidden="true" style="position: absolute; top: -7px; right: -6px; width: 20px; height: 20px; border-radius: 50%; background: {{c.checkBg}}; box-shadow: 0 0 0 1.5px {{c.checkRing}}, 0 0 0 3.5px #FCF8EF; display: grid; place-items: center">
+                      <sc-if value="{{c.checked}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FCF8EF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></sc-if>
+                    </span>
+                  </sc-if>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{isSelect}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; left: 0; right: 0; bottom: 28px; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 0 16px; pointer-events: none; z-index: 10">
+
+      <sc-if value="{{hasToast}}" hint-placeholder-val="{{false}}">
+        <div role="status" style="pointer-events: auto; display: flex; align-items: center; gap: 14px; background: #FCF8EF; border: 1px solid #AFC9B7; border-radius: 14px; padding: 12px 16px; box-shadow: 0 20px 40px -24px rgba(22,38,26,.5); color: #16261A">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2A4E36" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+          <span>{{toast}}</span>
+          <sc-if value="{{canUndo}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{undo}}" style="border: 0; background: transparent; color: #2A4E36; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; padding: 6px">Deshacer</button></sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{popCoach}}" hint-placeholder-val="{{false}}">
+        <div role="dialog" aria-label="Cambiar coach" style="pointer-events: auto; width: 460px; max-width: 100%; box-sizing: border-box; background: #FCF8EF; border: 1px solid #D6D5C2; border-radius: 20px; padding: 20px; box-shadow: 0 30px 60px -30px rgba(22,38,26,.55)">
+          <h2 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 28px; line-height: 1.05; color: #16261A">Cambiar coach</h2>
+          <p style="margin: 4px 0 14px; color: #6B554D; font-size: 13px">{{selList}}</p>
+          <div role="radiogroup" aria-label="Coach nueva" style="display: flex; flex-direction: column; gap: 6px">
+            <sc-for list="{{coachOpts}}" as="o" hint-placeholder-count="5">
+              <button type="button" role="radio" aria-checked="{{o.on}}" disabled="{{o.disabled}}" onClick="{{o.pick}}" style="display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 12px; border: 1px solid {{o.border}}; background: {{o.bg}}; color: #2E1B22; font: inherit; text-align: left; cursor: pointer; opacity: {{o.op}}">
+                <span style="width: 34px; height: 34px; flex: none; border-radius: 50%; background: #E6EDE4; color: #2A4E36; display: grid; place-items: center; font-weight: 600">{{o.ini}}</span>
+                <span style="flex: 1; min-width: 0">
+                  <span style="display: block; font-weight: 600">{{o.name}}</span>
+                  <span style="display: block; font-size: 12px; color: {{o.noteInk}}">{{o.note}}</span>
+                </span>
+                <span aria-hidden="true" style="width: 18px; height: 18px; flex: none; border-radius: 50%; box-shadow: inset 0 0 0 1.5px {{o.border}}; display: grid; place-items: center"><span style="width: 10px; height: 10px; border-radius: 50%; background: {{o.dot}}"></span></span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #E7E2D2; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: #2E1B22">
+            <p style="margin: 0; display: flex; align-items: center; gap: 8px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B554D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+              {{coachImpactApp}}
+            </p>
+            <p style="margin: 0; display: flex; align-items: center; gap: 8px">
+              <img src="/_blob/ed48d6778ac4054ef90b068af847d1e1" alt="TotalPass" style="height: 10px; width: auto; display: block; flex: none">
+              {{coachImpactTp}}
+            </p>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px">
+            <button type="button" onClick="{{closePop}}" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit; font-weight: 500; cursor: pointer">Cerrar</button>
+            <button type="button" onClick="{{applyCoach}}" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #2A4E36; background: #2A4E36; color: #FCF8EF; font: inherit; font-weight: 600; cursor: pointer">{{coachCta}}</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{popCupo}}" hint-placeholder-val="{{false}}">
+        <div role="dialog" aria-label="Cupo TotalPass" style="pointer-events: auto; width: 460px; max-width: 100%; box-sizing: border-box; background: #FCF8EF; border: 1px solid #D6D5C2; border-radius: 20px; padding: 20px; box-shadow: 0 30px 60px -30px rgba(22,38,26,.55)">
+          <div style="display: flex; align-items: center; gap: 10px">
+            <h2 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 28px; line-height: 1.05; color: #16261A">Lugares para</h2>
+            <img src="/_blob/ed48d6778ac4054ef90b068af847d1e1" alt="TotalPass" style="height: 16px; width: auto; display: block">
+          </div>
+          <p style="margin: 4px 0 16px; color: #6B554D; font-size: 13px">{{selList}}</p>
+          <div style="display: flex; align-items: center; gap: 16px">
+            <button type="button" aria-label="Uno menos" onClick="{{capDown}}" disabled="{{capAtMin}}" style="width: 48px; height: 48px; border-radius: 14px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit; font-size: 22px; cursor: pointer">−</button>
+            <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 52px; line-height: 1; min-width: 40px; text-align: center; font-variant-numeric: tabular-nums">{{cap}}</span>
+            <button type="button" aria-label="Uno más" onClick="{{capUp}}" disabled="{{capAtMax}}" style="width: 48px; height: 48px; border-radius: 14px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit; font-size: 22px; cursor: pointer">+</button>
+            <span style="font-size: 13px; color: #6B554D; flex: 1">de 7 en cada clase. {{capLocal}}</span>
+          </div>
+          <p style="margin: 14px 0 0; font-size: 13px; color: #2E1B22">{{capNote}}</p>
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px">
+            <button type="button" onClick="{{closePop}}" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit; font-weight: 500; cursor: pointer">Cerrar</button>
+            <button type="button" onClick="{{applyCupo}}" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #2A4E36; background: #2A4E36; color: #FCF8EF; font: inherit; font-weight: 600; cursor: pointer">{{cupoCta}}</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{popMover}}" hint-placeholder-val="{{false}}">
+        <div role="dialog" aria-label="Mover o cambiar clase" style="pointer-events: auto; width: 520px; max-width: 100%; box-sizing: border-box; background: #FCF8EF; border: 1px solid #D6D5C2; border-radius: 20px; padding: 20px; box-shadow: 0 30px 60px -30px rgba(22,38,26,.55)">
+          <h2 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 28px; line-height: 1.05; color: #16261A">Mover o cambiar clase</h2>
+          <p style="margin: 4px 0 16px; color: #6B554D; font-size: 13px">{{selList}}</p>
+          <p style="margin: 0 0 8px; font-weight: 600">Hora</p>
+          <div role="radiogroup" aria-label="Correr la hora" style="display: flex; gap: 6px; flex-wrap: wrap">
+            <sc-for list="{{shiftOpts}}" as="o" hint-placeholder-count="5">
+              <button type="button" role="radio" aria-checked="{{o.on}}" onClick="{{o.pick}}" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid {{o.border}}; background: {{o.bg}}; color: {{o.ink}}; font: inherit; font-weight: 500; cursor: pointer">{{o.label}}</button>
+            </sc-for>
+          </div>
+          <label style="display: flex; flex-direction: column; gap: 8px; margin-top: 16px">
+            <span style="font-weight: 600">Clase</span>
+            <select value="{{newType}}" onChange="{{onType}}" style="height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit">
+              <sc-for list="{{typeOpts}}" as="o" hint-placeholder-count="8"><option value="{{o.key}}">{{o.name}}</option></sc-for>
+            </select>
+          </label>
+          <sc-if value="{{moveWarn}}" hint-placeholder-val="{{false}}">
+            <div style="margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: #F4EFD9; border: 1px solid #E2D9AE; color: #5E5220; font-size: 13px; display: flex; flex-direction: column; gap: 4px">
+              <span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><img src="/_blob/ed48d6778ac4054ef90b068af847d1e1" alt="TotalPass" style="height: 10px; width: auto; display: block">pierde lugares si mueves la hora</span>
+              <span>{{moveWarnText}}</span>
+            </div>
+          </sc-if>
+          <p style="margin: 12px 0 0; font-size: 13px; color: #2E1B22">{{moveApp}}</p>
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px">
+            <button type="button" onClick="{{closePop}}" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit; font-weight: 500; cursor: pointer">Cerrar</button>
+            <button type="button" onClick="{{applyMove}}" disabled="{{moveDisabled}}" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #2A4E36; background: #2A4E36; color: #FCF8EF; font: inherit; font-weight: 600; cursor: pointer; opacity: {{moveOp}}">{{moveCta}}</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{popCancel}}" hint-placeholder-val="{{false}}">
+        <div role="dialog" aria-label="Cancelar clases" style="pointer-events: auto; width: 480px; max-width: 100%; box-sizing: border-box; background: #FCF8EF; border: 1px solid #D6D5C2; border-radius: 20px; padding: 20px; box-shadow: 0 30px 60px -30px rgba(22,38,26,.55)">
+          <h2 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 28px; line-height: 1.05; color: #7E1E16">{{cancelCta}}</h2>
+          <p style="margin: 4px 0 14px; color: #6B554D; font-size: 13px">{{selList}}</p>
+          <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px">
+            <p style="margin: 0">{{cancelApp}}</p>
+            <p style="margin: 0; display: flex; align-items: center; gap: 8px"><img src="/_blob/ed48d6778ac4054ef90b068af847d1e1" alt="TotalPass" style="height: 10px; width: auto; display: block; flex: none">{{cancelTp}}</p>
+            <p style="margin: 0; color: #6B554D">Las clases se quedan en el calendario marcadas como canceladas.</p>
+          </div>
+          <label style="display: flex; flex-direction: column; gap: 6px; margin-top: 14px">
+            <span style="font-weight: 600">Motivo que verán las alumnas</span>
+            <input type="text" placeholder="Ej. puente del 2 de noviembre" style="height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FFFFFF; color: #2E1B22; font: inherit">
+          </label>
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px">
+            <button type="button" onClick="{{closePop}}" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit; font-weight: 500; cursor: pointer">No cancelar</button>
+            <button type="button" onClick="{{applyCancel}}" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #B5342A; background: #B5342A; color: #FFFFFF; font: inherit; font-weight: 600; cursor: pointer">{{cancelCta}}</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <div role="toolbar" aria-label="Acciones para las clases seleccionadas" style="pointer-events: auto; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: center; max-width: 100%; box-sizing: border-box; background: #16261A; color: #F6F0E4; border-radius: 20px; padding: 10px 10px 10px 20px; box-shadow: 0 24px 48px -20px rgba(22,38,26,.65)">
+        <div style="display: flex; flex-direction: column; margin-right: 12px; min-width: 150px">
+          <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 24px; line-height: 1">{{selTitle}}</span>
+          <span style="font-size: 12px; color: #C3CFC4">{{selSub}}</span>
+        </div>
+        <button type="button" onClick="{{openCoach}}" disabled="{{noSel}}" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: {{barBg.coach}}; color: #F6F0E4; font: inherit; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 8px; opacity: {{barOp}}">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"></circle><path d="M2 21c0-3.9 3.1-7 7-7 1.5 0 2.9.5 4 1.3"></path><path d="M16 15l2 2 4-4"></path></svg>
+          Cambiar coach
+        </button>
+        <button type="button" onClick="{{openCupo}}" disabled="{{noSel}}" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: {{barBg.cupo}}; color: #F6F0E4; font: inherit; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 8px; opacity: {{barOp}}">
+          Cupo
+          <img src="/_blob/cc0c619f9fca05910cb6a88577c88465" alt="TotalPass" style="height: 10px; width: auto; display: block">
+        </button>
+        <button type="button" onClick="{{openMover}}" disabled="{{noSel}}" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: {{barBg.mover}}; color: #F6F0E4; font: inherit; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 8px; opacity: {{barOp}}">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+          Mover o cambiar clase
+        </button>
+        <button type="button" onClick="{{openCancel}}" disabled="{{noSel}}" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: {{barBg.cancel}}; color: #F2B8AC; font: inherit; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 8px; opacity: {{barOp}}">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M15 9l-6 6M9 9l6 6"></path></svg>
+          Cancelar clases
+        </button>
+        <button type="button" onClick="{{endSelect}}" aria-label="Terminar selección" style="width: 44px; height: 44px; margin-left: 6px; border-radius: 12px; border: 1px solid rgba(246,240,228,.25); background: transparent; color: #F6F0E4; font: inherit; cursor: pointer; display: grid; place-items: center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"inicio":{"editor":"enum","options":["normal","varias"],"default":"normal"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.state || {};
+    const inicio = this.props.inicio ?? 'normal';
+
+    const TYPES = {
+      mat:    { name: 'Pilates Mat',   cat: 'clases', strong: '#2A4E36', bg: '#E6EDE4', line: '#C9D8CC', ink: '#16261A', empty: '#93AA99' },
+      barre:  { name: 'Barre',         cat: 'clases', strong: '#7A3550', bg: '#F4E6EB', line: '#E3C9D3', ink: '#2E1B22', empty: '#C493A7' },
+      sculpt: { name: 'Sculpt',        cat: 'clases', strong: '#9A3D2D', bg: '#F6E5DE', line: '#E9C9BD', ink: '#2E1B22', empty: '#CF9586' },
+      yogaV:  { name: 'Yoga Vinyasa',  cat: 'clases', strong: '#6F6120', bg: '#F3EED8', line: '#E2D9AE', ink: '#2E1B22', empty: '#BBAC6E' },
+      yogaA:  { name: 'Yoga Ashtanga', cat: 'clases', strong: '#6F6120', bg: '#F3EED8', line: '#E2D9AE', ink: '#2E1B22', empty: '#BBAC6E' },
+      flex:   { name: 'Flex',          cat: 'clases', strong: '#3F5C59', bg: '#E4ECEA', line: '#C8D7D4', ink: '#16261A', empty: '#8FA9A5' },
+      abs:    { name: 'Power Abs',     cat: 'clases', strong: '#4E6018', bg: '#ECF0DC', line: '#D6DEB5', ink: '#16261A', empty: '#A3B272' },
+      salsa:  { name: 'Salsa',         cat: 'salsa',  strong: '#F6F0E4', bg: '#2E1B22', line: '#2E1B22', ink: '#F6F0E4', empty: 'rgba(246,240,228,.5)' }
+    };
+    const RAW = [
+      [0,'07:00',50,'mat','Ana',4,1],   [0,'08:00',50,'barre','Mariana',5,2], [0,'09:00',50,'sculpt','Sofía',2,0],
+      [0,'18:00',50,'yogaV','Valeria',3,1], [0,'19:00',50,'sculpt','Sofía',0,0,'cancelada'], [0,'20:00',60,'salsa','Pau',6,0],
+      [1,'07:00',50,'barre','Ana',3,2], [1,'08:00',50,'mat','Sofía',5,1], [1,'09:00',50,'flex','Valeria',1,0],
+      [1,'18:00',50,'abs','Mariana',2,1], [1,'19:00',50,'mat','Ana',6,1], [1,'20:00',60,'salsa','Pau',4,0],
+      [2,'07:00',50,'mat','Ana',3,1], [2,'08:00',50,'barre','Ana',4,1], [2,'09:00',50,'yogaA','Valeria',2,0],
+      [2,'18:00',50,'sculpt',null,1,0], [2,'19:00',50,'barre','Mariana',5,1], [2,'20:00',60,'salsa','Pau',5,0],
+      [3,'07:00',50,'barre','Ana',2,1], [3,'08:00',50,'mat','Sofía',4,0], [3,'09:00',50,'sculpt','Sofía',3,2],
+      [3,'18:00',50,'yogaV','Valeria',2,0], [3,'19:00',50,'abs','Mariana',4,2], [3,'20:00',60,'salsa','Pau',3,0],
+      [4,'07:00',50,'mat','Ana',1,1], [4,'08:00',50,'barre','Mariana',3,1], [4,'09:00',50,'flex','Valeria',2,0],
+      [4,'18:00',50,'barre','Ana',2,0], [4,'19:00',50,'sculpt','Sofía',1,0],
+      [5,'08:00',50,'barre','Mariana',5,2], [5,'09:00',50,'mat','Ana',4,2], [5,'10:00',60,'salsa','Pau',6,0],
+      [6,'09:00',50,'yogaV','Valeria',3,1]
+    ];
+    const DAYS = [['Lun',5],['Mar',6],['Mié',7],['Jue',8],['Vie',9],['Sáb',10],['Dom',11]];
+    const DAY_LONG = ['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
+    const COACHES = ['Ana','Mariana','Sofía','Valeria','Pau'];
+    const TODAY = 2;
+    const H = 76, BAND = 32, M0 = 420, M1 = 660, E0 = 1080;
+    const yOf = (m) => m < M1 ? (m - M0) / 60 * H : (M1 - M0) / 60 * H + BAND + (m - E0) / 60 * H;
+    const toMin = (t) => { const p = t.split(':'); return Number(p[0]) * 60 + Number(p[1]); };
+    const fmt = (m) => Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0');
+    const plural = (n, one, many) => n === 1 ? one : many;
+
+    const FP = { 2: 1, 7: 1, 26: 2, 30: 1 };
+    const over = s.over || {};
+    const classes = RAW.map((r, id) => {
+      const o = over[id] || {};
+      return {
+        id, day: r[0], start: toMin(r[1]) + (o.shift || 0), dur: r[2],
+        type: o.type || r[3], coach: o.coach !== undefined ? o.coach : r[4],
+        app: r[5], tp: r[6], fp: FP[id] || 0, cancelled: !!o.cancelled || r[7] === 'cancelada'
+      };
+    });
+
+    const preset = classes.filter(c => c.coach === 'Ana' && c.type === 'barre').map(c => c.id);
+    const mode = s.mode ?? (inicio === 'varias' ? 'select' : 'normal');
+    const isSelect = mode === 'select';
+    const sel = s.sel ?? (inicio === 'varias' ? preset : []);
+    const selSet = new Set(sel);
+    const pop = s.pop !== undefined ? s.pop : (inicio === 'varias' ? 'coach' : null);
+    const prog = s.prog || 'todo';
+    const coachF = s.coachF || 'Todas';
+    const visible = (c) => (prog === 'todo' || TYPES[c.type].cat === prog) && (coachF === 'Todas' || c.coach === coachF);
+
+    const toggle = (id) => {
+      if (!isSelect) return;
+      const cur = new Set(sel);
+      if (cur.has(id)) cur.delete(id); else cur.add(id);
+      this.setState({ sel: Array.from(cur), anchor: id, toast: null });
+    };
+
+    const card = (c) => {
+      const t = TYPES[c.type];
+      const on = selSet.has(c.id);
+      const seats = [];
+      for (let i = 0; i < 7; i++) {
+        if (i < c.app) seats.push({ fill: t.strong, ring: t.strong });
+        else if (i < c.app + c.tp) seats.push({ fill: '#26D07C', ring: '#0F7A45' });
+        else if (i < c.app + c.tp + c.fp) seats.push({ fill: '#5A8AD0', ring: '#2F5BA8' });
+        else seats.push({ fill: 'transparent', ring: t.empty });
+      }
+      const taken = c.app + c.tp + c.fp;
+      const noCoach = !c.coach;
+      return {
+        top: Math.round(yOf(c.start)) + 2, h: Math.round(c.dur / 60 * H) - 4,
+        bg: t.bg, line: on ? '#2A4E36' : t.line, ink: t.ink,
+        name: t.name, time: fmt(c.start),
+        coachLabel: noCoach ? 'Sin coach asignada' : c.coach,
+        coachInk: noCoach ? (c.type === 'salsa' ? '#F2B8AC' : '#8E3426') : 'inherit',
+        coachWeight: noCoach ? 600 : 400,
+        seats, count: taken >= 7 ? 'Lleno' : taken + '/7', countWeight: taken >= 7 ? 700 : 500,
+        isActive: !c.cancelled, isCancelled: c.cancelled,
+        op: c.cancelled ? 0.5 : 1, strike: c.cancelled ? 'line-through' : 'none',
+        ring: on ? '0 0 0 2px #2A4E36' : 'none',
+        showCheck: isSelect && !c.cancelled, checkBg: on ? '#2A4E36' : '#FCF8EF', checkRing: on ? '#2A4E36' : '#9C8E80', checked: on,
+        pressed: isSelect ? on : undefined,
+        aria: t.name + ', ' + DAY_LONG[c.day] + ' ' + fmt(c.start) + ', ' + (c.coach || 'sin coach') + ', ' + taken + ' de 7 lugares',
+        toggle: () => { if (!c.cancelled) toggle(c.id); }
+      };
+    };
+
+    const days = DAYS.map((d, i) => {
+      const list = classes.filter(c => c.day === i && visible(c)).sort((a, b) => a.start - b.start);
+      const active = list.filter(c => !c.cancelled);
+      const free = active.reduce((t, c) => t + Math.max(0, 7 - c.app - c.tp - c.fp), 0);
+      return {
+        dow: d[0], num: d[1], isToday: i === TODAY,
+        headBg: i === TODAY ? '#EEF3EC' : '#FCF8EF',
+        colBg: i === TODAY ? '#F8FAF4' : 'transparent',
+        numInk: i === TODAY ? '#2A4E36' : '#2E1B22',
+        cursor: isSelect ? 'pointer' : 'default',
+        aria: isSelect ? 'Seleccionar todo el ' + DAY_LONG[i] : DAY_LONG[i] + ' ' + d[1],
+        summary: active.length ? active.length + ' clases · ' + free + ' libres' : 'Sin clases',
+        nowTop: Math.round(yOf(8 * 60 + 25)),
+        pick: () => {
+          if (!isSelect) return;
+          const ids = active.map(c => c.id);
+          const cur = new Set(sel);
+          const all = ids.length > 0 && ids.every(x => cur.has(x));
+          ids.forEach(x => { if (all) cur.delete(x); else cur.add(x); });
+          this.setState({ sel: Array.from(cur), toast: null });
+        },
+        classes: list.map(card)
+      };
+    });
+
+    const hours = [420, 480, 540, 600, 1080, 1140, 1200].map(m => ({ label: fmt(m), top: Math.round(yOf(m)) }));
+    const activeAll = classes.filter(c => !c.cancelled && visible(c));
+    const freeAll = activeAll.reduce((t, c) => t + Math.max(0, 7 - c.app - c.tp - c.fp), 0);
+    const tpAll = activeAll.reduce((t, c) => t + c.tp + c.fp, 0);
+
+    const selCls = classes.filter(c => selSet.has(c.id)).sort((a, b) => a.day - b.day || a.start - b.start);
+    const n = selCls.length;
+    const appN = selCls.reduce((t, c) => t + c.app, 0);
+    const tpN = selCls.reduce((t, c) => t + c.tp, 0);
+    const when = (c) => DAYS[c.day][0].toLowerCase() + ' ' + fmt(c.start);
+    const selTypes = Array.from(new Set(selCls.map(c => c.type)));
+    const selList = n === 0 ? 'Ninguna clase seleccionada' :
+      selTypes.length === 1 ? TYPES[selTypes[0]].name + ' · ' + selCls.map(when).join(', ') :
+      selCls.map(c => TYPES[c.type].name + ' ' + when(c)).join(', ');
+    const nClases = n + ' ' + plural(n, 'clase', 'clases');
+
+    const anchorId = s.anchor ?? (sel.length ? sel[sel.length - 1] : 13);
+    const anchor = classes[anchorId];
+    const shortcutDefs = [];
+    if (anchor) {
+      shortcutDefs.push({ label: 'Mismo horario (' + fmt(anchor.start) + ')', f: c => c.start === anchor.start });
+      if (anchor.coach) shortcutDefs.push({ label: 'Las de ' + anchor.coach, f: c => c.coach === anchor.coach });
+      shortcutDefs.push({ label: 'Todas las ' + TYPES[anchor.type].name, f: c => c.type === anchor.type });
+      shortcutDefs.push({ label: 'Todo el ' + DAY_LONG[anchor.day], f: c => c.day === anchor.day });
+    }
+    const shortcuts = shortcutDefs.map(d => ({
+      label: d.label,
+      run: () => this.setState({ sel: classes.filter(c => !c.cancelled && visible(c) && d.f(c)).map(c => c.id), toast: null })
+    }));
+
+    const coachPick = s.coachPick ?? 'Sofía';
+    const currentCoaches = Array.from(new Set(selCls.map(c => c.coach).filter(Boolean)));
+    const coachOpts = COACHES.map(name => {
+      const load = classes.filter(c => c.coach === name && !c.cancelled).length;
+      const clash = selCls.filter(sc => classes.some(o => o.coach === name && !o.cancelled && !selSet.has(o.id) && o.day === sc.day && o.start < sc.start + sc.dur && sc.start < o.start + o.dur));
+      const isCurrent = currentCoaches.length === 1 && currentCoaches[0] === name;
+      const on = coachPick === name && !isCurrent;
+      return {
+        name, ini: name[0], on, disabled: isCurrent, op: isCurrent ? 0.55 : 1,
+        note: isCurrent ? 'Coach actual de estas clases' :
+          clash.length ? 'Ocupada a esa hora en ' + clash.length + ' de ' + n :
+          (n === 1 ? 'Libre en ese horario' : 'Libre en los ' + n + ' horarios') + ' · ' + load + ' clases esta semana',
+        noteInk: clash.length ? '#8E3426' : '#6B554D',
+        border: on ? '#2A4E36' : '#E2DCCB', bg: on ? '#EEF3EC' : '#FCF8EF', dot: on ? '#2A4E36' : 'transparent',
+        pick: () => this.setState({ coachPick: name })
+      };
+    });
+
+    const minCap = selCls.reduce((m, c) => Math.max(m, c.tp), 0);
+    const capMaxCls = selCls.find(c => c.tp === minCap);
+    const cap = Math.max(s.cap ?? 6, minCap);
+
+    const shift = s.shift ?? 30;
+    const newType = s.newType ?? 'mismo';
+    const SHIFTS = [[-60, '−1 h'], [-30, '−30 min'], [0, 'Misma hora'], [30, '+30 min'], [60, '+1 h']];
+
+    const applyOver = (fn, msg, canUndo) => {
+      const next = Object.assign({}, over);
+      selCls.forEach(c => { next[c.id] = Object.assign({}, next[c.id] || {}, fn(c)); });
+      this.setState({ prevOver: over, over: next, pop: null, sel: [], toast: msg, canUndo });
+    };
+    const openPop = (k) => () => this.setState({ pop: pop === k ? null : k, toast: null });
+    const barBg = (k) => pop === k ? '#2A4E36' : 'transparent';
+
+    return {
+      isNormal: !isSelect, isSelect,
+      selectBtn: isSelect
+        ? { label: 'Terminar selección', bg: '#2A4E36', ink: '#FCF8EF', border: '#2A4E36', run: () => this.setState({ mode: 'normal', sel: [], pop: null, toast: null }) }
+        : { label: 'Seleccionar varias', bg: '#FCF8EF', ink: '#2E1B22', border: '#D6D5C2', run: () => this.setState({ mode: 'select', toast: null }) },
+      progOpts: [['todo', 'Todo'], ['clases', 'Clases'], ['salsa', 'Salsa']].map(p => ({
+        label: p[1], on: prog === p[0], bg: prog === p[0] ? '#FCF8EF' : 'transparent',
+        weight: prog === p[0] ? 600 : 500, shadow: prog === p[0] ? '0 1px 2px rgba(42,33,24,.14)' : 'none',
+        pick: () => this.setState({ prog: p[0] })
+      })),
+      coachF, coachFilterOpts: ['Todas'].concat(COACHES),
+      onCoachF: (e) => this.setState({ coachF: e.target.value }),
+      stats: activeAll.length + ' clases · ' + freeAll + ' lugares libres · ' + tpAll + ' socias',
+      hours, days, shortcuts,
+      clearSel: () => this.setState({ sel: [], pop: null, toast: null }),
+
+      selTitle: n === 0 ? 'Ninguna clase' : nClases,
+      selSub: n === 0 ? 'Toca una clase para empezar' : (appN + tpN) + ' inscritas · ' + tpN + ' de TotalPass',
+      selList, noSel: n === 0, barOp: n === 0 ? 0.45 : 1,
+      barBg: { coach: barBg('coach'), cupo: barBg('cupo'), mover: barBg('mover'), cancel: barBg('cancel') },
+      openCoach: openPop('coach'), openCupo: openPop('cupo'), openMover: openPop('mover'), openCancel: openPop('cancel'),
+      closePop: () => this.setState({ pop: null }),
+      endSelect: () => this.setState({ mode: 'normal', sel: [], pop: null, toast: null }),
+      popCoach: isSelect && pop === 'coach' && n > 0,
+      popCupo: isSelect && pop === 'cupo' && n > 0,
+      popMover: isSelect && pop === 'mover' && n > 0,
+      popCancel: isSelect && pop === 'cancel' && n > 0,
+      hasToast: !!s.toast, toast: s.toast || '', canUndo: !!s.canUndo,
+      undo: () => this.setState({ over: s.prevOver || {}, toast: null, canUndo: false }),
+
+      coachOpts,
+      coachImpactApp: appN ? 'Avisamos del cambio a ' + appN + ' ' + plural(appN, 'alumna', 'alumnas') + ' por la app.' : 'No hay alumnas inscritas que avisar.',
+      coachImpactTp: tpN ? 'Se actualiza la coach; ' + plural(tpN, 'la socia conserva', 'las ' + tpN + ' socias conservan') + ' su lugar.' : 'Se actualiza la coach en TotalPass.',
+      coachCta: 'Cambiar a ' + coachPick + ' en ' + nClases,
+      applyCoach: () => applyOver(() => ({ coach: coachPick }), 'Listo: ' + nClases + ' ahora con ' + coachPick + '. Avisamos a ' + appN + ' ' + plural(appN, 'alumna', 'alumnas') + '.', true),
+
+      cap, capAtMin: cap <= minCap, capAtMax: cap >= 7,
+      capDown: () => this.setState({ cap: Math.max(minCap, cap - 1) }),
+      capUp: () => this.setState({ cap: Math.min(7, cap + 1) }),
+      capLocal: 7 - cap === 0 ? 'Ningún lugar queda solo para Casa Shé.' : 'Quedan ' + (7 - cap) + ' solo para alumnas de Casa Shé.',
+      capNote: minCap > 0 ? 'No puede bajar de ' + minCap + ': ' + when(capMaxCls) + ' ya tiene ' + minCap + ' ' + plural(minCap, 'socia', 'socias') + ' inscritas.' : 'Ninguna tiene socias todavía. En 0 la clase deja de ofrecerse en TotalPass.',
+      cupoCta: 'Guardar en ' + nClases,
+      applyCupo: () => this.setState({ pop: null, toast: 'Guardado: ' + cap + ' lugares para TotalPass en ' + nClases + '.', canUndo: false }),
+
+      shiftOpts: SHIFTS.map(o => ({
+        label: o[1], on: o[0] === shift,
+        bg: o[0] === shift ? '#2A4E36' : '#FCF8EF', ink: o[0] === shift ? '#FCF8EF' : '#2E1B22', border: o[0] === shift ? '#2A4E36' : '#D6D5C2',
+        pick: () => this.setState({ shift: o[0] })
+      })),
+      newType, typeOpts: [{ key: 'mismo', name: 'Misma clase' }].concat(Object.keys(TYPES).map(k => ({ key: k, name: TYPES[k].name }))),
+      onType: (e) => this.setState({ newType: e.target.value }),
+      moveWarn: shift !== 0 && tpN > 0,
+      moveWarnText: 'Mover la hora borra y vuelve a publicar la clase en TotalPass: ' + plural(tpN, 'la socia inscrita pierde', 'las ' + tpN + ' socias inscritas pierden') + ' su lugar y TotalPass les avisa. Cambiar solo la clase o la coach no les quita el lugar.',
+      moveApp: appN ? 'Avisamos del cambio a ' + appN + ' ' + plural(appN, 'alumna', 'alumnas') + '; conservan su lugar.' : '',
+      moveDisabled: shift === 0 && newType === 'mismo', moveOp: shift === 0 && newType === 'mismo' ? 0.45 : 1,
+      moveCta: shift === 0 && newType === 'mismo' ? 'Elige un cambio' : 'Aplicar a ' + nClases,
+      applyMove: () => applyOver(c => {
+        const prev = over[c.id] || {};
+        const r = { shift: (prev.shift || 0) + shift };
+        if (newType !== 'mismo') r.type = newType;
+        return r;
+      }, 'Listo: ' + nClases + ' ' + plural(n, 'actualizada', 'actualizadas') + '.', true),
+
+      cancelCta: 'Cancelar ' + nClases,
+      cancelApp: appN ? appN + ' ' + plural(appN, 'alumna recupera su crédito y recibe', 'alumnas recuperan su crédito y reciben') + ' aviso.' : 'No hay alumnas inscritas.',
+      cancelTp: tpN ? 'Se retiran de TotalPass; ' + plural(tpN, 'la socia recibe', 'las ' + tpN + ' socias reciben') + ' aviso de TotalPass.' : 'Se retiran de TotalPass para que nadie más reserve.',
+      applyCancel: () => applyOver(() => ({ cancelled: true }), nClases + ' ' + plural(n, 'cancelada', 'canceladas') + '. Siguen en el calendario, marcadas.', false)
+    };
+  }
+}
+</script>
+</body>
+</html>

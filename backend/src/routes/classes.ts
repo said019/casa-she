@@ -14,13 +14,19 @@ import { cancelClassWithRefunds } from '../lib/cancel-class.js';
 import { z } from 'zod';
 import { optionalAuth } from '../middleware/auth.js';
 import { capacityError } from '../lib/schedule.js';
+import { errorDeCupoAlEditar } from '../lib/class-capacity.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { setTotalpassCap } from '../lib/totalpass/caps.js';
 import { dispararRetiroTotalpass } from '../lib/totalpass/retire.js';
 import { marcarResyncTotalpass, dispararResyncTotalpass } from '../lib/totalpass/resync.js';
 import { copiarSemana, diasEntre } from '../lib/copy-week.js';
+import { CANALES_DE_CLASE_SQL } from '../lib/class-channels.js';
 import { intensitySchema } from '../lib/classIntensity.js';
+import { buscarCandidatas, ClaseNoEncontradaError } from '../lib/inscripcion.js';
+import { toDbClient } from '../lib/membershipSelection.js';
 import { isOctoberManagedDate } from '../data/october2026.js';
+import { LoteSchema, procesarLote, enviarAvisosDelLote, ErrorLote } from '../lib/classes-bulk.js';
+import { avisarAlumnasDeLaApp, avisoCambioDeHorario, horarioDeClase } from '../lib/avisos-clase.js';
 
 const router = Router();
 
@@ -85,7 +91,9 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
         ci.max_spots AS totalpass_spots,
         -- Cuántos de esos lugares ya ocupó TotalPass: permite marcar la clase en
         -- la rejilla sin tener que abrirla una por una.
-        COALESCE(ci.booked_spots, 0) AS totalpass_booked
+        COALESCE(ci.booked_spots, 0) AS totalpass_booked,
+        -- Una entrada por plataforma (channel_inventory): pinta los lugares de cada una.
+        ${CANALES_DE_CLASE_SQL} AS channels
       FROM classes c
       JOIN class_types ct ON c.class_type_id = ct.id
       JOIN instructors i ON c.instructor_id = i.id
@@ -149,9 +157,6 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
     }
 });
 
-// ============================================
-// POST /api/classes/bulk-delete - Delete empty classes in a date range
-// ============================================
 // ============================================
 // FREE CLASSES — Opening Day & cortesías
 // ============================================
@@ -280,27 +285,87 @@ router.post('/bulk-mark-free', authenticate, requireRole('admin', 'super_admin')
     }
 });
 
-router.post('/bulk-delete', authenticate, requireRole('admin', 'super_admin'), async (req: Request, res: Response) => {
+// ============================================
+// POST /api/classes/bulk - Cambios en bloque: coach, cupo de TotalPass, mover/cambiar
+// tipo, cancelar. `vistaPrevia: true` evalúa sin escribir. Al aplicar, cualquier clase
+// bloqueada → 409 con la misma respuesta y sin cambios. Todo en UNA transacción; avisos,
+// correos y barridos de TotalPass corren una sola vez después del COMMIT.
+// ============================================
+router.post('/bulk', authenticate, requireElevated, async (req: Request, res: Response) => {
+    const validation = LoteSchema.safeParse(req.body);
+    if (!validation.success) {
+        return res.status(400).json({ error: 'Datos inválidos', details: validation.error.flatten().fieldErrors });
+    }
+    const entrada = validation.data;
+
+    // Recepción queda limitada a su sucursal asignada (si tiene una).
+    let sucursalPermitida: string | null = null;
+    // OJO: `authenticate` mapea recepción → rol 'admin'; el rol real es `accountRole`.
+    // La recepción maestra ve todas las sucursales (igual que en el resto del panel).
+    if (req.user?.accountRole === 'reception') {
+        const fila = await queryOne<{ default_facility_id: string | null; is_reception_master: boolean }>(
+            `SELECT default_facility_id, is_reception_master FROM users WHERE id = $1`, [req.user.userId]);
+        sucursalPermitida = fila?.is_reception_master ? null : (fila?.default_facility_id ?? null);
+    }
+
+    const client = await pool.connect();
     try {
-        const { startDate, endDate } = req.body;
-
-        if (!startDate || !endDate) {
-            return res.status(400).json({ error: 'Se requieren startDate y endDate' });
+        await client.query('BEGIN');
+        const { respuesta, trasCommit } = await procesarLote(client, entrada, { userId: req.user!.userId, sucursalPermitida });
+        if (!respuesta.aplicado) {
+            await client.query('ROLLBACK');
+            return res.status(entrada.vistaPrevia ? 200 : 409).json(respuesta);
         }
+        await client.query('COMMIT');
 
-        const result = await query<{ id: string }>(
-            `DELETE FROM classes
-             WHERE date >= $1 AND date <= $2
-               AND current_bookings = 0
-               AND status != 'cancelled'
-             RETURNING id`,
-            [startDate, endDate]
-        );
-
-        res.json({ deleted: result.length, message: `${result.length} clases eliminadas` });
+        void enviarAvisosDelLote(trasCommit).catch((e) => console.error('[classes-bulk] avisos fallaron:', e));
+        if (trasCommit.retiro) dispararRetiroTotalpass();
+        if (trasCommit.resync) dispararResyncTotalpass();
+        await logAction(query, {
+            adminUserId: req.user!.userId,
+            actionType: `classes_bulk_${entrada.accion}`,
+            entityType: 'class',
+            description: `Cambio en bloque (${entrada.accion}) en ${entrada.classIds.length} clases`,
+            oldData: { clases: trasCommit.antes },
+            newData: {
+                classIds: entrada.classIds, instructorId: entrada.instructorId, canal: entrada.canal, lugares: entrada.lugares,
+                minutos: entrada.minutos, classTypeId: entrada.classTypeId, motivo: entrada.motivo, resumen: respuesta.resumen,
+            },
+            req,
+        });
+        return res.json(respuesta);
     } catch (error) {
-        console.error('Bulk delete classes error:', error);
-        res.status(500).json({ error: 'Error al eliminar clases' });
+        await client.query('ROLLBACK').catch(() => { /* best-effort */ });
+        if (error instanceof ErrorLote) return res.status(error.status).json({ error: error.message });
+        console.error('Bulk classes error:', error);
+        return res.status(500).json({ error: 'No se aplicó ningún cambio: falló el servidor.' });
+    } finally {
+        client.release();
+    }
+});
+
+// GET /api/classes/:id/candidatas?q= - Buscador de alumnas para inscribir (staff).
+// Misma regla que admin-book (lib/inscripcion.ts). Recepción solo en clases de su sucursal.
+router.get('/:id/candidatas', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
+    try {
+        const idOk = z.string().uuid().safeParse(req.params.id);
+        if (!idOk.success) return res.status(404).json({ error: 'Clase no encontrada' });
+        const cls = await queryOne<{ facility_id: string | null }>(`SELECT facility_id FROM classes WHERE id = $1`, [req.params.id]);
+        if (!cls) return res.status(404).json({ error: 'Clase no encontrada' });
+        if (req.user?.role === 'reception') {
+            const scope = await resolveRequestFacility(req.user, null);
+            if (scope.kind === 'error') return res.status(scope.status).json({ error: scope.message });
+            if (scope.kind === 'facility' && cls.facility_id !== scope.facilityId) {
+                return res.status(403).json({ error: 'Esa clase no es de tu sucursal asignada.' });
+            }
+        }
+        const q = typeof req.query.q === 'string' ? req.query.q : '';
+        if (q.trim().length < 2) return res.json([]);
+        res.json(await buscarCandidatas(toDbClient(query), req.params.id, q));
+    } catch (e: any) {
+        if (e instanceof ClaseNoEncontradaError) return res.status(404).json({ error: e.message });
+        console.error('GET /classes/:id/candidatas error:', e.message);
+        res.status(500).json({ error: 'Error al buscar alumnas' });
     }
 });
 
@@ -815,16 +880,10 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
 
         const data = validation.data;
 
-        if (data.maxCapacity !== undefined) {
-            const ctRow = await queryOne<{ category: string }>(
-                data.classTypeId
-                    ? `SELECT category FROM class_types WHERE id = $1`
-                    : `SELECT ct.category FROM classes c JOIN class_types ct ON ct.id = c.class_type_id WHERE c.id = $1`,
-                [data.classTypeId ?? req.params.id]
-            );
-            const capErrPut = capacityError(ctRow?.category ?? 'multi', data.maxCapacity);
-            if (capErrPut) return res.status(400).json({ error: capErrPut });
-        }
+        // Cupo vs. categoría: también cuando solo cambia el tipo (el frontend manda
+        // únicamente lo que cambió, así que el cupo puede no venir).
+        const capErrPut = await errorDeCupoAlEditar(pool, id, data);
+        if (capErrPut) return res.status(400).json({ error: capErrPut });
 
         // Check class exists
         const existing = await queryOne('SELECT * FROM classes WHERE id = $1', [id]);
@@ -885,11 +944,18 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
         }
 
         values.push(id);
+        const horarioAntes = await horarioDeClase(id);
         const result = await queryOne(
             `UPDATE classes SET ${updates.join(', ')}, updated_at = NOW()
              WHERE id = $${paramCount} RETURNING *`,
             values
         );
+
+        // Cambió el día o la hora: avisar a las alumnas de la app (in-app + push), igual
+        // que los cambios en bloque. Sin esto la alumna llegaba a la hora vieja.
+        const horarioDespues = await horarioDeClase(id);
+        const avisoHorario = horarioAntes && horarioDespues ? avisoCambioDeHorario(horarioAntes, horarioDespues) : null;
+        if (avisoHorario) void avisarAlumnasDeLaApp(id, avisoHorario);
 
         // Propagar a TotalPass lo que la socia ve en su app: tipo (título), coach
         // (responsable), fecha y hora. Sin esto la socia seguía viendo los datos

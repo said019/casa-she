@@ -19,6 +19,7 @@ import { useToast } from '@/components/ui/use-toast';
 import api, { getErrorMessage } from '@/lib/api';
 import type { User } from '@/types/auth';
 import { ArrowLeft, UserPlus, UserCheck } from 'lucide-react';
+import { BotonAccesoWhatsApp } from '@/components/clients/BotonAccesoWhatsApp';
 import { NewClientForm } from '@/components/admin/members/NewClientForm';
 import { ManualClientForm } from '@/components/admin/migration/ManualClientForm';
 import { MigrationConfirmation } from '@/components/admin/migration/MigrationConfirmation';
@@ -125,6 +126,18 @@ export default function MemberNew() {
                   </p>
                   <p className="text-sm text-success">
                     <strong>Teléfono:</strong> {newClientResult.user.phone}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <BotonAccesoWhatsApp
+                    userId={newClientResult.user.id}
+                    nombre={newClientResult.user.display_name}
+                    telefono={newClientResult.user.phone}
+                    variant="default"
+                  />
+                  <p className="text-xs text-success">
+                    Le llega un link para crear su propia contraseña. Vence en 7 días.
                   </p>
                 </div>
 

@@ -4387,6 +4387,23 @@ async function runStartupMigrations(): Promise<void> {
         console.error('Migration 120 error (el arranque continúa; se reintenta en el próximo):', e);
     }
 
+    // ---- Migration 121: access_links — links de acceso por WhatsApp ----
+    // Token opaco (solo se guarda su sha256), 7 días, un uso, revocable. Ver lib/accessLinks.ts.
+    try {
+        await query(`CREATE TABLE IF NOT EXISTS access_links (
+            id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token_hash  TEXT NOT NULL UNIQUE,
+            created_by  UUID REFERENCES users(id),
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            expires_at  TIMESTAMPTZ NOT NULL,
+            used_at     TIMESTAMPTZ,
+            revoked_at  TIMESTAMPTZ
+        )`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_access_links_user ON access_links(user_id)`);
+        console.log('  ✅ Migration 121: access_links');
+    } catch (e) { console.error('Migration 121 error:', e); }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();

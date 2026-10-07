@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Calendario en lista</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&amp;family=Instrument+Serif&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; min-height: 1180px; box-sizing: border-box; background: #F6F0E4; color: #2E1B22; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 14px; line-height: 1.4; padding-bottom: 130px">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 12px 32px; background: #FCF8EF; border-bottom: 1px solid #D6D5C2">
+    <div style="display: flex; align-items: baseline; gap: 12px">
+      <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 26px; line-height: 1; color: #2A4E36">Casa Shé</span>
+      <span style="font-size: 13px; color: #6B554D">Recepción</span>
+    </div>
+    <nav aria-label="Secciones" style="display: flex; gap: 4px; flex-wrap: wrap">
+      <a href="#" style="padding: 8px 12px; border-radius: 8px; color: #6B554D; text-decoration: none">Hoy</a>
+      <a href="#" aria-current="page" style="padding: 8px 12px; border-radius: 8px; background: #E6EDE4; color: #2A4E36; font-weight: 600; text-decoration: none">Calendario</a>
+      <a href="#" style="padding: 8px 12px; border-radius: 8px; color: #6B554D; text-decoration: none">Alumnas</a>
+      <a href="#" style="padding: 8px 12px; border-radius: 8px; color: #6B554D; text-decoration: none">Check-in</a>
+    </nav>
+  </header>
+
+  <div style="max-width: 1440px; margin: 0 auto; padding: 22px 32px 0; box-sizing: border-box">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap">
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+        <div style="display: flex; gap: 4px">
+          <button type="button" aria-label="Semana anterior" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; cursor: pointer; display: grid; place-items: center; font: inherit">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+          </button>
+          <button type="button" aria-label="Semana siguiente" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; cursor: pointer; display: grid; place-items: center; font: inherit">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
+          </button>
+        </div>
+        <button type="button" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; cursor: pointer; font: inherit; font-weight: 500">Hoy</button>
+        <h1 style="margin: 0 0 0 10px; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 40px; line-height: 1; color: #16261A">5 – 11 de octubre</h1>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+        <div role="group" aria-label="Vista" style="display: flex; background: #EFE8D8; border-radius: 12px; padding: 3px">
+          <a href="Main.dc.html" style="padding: 9px 16px; border-radius: 9px; color: #6B554D; text-decoration: none">Horas</a>
+          <span aria-current="true" style="padding: 9px 16px; border-radius: 9px; background: #FCF8EF; font-weight: 600; box-shadow: 0 1px 2px rgba(42,33,24,.14)">Lista</span>
+        </div>
+        <button type="button" style="height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; cursor: pointer; font: inherit; font-weight: 500">Copiar semana</button>
+        <button type="button" style="height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid #2A4E36; background: #2A4E36; color: #FCF8EF; cursor: pointer; font: inherit; font-weight: 600; display: flex; align-items: center; gap: 8px">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+          Nueva clase
+        </button>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 18px; min-height: 48px">
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+        <div role="group" aria-label="Programa" style="display: flex; background: #EFE8D8; border-radius: 999px; padding: 3px">
+          <button type="button" aria-pressed="true" style="padding: 8px 16px; border-radius: 999px; border: 0; background: #FCF8EF; color: #2E1B22; font: inherit; font-weight: 600; box-shadow: 0 1px 2px rgba(42,33,24,.14)">Todo</button>
+          <button type="button" aria-pressed="false" style="padding: 8px 16px; border-radius: 999px; border: 0; background: transparent; color: #2E1B22; font: inherit; font-weight: 500">Clases</button>
+          <button type="button" aria-pressed="false" style="padding: 8px 16px; border-radius: 999px; border: 0; background: transparent; color: #2E1B22; font: inherit; font-weight: 500">Salsa</button>
+        </div>
+        <label style="display: flex; align-items: center; gap: 8px; color: #6B554D">
+          Buscar
+          <input type="search" placeholder="Clase, coach u hora" style="height: 40px; width: 220px; padding: 0 12px; border-radius: 10px; border: 1px solid #D6D5C2; background: #FCF8EF; color: #2E1B22; font: inherit">
+        </label>
+      </div>
+      <span style="font-size: 13px; color: #6B554D">Marca la casilla para elegir varias. Mayús + clic elige un rango.</span>
+    </div>
+
+    <div style="margin-top: 16px; overflow-x: auto; border: 1px solid #D6D5C2; border-radius: 18px; background: #FCF8EF">
+      <table style="width: 100%; min-width: 1000px; border-collapse: collapse; font-size: 14px">
+        <thead>
+          <tr style="text-align: left; color: #6B554D; font-size: 12.5px">
+            <th scope="col" style="width: 52px; padding: 12px 0 12px 18px; font-weight: 500"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Elegir</span></th>
+            <th scope="col" style="padding: 12px 10px; font-weight: 500; width: 110px">Hora</th>
+            <th scope="col" style="padding: 12px 10px; font-weight: 500">Clase</th>
+            <th scope="col" style="padding: 12px 10px; font-weight: 500">Coach</th>
+            <th scope="col" style="padding: 12px 10px; font-weight: 500">Lugares</th>
+            <th scope="col" style="padding: 12px 10px; font-weight: 500"><img src="/_blob/ed48d6778ac4054ef90b068af847d1e1" alt="TotalPass" style="height: 10px; width: auto; display: block"></th>
+            <th scope="col" style="padding: 12px 10px; font-weight: 500">Estado</th>
+            <th scope="col" style="padding: 12px 18px 12px 10px; font-weight: 500; text-align: right"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Acciones</span></th>
+          </tr>
+        </thead>
+        <sc-for list="{{groups}}" as="g" hint-placeholder-count="7">
+          <tbody>
+            <tr style="background: {{g.bg}}; border-top: 1px solid #D6D5C2">
+              <td style="padding: 10px 0 10px 18px">
+                <sc-if value="{{g.open}}" hint-placeholder-val="{{true}}">
+                  <span aria-hidden="true" style="display: block; width: 18px; height: 18px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px #9C8E80; background: #FCF8EF"></span>
+                </sc-if>
+              </td>
+              <td colspan="7" style="padding: 10px 10px">
+                <span style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap">
+                  <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 22px; line-height: 1; color: {{g.ink}}">{{g.title}}</span>
+                  <sc-if value="{{g.isToday}}" hint-placeholder-val="{{false}}"><span style="font-size: 11px; font-weight: 600; color: #FCF8EF; background: #2A4E36; border-radius: 999px; padding: 2px 8px">Hoy</span></sc-if>
+                  <span style="font-size: 13px; color: #6B554D">{{g.summary}}</span>
+                  <sc-if value="{{g.closed}}" hint-placeholder-val="{{false}}"><span style="margin-left: auto; font-size: 13px; color: #2A4E36; font-weight: 600">Ver clases</span></sc-if>
+                </span>
+              </td>
+            </tr>
+            <sc-for list="{{g.rows}}" as="r" hint-placeholder-count="6">
+              <tr style="border-top: 1px solid #ECE6D6; background: {{r.bg}}">
+                <td style="padding: 10px 0 10px 18px">
+                  <span role="checkbox" aria-checked="{{r.on}}" aria-label="{{r.aria}}" style="display: grid; place-items: center; width: 18px; height: 18px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px {{r.boxRing}}; background: {{r.boxBg}}">
+                    <sc-if value="{{r.on}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FCF8EF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></sc-if>
+                  </span>
+                </td>
+                <td style="padding: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; text-decoration: {{r.strike}}; color: {{r.mute}}">{{r.time}}</td>
+                <td style="padding: 10px">
+                  <span style="display: flex; align-items: center; gap: 8px; text-decoration: {{r.strike}}; color: {{r.mute}}">
+                    <span style="width: 10px; height: 10px; border-radius: 3px; background: {{r.color}}; flex: none"></span>
+                    <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 18px; line-height: 1">{{r.name}}</span>
+                  </span>
+                </td>
+                <td style="padding: 10px; color: {{r.coachInk}}; font-weight: {{r.coachWeight}}">{{r.coach}}</td>
+                <td style="padding: 10px">
+                  <sc-if value="{{r.isActive}}" hint-placeholder-val="{{true}}">
+                    <span style="display: flex; align-items: center; gap: 4px">
+                      <sc-for list="{{r.seats}}" as="s" hint-placeholder-count="7"><span style="width: 9px; height: 9px; border-radius: 50%; background: {{s.fill}}; box-shadow: inset 0 0 0 1.25px {{s.ring}}"></span></sc-for>
+                      <span style="margin-left: 8px; font-variant-numeric: tabular-nums; font-weight: 500">{{r.count}}</span>
+                    </span>
+                  </sc-if>
+                </td>
+                <td style="padding: 10px; font-variant-numeric: tabular-nums; color: {{r.mute}}">{{r.tp}}</td>
+                <td style="padding: 10px">
+                  <span style="display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; background: {{r.stBg}}; color: {{r.stInk}}">{{r.status}}</span>
+                </td>
+                <td style="padding: 10px 18px 10px 10px; text-align: right">
+                  <a href="Inscribir.dc.html" style="color: #2A4E36; font-weight: 600; text-decoration: none; padding: 8px 4px">Abrir</a>
+                </td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </sc-for>
+      </table>
+    </div>
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 28px; display: flex; justify-content: center; padding: 0 16px">
+    <div role="toolbar" aria-label="Acciones para las clases seleccionadas" style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: center; background: #16261A; color: #F6F0E4; border-radius: 20px; padding: 10px 10px 10px 20px; box-shadow: 0 24px 48px -20px rgba(22,38,26,.65)">
+      <div style="display: flex; flex-direction: column; margin-right: 12px">
+        <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 24px; line-height: 1">2 clases</span>
+        <span style="font-size: 12px; color: #C3CFC4">8 inscritas · 2 de TotalPass</span>
+      </div>
+      <button type="button" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: transparent; color: #F6F0E4; font: inherit; font-weight: 500">Cambiar coach</button>
+      <button type="button" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: transparent; color: #F6F0E4; font: inherit; font-weight: 500; display: flex; align-items: center; gap: 8px">Cupo <img src="/_blob/cc0c619f9fca05910cb6a88577c88465" alt="TotalPass" style="height: 10px; width: auto; display: block"></button>
+      <button type="button" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: transparent; color: #F6F0E4; font: inherit; font-weight: 500">Mover o cambiar clase</button>
+      <button type="button" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: transparent; color: #F2B8AC; font: inherit; font-weight: 500">Cancelar clases</button>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const T = {
+      mat: ['Pilates Mat', '#2A4E36'], barre: ['Barre', '#7A3550'], sculpt: ['Sculpt', '#9A3D2D'],
+      yogaV: ['Yoga Vinyasa', '#6F6120'], yogaA: ['Yoga Ashtanga', '#6F6120'], flex: ['Flex', '#3F5C59'],
+      abs: ['Power Abs', '#4E6018'], salsa: ['Salsa', '#2E1B22']
+    };
+    const row = (time, end, type, coach, app, tp, flag, on) => {
+      const taken = app + tp;
+      const cancelled = flag === 'cancelada';
+      const seats = [];
+      for (let i = 0; i < 7; i++) {
+        if (i < app) seats.push({ fill: T[type][1], ring: T[type][1] });
+        else if (i < taken) seats.push({ fill: '#26D07C', ring: '#0F7A45' });
+        else seats.push({ fill: 'transparent', ring: '#B8B09C' });
+      }
+      let status = 'Abierta', stBg = '#E6EDE4', stInk = '#2A4E36';
+      if (cancelled) { status = 'Cancelada'; stBg = '#EFE8D8'; stInk = '#6B554D'; }
+      else if (!coach) { status = 'Sin coach'; stBg = '#F7E1DC'; stInk = '#7E1E16'; }
+      else if (taken >= 7) { status = 'Llena'; stBg = '#2E1B22'; stInk = '#F6F0E4'; }
+      else if (taken >= 5) { status = 'Últimos lugares'; stBg = '#F4EFD9'; stInk = '#5E5220'; }
+      return {
+        time: time + '–' + end, name: T[type][0], color: T[type][1],
+        coach: coach || 'Sin coach asignada', coachInk: coach ? '#2E1B22' : '#8E3426', coachWeight: coach ? 400 : 600,
+        seats, count: taken + '/7', tp: cancelled ? '—' : tp + ' de 6',
+        isActive: !cancelled, strike: cancelled ? 'line-through' : 'none', mute: cancelled ? '#9C8E80' : '#2E1B22',
+        status, stBg, stInk,
+        on: !!on, bg: on ? '#EEF3EC' : 'transparent', boxBg: on ? '#2A4E36' : '#FCF8EF', boxRing: on ? '#2A4E36' : '#9C8E80',
+        aria: 'Elegir ' + T[type][0] + ' ' + time
+      };
+    };
+    const closed = (title, summary) => ({ title, summary, rows: [], open: false, closed: true, isToday: false, bg: '#F6F0E4', ink: '#6B554D' });
+    return {
+      groups: [
+        closed('Lunes 5', '6 clases · ya pasó'),
+        closed('Martes 6', '6 clases · ya pasó'),
+        {
+          title: 'Miércoles 7', summary: '6 clases · 19 lugares libres', open: true, closed: false, isToday: true, bg: '#EEF3EC', ink: '#2A4E36',
+          rows: [
+            row('7:00', '7:50', 'mat', 'Ana', 3, 1),
+            row('8:00', '8:50', 'barre', 'Ana', 4, 1, null, true),
+            row('9:00', '9:50', 'yogaA', 'Valeria', 2, 0),
+            row('18:00', '18:50', 'sculpt', null, 1, 0),
+            row('19:00', '19:50', 'barre', 'Mariana', 5, 1),
+            row('20:00', '21:00', 'salsa', 'Pau', 5, 0)
+          ]
+        },
+        {
+          title: 'Jueves 8', summary: '6 clases · 19 lugares libres', open: true, closed: false, isToday: false, bg: '#FCF8EF', ink: '#16261A',
+          rows: [
+            row('7:00', '7:50', 'barre', 'Ana', 2, 1, null, true),
+            row('8:00', '8:50', 'mat', 'Sofía', 4, 0),
+            row('9:00', '9:50', 'sculpt', 'Sofía', 3, 2),
+            row('18:00', '18:50', 'yogaV', 'Valeria', 2, 0),
+            row('19:00', '19:50', 'abs', 'Mariana', 4, 2),
+            row('20:00', '21:00', 'salsa', 'Pau', 3, 0)
+          ]
+        },
+        closed('Viernes 9', '5 clases · 22 lugares libres'),
+        closed('Sábado 10', '3 clases · 1 lugar libre'),
+        closed('Domingo 11', '1 clase · 3 lugares libres')
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

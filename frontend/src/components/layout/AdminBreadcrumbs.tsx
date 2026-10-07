@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Breadcrumb,
@@ -8,6 +8,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
+import { ChannelLogo } from '@/components/brands/ChannelLogo';
 
 const labelMap: Record<string, string> = {
   admin: 'Admin',
@@ -59,7 +60,12 @@ export function AdminBreadcrumbs() {
 
   const crumbs = segments.map((segment, index) => {
     const previous = segments[index - 1];
-    let label = labelMap[segment] || segment;
+    let label: ReactNode = labelMap[segment] || segment;
+
+    // TotalPass se nombra con su logo oficial, no con el slug.
+    if (segment === 'totalpass' && previous === 'settings') {
+      label = <ChannelLogo canal="totalpass" alto={10} />;
+    }
 
     if (isUuid(segment)) {
       label = previous === 'members' ? 'Perfil' : 'Detalle';

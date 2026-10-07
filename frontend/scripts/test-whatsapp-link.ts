@@ -1,7 +1,7 @@
 // Enlace de WhatsApp para escribirle a una alumna: casos borde de teléfono y mensaje.
 // Correr con: npx tsx scripts/test-whatsapp-link.ts
 import assert from 'node:assert/strict';
-import { enlaceWhatsApp } from '../src/lib/whatsapp.js';
+import { enlaceWhatsApp, enlaceAccesoWhatsApp, mensajeAccesoWhatsApp } from '../src/lib/whatsapp.js';
 
 const base = { nombre: 'Montserrat Rojas Pliego', clase: 'Barre', fecha: '2026-07-29', hora: '08:00' };
 
@@ -39,5 +39,30 @@ assert.ok(!/sobre tu clase/.test(soloFecha), 'sin hora no debe mencionar la clas
 // Sin nombre: el saludo no queda con un hueco.
 const sinNombre = decodeURIComponent(enlaceWhatsApp({ ...base, nombre: '', telefono: '2291044669' })!);
 assert.match(sinNombre, /^https:\/\/wa\.me\/522291044669\?text=Hola, te escribimos/);
+
+// --- Mensaje de acceso (Entrega 5) ---
+const url = 'https://casashe.mx/acceso/TOKEN_DE_PRUEBA';
+const acceso = { nombre: 'Daniela Pérez', clase: 'Barre', fecha: '2026-10-07', hora: '08:00', url };
+const enlaceAcceso = enlaceAccesoWhatsApp({ ...acceso, telefono: '2291044669' })!;
+assert.match(enlaceAcceso, /^https:\/\/wa\.me\/522291044669\?text=/);
+assert.equal(
+    decodeURIComponent(enlaceAcceso.split('?text=')[1]),
+    `Hola Daniela, te escribimos de Casa Shé. Ya tienes tu lugar en Barre el miércoles 7 de octubre a las 8:00. Crea tu contraseña aquí para ver tus clases y reservar desde tu celular: ${url}\nEl link vence en 7 días.`,
+);
+// La misma normalización de lada que enlaceWhatsApp.
+for (const t of ['+52 229 104 4669', '(229) 104-4669', '52 229 104 4669']) {
+    assert.equal(enlaceAccesoWhatsApp({ ...acceso, telefono: t })?.split('?')[0], 'https://wa.me/522291044669');
+}
+assert.match(enlaceAccesoWhatsApp({ ...acceso, telefono: '525538861972' })!, /wa\.me\/525538861972\?/);
+assert.match(enlaceAccesoWhatsApp({ ...acceso, telefono: '+1 555 123 4567' })!, /wa\.me\/15551234567\?/);
+for (const t of [null, undefined, '', '55 1234']) {
+    assert.equal(enlaceAccesoWhatsApp({ ...acceso, telefono: t as string }), null);
+}
+// Sin datos de clase: no se escribe "undefined" ni una frase a medias.
+const sinLugar = mensajeAccesoWhatsApp({ nombre: 'Ana', url });
+assert.ok(!/undefined|null|Ya tienes tu lugar/.test(sinLugar));
+assert.match(sinLugar, /^Hola Ana, te escribimos de Casa Shé\. Crea tu contraseña/);
+// Hora de dos dígitos se respeta ("18:30"); el día no se corre por zona horaria.
+assert.match(mensajeAccesoWhatsApp({ ...acceso, fecha: '2026-12-31', hora: '18:30' }), /jueves 31 de diciembre a las 18:30\./);
 
 console.log('test-whatsapp-link: OK');
