@@ -39,6 +39,7 @@ import { CLIENT_TAGS } from '@/data/clientTags';
 import SellPlanDialog from '@/components/memberships/SellPlanDialog';
 import { AdjustCreditsDialog } from '@/components/clients/AdjustCreditsDialog';
 import { isMembershipScheduled } from '@/lib/membershipStatus';
+import { PlanLabel } from '@/components/brands/PlanLabel';
 
 interface FacilityOpt {
     id: string;
@@ -488,7 +489,7 @@ export default function ClientsList() {
                                                         <Badge variant="outline" className="text-gray-500">Sin membresía</Badge>
                                                     )}
                                                     {user.plan_name && (
-                                                        <Badge variant="secondary" className="text-xs">{user.plan_name}</Badge>
+                                                        <Badge variant="secondary" className="text-xs"><PlanLabel nombre={user.plan_name} /></Badge>
                                                     )}
                                                     {user.membership_status === 'active' && (
                                                         <Badge variant="outline" className="text-xs tabular-nums">

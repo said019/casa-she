@@ -66,6 +66,9 @@ import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { enlaceWhatsApp } from '@/lib/whatsapp';
+import { ChannelLogo } from '@/components/brands/ChannelLogo';
+import { PlanLabel } from '@/components/brands/PlanLabel';
+import { CANALES, canalDePlan, esCanal } from '@/lib/canales';
 
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
@@ -721,17 +724,17 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                         {attendee.is_free_booking
                             ? <Badge variant="outline" className="text-[10px] border-balance-gold/50 text-balance-gold">Invitada</Badge>
-                            : attendee.plan_name && <Badge variant="outline" className="text-[10px]">{attendee.plan_name}</Badge>}
+                            : attendee.plan_name && canalDePlan(attendee.plan_name) !== attendee.channel && (
+                                <Badge variant="outline" className="text-[10px]"><PlanLabel nombre={attendee.plan_name} /></Badge>
+                            )}
                         {mode === 'espera' && attendee.waitlist_position != null && (
                             <span className="font-medium text-balance-olive">#{attendee.waitlist_position} en espera</span>
                         )}
-                        {attendee.channel === 'totalpass' && (
-                            <Badge variant="outline" className="border-[#2A4E36]/40 text-[10px] text-[#2A4E36]">TotalPass</Badge>
-                        )}
+                        {esCanal(attendee.channel) && <ChannelLogo canal={attendee.channel} alto={9} />}
                         {attendee.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{attendee.phone}</span>}
                     </div>
                     <p className="mt-0.5 text-[11px] text-muted-foreground/75">
-                        Reservó: {attendee.channel === 'totalpass' ? 'desde TotalPass' : attendeeBookedBy(attendee)}
+                        Reservó: {esCanal(attendee.channel) ? `desde ${CANALES[attendee.channel].nombre}` : attendeeBookedBy(attendee)}
                     </p>
                 </div>
             </div>
@@ -1292,13 +1295,9 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                 {selectedClass?.status !== 'cancelled' && (
                                     <div className="rounded-xl border border-balance-sand/55 bg-balance-cream/45 p-3">
                                         <div className="mb-2 flex items-center gap-2">
-                                            <span
-                                                className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white"
-                                                style={{ backgroundColor: '#2A4E36' }}
-                                            >
-                                                TotalPass
-                                            </span>
-                                            <p className="text-sm font-semibold">Lugares para TotalPass</p>
+                                            <p className="flex items-center gap-2 text-sm font-semibold">
+                                                Lugares para <ChannelLogo canal="totalpass" alto={12} />
+                                            </p>
                                         </div>
                                         <div className="flex items-center justify-center gap-4">
                                             <Button
@@ -1887,7 +1886,7 @@ export default function ClassesCalendar({ initialGenerateOpen = false, embedded 
                                 <ClassIntensitySelector value={editForm.watch('intensity')} onChange={(value) => editForm.setValue('intensity', value, { shouldDirty: true, shouldValidate: true })} />
 
                                 <div className="space-y-2">
-                                    <Label>Lugares TotalPass</Label>
+                                    <Label className="flex items-center gap-1.5">Lugares para <ChannelLogo canal="totalpass" alto={10} /></Label>
                                     <Input type="number" min={0} {...editForm.register('totalpassSpots', { valueAsNumber: true })} />
                                     <p className="text-xs text-muted-foreground">0 = clase no ofrecida en TotalPass</p>
                                 </div>

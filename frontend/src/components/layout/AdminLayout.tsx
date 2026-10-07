@@ -48,6 +48,8 @@ import { AdminBreadcrumbs } from '@/components/layout/AdminBreadcrumbs';
 import { AdminSearch } from '@/components/admin/AdminSearch';
 import api from '@/lib/api';
 import { isReceptionAccount } from '@/lib/operationalAccess';
+import { ChannelLogo } from '@/components/brands/ChannelLogo';
+import type { CanalClave } from '@/lib/canales';
 
 interface AdminLayoutProps {
     children: ReactNode;
@@ -57,6 +59,8 @@ type SidebarChild = {
     href?: string;
     label: string;
     kind?: 'header';
+    /** Si el destino es de una plataforma, se pinta su logo en lugar del texto. */
+    logo?: CanalClave;
 };
 
 type SidebarItem = {
@@ -180,7 +184,7 @@ const sidebarItems: SidebarItem[] = [
             { href: '/admin/settings/whatsapp', label: 'WhatsApp' },
             { href: '/admin/settings/closed-days', label: 'Días cerrados' },
             { href: '/admin/settings/onboarding', label: 'Perfilador' },
-            { href: '/admin/settings/totalpass', label: 'TotalPass' },
+            { href: '/admin/settings/totalpass', label: 'TotalPass', logo: 'totalpass' },
             { href: '/admin/audit', label: 'Bitácora' },
         ],
     },
@@ -386,13 +390,20 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                                                         to={child.href!}
                                                         onClick={() => setMobileMenuOpen(false)}
                                                         className={cn(
-                                                            'block rounded-[0.85rem] px-3 py-2 text-sm transition-[background,color,transform] duration-200 active:scale-[0.99]',
+                                                            'group block rounded-[0.85rem] px-3 py-2 text-sm transition-[background,color,transform] duration-200 active:scale-[0.99]',
                                                             isActive(child.href!)
                                                                 ? 'bg-balance-cream/12 font-semibold text-balance-cream'
                                                                 : 'text-[rgba(246,240,228,0.58)] hover:bg-balance-cream/8 hover:text-balance-cream'
                                                         )}
                                                     >
-                                                        {child.label}
+                                                        {child.logo ? (
+                                                            <ChannelLogo
+                                                                canal={child.logo}
+                                                                fondo="oscuro"
+                                                                alto={11}
+                                                                className={isActive(child.href!) ? undefined : 'opacity-60 transition-opacity group-hover:opacity-100'}
+                                                            />
+                                                        ) : child.label}
                                                     </Link>
                                                 );
                                             })}

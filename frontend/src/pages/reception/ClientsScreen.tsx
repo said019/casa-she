@@ -47,6 +47,7 @@ import {
 } from '@/lib/manualDiscount';
 import { MembershipStartPicker } from '@/components/memberships/MembershipStartPicker';
 import { isMembershipScheduled } from '@/lib/membershipStatus';
+import { PlanLabel } from '@/components/brands/PlanLabel';
 
 const mxn = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
 
@@ -1596,7 +1597,7 @@ export default function ClientsScreen() {
                                         ? 'text-emerald-600 border-emerald-600'
                                         : 'text-muted-foreground'}
                                 >
-                                    {c.plan_name}
+                                    <PlanLabel nombre={c.plan_name} />
                                 </Badge>
                             ) : (
                                 <Badge variant="outline" className="text-muted-foreground">Lead</Badge>

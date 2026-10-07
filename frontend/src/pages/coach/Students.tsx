@@ -13,6 +13,8 @@ import { AuthGuard } from '@/components/layout/AuthGuard';
 import { CoachPageHero, CoachStat, CoachEmptyState } from '@/components/coach/CoachUI';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { ChannelLogo } from '@/components/brands/ChannelLogo';
+import { esCanal } from '@/lib/canales';
 
 interface Student {
     user_id: string;
@@ -32,9 +34,8 @@ interface StudentsResponse {
     students: Student[];
 }
 
+/** Plataformas sin logo en el catálogo: se muestran con su nombre. */
 const CHANNEL_LABEL: Record<string, string> = {
-    totalpass: 'TotalPass',
-    fitpass: 'FitPass',
     wellhub: 'Wellhub',
 };
 
@@ -185,7 +186,9 @@ export default function CoachStudents() {
                                                                 Regular
                                                             </Badge>
                                                         )}
-                                                        {channelLabel && (
+                                                        {esCanal(student.primary_channel) ? (
+                                                            <ChannelLogo canal={student.primary_channel} alto={9} />
+                                                        ) : channelLabel && (
                                                             <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                                                                 {channelLabel}
                                                             </Badge>

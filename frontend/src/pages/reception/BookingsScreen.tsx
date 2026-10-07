@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { ClassIntensity } from '@/components/classes/ClassIntensity';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -38,6 +38,8 @@ import { useAuthStore } from '@/stores/authStore';
 import SellPlanDialog from '@/components/memberships/SellPlanDialog';
 import { formatFolio } from '@/lib/folio';
 import { StudioPaymentBadge } from '@/components/bookings/StudioPaymentBadge';
+import { ChannelLogo } from '@/components/brands/ChannelLogo';
+import { CANALES } from '@/lib/canales';
 
 const WEEK_DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
@@ -71,7 +73,8 @@ function MarcaTotalPass({ n }: { n: number }) {
     if (!n) return null;
     return (
         <span
-            className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-[#2A4E36]"
+            className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full"
+            style={{ backgroundColor: CANALES.totalpass.punto, boxShadow: `0 0 0 1px ${CANALES.totalpass.anillo}` }}
             title={`${n} ${n === 1 ? 'reserva' : 'reservas'} de TotalPass`}
             aria-label={`${n} ${n === 1 ? 'reserva' : 'reservas'} de TotalPass`}
         />
@@ -245,8 +248,8 @@ function ClassDetailDrawer({
 
     // Las socias de TotalPass nunca tienen plan de Casa Shé: marcarlas "Sin plan"
     // (en ámbar, como una alerta) hacía pensar que algo estaba mal.
-    const planLabel = (b: BookingRow) =>
-        esTotalPass(b) ? 'TotalPass' : b.is_free_booking ? 'Invitada' : (b.plan_name || 'Sin plan');
+    const planLabel = (b: BookingRow): ReactNode =>
+        esTotalPass(b) ? <ChannelLogo canal="totalpass" alto={9} /> : b.is_free_booking ? 'Invitada' : (b.plan_name || 'Sin plan');
 
     // Mini "Reservar a cliente" inline para esta clase específica
     const [clientSearch, setClientSearch] = useState('');
@@ -504,7 +507,7 @@ function ClassDetailDrawer({
                                                                                 {b.is_free_booking ? (
                                                                                     <Badge variant="outline" className="h-4 px-1.5 text-[10px] border-balance-gold/50 text-balance-gold">Invitada</Badge>
                                                                                 ) : esTotalPass(b) ? (
-                                                                                    <Badge variant="outline" className="h-4 px-1.5 text-[10px] border-[#2A4E36]/40 text-[#2A4E36]">TotalPass</Badge>
+                                                                                    <ChannelLogo canal="totalpass" alto={9} />
                                                                                 ) : (
                                                                                     <span className={b.plan_name ? '' : 'text-amber-600'}>{planLabel(b)}</span>
                                                                                 )}
@@ -970,10 +973,11 @@ function DayView({
                                 {/* Aviso de que en esta clase hay gente de TotalPass, sin abrirla. */}
                                 {(c.totalpass_booked ?? 0) > 0 && (
                                     <span
-                                        className="shrink-0 rounded-sm border border-[#2A4E36]/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#2A4E36]"
+                                        className="inline-flex shrink-0 items-center gap-1.5 rounded-sm border border-[#0F7A45]/40 px-2 py-0.5 text-[10px] font-semibold text-[#2A4E36]"
                                         title={`${c.totalpass_booked} desde TotalPass`}
                                     >
-                                        <span className="hidden sm:inline">TotalPass · </span>{c.totalpass_booked}
+                                        <span className="hidden sm:inline-flex"><ChannelLogo canal="totalpass" alto={9} /></span>
+                                        <span className="tabular-nums">{c.totalpass_booked}</span>
                                     </span>
                                 )}
                                 <div className="text-right shrink-0 min-w-[64px]">
