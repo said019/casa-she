@@ -12,6 +12,7 @@ async function main() {
     const srv = await levantarServidorLocal(PORT);
     process.env.DATABASE_URL = srv.databaseUrl;
     const { pool } = await import('../src/config/database.js');
+    const { crearLinkAcceso } = await import('../src/lib/accessLinks.js');
     const A = srv.api;
     const sha = (t: string) => createHash('sha256').update(t).digest('hex');
     const tokenDe = (url: string) => url.split('/acceso/')[1];
@@ -28,9 +29,11 @@ async function main() {
         const recep = await mk('reception', 'rec');
         const otroAdmin = await mk('admin', 'adm2');
         const alumna = await mk('client', 'alu');
+        const superAdm = await mk('super_admin', 'sup');
         const login = async (email: string) => (await http(A, 'POST', '/auth/login', undefined, { email, password: clave })).json.token as string;
         const tAdmin = await login(admin.email);
         const tRecep = await login(recep.email);
+        const tSuper = await login(superAdm.email);
         const tAlumna = await login(alumna.email);
 
         // --- Generar link ---
@@ -54,6 +57,7 @@ async function main() {
         const g1 = await http(A, 'GET', `/auth/acceso/${token1}`);
         assert.equal(g1.status, 200);
         assert.deepEqual(g1.json, { nombre: alumna.email ? `Daniela alu` : '', email: alumna.email });
+        assert.match(g1.headers.get('cache-control') || '', /no-store/, 'GET /auth/acceso/:token no se cachea');
 
         // --- El token NO es una sesión ---
         for (const ruta of ['/auth/me', `/users/${alumna.id}`]) {
@@ -66,12 +70,19 @@ async function main() {
         // --- Permisos al generar ---
         assert.equal((await http(A, 'POST', `/users/${alumna.id}/acceso`, tAlumna)).status, 403, 'una clienta no genera links');
         assert.equal((await http(A, 'POST', `/users/${otroAdmin.id}/acceso`, tRecep)).status, 403, 'recepción no genera link de un admin');
+        // El link permite fijar la contraseña de la cuenta: solo a clientes (admin NO a otro admin).
+        assert.equal((await http(A, 'POST', `/users/${otroAdmin.id}/acceso`, tAdmin)).status, 403, 'admin no genera link de otro admin');
+        assert.equal((await http(A, 'POST', `/users/${superAdm.id}/acceso`, tAdmin)).status, 403, 'admin no genera link de un super_admin');
+        assert.equal((await http(A, 'POST', `/users/${recep.id}/acceso`, tAdmin)).status, 403, 'admin no genera link de recepción');
+        assert.equal((await http(A, 'POST', `/users/${otroAdmin.id}/acceso`, tSuper)).status, 201, 'super_admin sí puede a cualquier rol');
+        assert.equal((await http(A, 'POST', `/users/${alumna.id}/acceso`, tAdmin)).status, 201, 'admin sí genera para una clienta');
         assert.equal((await http(A, 'POST', `/users/${alumna.id}/acceso`)).status, 401, 'sin sesión no se genera');
         assert.equal((await http(A, 'POST', `/users/00000000-0000-0000-0000-000000000000/acceso`, tAdmin)).status, 404);
         assert.equal((await http(A, 'POST', `/users/${alumna.id}/acceso`, tRecep)).status, 201, 'recepción sí genera para una clienta');
         // (ese último revocó token1)
         const gRevocado = await http(A, 'GET', `/auth/acceso/${token1}`);
         assert.equal(gRevocado.status, 410);
+        assert.match(gRevocado.headers.get('cache-control') || '', /no-store/, 'también el 410 va con no-store');
         assert.equal(gRevocado.json.code, 'LINK_INVALIDO');
 
         // --- Un link nuevo revoca el anterior ---
@@ -114,6 +125,7 @@ async function main() {
         assert.equal(ok.length, 1, `exactamente un uso gana: ${x.status}/${y.status}`);
         assert.equal(muerto.length, 1);
         assert.equal(muerto[0].json.code, 'LINK_USADO');
+        assert.match(ok[0].headers.get('cache-control') || '', /no-store/, 'POST /auth/acceso/:token (devuelve sesión) no se cachea');
         const sesion = ok[0].json;
         const clavePuesta = ok[0] === x ? 'Primera-Clave-1' : 'Segunda-Clave-2';
         assert.equal(sesion.user.email, alumna.email);
@@ -140,6 +152,15 @@ async function main() {
             const r = await http(A, 'GET', `/auth/acceso/${t}`);
             assert.equal(r.status, 410);
             assert.equal(r.json.code, 'LINK_INVALIDO');
+        }
+
+        // --- Concurrencia: dos crearLinkAcceso en paralelo con el pool dejan EXACTAMENTE un link activo ---
+        const alumnaCarrera = await mk('client', 'car');
+        for (let i = 0; i < 5; i++) {
+            const lotes = await Promise.all([1, 2, 3, 4].map(() => crearLinkAcceso(pool, alumnaCarrera.id, admin.id)));
+            assert.equal(new Set(lotes.map(l => l.url)).size, 4, 'cada llamada devuelve un token distinto');
+            const act = await sql(`SELECT count(*)::int n FROM access_links WHERE user_id = $1 AND used_at IS NULL AND revoked_at IS NULL`, [alumnaCarrera.id]);
+            assert.equal(act[0].n, 1, `ronda ${i}: exactamente un link activo tras llamadas concurrentes, hay ${act[0].n}`);
         }
 
         // --- Cuenta desactivada: el link no sirve ---

@@ -148,6 +148,21 @@ async function main() {
         assert.equal(dupTel.json.coincidencia, 'telefono');
         assert.deepEqual(await conteos(), d0, 'duplicado por teléfono: no escribe nada');
 
+        // ---- Coincidencia con alguien que NO es clienta (staff): no se revela quién es ----
+        const staff = await mk('admin', 'stf', '5500000004');
+        const dStaff = await conteos();
+        for (const [que, extra] of [
+            ['correo', { email: staff.email.toUpperCase(), telefono: '5599887755' }],
+            ['teléfono', { telefono: '5500000004' }],
+        ] as const) {
+            const dupStaff = await http(A, 'POST', '/users/alta-rapida', tRecep, body(14, extra));
+            assert.equal(dupStaff.status, 409, `staff por ${que}`);
+            assert.deepEqual(dupStaff.json, {
+                error: 'Esta alumna ya está registrada', code: 'YA_EXISTE', coincidencia: que === 'correo' ? 'email' : 'telefono',
+            }, `por ${que}: sin userId ni nombre cuando no es clienta`);
+        }
+        assert.deepEqual(await conteos(), dStaff, 'duplicado de staff: no escribe nada');
+
         // ---- Una falla al inscribir deshace TODO (clienta, paquete, pago, bono, link) ----
         const fallas: Array<[string, Record<string, unknown>, number]> = [
             ['clase llena', { classId: claseLlena }, 400],

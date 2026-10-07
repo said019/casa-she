@@ -79,7 +79,7 @@ export async function altaRapida(
 
         // 1. Duplicados: correo exacto (minúsculas) o últimos 10 dígitos del teléfono.
         const dup = (await client.query(
-            `SELECT id, display_name, lower(email) = $1 AS por_email
+            `SELECT id, display_name, role, lower(email) = $1 AS por_email
                FROM users
               WHERE lower(email) = $1
                  OR right(regexp_replace(COALESCE(phone, ''), '\\D', '', 'g'), 10) = $2
@@ -91,8 +91,8 @@ export async function altaRapida(
             throw new AltaRapidaError(409, {
                 error: 'Esta alumna ya está registrada',
                 code: 'YA_EXISTE',
-                userId: dup.id,
-                nombre: dup.display_name,
+                // Solo se revela quién es si es una clienta; a staff no se le expone id ni nombre.
+                ...(dup.role === 'client' ? { userId: dup.id, nombre: dup.display_name } : {}),
                 coincidencia: dup.por_email ? 'email' : 'telefono',
             });
         }

@@ -475,7 +475,13 @@ const MENSAJES_LINK: Record<string, string> = {
     LINK_INVALIDO: 'Este link ya no sirve. Pide uno nuevo en recepción.',
 };
 
-router.get('/acceso/:token', async (req: Request, res: Response) => {
+// El token viaja en la URL y las respuestas pueden traer sesión: nada de cachés intermedios.
+const sinCache = (_req: Request, res: Response, next: () => void) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+};
+
+router.get('/acceso/:token', sinCache, async (req: Request, res: Response) => {
     try {
         const r = await consultarLinkAcceso(String(req.params.token));
         if (!r.ok) return res.status(410).json({ code: r.code, error: MENSAJES_LINK[r.code] });
@@ -488,7 +494,7 @@ router.get('/acceso/:token', async (req: Request, res: Response) => {
 
 const AccesoSchema = ResetPasswordSchema.pick({ password: true });
 
-router.post('/acceso/:token', async (req: Request, res: Response) => {
+router.post('/acceso/:token', sinCache, async (req: Request, res: Response) => {
     try {
         const validation = AccesoSchema.safeParse(req.body);
         if (!validation.success) {

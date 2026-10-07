@@ -60,6 +60,15 @@ export default function Acceso() {
         resolver: zodResolver(schema),
     });
 
+    // El token viaja en la URL: que no se filtre por Referer a ningún recurso externo.
+    useEffect(() => {
+        const meta = document.createElement('meta');
+        meta.name = 'referrer';
+        meta.content = 'no-referrer';
+        document.head.appendChild(meta);
+        return () => { meta.remove(); };
+    }, []);
+
     useEffect(() => {
         let vivo = true;
         api.get<{ nombre: string }>(`/auth/acceso/${encodeURIComponent(token)}`)

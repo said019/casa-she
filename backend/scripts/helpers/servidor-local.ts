@@ -83,5 +83,5 @@ export async function http(api: string, method: string, url: string, token?: str
     });
     let json: any = null;
     try { json = await res.json(); } catch { /* sin body */ }
-    return { status: res.status, json };
+    return { status: res.status, json, headers: res.headers };
 }

@@ -6,6 +6,7 @@ import multer from 'multer';
 import { query, queryOne, pool } from '../config/database.js';
 import { logAction } from '../lib/audit.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
+import { isElevated } from '../lib/elevation.js';
 import { requireElevated } from '../middleware/elevation.js';
 import { requirePermission } from '../middleware/requirePermission.js';
 import { effectivePermissions, mergeRequested, validatePermissionChange, PRESETS, PresetName, PERMISSION_LABELS, isMasterPreset } from '../lib/permissions.js';
@@ -13,7 +14,6 @@ import { UpdateProfileSchema, User } from '../types/auth.js';
 import { z } from 'zod';
 import { sendAccesoAlumnaEmail, sendClientWelcomeEmail, sendPlainEmail, sendReceptionAssignedEmail, sendReceptionCredentials } from '../services/email.js';
 import { sendClientWelcome, sendWhatsAppMessage } from '../lib/whatsapp.js';
-import { isElevated } from '../lib/elevation.js';
 import { instanceByKey, instanceForFacility } from '../lib/whatsapp-instances.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { awardWelcomeBonus } from '../lib/loyalty.js';
@@ -779,11 +779,14 @@ router.post('/:id/resend-credentials', requireRole('admin', 'super_admin', 'rece
         // clientes (la dueña pidió que recepción reseteara CLIENTES, 2026-06-23). Sin esto, una
         // recepcionista podía resetear a un admin, recibir su contraseña temporal en la respuesta
         // y tomar la cuenta. Además, nadie por debajo de super_admin puede resetear a un super_admin.
-        const requesterElevated = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+        // OJO: `req.user.role` es el rol OPERATIVO (recepción se mapea a 'admin'); la cuenta real
+        // está en `accountRole`. Con `role` esta guarda dejaba pasar a recepción.
+        const cuentaSolicitante = req.user?.accountRole;
+        const requesterElevated = cuentaSolicitante === 'admin' || cuentaSolicitante === 'super_admin';
         if (!requesterElevated && target.role !== 'client') {
             return res.status(403).json({ error: 'Solo puedes reenviar credenciales a clientes.' });
         }
-        if (target.role === 'super_admin' && req.user?.role !== 'super_admin') {
+        if (target.role === 'super_admin' && cuentaSolicitante !== 'super_admin') {
             return res.status(403).json({ error: 'No autorizado para resetear a un super administrador.' });
         }
 
@@ -806,7 +809,7 @@ router.post('/:id/resend-credentials', requireRole('admin', 'super_admin', 'rece
         const whatsappKey = typeof req.body?.whatsappKey === 'string' ? req.body.whatsappKey : null;
         if (whatsappKey && isElevated(req.user)) {
             waInstance = instanceByKey(whatsappKey);
-        } else if (req.user?.role === 'reception') {
+        } else if (cuentaSolicitante === 'reception') {
             const scope = await resolveRequestFacility(req.user);
             if (scope.kind === 'facility') {
                 const fac = await queryOne<{ name: string }>('SELECT name FROM facilities WHERE id = $1', [scope.facilityId]);
@@ -912,8 +915,7 @@ router.post('/alta-rapida', requireRole('admin', 'super_admin', 'reception'), as
 // ============================================
 // POST /api/users/:id/acceso - Genera un link de acceso (crear contraseña) para una alumna.
 // Es el "Mandar / Reenviar acceso por WhatsApp" de la ficha. Revoca los links activos
-// anteriores. Mismas guardas que resend-credentials: recepción solo a clientes; a un
-// super_admin solo otro super_admin (el link permite fijar la contraseña de la cuenta).
+// anteriores. Solo a clientes; un super_admin puede a cualquier rol.
 // ============================================
 router.post('/:id/acceso', requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
     try {
@@ -927,12 +929,10 @@ router.post('/:id/acceso', requireRole('admin', 'super_admin', 'reception'), asy
         // OJO: `req.user.role` es el rol OPERATIVO (recepción se mapea a 'admin'); la cuenta
         // real está en `accountRole`. Con `role` esta guarda dejaría pasar a recepción.
         const cuenta = req.user?.accountRole;
-        const requesterElevated = cuenta === 'admin' || cuenta === 'super_admin';
-        if (!requesterElevated && target.role !== 'client') {
+        // Solo a clientes (el link permite fijar la contraseña de la cuenta); únicamente un
+        // super_admin puede generarlo para cualquier otro rol.
+        if (target.role !== 'client' && cuenta !== 'super_admin') {
             return res.status(403).json({ error: 'Solo puedes mandar acceso a clientes.' });
-        }
-        if (target.role === 'super_admin' && cuenta !== 'super_admin') {
-            return res.status(403).json({ error: 'No autorizado para generar acceso a un super administrador.' });
         }
         if (target.is_active === false) {
             return res.status(409).json({ error: 'La cuenta está desactivada.' });

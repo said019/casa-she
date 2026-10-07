@@ -30,7 +30,7 @@ const METODOS: Array<{ value: Metodo; label: string; resumen: string }> = [
     { value: 'card', label: 'Tarjeta', resumen: 'tarjeta' },
 ];
 
-interface Existente { userId: string; nombre: string; coincidencia: 'email' | 'telefono' }
+interface Existente { userId?: string; nombre?: string; coincidencia: 'email' | 'telefono' }
 interface Listo {
     userId: string;
     nombre: string;
@@ -219,9 +219,11 @@ export function DialogoAlumnaNueva({ clase, open, onOpenChange, nombreInicial = 
                             {existente && (
                                 <div role="alert" className="space-y-2 rounded-xl border border-casa-arena bg-casa-avena/60 p-3 text-sm">
                                     <p>
-                                        <strong>{existente.nombre}</strong> ya está registrada con ese {existente.coincidencia === 'email' ? 'correo' : 'teléfono'}.
+                                        {existente.nombre ? <><strong>{existente.nombre}</strong> ya está registrada</> : 'Ya existe una cuenta registrada'} con ese {existente.coincidencia === 'email' ? 'correo' : 'teléfono'}.
                                     </p>
-                                    <Button type="button" size="sm" onClick={() => abrirFicha(existente.userId)}>Abrir su ficha</Button>
+                                    {existente.userId && (
+                                        <Button type="button" size="sm" onClick={() => abrirFicha(existente.userId!)}>Abrir su ficha</Button>
+                                    )}
                                 </div>
                             )}
 

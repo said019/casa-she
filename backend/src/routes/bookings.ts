@@ -980,7 +980,8 @@ router.post('/admin-book', authenticate, requireRole('admin', 'super_admin', 're
     const { classId, userId, force } = req.body;
     // Forzar sobrecupo (meter a alguien aunque la clase esté llena) es SOLO admin/super_admin
     // (decisión de la dueña: "solo admin"). Recepción NO puede forzar.
-    const canForce = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+    // OJO: `role` es el rol operativo (recepción → 'admin'); la cuenta real es `accountRole`.
+    const canForce = req.user?.accountRole === 'admin' || req.user?.accountRole === 'super_admin';
     const forcing = force === true && canForce;
 
     if (!classId || !userId) {

@@ -25,9 +25,34 @@ function frontendUrl(): string {
     return (process.env.FRONTEND_URL || 'https://casashe.mx').replace(/\/+$/, '');
 }
 
-/** Crea un link nuevo y revoca los activos de esa alumna. Corre en el `db` que se le pase
- *  (la transacción del alta rápida, o el pool). */
+/** Crea un link nuevo y revoca los activos de esa alumna. Corre en el `db` que se le pase.
+ *  Si es el pool, abre su propia transacción con un advisory lock por alumna: dos llamadas
+ *  concurrentes se serializan y nunca quedan dos links activos. Si es un cliente (la
+ *  transacción del alta rápida, donde la alumna es nueva), usa esa conexión tal cual. */
 export async function crearLinkAcceso(
+    db: AccessDb,
+    userId: string,
+    creadoPor: string | null,
+): Promise<{ url: string; venceEl: string }> {
+    const conPool = db as AccessDb & { connect?: () => Promise<AccessDb & { release: () => void }> };
+    // Un PoolClient también tiene `connect`, pero se distingue por `release`.
+    if (typeof conPool.connect !== 'function' || 'release' in db) return crearLinkEn(db, userId, creadoPor);
+    const client = await conPool.connect();
+    try {
+        await client.query('BEGIN');
+        await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`access-link:${userId}`]);
+        const r = await crearLinkEn(client, userId, creadoPor);
+        await client.query('COMMIT');
+        return r;
+    } catch (e) {
+        try { await client.query('ROLLBACK'); } catch { /* ya cerrada */ }
+        throw e;
+    } finally {
+        client.release();
+    }
+}
+
+async function crearLinkEn(
     db: AccessDb,
     userId: string,
     creadoPor: string | null,
