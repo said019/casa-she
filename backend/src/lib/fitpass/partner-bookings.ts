@@ -134,7 +134,11 @@ export async function upsertFitpassBooking(db: Db, input: UpsertFitpassBookingIn
             throw new FitpassBookingError('FITPASS_QUOTA_EXHAUSTED', `FitPass ya tiene ${k.fp_booked}/${k.fp_cap ?? 0} asistentes en esta clase`);
         }
     } else if (Number(k.current_bookings) >= Number(k.max_capacity)) {
+        // classes_capacity_check (current_bookings <= max_capacity) rechazaría la inserción: la reserva YA
+        // ocurrió en FitPass, así que se sube el aforo en 1 (reversible al cancelar) y se marca visible.
         metadata.overbooked = true;
+        metadata.overbooked_prev_capacity = Number(k.max_capacity);
+        await db.query(`UPDATE classes SET max_capacity = current_bookings + 1 WHERE id=$1`, [input.classId]);
     }
     const ins = await db.query(
         `INSERT INTO bookings (class_id, user_id, membership_id, status, channel, external_ref, booked_by, partner_metadata)
@@ -155,6 +159,13 @@ export async function cancelFitpassBooking(
         [bookingId, reason, JSON.stringify(metadataPatch ?? {})],
     );
     await db.query(`UPDATE checkins SET status='cancelled', updated_at=NOW() WHERE booking_id=$1 AND status<>'cancelled'`, [bookingId]);
+    // Si esta reserva había subido el aforo (overbooked), lo restaura cuando ya cabe en el aforo original.
+    await db.query(
+        `UPDATE classes c SET max_capacity = (b.partner_metadata->>'overbooked_prev_capacity')::int
+           FROM bookings b
+          WHERE b.id=$1 AND c.id=b.class_id AND b.partner_metadata ? 'overbooked_prev_capacity'
+            AND c.current_bookings <= (b.partner_metadata->>'overbooked_prev_capacity')::int
+            AND c.max_capacity > (b.partner_metadata->>'overbooked_prev_capacity')::int`, [bookingId]);
 }
 
 /** Check-in automatizado/recepción confirmado (idempotente por platform_event_id) y booking → checked_in. */
