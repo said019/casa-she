@@ -43,7 +43,18 @@ async function main() {
     assert.equal(src.pickCandidate([cand('a', 'Barre', 1), cand('b', 'Flex', 2)], { ...lk, fitpassLessonId: 2 }), 'b', 'lesson_id manda');
     assert.equal(src.pickCandidate([cand('a', 'Barre', null), cand('b', 'Flex', null)], { ...lk, className: 'FLEX' }), 'b', 'nombre');
     assert.equal(src.pickCandidate([cand('a', 'Barre', null, 'Ana'), cand('b', 'Barre', null, 'Luz')], { ...lk, className: 'Barre', coachName: 'luz' }), 'b', 'coach');
-    assert.throws(() => src.pickCandidate([cand('a', 'Barre', 1), cand('b', 'Flex', 2)], { ...lk, fitpassLessonId: 9 }), /no coincide/, 'lesson sin match falla visible');
+    // lesson_id ya NO es autoritativo: una variante sin mapear cae a familia/nombre
+    assert.equal(src.pickCandidate([cand('a', 'Barre', 1), cand('b', 'Flex', 2)], { ...lk, fitpassLessonId: 9, className: 'BARRE GAP' }), 'a', 'variante -> familia');
+    assert.throws(() => src.pickCandidate([cand('a', 'Barre', 1), cand('b', 'Flex', 2)], { ...lk, fitpassLessonId: 9 }), /no se pudo identificar/, 'sin pistas falla visible');
+    const fam = [cand('p', 'Pilates Mat', 47206), cand('m', 'Mat Power Abs', 47182), cand('s', 'Sculpt (Abs & Butt)', 47184), cand('f', 'Sculpt Full Body', 46821), cand('b', 'Barre', 46820)];
+    for (const [nm, les, want] of [
+        ['PILATES MAT - GAP', 47203, 'p'], ['PILATES MAT ABS & BUTT', 46819, 'p'], ['MAT - POWER ABS', 47182, 'm'],
+        ['SCULPT - POWER ABS', 47183, 's'], ['SCULPT ABS & BUTT', 47184, 's'], ['SCULPT FULL BODY', 46821, 'f'],
+        ['BARRE - ABS & BUTT', 46827, 'b'], ['BARRE BUTT', 47181, 'b'],
+    ] as const) assert.equal(src.pickCandidate(fam, { ...lk, className: nm, fitpassLessonId: les }), want, nm);
+    assert.equal(src.pickCandidate([cand('x', 'Sculpt (Abs & Butt)', 1), cand('y', 'Sculpt Full Body', 2)], { ...lk, className: 'SCULPT', fitpassLessonId: 2 }), 'y', 'misma familia: desempata lesson_id');
+    assert.equal(src.pickCandidate([cand('x', 'Barre', null, 'Ana'), cand('y', 'Barre', null, 'Luz')], { ...lk, className: 'BARRE GAP', coachName: 'Luz' }), 'y', 'misma familia: desempata coach');
+    assert.equal(src.pickCandidate([cand('only', 'Yoga Dharma', null)], { ...lk, className: 'COSA RARA' }), 'only', 'única en el slot (c)');
     assert.throws(() => src.pickCandidate([cand('a', 'Barre', null), cand('b', 'Flex', null)], lk), /no se pudo identificar/, 'ambiguo falla visible');
     assert.throws(() => src.pickCandidate([cand('a', 'Barre', null, 'Ana'), cand('b', 'Barre', null, 'Ana')], { ...lk, className: 'Barre' }), /Varias clases/);
     assert.throws(() => src.pickCandidate([], lk), /Sin clase/);
@@ -156,6 +167,9 @@ async function main() {
         assert.equal((await one(`SELECT class_id FROM bookings WHERE external_ref='8004'`)).class_id, cAmb2, 'por coach');
         r = await imp([row({ sourceRef: '8005', classLookup: { date: D, startTime: '19:30' } })]);
         assert.equal(r.summary.failed, 1, 'sin clase falla visible');
+        // variantes de FitPass contra una familia: en el slot 10:00 (Alpha/Beta) 'ZZ FP ALPHA GAP' cae a Alpha por familia no aplica (sin keywords) -> ambigua visible
+        r = await imp([row({ sourceRef: '8006', displayName: 'Kai Fit', classLookup: { date: D, startTime: '10:00', className: 'ZZ FP ALPHA - GAP' } })]);
+        assert.equal(r.summary.failed, 1, 'variante sin pista de familia ni lesson: falla visible');
         void cAmb1;
 
         // sobrecupo: nunca se rechaza, se marca overbooked
@@ -163,6 +177,7 @@ async function main() {
         r = await imp([row({ sourceRef: '9002', displayName: 'Ivo Fit', classLookup: { date: D, startTime: '12:00' } })]);
         if (r.summary.failed) console.log('  AVISO: sobrecupo falló:', JSON.stringify(r.rows));
         assert.equal(r.summary.created, 1, 'el import no rechaza por cupo: ' + JSON.stringify(r.rows));
+        assert.equal(r.overbooked, 1); assert.deepEqual(r.overbookedRefs, ['9002'], 'el resumen expone los overbooked');
         assert.equal((await one(`SELECT partner_metadata->>'overbooked' AS o FROM bookings WHERE external_ref='9002'`)).o, 'true');
         assert.equal(Number((await one(`SELECT max_capacity FROM classes WHERE id=$1`, [cSmall])).max_capacity), 2, 'aforo subido para no violar el CHECK');
         r = await imp([row({ sourceRef: '9002', displayName: 'Ivo Fit', status: 'cancelled', classLookup: { date: D, startTime: '12:00' } })]);

@@ -50,6 +50,9 @@ export interface FitpassSyncCycleResult {
     fetched?: number;
     import?: FitpassImportResult['summary'];
     errors?: string[];
+    /** reservas importadas por encima del aforo (max_capacity +1): el dueño debe verlas */
+    overbooked?: number;
+    overbookedRefs?: string[];
     attendance?: { pending: number; ok: number; failed: number };
     error?: string;
 }
@@ -111,7 +114,7 @@ export async function runFitpassSyncCycle(opts: FitpassSyncCycleOptions = {}): P
             return { status: 'fetch-failed', retryable: true, error: (e as Error).message };
         }
         let imp: FitpassImportResult = {
-            summary: { total: 0, created: 0, updated: 0, cancelled: 0, skipped: 0, failed: 0 }, rows: [],
+            summary: { total: 0, created: 0, updated: 0, cancelled: 0, skipped: 0, failed: 0 }, rows: [], overbooked: 0, overbookedRefs: [],
         };
         if (rows.length > 0) {
             try {
@@ -123,7 +126,7 @@ export async function runFitpassSyncCycle(opts: FitpassSyncCycleOptions = {}): P
                 return { status: 'cycle-skipped', retryable: true, fetched: rows.length, import: imp.summary, error: `importación omitida: ${imp.skipped}` };
             }
         }
-        const base = { fetched: rows.length, import: imp.summary };
+        const base = { fetched: rows.length, import: imp.summary, overbooked: imp.overbooked, overbookedRefs: imp.overbookedRefs };
         if (imp.summary.failed > 0) {
             const errors = sampleErrors(imp);
             // Un fallo visible (p. ej. clase ambigua) no impide atender el resto, pero el ciclo no cuenta como limpio.

@@ -51,6 +51,7 @@ export interface FitpassImportRowResult {
     bookingId?: string;
     checkinId?: string;
     reason?: string;
+    overbooked?: boolean;
     error?: FitpassErrorCode | 'UNKNOWN';
     message?: string;
 }
@@ -58,6 +59,9 @@ export interface FitpassImportRowResult {
 export interface FitpassImportResult {
     summary: { total: number; created: number; updated: number; cancelled: number; skipped: number; failed: number };
     rows: FitpassImportRowResult[];
+    /** reservas importadas que excedieron el aforo (se subió max_capacity en 1) */
+    overbooked: number;
+    overbookedRefs: string[];
     /** 'locked' si FP_IMPORT estaba tomado. */
     skipped?: string;
 }
@@ -89,7 +93,28 @@ export function normalizeHHMMSS(t: string): string {
 
 interface Candidate { id: string; ct_name: string; fitpass_lesson_id: number | null; coach_name: string | null }
 
-/** PURA: elige una clase entre candidatas del mismo (fecha, hora) o lanza CLASS_NOT_FOUND visible. */
+/** Palabras que identifican la FAMILIA de una disciplina (FitPass usa variantes por horario). */
+export const FAMILY_KEYWORDS = ['barre', 'pilates', 'mat', 'sculpt', 'abs', 'vinyasa', 'dharma', 'rocket', 'ashtanga', 'navakarana', 'flow', 'flex', 'yoga'];
+
+/** Palabras genéricas pesan 1; las que nombran la disciplina pesan 3. */
+const SECONDARY_KEYWORDS = new Set(['mat', 'abs', 'yoga']);
+const kwWeight = (k: string) => (SECONDARY_KEYWORDS.has(k) ? 1 : 3);
+
+export function familyKeywords(name: string): Set<string> {
+    const words = new Set(fold(name).split(' '));
+    return new Set(FAMILY_KEYWORDS.filter((k) => words.has(k)));
+}
+
+/**
+ * PURA: elige una clase entre candidatas del mismo (fecha, hora CDMX) o lanza CLASS_NOT_FOUND visible.
+ * Casa Shé tiene UN class_type por familia y FitPass publica VARIANTES por slot ("BARRE - ABS & BUTT",
+ * "PILATES MAT - GAP"), así que el lesson_id NO es autoritativo (solo fija un default por tipo). Orden:
+ *   (c) una sola candidata en el slot -> esa;
+ *   (d) varias: nombre exacto (con alias) -> familia (palabras clave compartidas, gana el mayor traslape)
+ *       -> igualdad de lesson_id -> coach; si sigue ambiguo falla VISIBLE.
+ * (a) enlace por external_ref y (b) ownership por partner_class_mappings se resuelven antes (la fila no
+ * expone el schedule id, así que (b) no aplica al feed de reservaciones).
+ */
 export function pickCandidate(
     candidates: Candidate[],
     lk: { date: string; startTime: string; className?: string; fitpassLessonId?: number; coachName?: string },
@@ -98,45 +123,44 @@ export function pickCandidate(
     if (candidates.length === 0) throw new FitpassError('CLASS_NOT_FOUND', `Sin clase para ${slot}`);
     if (candidates.length === 1) return candidates[0].id;
 
-    const norm = lk.className ? normalizeImportClassName(lk.className) : null;
-
-    if (lk.fitpassLessonId != null && lk.fitpassLessonId > 0) {
-        const byLesson = candidates.filter((c) => c.fitpass_lesson_id != null && Number(c.fitpass_lesson_id) === Number(lk.fitpassLessonId));
-        if (byLesson.length === 1) return byLesson[0].id;
-        if (byLesson.length > 1) {
-            if (norm) {
-                const m = byLesson.filter((c) => fold(c.ct_name) === norm);
-                if (m.length === 1) return m[0].id;
-            }
-            if (lk.coachName) {
-                const nc = normalizeCoach(lk.coachName);
-                const m = byLesson.filter((c) => c.coach_name && normalizeCoach(c.coach_name) === nc);
-                if (m.length === 1) return m[0].id;
-            }
-            throw new FitpassError('CLASS_NOT_FOUND', `Varias clases comparten lesson ${lk.fitpassLessonId} en ${slot} y no se pudo afinar (${lk.className ?? '?'}).`);
-        }
-        // lesson autoritativo sin coincidencia: solo se cae a nombre si NINGUNA candidata tiene lesson mapeado.
-        if (candidates.some((c) => c.fitpass_lesson_id != null)) {
-            throw new FitpassError('CLASS_NOT_FOUND', `lesson ${lk.fitpassLessonId} no coincide con ninguna clase del slot ${slot}.`);
-        }
-    }
-
-    if (norm) {
-        let byName = candidates.filter((c) => fold(c.ct_name) === norm);
-        if (byName.length > 1 && lk.coachName) {
-            const nc = normalizeCoach(lk.coachName);
-            const byCoach = byName.filter((c) => c.coach_name && normalizeCoach(c.coach_name) === nc);
-            if (byCoach.length === 1) byName = byCoach;
-        }
-        if (byName.length === 1) return byName[0].id;
-        if (byName.length > 1) throw new FitpassError('CLASS_NOT_FOUND', `Varias clases coinciden con "${lk.className}" en ${slot} (coach=${lk.coachName ?? '?'}).`);
-    }
-    if (lk.coachName && !norm && lk.fitpassLessonId == null) {
+    const byCoach = (set: Candidate[]): string | null => {
+        if (!lk.coachName) return null;
         const nc = normalizeCoach(lk.coachName);
-        const byCoach = candidates.filter((c) => c.coach_name && normalizeCoach(c.coach_name) === nc);
-        if (byCoach.length === 1) return byCoach[0].id;
+        const m = set.filter((c) => c.coach_name && normalizeCoach(c.coach_name) === nc);
+        return m.length === 1 ? m[0].id : null;
+    };
+    const byLesson = (set: Candidate[]): Candidate[] | null => {
+        if (lk.fitpassLessonId == null || lk.fitpassLessonId <= 0) return null;
+        const m = set.filter((c) => c.fitpass_lesson_id != null && Number(c.fitpass_lesson_id) === Number(lk.fitpassLessonId));
+        return m.length ? m : null;
+    };
+    const resolveIn = (set: Candidate[]): string | null => {
+        if (set.length === 1) return set[0].id;
+        const l = byLesson(set);
+        if (l?.length === 1) return l[0].id;
+        return byCoach(l ?? set);
+    };
+
+    let pool = candidates;
+    if (lk.className) {
+        const norm = normalizeImportClassName(lk.className);
+        const exact = candidates.filter((c) => fold(c.ct_name) === norm);
+        if (exact.length === 1) return exact[0].id;
+        if (exact.length > 1) pool = exact;
+        else {
+            const fp = familyKeywords(lk.className);
+            const scored = candidates.map((c) => {
+                const ck = familyKeywords(c.ct_name);
+                return { c, n: [...ck].filter((k) => fp.has(k)).reduce((a, k) => a + kwWeight(k), 0) };
+            });
+            const best = Math.max(0, ...scored.map((x) => x.n));
+            if (best > 0) pool = scored.filter((x) => x.n === best).map((x) => x.c);
+        }
     }
-    throw new FitpassError('CLASS_NOT_FOUND', `Varias clases en ${slot} y no se pudo identificar el tipo (lesson=${lk.fitpassLessonId ?? '?'}, nombre=${lk.className ?? '?'}). Revisa el mapeo o el feed.`);
+    const hit = resolveIn(pool);
+    if (hit) return hit;
+    throw new FitpassError('CLASS_NOT_FOUND',
+        `Varias clases en ${slot} y no se pudo identificar el tipo (lesson=${lk.fitpassLessonId ?? '?'}, nombre=${lk.className ?? '?'}, coach=${lk.coachName ?? '?'}). Revisa el mapeo o el feed.`);
 }
 
 export async function resolveClassIdForImport(db: Db, row: FitpassSourceRow): Promise<string> {
@@ -269,7 +293,8 @@ async function importSingleRow(db: Db, row: FitpassSourceRow, actor: string | nu
         });
         checkinId = c.checkinId ?? undefined;
     }
-    return { outcome: isExisting ? 'updated' : 'created', bookingId: up.booking.id, checkinId };
+    const overbooked = up.created && up.booking.partner_metadata?.overbooked === true;
+    return { outcome: isExisting ? 'updated' : 'created', bookingId: up.booking.id, checkinId, overbooked: overbooked || undefined };
 }
 
 /** Ejecuta fn en transacción (cliente nuevo) o en SAVEPOINT si el caller pasó su propio cliente. */
@@ -315,18 +340,21 @@ export async function importFitpassReservations(
     const r = await withFitpassLock('FP_IMPORT', run);
     return r ?? {
         summary: { total: rows.length, created: 0, updated: 0, cancelled: 0, skipped: 0, failed: 0 },
-        rows: [], skipped: 'locked',
+        rows: [], overbooked: 0, overbookedRefs: [], skipped: 'locked',
     };
 }
 
 async function importInner(rows: FitpassSourceRow[], actor: string | null, opts: ImportOptions): Promise<FitpassImportResult> {
     const results: FitpassImportRowResult[] = [];
     const summary = { total: rows.length, created: 0, updated: 0, cancelled: 0, skipped: 0, failed: 0 };
+    let overbooked = 0;
+    const overbookedRefs: string[] = [];
     for (let i = 0; i < rows.length; i++) {
         try {
             const out = await inRowTx(opts.db, (c) => importSingleRow(c, rows[i], actor));
             results.push({ index: i, ...out });
             summary[out.outcome] += 1;
+            if (out.overbooked) { overbooked++; overbookedRefs.push(rows[i].sourceRef ?? `fila ${i}`); }
         } catch (err) {
             if (err instanceof FitpassError || err instanceof FitpassBookingError) {
                 results.push({ index: i, outcome: 'failed', error: err.code as FitpassErrorCode, message: err.message });
@@ -339,7 +367,7 @@ async function importInner(rows: FitpassSourceRow[], actor: string | null, opts:
             opts.onProgress?.(i + 1, rows.length);
         }
     }
-    return { summary, rows: results };
+    return { summary, rows: results, overbooked, overbookedRefs: overbookedRefs.slice(0, 20) };
 }
 
 // ── Recepción (walk-in) ─────────────────────────────────────────────────────
