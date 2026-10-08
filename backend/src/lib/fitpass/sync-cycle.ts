@@ -58,12 +58,38 @@ function sampleErrors(r: FitpassImportResult): string[] {
     return r.rows.filter((x) => x.outcome === 'failed').slice(0, 8).map((x) => `${x.error}: ${x.message}`);
 }
 
+/**
+ * La tabla de reservaciones trae el NOMBRE de la disciplina pero no su lesson_id. Se completa por nombre
+ * exacto (normalizado) contra el catálogo vivo de lessons para que class_types.fitpass_lesson_id sea
+ * la llave autoritativa del import. PURA.
+ */
+export function attachLessonIds(rows: FitpassImportRow[], lessons: Array<{ id: number; name: string }>): FitpassImportRow[] {
+    const norm = (x: string) => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    const byName = new Map<string, number | null>();
+    for (const l of lessons) {
+        const k = norm(l.name);
+        byName.set(k, byName.has(k) && byName.get(k) !== l.id ? null : l.id); // nombre repetido => no se adivina
+    }
+    return rows.map((r) => {
+        const lk = r.classLookup;
+        if (!lk || lk.fitpassLessonId || !lk.className) return r;
+        const id = byName.get(norm(lk.className));
+        return id ? { ...r, classLookup: { ...lk, fitpassLessonId: id } } : r;
+    });
+}
+
 async function defaultFetch(from: Date, to: Date): Promise<FitpassImportRow[]> {
     const creds = await getFitpassCreds();
     if (!creds) throw new NoCredsError();
     const scraper = new FitPassScraper(creds.panelUrl);
     await scraper.login({ email: creds.email, password: creds.password });
-    return scraper.fetchReservationsRows(from, to);
+    const rows = await scraper.fetchReservationsRows(from, to);
+    try {
+        return attachLessonIds(rows, await scraper.fetchLessons());
+    } catch (e) {
+        console.warn('[fitpass-sync] no se pudo leer el catálogo de lessons; el import resuelve por nombre:', (e as Error).message);
+        return rows;
+    }
 }
 
 class NoCredsError extends Error {

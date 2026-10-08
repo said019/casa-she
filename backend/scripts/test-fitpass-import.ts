@@ -23,6 +23,7 @@ const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.met
     console.log('  ok cableado');
 }
 
+const D0 = '2031-03-10';
 async function main() {
     const { pool } = await import('../src/config/database.js');
     const { FITPASS_MIGRATIONS } = await import('../src/lib/fitpass/migrations.js');
@@ -46,6 +47,13 @@ async function main() {
     assert.throws(() => src.pickCandidate([cand('a', 'Barre', null), cand('b', 'Flex', null)], lk), /no se pudo identificar/, 'ambiguo falla visible');
     assert.throws(() => src.pickCandidate([cand('a', 'Barre', null, 'Ana'), cand('b', 'Barre', null, 'Ana')], { ...lk, className: 'Barre' }), /Varias clases/);
     assert.throws(() => src.pickCandidate([], lk), /Sin clase/);
+    const sc = await import('../src/lib/fitpass/sync-cycle.js');
+    const att2 = sc.attachLessonIds([
+        { displayName: 'a', status: 'reserved', classLookup: { date: D0, startTime: '09:00', className: 'Barre - Abs & Butt' } },
+        { displayName: 'b', status: 'reserved', classLookup: { date: D0, startTime: '09:00', className: 'Dup' } },
+        { displayName: 'c', status: 'reserved', classLookup: { date: D0, startTime: '09:00', className: 'Nada' } },
+    ], [{ id: 7, name: 'BARRE - ABS & BUTT' }, { id: 8, name: 'Dup' }, { id: 9, name: 'dup' }]);
+    assert.equal(att2[0].classLookup.fitpassLessonId, 7); assert.equal(att2[1].classLookup.fitpassLessonId, undefined, 'nombre repetido no se adivina'); assert.equal(att2[2].classLookup.fitpassLessonId, undefined);
     console.log('  ok funciones puras');
 
     // ── fixtures (todo se revierte) ─────────────────────────────────────────
