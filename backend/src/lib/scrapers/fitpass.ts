@@ -288,6 +288,61 @@ export function parseReservacionesHtml(html: string): Record<string, unknown>[] 
     return out;
 }
 
+export interface FitpassLesson {
+    id: number;
+    name: string;
+    description?: string;
+    activities?: string[];
+    /** false si el panel la marca como no activa (columna Estatus). */
+    active?: boolean;
+}
+
+/**
+ * Parsea /lessons. Layout verificado en vivo (Casa Shé, oct-2026): columnas
+ * [Logo(iniciales) | Disciplina(span.data-table__name + span.data-table__description) |
+ *  Actividades(chips) | Estatus | Acciones], y el link /lessons/{id} en la fila.
+ * Respaldo para el layout de Hundred ([logo vacío, NOMBRE, DESCRIPCIÓN, ACTIVIDADES, ...]):
+ * se ignora una primera celda corta (iniciales del logo) y se toma la primera de texto.
+ */
+export function parseLessonsHtml(html: string): FitpassLesson[] {
+    const $ = cheerio.load(html);
+    const seen = new Map<number, FitpassLesson>();
+    $('a[href*="/lessons/"]').each((_, el) => {
+        const href = $(el).attr('href') || '';
+        const m = href.match(/\/lessons\/(\d+)(?:\/edit)?(?:[/?#]|$)/);
+        if (!m) return;
+        const id = Number(m[1]);
+        if (Number.isNaN(id) || seen.has(id)) return;
+        const row = $(el).closest('tr');
+        if (!row.length) return;
+        const clean = (t: string) => t.replace(/\s+/g, ' ').trim();
+
+        let name = clean(row.find('.data-table__name').first().text());
+        let description = clean(row.find('.data-table__description').first().text()) || undefined;
+        let activities: string[] | undefined;
+        const chips = row.find('td').eq(2).find('.data-table__chip').toArray().map((c) => clean($(c).text())).filter(Boolean);
+
+        const cells = row.find('td').toArray().map((c) => clean($(c).text())).filter(Boolean)
+            .filter((t) => !/^(ver\s+)?editar$|^ver$/i.test(t) && !/^ver editar$/i.test(t));
+        if (!name) {
+            // Layout de respaldo (Hundred): saltar celda de iniciales del logo.
+            const rest = cells.length > 1 && cells[0].length <= 3 ? cells.slice(1) : cells;
+            name = rest[0] || '';
+            description = description ?? rest[1];
+            const rawCells = row.find('td').toArray().map((c) => $(c).text().trim()).filter(Boolean)
+                .filter((t) => !/^(ver\s+)?editar$|^ver$/i.test(t.replace(/\s+/g, ' ')));
+            const rawRest = rawCells.length > 1 && clean(rawCells[0]).length <= 3 ? rawCells.slice(1) : rawCells;
+            if (rawRest[2]) activities = rawRest[2].split(/\s{2,}|\n+/).map((x) => x.trim()).filter(Boolean);
+        }
+        if (!name) return;
+        if (chips.length) activities = chips;
+        const statusCell = cells.find((t) => /^(activa|activo|inactiva|inactivo|deshabilitada|deshabilitado)$/i.test(t));
+        const active = statusCell ? /^activ/i.test(statusCell) : undefined;
+        seen.set(id, { id, name, description, activities, ...(active === undefined ? {} : { active }) });
+    });
+    return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+}
+
 export class FitPassScraper extends BaseScraper {
     private base: string;
 
@@ -414,42 +469,15 @@ export class FitPassScraper extends BaseScraper {
         return recordsToImportRows(allRecords);
     }
 
-    /** Trae la lista de disciplinas (lessons) del gym, parseando el HTML de
-     *  /lessons. FitPass admin no expone JSON para esto, así que cheerio busca
-     *  los links `/lessons/{id}/edit` y extrae el texto de la disciplina en la
-     *  misma fila. Devuelve también descripción y actividades si vienen. */
-    async fetchLessons(): Promise<Array<{ id: number; name: string; description?: string; activities?: string[] }>> {
+    /** Trae la lista de disciplinas (lessons) del gym, parseando el HTML de /lessons
+     *  (FitPass no expone JSON para esto). Ver parseLessonsHtml. */
+    async fetchLessons(): Promise<FitpassLesson[]> {
         if (!this.loggedIn) throw new Error('FitPass scraper not logged in');
         const r = await this.http.get(`${this.base}/lessons`, {
             headers: { 'Accept': 'text/html' },
         });
         if (r.status >= 400) throw new Error(`FitPass: GET /lessons status ${r.status}`);
-
-        const $ = cheerio.load(String(r.data || ''));
-        const seen = new Map<number, { id: number; name: string; description?: string; activities?: string[] }>();
-
-        $('a[href*="/lessons/"]').each((_, el) => {
-            const href = $(el).attr('href') || '';
-            const m = href.match(/\/lessons\/(\d+)(?:\/edit)?/);
-            if (!m) return;
-            const id = Number(m[1]);
-            if (Number.isNaN(id) || seen.has(id)) return;
-            // El nombre de la disciplina suele estar en la <tr> del link, en una
-            // celda anterior. Buscá el <tr> ancestro y extraé las celdas.
-            const row = $(el).closest('tr');
-            if (!row.length) return;
-            const cells = row.find('td').toArray().map((c) => $(c).text().trim()).filter(Boolean);
-            // Tabla del panel: [logo, NOMBRE, DESCRIPCIÓN, ACTIVIDADES, QUE TRAER, acciones]
-            // Filtramos celdas vacías o que son solo el botón "EDITAR".
-            const textCells = cells.filter((t) => !/^editar$/i.test(t));
-            const name = textCells[0] || '';
-            if (!name) return;
-            const description = textCells[1] || undefined;
-            const activities = textCells[2] ? textCells[2].split(/\s{2,}|\n+/).map((s) => s.trim()).filter(Boolean) : undefined;
-            seen.set(id, { id, name, description, activities });
-        });
-
-        return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+        return parseLessonsHtml(String(r.data || ''));
     }
 
     /** Trae un CSRF token fresco navegando al calendario admin.
