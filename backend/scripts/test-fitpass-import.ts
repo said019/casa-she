@@ -172,6 +172,23 @@ async function main() {
         assert.equal(r.summary.failed, 1, 'variante sin pista de familia ni lesson: falla visible');
         void cAmb1;
 
+        // clase PASADA ambigua/no ubicable => skipped 'clase-pasada' (no bloquea el ciclo); futura => failed
+        const P = '2020-01-07';
+        const mkP = async (time: string, instId = inst.id) =>
+            (await one(`INSERT INTO classes (class_type_id, instructor_id, date, start_time, end_time, max_capacity)
+                        VALUES ($1,$2,$3,$4,($4::time + interval '50 min'),8) RETURNING id`, [ctA.id, instId, P, time])).id as string;
+        await mkP('08:00'); await mkP('08:00', inst2.id);
+        r = await imp([row({ sourceRef: '8101', displayName: 'Pasada Fit', classLookup: { date: P, startTime: '08:00', fitpassLessonId: 990001, className: 'ZZ Fp Alpha' } })]);
+        assert.deepEqual(r.summary, { total: 1, created: 0, updated: 0, cancelled: 0, skipped: 1, failed: 0 }, JSON.stringify(r));
+        assert.equal(r.rows[0].outcome, 'skipped'); assert.equal(r.rows[0].reason, 'clase-pasada');
+        assert.equal((await rows(`SELECT 1 FROM bookings WHERE external_ref='8101'`)).length, 0);
+        r = await imp([row({ sourceRef: '8102', classLookup: { date: P, startTime: '19:30' } })]);
+        assert.equal(r.summary.skipped, 1, 'pasada sin clase: skipped'); assert.equal(r.rows[0].reason, 'clase-pasada');
+        r = await imp([row({ sourceRef: '8103', displayName: 'Futura Fit', classLookup: { date: D, startTime: '11:00', fitpassLessonId: 990001, className: 'ZZ Fp Alpha' } })]);
+        assert.equal(r.summary.failed, 1, 'futura ambigua sigue fallando'); assert.equal(r.summary.skipped, 0);
+        assert.equal(src.isPastClassRow(row({ classLookup: { date: P, startTime: '08:00' } })), true);
+        assert.equal(src.isPastClassRow(row({ classLookup: { date: D, startTime: '08:00' } })), false);
+
         // sobrecupo: nunca se rechaza, se marca overbooked
         await imp([row({ sourceRef: '9001', displayName: 'Hana Fit', classLookup: { date: D, startTime: '12:00' } })]);
         r = await imp([row({ sourceRef: '9002', displayName: 'Ivo Fit', classLookup: { date: D, startTime: '12:00' } })]);

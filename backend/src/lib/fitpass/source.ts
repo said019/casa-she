@@ -16,6 +16,7 @@ import type { PoolClient } from 'pg';
 import { pool } from '../../config/database.js';
 import { fitpassClassAliases } from '../gym-config.js';
 import { withFitpassLock } from './locks.js';
+import { cdmxWallClockToUtc } from '../schedule.js';
 import { familyScore, familyKeywords } from './family.js';
 import {
     type Db, blocksFitpassReactivation, cancelFitpassBooking, confirmFitpassCheckin,
@@ -337,6 +338,16 @@ export async function importFitpassReservations(
     };
 }
 
+/** La fila apunta (por fecha+hora CDMX) a una clase que ya empezó. Sin classLookup => false. */
+export function isPastClassRow(row: FitpassSourceRow, now: Date = new Date()): boolean {
+    const lk = row.classLookup;
+    if (!lk?.date || !lk.startTime) return false;
+    try {
+        const start = cdmxWallClockToUtc(lk.date, normalizeHHMMSS(lk.startTime).slice(0, 5));
+        return !Number.isNaN(start.getTime()) && start.getTime() < now.getTime();
+    } catch { return false; }
+}
+
 async function importInner(rows: FitpassSourceRow[], actor: string | null, opts: ImportOptions): Promise<FitpassImportResult> {
     const results: FitpassImportRowResult[] = [];
     const summary = { total: rows.length, created: 0, updated: 0, cancelled: 0, skipped: 0, failed: 0 };
@@ -349,6 +360,12 @@ async function importInner(rows: FitpassSourceRow[], actor: string | null, opts:
             summary[out.outcome] += 1;
             if (out.overbooked) { overbooked++; overbookedRefs.push(rows[i].sourceRef ?? `fila ${i}`); }
         } catch (err) {
+            if ((err instanceof FitpassError || err instanceof FitpassBookingError) && isPastClassRow(rows[i])) {
+                // Clase ya pasada que no se puede ubicar/aplicar: no bloquea el ciclo (visible como skipped).
+                results.push({ index: i, outcome: 'skipped', reason: 'clase-pasada', error: err.code as FitpassErrorCode, message: err.message });
+                summary.skipped += 1;
+                continue;
+            }
             if (err instanceof FitpassError || err instanceof FitpassBookingError) {
                 results.push({ index: i, outcome: 'failed', error: err.code as FitpassErrorCode, message: err.message });
             } else {
