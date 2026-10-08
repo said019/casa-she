@@ -149,7 +149,8 @@ router.post('/lessons/auto-map', ...guard, async (req: Request, res: Response) =
 });
 
 const lessonSchema = z.object({
-    fitpass_lesson_id: z.number().int().positive().nullable(),
+    // Omitido = conservar el mapeo actual (solo cambia el cupo); null = quitarlo.
+    fitpass_lesson_id: z.number().int().positive().nullable().optional(),
     fitpass_quota: z.number().int().min(0).max(500),
 });
 
