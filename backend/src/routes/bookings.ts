@@ -20,6 +20,7 @@ import { joinWaitlist, waitlistOffer, compactWaitlist, promoteNextFromWaitlist }
 import { cdmxWallClockToUtc } from '../lib/schedule.js';
 import crypto from 'node:crypto';
 import { avisarReservaTotalPass } from '../lib/totalpass/alerta-admin.js';
+import { reflectFitpassAttendance } from '../lib/fitpass/attendance.js';
 
 const router = Router();
 
@@ -1690,6 +1691,7 @@ router.post('/:id/check-in', authenticate, requireRole('admin', 'instructor'), a
 
         // Award attendance loyalty points (idempotent; non-blocking on failure)
         void awardCheckinPoints(booking.user_id, booking.id);
+        void reflectFitpassAttendance(booking.id);
 
         res.json(booking);
     } catch (error) {

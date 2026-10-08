@@ -19,6 +19,7 @@ import { ImageStorageError, subirImagen } from '../lib/imageStorage.js';
 import { awardCheckinPoints } from '../lib/loyalty.js';
 import { sendWhatsAppMessage } from '../lib/whatsapp.js';
 import { z } from 'zod';
+import { reflectFitpassAttendance } from '../lib/fitpass/attendance.js';
 
 const photoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -1256,6 +1257,7 @@ router.post('/:id/classes/:classId/checkin', authenticate, requireSelfInstructor
             for (const row of result) {
                 void awardCheckinPoints(row.user_id, row.id);
             }
+            void reflectFitpassAttendance(result.map((r) => r.id));
         } else if (Array.isArray(bookingIds) && bookingIds.length > 0) {
             // Individual check-ins
             for (const bookingId of bookingIds) {
@@ -1268,6 +1270,7 @@ router.post('/:id/classes/:classId/checkin', authenticate, requireSelfInstructor
                 if (row) {
                     checkedIn++;
                     void awardCheckinPoints(row.user_id, row.id);
+                    void reflectFitpassAttendance(row.id);
                 }
             }
         } else {
