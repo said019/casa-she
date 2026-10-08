@@ -29,8 +29,9 @@ interface CredentialsStatus {
 interface Lesson { id: number; name: string }
 
 interface AutoMapResult {
-  mapped: { class_type_id: string; class_type_name: string; fitpass_lesson_id: number; lesson_name: string }[];
-  unmatched: { class_type_id: string; class_type_name: string }[];
+  applied: number;
+  assignments: { classTypeId: string; classTypeName: string; lessonId: number; lessonName: string }[];
+  skipped: { classTypeId?: string; classTypeName?: string; lessonId?: number; lessonName?: string; reason: string }[];
 }
 
 interface SyncStatus {
@@ -136,7 +137,10 @@ export default function FitpassSettings() {
 
   const { data: lecciones = [] } = useQuery<Lesson[]>({
     queryKey: ['fitpass-lessons'],
-    queryFn: async () => (await api.get('/partners/fitpass/lessons')).data,
+    queryFn: async () => {
+      const d = (await api.get('/partners/fitpass/lessons')).data;
+      return (Array.isArray(d) ? d : d?.lessons ?? []) as Lesson[];
+    },
     enabled: conectado,
   });
 
@@ -202,7 +206,7 @@ export default function FitpassSettings() {
     onSuccess: (res) => {
       setAutoMapa(res);
       qc.invalidateQueries({ queryKey: ['class-types'] });
-      toast({ title: 'Mapeo automático listo', description: `${res.mapped.length} mapeadas · ${res.unmatched.length} sin coincidencia` });
+      toast({ title: 'Mapeo automático listo', description: `${res.assignments.length} mapeadas · ${res.skipped.length} sin coincidencia` });
     },
     onError: (err) => toast({ title: 'No se pudo mapear', description: getErrorMessage(err), variant: 'destructive' }),
   });
@@ -316,12 +320,12 @@ export default function FitpassSettings() {
 
                   {autoMapa && (
                     <div className="space-y-1 rounded-xl border border-casa-arena bg-casa-avena/45 p-3 text-sm" data-testid="resultado-automapa">
-                      <p className="font-medium text-casa-ciruela">{autoMapa.mapped.length} mapeadas · {autoMapa.unmatched.length} sin coincidencia</p>
-                      {autoMapa.mapped.map((m) => (
-                        <p key={m.class_type_id} className="text-green-700">{m.class_type_name} → {m.lesson_name}</p>
+                      <p className="font-medium text-casa-ciruela">{autoMapa.assignments.length} mapeadas · {autoMapa.skipped.length} sin coincidencia</p>
+                      {autoMapa.assignments.map((m) => (
+                        <p key={m.classTypeId} className="text-green-700">{m.classTypeName} → {m.lessonName}</p>
                       ))}
-                      {autoMapa.unmatched.map((u) => (
-                        <p key={u.class_type_id} className="text-muted-foreground">{u.class_type_name}: sin coincidencia, elígela abajo</p>
+                      {autoMapa.skipped.map((u, i) => (
+                        <p key={`${u.classTypeId ?? u.lessonId ?? i}`} className="text-muted-foreground">{u.classTypeName ?? u.lessonName}: {u.reason}</p>
                       ))}
                     </div>
                   )}

@@ -32,7 +32,7 @@ test.describe("Admin – Fitpass", () => {
       await route.fulfill({ json: { ok: true, lessons: 2 } });
     });
     await page.route(/\/api\/partners\/fitpass\/lessons$/, (route) =>
-      route.fulfill({ json: [{ id: 11, name: "Barre Fit" }, { id: 12, name: "Pilates Mat" }] }),
+      route.fulfill({ json: { lessons: [{ id: 11, name: "Barre Fit" }, { id: 12, name: "Pilates Mat" }] } }),
     );
     await page.route(/\/api\/partners\/fitpass\/sync-status$/, (route) =>
       route.fulfill({ json: { last_run_at: new Date(Date.now() - 5 * 60_000).toISOString(), success: true, details: null } }),
@@ -42,8 +42,9 @@ test.describe("Admin – Fitpass", () => {
       tipos = tipos.map((t) => (t.id === TIPO_PILATES ? { ...t, fitpass_lesson_id: 12 } : t));
       await route.fulfill({
         json: {
-          mapped: [{ class_type_id: TIPO_PILATES, class_type_name: "Pilates Mat", fitpass_lesson_id: 12, lesson_name: "Pilates Mat" }],
-          unmatched: [{ class_type_id: TIPO_BARRE, class_type_name: "Barre" }],
+          applied: 1,
+          assignments: [{ classTypeId: TIPO_PILATES, classTypeName: "Pilates Mat", lessonId: 12, lessonName: "Pilates Mat" }],
+          skipped: [{ classTypeId: TIPO_BARRE, classTypeName: "Barre", reason: "sin coincidencia" }],
         },
       });
     });

@@ -64,8 +64,9 @@ const classTypeSchema = z.object({
 
 type ClassTypeForm = z.infer<typeof classTypeSchema>;
 
-const guardarCupoFitpass = (id: string, lessonId: number | null, cupo: number) =>
-    api.put(`/partners/fitpass/class-types/${id}/lesson`, { fitpass_lesson_id: lessonId, fitpass_quota: cupo });
+const guardarCupoFitpass = (id: string, cupo: number) =>
+    // fitpass_lesson_id se omite a propósito: el backend conserva la lección ya mapeada.
+    api.put(`/partners/fitpass/class-types/${id}/lesson`, { fitpass_quota: cupo });
 
 export default function ClassTypesList() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -100,7 +101,7 @@ export default function ClassTypesList() {
         mutationFn: async (data: any) => {
             const { fitpass_quota, ...resto } = data;
             const res = await api.post('/class-types', resto);
-            if (Number(fitpass_quota) > 0 && res.data?.id) await guardarCupoFitpass(res.data.id, null, Number(fitpass_quota));
+            if (Number(fitpass_quota) > 0 && res.data?.id) await guardarCupoFitpass(res.data.id, Number(fitpass_quota));
             return res;
         },
         onSuccess: () => {
@@ -121,7 +122,7 @@ export default function ClassTypesList() {
             // El cupo Fitpass vive junto a la lección mapeada: se guarda por la ruta de Fitpass,
             // conservando la lección que ya tenga.
             if (Number(fitpass_quota) !== Number(editingType?.fitpass_quota ?? 0)) {
-                await guardarCupoFitpass(id, editingType?.fitpass_lesson_id ?? null, Number(fitpass_quota) || 0);
+                await guardarCupoFitpass(id, Number(fitpass_quota) || 0);
             }
             return res;
         },
