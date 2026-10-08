@@ -18,6 +18,7 @@
  */
 import { query, queryOne } from '../../config/database.js';
 import { FitPassScraper } from '../scrapers/fitpass.js';
+import { createFitpassSessionManager } from './session.js';
 
 export interface FitpassCreds {
     email: string;
@@ -72,15 +73,27 @@ export async function getFitpassCreds(opts: { includeDisabled?: boolean } = {}):
     };
 }
 
-export async function getFitpassScraper(): Promise<FitPassScraper> {
-    const creds = await getFitpassCreds();
-    if (!creds) throw new FitpassNotConfiguredError();
-    const scraper = new FitPassScraper(creds.panelUrl);
-    await scraper.login({ email: creds.email, password: creds.password });
-    return scraper;
+const sessionManager = createFitpassSessionManager({
+    loadCreds: async () => {
+        const creds = await getFitpassCreds();
+        if (!creds) throw new FitpassNotConfiguredError();
+        return creds;
+    },
+    makeScraper: (panelUrl) => new FitPassScraper(panelUrl),
+});
+
+/** Scraper logueado y COMPARTIDO por todo el proceso (un solo login a la vez; ver session.ts). */
+export function getFitpassScraper(): Promise<FitPassScraper> {
+    return sessionManager.get();
+}
+
+/** Descarta la sesión cacheada (cambian credenciales / se deshabilita). */
+export function resetFitpassSession(): void {
+    sessionManager.reset();
 }
 
 export async function saveFitpassCreds(creds: FitpassCreds, userId?: string | null): Promise<void> {
+    resetFitpassSession();
     const key = getEncryptionKey();
     const payload = JSON.stringify({
         email: creds.email,
@@ -100,6 +113,7 @@ export async function saveFitpassCreds(creds: FitpassCreds, userId?: string | nu
 }
 
 export async function disableFitpass(userId?: string | null): Promise<void> {
+    resetFitpassSession();
     await query(
         `UPDATE platform_credentials SET is_enabled = false, updated_at = NOW(), updated_by = $1 WHERE channel = 'fitpass'`,
         [userId ?? null],

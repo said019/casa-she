@@ -8,7 +8,7 @@
  */
 import { pool, query } from '../../config/database.js';
 import { FitPassScraper, fitpassAttendanceResponseMatches } from '../scrapers/fitpass.js';
-import { getFitpassCreds } from './credentials.js';
+import { getFitpassCreds, getFitpassScraper } from './credentials.js';
 
 export interface PushResult { ok: boolean; status?: number; reason?: string }
 
@@ -27,9 +27,7 @@ async function pushWith(scraper: Attender, reservationId: string): Promise<PushR
 async function loginScraper(): Promise<FitPassScraper | null> {
     const creds = await getFitpassCreds();
     if (!creds) return null;
-    const scraper = new FitPassScraper(creds.panelUrl);
-    await scraper.login({ email: creds.email, password: creds.password });
-    return scraper;
+    return getFitpassScraper(); // sesión compartida del proceso
 }
 
 export async function pushFitpassAttendance(reservationId: string): Promise<PushResult> {
