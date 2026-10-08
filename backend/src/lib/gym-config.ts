@@ -14,13 +14,15 @@ export const GYM_TEAM_NAME = process.env.GYM_TEAM_NAME || 'Casa Shé';
 
 /**
  * Alias nombre-FitPass → nombre-class_type de Hundred para el matching del import.
- * Codifican la taxonomía del estudio (en Hundred, "Yoga"/"Vinyasa" se dan como
- * "Hatha"); otro gimnasio define los suyos con FITPASS_CLASS_ALIASES en JSON,
- * ej. '{"spinning":"cycling"}'. Inválido o ausente → defaults de Hundred.
+ * Codifican la taxonomía del estudio; otro gimnasio define los suyos con FITPASS_CLASS_ALIASES en JSON,
+ * ej. '{"spinning":"cycling"}'. Inválido o ausente → defaults de Casa Shé.
  */
 const DEFAULT_CLASS_ALIASES: Record<string, string> = {
-    yoga: 'hatha', vinyasa: 'hatha', 'power flow': 'hatha', flex: 'hatha',
-    functional: 'funcional',
+    // Disciplinas de FitPass (Casa Shé) cuyo nombre difiere del class_type local.
+    'dharma yoga': 'yoga dharma',
+    'ashtanga yoga': 'yoga ashtanga',
+    'vinyasa yoga': 'yoga vinyasa',
+    'navakaranana yoga': 'navakarana',
 };
 
 let cachedAliases: Record<string, string> | null = null;
