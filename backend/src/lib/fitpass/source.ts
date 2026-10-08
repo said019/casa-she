@@ -16,6 +16,7 @@ import type { PoolClient } from 'pg';
 import { pool } from '../../config/database.js';
 import { fitpassClassAliases } from '../gym-config.js';
 import { withFitpassLock } from './locks.js';
+import { familyScore, familyKeywords } from './family.js';
 import {
     type Db, blocksFitpassReactivation, cancelFitpassBooking, confirmFitpassCheckin,
     findActiveFitpassBookingForPair, findFitpassBookingByRef, fitpassStudioCancellationMetadata,
@@ -93,18 +94,6 @@ export function normalizeHHMMSS(t: string): string {
 
 interface Candidate { id: string; ct_name: string; fitpass_lesson_id: number | null; coach_name: string | null }
 
-/** Palabras que identifican la FAMILIA de una disciplina (FitPass usa variantes por horario). */
-export const FAMILY_KEYWORDS = ['barre', 'pilates', 'mat', 'sculpt', 'abs', 'vinyasa', 'dharma', 'rocket', 'ashtanga', 'navakarana', 'flow', 'flex', 'yoga'];
-
-/** Palabras genéricas pesan 1; las que nombran la disciplina pesan 3. */
-const SECONDARY_KEYWORDS = new Set(['mat', 'abs', 'yoga']);
-const kwWeight = (k: string) => (SECONDARY_KEYWORDS.has(k) ? 1 : 3);
-
-export function familyKeywords(name: string): Set<string> {
-    const words = new Set(fold(name).split(' '));
-    return new Set(FAMILY_KEYWORDS.filter((k) => words.has(k)));
-}
-
 /**
  * PURA: elige una clase entre candidatas del mismo (fecha, hora CDMX) o lanza CLASS_NOT_FOUND visible.
  * Casa Shé tiene UN class_type por familia y FitPass publica VARIANTES por slot ("BARRE - ABS & BUTT",
@@ -148,13 +137,17 @@ export function pickCandidate(
         if (exact.length === 1) return exact[0].id;
         if (exact.length > 1) pool = exact;
         else {
-            const fp = familyKeywords(lk.className);
-            const scored = candidates.map((c) => {
-                const ck = familyKeywords(c.ct_name);
-                return { c, n: [...ck].filter((k) => fp.has(k)).reduce((a, k) => a + kwWeight(k), 0) };
-            });
+            // Familia compartida (family.ts, única fuente de verdad); 0 = incompatible, nunca empata.
+            const scored = candidates.map((c) => ({ c, n: familyScore(c.ct_name, lk.className) }));
             const best = Math.max(0, ...scored.map((x) => x.n));
             if (best > 0) pool = scored.filter((x) => x.n === best).map((x) => x.c);
+            else if (familyKeywords(lk.className).size > 0) {
+                // El panel nombra una disciplina y ninguna clase del slot es de esa familia: no se adivina
+                // por coach; solo vale el mapeo explícito de lesson_id.
+                const l = byLesson(candidates);
+                if (l?.length === 1) return l[0].id;
+                pool = [];
+            }
         }
     }
     const hit = resolveIn(pool);
