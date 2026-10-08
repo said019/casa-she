@@ -72,7 +72,7 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
         return () => clearTimeout(t);
     }, [resaltada]);
 
-    const { data: attendees, isLoading: attendeesLoading, refetch: refetchAttendees } = useQuery<Attendee[]>({
+    const { data: attendees, isLoading: attendeesLoading, isError: attendeesError, refetch: refetchAttendees } = useQuery<Attendee[]>({
         queryKey: ['attendees', clase?.id],
         queryFn: async () => (await api.get(`/bookings/class/${clase?.id}?include_cancelled=true`)).data,
         enabled: !!clase?.id && open,
@@ -195,21 +195,24 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
             key={attendee.booking_id}
             data-resaltada={attendee.user_id === resaltada ? 'true' : undefined}
             className={cn(
-                "flex items-center justify-between gap-2 rounded-lg border p-3 transition-colors duration-500",
+                "flex flex-col gap-3 rounded-2xl border border-casa-arena/70 bg-background p-4 transition-colors hover:border-casa-verde/40",
                 attendee.user_id === resaltada && "border-casa-verde bg-casa-verde/10 ring-2 ring-casa-verde/40",
                 (attendee.channel === 'totalpass' ? attendee.totalpass_checkin_confirmed : attendee.status === 'checked_in') && "border-success/30 bg-success/10",
                 mode === 'cancelado' && "opacity-70",
             )}
         >
             <div className="flex min-w-0 items-center gap-3">
-                <Link to={`/admin/members/${attendee.user_id}`}>
+                <Link to={`/admin/members/${attendee.user_id}`} onClick={() => onOpenChange(false)} aria-label={`Ver perfil de ${attendee.display_name}`} className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-casa-verde focus-visible:ring-offset-2">
                     <Avatar className="cursor-pointer transition-shadow hover:ring-2 hover:ring-primary">
                         <AvatarImage src={attendee.photo_url || undefined} />
                         <AvatarFallback>{getInitials(attendee.display_name)}</AvatarFallback>
                     </Avatar>
                 </Link>
                 <div className="min-w-0">
-                    <p className="truncate font-medium">{attendee.display_name}</p>
+                    <Link to={`/admin/members/${attendee.user_id}`} onClick={() => onOpenChange(false)} className="block rounded-sm font-semibold text-casa-profundo underline-offset-4 hover:text-casa-verde hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-casa-verde">
+                        <span className="break-words">{attendee.display_name}</span>
+                        <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">Ver perfil</span>
+                    </Link>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                         {attendee.is_free_booking
                             ? <Badge variant="outline" className="text-[10px] border-balance-gold/50 text-balance-gold">Invitada</Badge>
@@ -227,7 +230,7 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
                     </p>
                 </div>
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-casa-arena/60 pt-3">
                 {['admin', 'super_admin', 'reception'].includes(user?.role || '') && <Button size="icon" variant="outline" aria-label={`Invitadas de ${attendee.display_name}`} title="Invitadas" onClick={() => setCompanionHost(attendee)}><Users className="h-4 w-4" /></Button>}
                 {/* Escribirle por WhatsApp. Importa sobre todo con las socias de
                     TotalPass: reservaron desde su app y el estudio no las conoce. */}
@@ -299,11 +302,12 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
     return (
         <>
             <Sheet open={open && !!clase} onOpenChange={onOpenChange}>
-                <SheetContent className="w-full overflow-y-auto p-0 font-body sm:max-w-lg">
+                <SheetContent className="w-full overflow-y-auto bg-background p-0 font-sans sm:max-w-xl [&_h3]:font-sans [&_button]:font-sans [&_input]:font-sans">
                     {/* ── Qué clase es y cómo va de lugares ── */}
-                    <div className="border-b border-casa-arena bg-casa-avena/60 p-5">
+                    <div className="border-b border-casa-arena bg-casa-avena/60 px-5 pb-6 pt-8 sm:px-7">
+                        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-casa-verde">Agenda · Detalle de clase</p>
                         <SheetHeader className="space-y-0 text-left">
-                            <SheetTitle className="flex flex-wrap items-center gap-2 font-heading text-2xl font-normal text-casa-profundo">
+                            <SheetTitle className="flex flex-wrap items-center gap-2 pr-6 font-sans text-2xl font-semibold tracking-tight text-casa-profundo">
                                 {clase?.class_type_name}
                                 <ClassIntensity intensity={clase?.intensity} />
                                 {cancelada && <Badge variant="destructive">Cancelada</Badge>}
@@ -314,7 +318,7 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
                             </SheetTitle>
                             <SheetDescription className="sr-only">Detalle de la clase y asistentes</SheetDescription>
                         </SheetHeader>
-                        <div className="mt-3 space-y-1.5 text-sm text-casa-ciruela">
+                        <div className="mt-5 grid gap-3 text-sm text-casa-ciruela sm:grid-cols-2">
                             <p className="flex items-center gap-2.5">
                                 <CalendarIcon className="h-4 w-4 shrink-0 text-casa-verde" />
                                 <span className="capitalize">
@@ -338,7 +342,7 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
                             )}
                         </div>
                         {lugares && !cancelada && (
-                            <div className="mt-4 space-y-2" data-testid="lugares-panel">
+                            <div className="mt-5 space-y-3 border-t border-casa-arena pt-4" data-testid="lugares-panel">
                                 <div className="flex flex-wrap items-center gap-1.5">
                                     {lugares.lugares.map((l, i) => {
                                         const e = estiloDeLugar(l, colorAlumna);
@@ -366,17 +370,17 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
                         )}
                     </div>
 
-                    <div className="space-y-5 p-5">
+                    <div className="space-y-6 px-5 py-6 sm:px-7">
                         {/* Acciones */}
                         {!cancelada && (
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            <div className="grid grid-cols-2 gap-2">
                                 <Button variant="outline" className="px-2" onClick={onEditar}>
                                     <Edit className="mr-1.5 h-4 w-4" /> Editar clase
                                 </Button>
                                 <Button variant="outline" className="px-2" onClick={onCambiarCoach}>
                                     <Users className="mr-1.5 h-4 w-4" /> Cambiar coach
                                 </Button>
-                                <Button variant="destructive" className="px-2" onClick={onCancelar}>
+                                <Button variant="ghost" className="col-span-2 justify-start px-2 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={onCancelar}>
                                     <Trash2 className="mr-1.5 h-4 w-4" /> Cancelar clase
                                 </Button>
                             </div>
@@ -409,14 +413,25 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
 
                         {/* ── Inscritas: pestañas Reservado / Lista de espera / Cancelado ── */}
                         <Tabs value={attendeesTab} onValueChange={(v) => setAttendeesTab(v as 'reservado' | 'espera' | 'cancelado')}>
-                            <TabsList className="grid w-full grid-cols-3">
+                            <div className="mb-3">
+                                <h3 className="text-sm font-semibold text-casa-profundo">Clientas de la clase</h3>
+                                <p className="mt-1 text-xs text-muted-foreground">Pulsa su nombre o foto para abrir su perfil.</p>
+                            </div>
+                            <TabsList className="grid h-11 w-full grid-cols-3 rounded-xl bg-casa-avena p-1">
                                 <TabsTrigger value="reservado">Reservado <span className="ml-1.5 text-xs opacity-70">{reservados.length}</span></TabsTrigger>
                                 <TabsTrigger value="espera">Espera <span className="ml-1.5 text-xs opacity-70">{enEspera.length}</span></TabsTrigger>
                                 <TabsTrigger value="cancelado">Cancelado <span className="ml-1.5 text-xs opacity-70">{cancelados.length}</span></TabsTrigger>
                             </TabsList>
 
                             {attendeesLoading ? (
-                                <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                                <div className="mt-4 space-y-3" role="status" aria-label="Cargando clientas">
+                                    {[0, 1, 2].map((i) => <div key={i} className="h-32 rounded-2xl bg-casa-avena motion-safe:animate-pulse" />)}
+                                </div>
+                            ) : attendeesError ? (
+                                <div role="alert" className="mt-4 rounded-xl border border-destructive/20 p-4 text-sm">
+                                    <p>No se pudo cargar la lista de clientas.</p>
+                                    <Button variant="outline" size="sm" className="mt-3" onClick={() => refetchAttendees()}>Reintentar</Button>
+                                </div>
                             ) : (
                                 <>
                                     <TabsContent value="reservado" className="mt-4 space-y-2.5">
