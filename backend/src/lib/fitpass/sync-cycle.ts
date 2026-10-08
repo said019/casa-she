@@ -20,6 +20,12 @@ import { reconcileFitpassAttendance } from './attendance.js';
 
 export const FITPASS_SYNC_JOB = 'FITPASS_SYNC';
 
+let defaultAfterImport: (() => Promise<void>) | null = null;
+/** Registra el hook por defecto (lo usa el cron). 2B/integración: setFitpassAfterImportHook(reconcilePoolAndPush). */
+export function setFitpassAfterImportHook(fn: (() => Promise<void>) | null): void {
+    defaultAfterImport = fn;
+}
+
 export type FitpassSyncCycleStatus = 'ok' | 'cycle-skipped' | 'no-creds' | 'fetch-failed' | 'import-failed' | 'after-import-failed';
 
 export interface FitpassSyncCycleOptions {
@@ -95,9 +101,10 @@ export async function runFitpassSyncCycle(opts: FitpassSyncCycleOptions = {}): P
             // Un fallo visible (p. ej. clase ambigua) no impide atender el resto, pero el ciclo no cuenta como limpio.
             return { status: 'import-failed', retryable: false, ...base, errors, error: `${imp.summary.failed} fallos de importación` };
         }
-        if (opts.afterImport) {
+        const hook = opts.afterImport ?? defaultAfterImport;
+        if (hook) {
             try {
-                await opts.afterImport();
+                await hook();
             } catch (e) {
                 return { status: 'after-import-failed', retryable: true, ...base, error: (e as Error).message };
             }
