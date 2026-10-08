@@ -1656,7 +1656,11 @@ router.get('/class/:classId', authenticate, requireRole('admin', 'instructor', '
                 b.booked_by,
                 bb.display_name as booked_by_name,
                 bb.role as booked_by_role,
-                b.channel
+                b.channel,
+                EXISTS (
+                    SELECT 1 FROM checkins ck WHERE ck.booking_id = b.id
+                    AND ck.channel = 'totalpass' AND ck.status = 'confirmed'
+                ) AS totalpass_checkin_confirmed
              FROM bookings b
              JOIN users u ON b.user_id = u.id
              LEFT JOIN users bb ON bb.id = b.booked_by
@@ -1679,13 +1683,15 @@ router.get('/class/:classId', authenticate, requireRole('admin', 'instructor', '
 router.post('/:id/check-in', authenticate, requireRole('admin', 'instructor'), async (req: Request, res: Response) => {
     try {
         const bookingId = req.params.id;
+        const source = await queryOne<{ channel: string }>('SELECT channel FROM bookings WHERE id = $1', [bookingId]);
+        if (source?.channel === 'totalpass') return res.status(409).json({ code: 'TOTALPASS_CHECKIN_REQUIRED', error: 'El check-in de TotalPass debe confirmarse desde TotalPass, no como asistencia manual.' });
 
         // This update triggers the DB function we want to disable/avoid?
         // We will disable the trigger in index.ts, so this just marks status.
         const booking = await queryOne<{ id: string; user_id: string }>(
             `UPDATE bookings
              SET status = 'checked_in', checked_in_at = NOW(), checked_in_by = $1
-             WHERE id = $2
+             WHERE id = $2 AND channel IS DISTINCT FROM 'totalpass'
              RETURNING *`,
             [req.user?.userId, bookingId]
         );
@@ -1707,11 +1713,13 @@ router.post('/:id/check-in', authenticate, requireRole('admin', 'instructor'), a
 router.post('/:id/uncheck-in', authenticate, requireRole('admin', 'instructor'), async (req: Request, res: Response) => {
     try {
         const bookingId = req.params.id;
+        const source = await queryOne<{ channel: string }>('SELECT channel FROM bookings WHERE id = $1', [bookingId]);
+        if (source?.channel === 'totalpass') return res.status(409).json({ code: 'TOTALPASS_CHECKIN_REQUIRED', error: 'El check-in de TotalPass no puede deshacerse como asistencia manual.' });
 
         const booking = await queryOne(
             `UPDATE bookings
              SET status = 'confirmed', checked_in_at = NULL, checked_in_by = NULL, updated_at = NOW()
-             WHERE id = $1 AND status = 'checked_in'
+             WHERE id = $1 AND status = 'checked_in' AND channel IS DISTINCT FROM 'totalpass'
              RETURNING *`,
             [bookingId]
         );

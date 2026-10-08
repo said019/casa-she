@@ -25,6 +25,7 @@ export interface Attendee {
     booked_by_role?: string | null;
     /** 'app' | 'totalpass' | 'wellhub' | 'fitpass' — de dónde vino la reserva. */
     channel?: string | null;
+    totalpass_checkin_confirmed?: boolean;
 }
 
 /** Lo que devuelve /classes/copy-week, en vista previa y en la copia real. */

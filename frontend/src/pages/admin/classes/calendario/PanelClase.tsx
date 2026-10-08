@@ -197,7 +197,7 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
             className={cn(
                 "flex items-center justify-between gap-2 rounded-lg border p-3 transition-colors duration-500",
                 attendee.user_id === resaltada && "border-casa-verde bg-casa-verde/10 ring-2 ring-casa-verde/40",
-                attendee.status === 'checked_in' && "border-success/30 bg-success/10",
+                (attendee.channel === 'totalpass' ? attendee.totalpass_checkin_confirmed : attendee.status === 'checked_in') && "border-success/30 bg-success/10",
                 mode === 'cancelado' && "opacity-70",
             )}
         >
@@ -248,7 +248,13 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
                         </Button>
                     );
                 })()}
-                {mode === 'reservado' && attendee.status === 'checked_in' && (
+                {mode === 'reservado' && attendee.channel === 'totalpass' && (
+                    <Badge className={attendee.totalpass_checkin_confirmed ? 'bg-success' : ''} variant={attendee.totalpass_checkin_confirmed ? 'default' : 'outline'}>
+                        {attendee.totalpass_checkin_confirmed ? <Check className="mr-1 h-3 w-3" /> : <Clock className="mr-1 h-3 w-3" />}
+                        {attendee.totalpass_checkin_confirmed ? 'Check-in validado' : 'Check-in pendiente'}
+                    </Badge>
+                )}
+                {mode === 'reservado' && attendee.channel !== 'totalpass' && attendee.status === 'checked_in' && (
                     <>
                         <Badge className="bg-success"><Check className="mr-1 h-3 w-3" />Asistió</Badge>
                         <Button
@@ -262,12 +268,12 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
                 )}
                 {mode === 'reservado' && attendee.status !== 'checked_in' && (
                     <>
-                        <Button
+                        {attendee.channel !== 'totalpass' && <Button
                             size="icon" className="h-9 w-9 bg-success hover:bg-success/90" title="Marcar asistencia"
                             onClick={() => checkInMutation.mutate(attendee.booking_id)} disabled={checkInMutation.isPending}
                         >
                             {checkInMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                        </Button>
+                        </Button>}
                         <Button
                             size="icon" variant="outline" className="h-9 w-9 text-destructive hover:bg-destructive/10" title="Cancelar reserva"
                             onClick={() => setCancelBookingId(attendee.booking_id)}
