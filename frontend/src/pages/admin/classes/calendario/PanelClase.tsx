@@ -390,10 +390,8 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
                             />
                         )}
 
-                        {/* Cupo de cada plataforma conectada. Solo TotalPass: PUT /classes/:id/channels
-                            hoy acepta únicamente `totalpass`; Fitpass necesita soporte en el backend
-                            antes de mostrar su control (el catálogo de canales no cambia). */}
-                        {!cancelada && clase && canalesConectados().filter((c) => c.clave === 'totalpass').map((canal) => (
+                        {/* Cupo de cada plataforma conectada: PUT /classes/:id/channels { [canal]: n }. */}
+                        {!cancelada && clase && canalesConectados().map((canal) => (
                             <ControlCupoCanal
                                 key={canal.clave}
                                 canal={canal}

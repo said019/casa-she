@@ -32,6 +32,8 @@ export interface ClassType {
     is_active: boolean;
     created_at: string;
     totalpass_default_spots?: number | null;
+    fitpass_lesson_id?: number | null;
+    fitpass_quota?: number | null;
 }
 
 export interface Schedule {

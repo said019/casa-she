@@ -25,7 +25,7 @@ export type AccionLote = 'coach' | 'cupo_canal' | 'mover' | 'cancelar';
 
 export interface ParametrosLote {
     instructorId?: string;
-    canal?: 'totalpass';
+    canal?: 'totalpass' | 'fitpass';
     lugares?: number;
     minutos?: number;
     classTypeId?: string;
@@ -178,14 +178,14 @@ export function textoHecho(accion: AccionLote, p: ParametrosLote, r: RespuestaLo
     const clases = nClases(r.resumen.ok);
     const avisadas = r.resumen.alumnasAvisadas ? ` Avisamos a ${nAlumnas(r.resumen.alumnasAvisadas)}.` : '';
     if (accion === 'coach') return `Listo: ${clases} ahora con ${nombres.coach ?? 'la coach nueva'}.${avisadas}`;
-    if (accion === 'cupo_canal') return `Guardado: ${p.lugares} ${p.lugares === 1 ? 'lugar' : 'lugares'} para TotalPass en ${clases}.`;
+    if (accion === 'cupo_canal') return `Guardado: ${p.lugares} ${p.lugares === 1 ? 'lugar' : 'lugares'} para ${p.canal === 'fitpass' ? 'Fitpass' : 'TotalPass'} en ${clases}.`;
     if (accion === 'cancelar') return `${clases} ${r.resumen.ok === 1 ? 'cancelada' : 'canceladas'}. Siguen en el calendario, marcadas.`;
     return `Listo: ${clases} ${r.resumen.ok === 1 ? 'actualizada' : 'actualizadas'}.${avisadas}`;
 }
 
 /** Impacto en alumnas de la app según la vista previa. */
-export function textoAvisadas(accion: AccionLote, n: number): string {
-    if (accion === 'cupo_canal') return 'Las alumnas no reciben aviso: solo cambia el cupo de TotalPass.';
+export function textoAvisadas(accion: AccionLote, n: number, canal: 'totalpass' | 'fitpass' = 'totalpass'): string {
+    if (accion === 'cupo_canal') return `Las alumnas no reciben aviso: solo cambia el cupo de ${canal === 'fitpass' ? 'Fitpass' : 'TotalPass'}.`;
     if (n === 0) return 'No hay alumnas inscritas que avisar.';
     if (accion === 'cancelar') return `${nAlumnas(n)} ${n === 1 ? 'recupera su crédito y recibe' : 'recuperan su crédito y reciben'} aviso.`;
     return `Avisamos del cambio a ${nAlumnas(n)} por la app.`;

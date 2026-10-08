@@ -59,9 +59,13 @@ const classTypeSchema = z.object({
     category: z.enum(['reformer', 'multi']).default('multi'),
     isActive: z.boolean().default(true),
     totalpass_default_spots: z.coerce.number().int().min(0).optional().default(0),
+    fitpass_quota: z.coerce.number().int().min(0).optional().default(0),
 });
 
 type ClassTypeForm = z.infer<typeof classTypeSchema>;
+
+const guardarCupoFitpass = (id: string, lessonId: number | null, cupo: number) =>
+    api.put(`/partners/fitpass/class-types/${id}/lesson`, { fitpass_lesson_id: lessonId, fitpass_quota: cupo });
 
 export default function ClassTypesList() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -79,6 +83,7 @@ export default function ClassTypesList() {
             category: 'multi',
             isActive: true,
             totalpass_default_spots: 0,
+            fitpass_quota: 0,
         },
     });
     const selectedColor = watch('color');
@@ -93,7 +98,10 @@ export default function ClassTypesList() {
 
     const createMutation = useMutation({
         mutationFn: async (data: any) => {
-            return await api.post('/class-types', data);
+            const { fitpass_quota, ...resto } = data;
+            const res = await api.post('/class-types', resto);
+            if (Number(fitpass_quota) > 0 && res.data?.id) await guardarCupoFitpass(res.data.id, null, Number(fitpass_quota));
+            return res;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['class-types'] });
@@ -108,7 +116,14 @@ export default function ClassTypesList() {
 
     const updateMutation = useMutation({
         mutationFn: async ({ id, data }: { id: string; data: any }) => {
-            return await api.put(`/class-types/${id}`, data);
+            const { fitpass_quota, ...resto } = data;
+            const res = await api.put(`/class-types/${id}`, resto);
+            // El cupo Fitpass vive junto a la lección mapeada: se guarda por la ruta de Fitpass,
+            // conservando la lección que ya tenga.
+            if (Number(fitpass_quota) !== Number(editingType?.fitpass_quota ?? 0)) {
+                await guardarCupoFitpass(id, editingType?.fitpass_lesson_id ?? null, Number(fitpass_quota) || 0);
+            }
+            return res;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['class-types'] });
@@ -154,6 +169,7 @@ export default function ClassTypesList() {
         setValue('category', ((item as any).category === 'reformer' ? 'reformer' : 'multi'));
         setValue('isActive', item.is_active);
         setValue('totalpass_default_spots', item.totalpass_default_spots ?? 0);
+        setValue('fitpass_quota', item.fitpass_quota ?? 0);
         setIsDialogOpen(true);
     };
 
@@ -324,6 +340,16 @@ export default function ClassTypesList() {
                                     <Input type="number" id="totalpassDefaultSpots" min={0} {...register('totalpass_default_spots')} />
                                     <p className="text-xs text-muted-foreground">
                                         Cupo TotalPass sugerido al crear clases de esta disciplina. 0 = no ofrecida en TotalPass por defecto.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="fitpassQuota" className="flex items-center gap-1.5">
+                                        Lugares para <ChannelLogo canal="fitpass" alto={10} /> por defecto
+                                    </Label>
+                                    <Input type="number" id="fitpassQuota" min={0} {...register('fitpass_quota')} />
+                                    <p className="text-xs text-muted-foreground">
+                                        Cupo Fitpass sugerido al crear clases de esta disciplina. 0 = no ofrecida en Fitpass por defecto.
                                     </p>
                                 </div>
 

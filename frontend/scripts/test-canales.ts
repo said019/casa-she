@@ -28,8 +28,8 @@ for (const v of ['wellhub', 'app', '', null, undefined, 3, 'TotalPass']) {
     assert.equal(esCanal(v), false, `v=${String(v)}`);
 }
 
-// Conectados: hoy solo TotalPass.
-assert.deepEqual(canalesConectados().map((c) => c.clave), ['totalpass']);
+// Conectados: TotalPass y Fitpass.
+assert.deepEqual(canalesConectados().map((c) => c.clave), ['totalpass', 'fitpass']);
 
 // Colores de la spec.
 assert.equal(CANALES.totalpass.punto, '#26D07C');
