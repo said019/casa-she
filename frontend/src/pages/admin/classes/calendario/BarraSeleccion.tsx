@@ -1,4 +1,5 @@
 import { Clock, UserRoundCheck, X, XCircle } from 'lucide-react';
+import { canalesConectados } from '@/lib/canales';
 import { ChannelLogo } from '@/components/brands/ChannelLogo';
 import { cn } from '@/lib/utils';
 import type { AccionLote } from './seleccion';
@@ -36,7 +37,7 @@ export function BarraSeleccion({ titulo, detalle, activa, abierta, onAccion, onT
                     <UserRoundCheck className="h-[17px] w-[17px]" aria-hidden="true" /> Cambiar coach
                 </button>
                 <button type="button" className={cn(BOTON, resaltada('cupo_canal'))} disabled={!activa} onClick={() => onAccion('cupo_canal')}>
-                    Cupo <ChannelLogo canal="totalpass" fondo="oscuro" alto={10} />
+                    Cupo {canalesConectados().map((c) => <ChannelLogo key={c.clave} canal={c.clave} fondo="oscuro" alto={10} />)}
                 </button>
                 <button type="button" className={cn(BOTON, resaltada('mover'))} disabled={!activa} onClick={() => onAccion('mover')}>
                     <Clock className="h-[17px] w-[17px]" aria-hidden="true" /> Mover o cambiar clase

@@ -91,6 +91,9 @@ import WhatsAppSettings from "./pages/admin/settings/WhatsAppSettings";
 import AdminOnboardingRules from "./pages/admin/settings/OnboardingRules";
 import BarSettings from "./pages/admin/settings/BarSettings";
 import TotalPassSettings from "./pages/admin/settings/TotalPassSettings";
+import FitpassSettings from "./pages/admin/settings/FitpassSettings";
+import FitpassAttendees from "./pages/admin/bookings/FitpassAttendees";
+import FitpassImport from "./pages/admin/bookings/FitpassImport";
 import BarExtras from "./pages/admin/settings/BarExtras";
 import BarQueue from "./pages/admin/bar/BarQueue";
 
@@ -354,6 +357,9 @@ const App = () => (
             <Route path="/admin/settings/whatsapp" element={<WhatsAppSettings />} />
             <Route path="/admin/settings/onboarding" element={<AdminOnboardingRules />} />
             <Route path="/admin/settings/totalpass" element={<TotalPassSettings />} />
+            <Route path="/admin/settings/fitpass" element={<FitpassSettings />} />
+            <Route path="/admin/bookings/fitpass" element={<FitpassAttendees />} />
+            <Route path="/admin/bookings/fitpass-import" element={<FitpassImport />} />
             <Route path="/admin/settings/bar" element={<BarSettings />} />
             <Route path="/admin/settings/bar/extras" element={<BarExtras />} />
             <Route path="/admin/bar/queue" element={<BarQueue />} />

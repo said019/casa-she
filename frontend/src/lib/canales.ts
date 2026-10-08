@@ -45,7 +45,7 @@ export const CANALES: Record<CanalClave, Canal> = {
         logoOscuro: null,
         // El PNG incluye el ícono circular: a igual alto, las letras salen más chicas que las de TotalPass.
         escalaAlto: 1.6,
-        conectado: false,
+        conectado: true,
     },
 };
 

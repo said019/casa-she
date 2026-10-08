@@ -28,11 +28,19 @@ import { renewTotalPassToken, isTotalpassEnabled } from '../lib/totalpass/token.
 import { publishTotalPassIndividualClasses } from '../lib/totalpass/publish.js';
 import { reconcileTotalpassPool } from '../lib/totalpass/pool.js';
 import { retirarClasesPendientesDeTotalpass } from '../lib/totalpass/retire.js';
+// >>> FITPASS 2B (publicación/cupo/outbox) — bloque delimitado para facilitar el merge con 2A
+import { reconcileFitpassPool } from '../lib/fitpass/availability.js';
+import { extendFitpassWeek } from '../lib/fitpass/publish.js';
+import { retryFitpassOutbox } from '../lib/fitpass/outbox.js';
+import { logFitpassCron } from '../lib/fitpass/cron-log.js';
+// <<< FITPASS 2B
 import { resincronizarClasesPendientes } from '../lib/totalpass/resync.js';
 import { syncTotalPassReservations } from '../lib/totalpass/source.js';
 import { withPgAdvisoryLock } from '../lib/totalpass/lock.js';
 import { localDateStr, addDaysToDateStr } from '../lib/mx-time.js';
 import { cdmxToday } from '../lib/schedule.js';
+import { runFitpassSyncCycle } from '../lib/fitpass/sync-cycle.js';
+import { getFitpassCreds } from '../lib/fitpass/credentials.js';
 
 // ============================================
 // TIPOS
@@ -759,6 +767,48 @@ export async function expireBenefits(): Promise<void> {
     }
 }
 
+// >>> FITPASS 2B — jobs de cupo / semana / outbox (inertes sin credenciales FitPass habilitadas ni schedules dueñas)
+/** :07/:17/... — respaldo batch del cupo (hoy..+21d). Los eventos empujan al instante; esto corrige lo que se escapó. */
+async function fitpassPoolJob(): Promise<void> {
+    const jobName = 'FITPASS_POOL';
+    try {
+        const r = await reconcileFitpassPool();
+        if (r.skipped_all === 'nothing-owned' || r.skipped_all === 'not-configured') return;
+        logJob(jobName, JSON.stringify(r));
+        await logFitpassCron(jobName, !r.failed && r.skipped_all !== 'lock-busy', r);
+    } catch (error) {
+        logError(jobName, error);
+        await logFitpassCron(jobName, false, String(error));
+    }
+}
+
+/** Lunes 5:00 CDMX — repone schedules de hoy a +7d. No hace nada sin FITPASS_PUBLISH_ENABLED=true. */
+async function fitpassExtendWeekJob(): Promise<void> {
+    const jobName = 'FITPASS_EXTEND_WEEK';
+    try {
+        const r = await extendFitpassWeek(); // se auto-registra en cron_job_logs cuando corre
+        logJob(jobName, JSON.stringify('counts' in r ? r.counts : r));
+    } catch (error) {
+        logError(jobName, error);
+        await logFitpassCron(jobName, false, String(error));
+    }
+}
+
+/** Cada 5 min — reintenta cancelaciones y ediciones pendientes (outbox) hacia FitPass. */
+async function fitpassRetryJob(): Promise<void> {
+    const jobName = 'FITPASS_RETRY';
+    try {
+        const r = await retryFitpassOutbox();
+        if (r.skipped === 'nothing-pending' || r.skipped === 'not-configured') return;
+        logJob(jobName, JSON.stringify(r));
+        await logFitpassCron(jobName, !(r.cancel?.fallidas || r.edit?.fallidas), r);
+    } catch (error) {
+        logError(jobName, error);
+        await logFitpassCron(jobName, false, String(error));
+    }
+}
+// <<< FITPASS 2B
+
 // ============================================
 // JOBS DE TOTALPASS (Fase 7, Task 17)
 //
@@ -849,6 +899,22 @@ async function totalpassImportJob(): Promise<void> {
     } catch (error) {
         logError(jobName, error);
         await recordJobExecution(jobName, false, String(error));
+    }
+}
+
+/**
+ * FITPASS_SYNC — cada 2 min: snapshot de reservas del panel de FitPass + import + asistencia.
+ * Inerte salvo que el job esté EXPLÍCITAMENTE en CRON_JOBS (una lista vacía = "todos" NO lo
+ * enciende) y que las credenciales de FitPass existan y estén habilitadas. Se registra solo en
+ * cron_job_logs (lo hace el propio ciclo). Lock ocupado => skip retryable.
+ */
+async function fitpassSyncJob(): Promise<void> {
+    try {
+        if (!(await getFitpassCreds())) return; // sin credenciales o deshabilitado — inerte
+        const r = await runFitpassSyncCycle();
+        if (r.status !== 'ok') logJob('FITPASS_SYNC', `${r.status}${r.error ? `: ${r.error}` : ''}${r.retryable ? ' (se reintenta)' : ''}`);
+    } catch (error) {
+        logError('FITPASS_SYNC', error);
     }
 }
 
@@ -1138,6 +1204,22 @@ export function initializeCronJobs(): void {
     // Cada 10 min (:03,:13,...) - Empujar a TotalPass los cambios de clases editadas.
     job('TOTALPASS_RESYNC', '3,13,23,33,43,53 * * * *', () => { void totalpassResyncJob(); }, 'TOTALPASS_RESYNC - Cada 10 min');
 
+    // Cada 2 min - FitPass: reservas, asistencias y cancelaciones del panel (solo si está en CRON_JOBS).
+    if (listaBlanca.includes('FITPASS_SYNC')) {
+        job('FITPASS_SYNC', '*/2 * * * *', () => { void fitpassSyncJob(); }, 'FITPASS_SYNC - Cada 2 min');
+    } else {
+        console.log('  ⏸️  FITPASS_SYNC - omitido (requiere estar explícitamente en CRON_JOBS)');
+    }
+
+    // >>> FITPASS 2B — crons de publicación/cupo/outbox
+    // Cada 10 min (:07,:17,...) - Respaldo del cupo total hacia FitPass (desfasado de TotalPass)
+    job('FITPASS_POOL', '7,17,27,37,47,57 * * * *', () => { void fitpassPoolJob(); }, 'FITPASS_POOL - Cada 10 min');
+    // Lunes 5:00 - Reponer la semana (no-op sin FITPASS_PUBLISH_ENABLED=true)
+    job('FITPASS_EXTEND_WEEK', '0 5 * * 1', () => { void fitpassExtendWeekJob(); }, 'FITPASS_EXTEND_WEEK - Lunes 5:00 AM');
+    // Cada 5 min - Reintentar cancelaciones/ediciones pendientes
+    job('FITPASS_RETRY', '1,6,11,16,21,26,31,36,41,46,51,56 * * * *', () => { void fitpassRetryJob(); }, 'FITPASS_RETRY - Cada 5 min');
+    // <<< FITPASS 2B
+
     console.log('\n⏰ Cron Jobs inicializados correctamente\n');
 }
 
@@ -1166,6 +1248,7 @@ export const cronJobs = {
     totalpassImport: totalpassImportJob,
     totalpassRetire: totalpassRetireJob,
     totalpassResync: totalpassResyncJob,
+    fitpassSync: fitpassSyncJob,
 };
 
 export default initializeCronJobs;

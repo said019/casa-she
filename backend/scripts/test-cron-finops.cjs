@@ -36,7 +36,7 @@ for(const [i,[,pattern,name]] of expected.entries()) {
 }
 assert.equal(registrations(' unknown_job ').calls.length,0);
 assert.equal(registrations(' totalpass_import, TOTALPASS_TOKEN ').calls.length,2);
-assert.equal(registrations('').calls.length,17);
+assert.equal(registrations('').calls.length,20); // 17 + FITPASS_POOL, FITPASS_EXTEND_WEEK, FITPASS_RETRY (FITPASS_SYNC solo si está explícito)
 
 const RealDate=Date; let now=RealDate.parse('2026-09-07T02:59:17Z');
 global.Date=class extends RealDate {constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}};
