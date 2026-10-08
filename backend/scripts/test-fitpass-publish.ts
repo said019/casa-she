@@ -36,7 +36,7 @@ assert.equal(isRealCoach('Ana', GYM_DEFAULT_COACH), true);
 ok('fingerprint UTC->CDMX (antes y después de las 6pm)');
 
 // ── 1b. Familias: tipo de Casa Shé vs variante del panel ────────────────────
-for (const [casa, fpn] of [['Barre', 'BARRE - ABS & BUTT'], ['Barre', 'BARRE GAP'], ['Barre Funcional', 'BARRE - FULL BODY'], ['Pilates Mat', 'PILATES MAT - GAP'],
+for (const [casa, fpn] of [['Barre', 'BARRE - ABS & BUTT'], ['Barre', 'BARRE GAP'], ['Barre Funcional', 'BARRE - FULL BODY'], ['Pilates Mat', 'PILATES MAT - GAP'], ['Pilates Mat', 'MAT FULL BODY'], ['Pilates Mat', 'MAT ABS Y BUTT'], ['Pilates Booty', 'PILATES MAT ABS & BUTT'],
     ['Power Abs', 'POWER ABS'], ['Mat Power Abs', 'MAT - POWER ABS'], ['Sculpt (Abs & Butt)', 'SCULPT ABS & BUTT'], ['Yoga Vinyasa', 'VINYASA YOGA'],
     ['Power Vinyasa', 'VINYASA YOGA'], ['Navakarana', 'NAVAKARANANA YOGA'], ['Inicios de Ashtanga', 'ASHTANGA YOGA'], ['Flex & Flow', 'FLEX'], ['Yoga Dharma', 'DHARMA YOGA'], ['Morning Flow', 'FLOW YOGA']]) {
     assert.ok(familyCompatible(casa, fpn), `${casa} ~ ${fpn}`);

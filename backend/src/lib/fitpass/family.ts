@@ -7,7 +7,9 @@
  * (Misma lista y pesos que la resolución del import de 2A; unificar al integrar.)
  */
 export const FAMILY_KEYWORDS = ['barre', 'pilates', 'mat', 'sculpt', 'abs', 'vinyasa', 'dharma', 'rocket', 'ashtanga', 'navakarana', 'flow', 'flex', 'yoga'] as const;
-const SECONDARY = new Set<string>(['mat', 'abs', 'yoga']);
+// 'mat' es disciplina por sí misma: el tipo "Pilates Mat" de Casa Shé aparece en el panel como
+// "MAT FULL BODY", "MAT ABS Y BUTT"… (y 'pilates' cuenta como 'mat' abajo).
+const SECONDARY = new Set<string>(['abs', 'yoga']);
 const weight = (k: string) => (SECONDARY.has(k) ? 1 : 3);
 
 /** minúsculas, sin acentos ni puntuación (& se vuelve espacio); navakaranana -> navakarana. */
@@ -18,6 +20,8 @@ export function foldName(s: string | null | undefined): string {
 
 export function familyKeywords(name: string | null | undefined): Set<string> {
     const words = new Set(foldName(name).split(' '));
+    if (words.has('pilates')) words.add('mat');
+    if (words.has('mat')) words.add('pilates');
     return new Set(FAMILY_KEYWORDS.filter((k) => words.has(k)));
 }
 
