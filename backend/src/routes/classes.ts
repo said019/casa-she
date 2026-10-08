@@ -18,6 +18,12 @@ import { errorDeCupoAlEditar } from '../lib/class-capacity.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { setTotalpassCap } from '../lib/totalpass/caps.js';
 import { dispararRetiroTotalpass } from '../lib/totalpass/retire.js';
+import { dispararFitpassOutbox } from '../lib/fitpass/outbox.js';
+import { marcarEdicionFitpass, preflightFitpassClassEdit } from '../lib/fitpass/edit.js';
+import { getPanelCtx, fitpassPublishEnabled } from '../lib/fitpass/panel.js';
+import { setFitpassCap } from '../lib/fitpass/caps.js';
+import { dispararDisponibilidadFitpass } from '../lib/fitpass/availability.js';
+import { publishClassToFitpass } from '../lib/fitpass/publish.js';
 import { marcarResyncTotalpass, dispararResyncTotalpass } from '../lib/totalpass/resync.js';
 import { copiarSemana, diasEntre } from '../lib/copy-week.js';
 import { CANALES_DE_CLASE_SQL } from '../lib/class-channels.js';
@@ -320,7 +326,9 @@ router.post('/bulk', authenticate, requireElevated, async (req: Request, res: Re
 
         void enviarAvisosDelLote(trasCommit).catch((e) => console.error('[classes-bulk] avisos fallaron:', e));
         if (trasCommit.retiro) dispararRetiroTotalpass();
+        dispararFitpassOutbox(); // cancelaciones y ediciones de FitPass marcadas por el lote
         if (trasCommit.resync) dispararResyncTotalpass();
+        if (entrada.accion === 'cupo_canal' && entrada.canal === 'fitpass') for (const id of entrada.classIds) dispararDisponibilidadFitpass(id);
         await logAction(query, {
             adminUserId: req.user!.userId,
             actionType: `classes_bulk_${entrada.accion}`,
@@ -943,6 +951,28 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
             return res.json(existing);
         }
 
+        // FitPass: si la clase es dueña de una schedule y se mueve/cambia de tipo, validar ANTES del
+        // UPDATE local que el destino no esté ocupado por otra clase del panel (anti-robo).
+        // Solo con FITPASS_PUBLISH_ENABLED (la edición en FitPass está detrás de ese flag).
+        if (fitpassPublishEnabled() && (data.date !== undefined || data.startTime !== undefined || data.classTypeId !== undefined)) {
+            try {
+                const ctx = await getPanelCtx();
+                if (ctx) {
+                    const dest = await queryOne<{ date: string; hhmm: string; type_name: string }>(
+                        `SELECT COALESCE($2::date, c.date)::text AS date, COALESCE($3::text, substr(c.start_time::text,1,5)) AS hhmm,
+                                ct.name AS type_name
+                           FROM classes c JOIN class_types ct ON ct.id = COALESCE($4::uuid, c.class_type_id) WHERE c.id = $1`,
+                        [id, data.date ?? null, data.startTime ?? null, data.classTypeId ?? null]);
+                    if (dest) {
+                        const pre = await preflightFitpassClassEdit(id, { date: dest.date, hhmm: dest.hhmm, typeName: dest.type_name }, { ctx });
+                        if (!pre.ok) return res.status(409).json({ error: pre.message, code: pre.code });
+                    }
+                }
+            } catch (preErr) {
+                console.error('[fitpass] preflight de edición falló (no bloquea):', (preErr as Error).message);
+            }
+        }
+
         values.push(id);
         const horarioAntes = await horarioDeClase(id);
         const result = await queryOne(
@@ -950,6 +980,9 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
              WHERE id = $${paramCount} RETURNING *`,
             values
         );
+
+        // Cambió la capacidad: el techo que ve FitPass cambia (solo si la clase es dueña de una schedule).
+        if (data.maxCapacity !== undefined) dispararDisponibilidadFitpass(id);
 
         // Cambió el día o la hora: avisar a las alumnas de la app (in-app + push), igual
         // que los cambios en bloque. Sin esto la alumna llegaba a la hora vieja.
@@ -966,6 +999,7 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
         if (tocaTotalpass) {
             const marcadas = await marcarResyncTotalpass([id]);
             if (marcadas) dispararResyncTotalpass();
+            if (await marcarEdicionFitpass([id])) dispararFitpassOutbox();
         }
 
         // Cambio de instructor: audit + advertencia si el mes ya tiene nómina pagada.
@@ -1029,13 +1063,17 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
     }
 });
 
-// PUT /api/classes/:id/channels — setear lugares de TotalPass para una clase.
+// PUT /api/classes/:id/channels — setear lugares de TotalPass y/o FitPass para una clase.
 // Admin + TODA la recepción (con scope de sucursal, igual que close-bookings).
 router.put('/:id/channels', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
     try {
-        const { totalpass } = req.body ?? {};
-        const n = Number(totalpass);
-        if (!Number.isInteger(n) || n < 0) return res.status(400).json({ error: 'totalpass debe ser un entero >= 0' });
+        const { totalpass, fitpass } = req.body ?? {};
+        const parseN = (v: unknown) => (v === undefined ? undefined : Number(v));
+        const tpN = parseN(totalpass);
+        const fpN = parseN(fitpass);
+        if (tpN === undefined && fpN === undefined) return res.status(400).json({ error: 'Indica totalpass y/o fitpass', code: 'CHANNEL_REQUIRED' });
+        if (tpN !== undefined && (!Number.isInteger(tpN) || tpN < 0)) return res.status(400).json({ error: 'totalpass debe ser un entero >= 0' });
+        if (fpN !== undefined && (!Number.isInteger(fpN) || fpN < 0)) return res.status(400).json({ error: 'fitpass debe ser un entero >= 0', code: 'FITPASS_INVALID' });
 
         const cls = await queryOne<{ id: string; facility_id: string | null }>(
             `SELECT id, facility_id FROM classes WHERE id = $1`,
@@ -1052,9 +1090,16 @@ router.put('/:id/channels', authenticate, requireRole('admin', 'super_admin', 'r
             }
         }
 
-        const result = await setTotalpassCap(req.params.id, n);
+        const result = tpN !== undefined ? await setTotalpassCap(req.params.id, tpN) : undefined;
         // Apagar el cupo (0) marca la clase para retiro; ejecutarlo al vuelo.
-        if (n === 0) dispararRetiroTotalpass();
+        if (tpN === 0) dispararRetiroTotalpass();
+        const fpResult = fpN !== undefined ? await setFitpassCap(req.params.id, fpN) : undefined;
+        if (fpResult) {
+            // Empuja el techo nuevo al panel (solo si la clase ya es dueña de una schedule).
+            dispararDisponibilidadFitpass(req.params.id);
+            // Subir el tope de 0 a N en una clase sin schedule: publicarla (solo con FITPASS_PUBLISH_ENABLED).
+            if (fpResult.max_spots > 0) void publishClassToFitpass(req.params.id).catch(() => { /* best-effort */ });
+        }
 
         try {
             await logAction(query, {
@@ -1062,19 +1107,21 @@ router.put('/:id/channels', authenticate, requireRole('admin', 'super_admin', 'r
                 actionType: 'class_totalpass_cap_updated',
                 entityType: 'class',
                 entityId: req.params.id,
-                description: `Cupo TotalPass actualizado a ${result.max_spots} lugares`,
-                newData: { classId: req.params.id, totalpass: result.max_spots },
+                description: [result ? `Cupo TotalPass actualizado a ${result.max_spots} lugares` : null,
+                    fpResult ? `Cupo FitPass actualizado a ${fpResult.max_spots} lugares` : null].filter(Boolean).join('; '),
+                newData: { classId: req.params.id, totalpass: result?.max_spots, fitpass: fpResult?.max_spots },
                 req,
             });
         } catch (auditErr) {
             console.error('[channels] audit failed (no bloquea):', auditErr);
         }
 
-        res.json({ ok: true, totalpass: result });
+        res.json({ ok: true, ...(result ? { totalpass: result } : {}), ...(fpResult ? { fitpass: fpResult } : {}) });
     } catch (e: any) {
-        if (e.code === 'CLASS_NOT_FOUND') return res.status(404).json({ error: 'Clase no encontrada' });
-        if (e.code === 'CAP_BELOW_BOOKED') return res.status(409).json({ error: `Ya hay ${e.booked} reservas TotalPass; no puedes bajar de ahí` });
-        if (e.code === 'CAP_EXCEEDS_CAPACITY') return res.status(400).json({ error: 'Los lugares TP no pueden exceder la capacidad de la clase' });
+        if (e.code === 'CLASS_NOT_FOUND') return res.status(404).json({ error: 'Clase no encontrada', code: e.code });
+        const plataforma = req.body?.fitpass !== undefined && req.body?.totalpass === undefined ? 'FitPass' : 'TotalPass';
+        if (e.code === 'CAP_BELOW_BOOKED') return res.status(409).json({ error: `Ya hay ${e.booked} reservas ${plataforma}; no puedes bajar de ahí`, code: e.code });
+        if (e.code === 'CAP_EXCEEDS_CAPACITY') return res.status(400).json({ error: `Los lugares ${plataforma} no pueden exceder la capacidad de la clase`, code: e.code });
         console.error('setTotalpassCap error:', e);
         res.status(500).json({ error: 'Error al guardar lugares TotalPass' });
     }
@@ -1199,6 +1246,7 @@ router.post('/:id/change-instructor', authenticate, requireElevated, async (req:
         if (tocadas.length) {
             const marcadas = await marcarResyncTotalpass(tocadas);
             if (marcadas) dispararResyncTotalpass();
+            if (await marcarEdicionFitpass(tocadas)) dispararFitpassOutbox();
         }
 
         await logAction(query, {
@@ -1259,6 +1307,7 @@ router.delete('/:id', authenticate, requireElevated, async (req: Request, res: R
             // Ya quedaron marcadas TODAS las clases de la serie: un solo barrido las
             // retira de TotalPass en segundos (si falla, el cron lo retoma).
             dispararRetiroTotalpass();
+            dispararFitpassOutbox();
             try {
                 await logAction(query, {
                     adminUserId: req.user!.userId,
@@ -1303,6 +1352,7 @@ router.delete('/:id', authenticate, requireElevated, async (req: Request, res: R
         // Quitarla de TotalPass enseguida: mientras siga publicada allá, una socia
         // puede reservar una clase que ya no existe.
         dispararRetiroTotalpass();
+        dispararFitpassOutbox();
 
         // Aviso al coach (fuera de la app) de que su clase se canceló.
         try {
@@ -1400,6 +1450,7 @@ router.post('/:id/substitute', authenticate, requireRole('admin'), async (req: R
         // La socia de TotalPass ve el nombre del coach en su app: empujarle el cambio.
         const marcadasSub = await marcarResyncTotalpass([id]);
         if (marcadasSub) dispararResyncTotalpass();
+        if (await marcarEdicionFitpass([id])) dispararFitpassOutbox();
 
         // Record substitution
         await queryOne(`

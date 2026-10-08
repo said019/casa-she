@@ -103,12 +103,12 @@ export async function autoMapLessons(lessons: FitpassLesson[]): Promise<AutoMapP
 
 export async function setClassTypeLesson(
     classTypeId: string,
-    lessonId: number | null,
+    lessonId: number | null | undefined,
     quota: number,
 ): Promise<{ id: string; name: string; fitpass_lesson_id: number | null; fitpass_quota: number } | null> {
     return queryOne(
-        `UPDATE class_types SET fitpass_lesson_id = $2, fitpass_quota = $3 WHERE id = $1
+        `UPDATE class_types SET fitpass_lesson_id = CASE WHEN $4::boolean THEN $2::int ELSE fitpass_lesson_id END, fitpass_quota = $3 WHERE id = $1
          RETURNING id, name, fitpass_lesson_id, fitpass_quota`,
-        [classTypeId, lessonId, quota],
+        [classTypeId, lessonId === undefined ? null : lessonId, quota, lessonId !== undefined],
     );
 }

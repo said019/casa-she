@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { pool } from '../src/config/database.js';
 import { FITPASS_MIGRATIONS } from '../src/lib/fitpass/migrations.js';
 
-assert.deepEqual(FITPASS_MIGRATIONS.map((m) => m.n), [122, 123, 124, 125, 126, 127]);
+assert.deepEqual(FITPASS_MIGRATIONS.map((m) => m.n), [122, 123, 124, 125, 126, 127, 128]);
 
 async function main() {
     const client = await pool.connect();
@@ -70,6 +70,16 @@ async function main() {
         await client.query('ROLLBACK TO SAVEPOINT sp');
         await client.query(`INSERT INTO partner_class_mappings (class_id, channel, external_slot_id, sync_enabled) VALUES ($1,'fitpass','S-1', false)`, [c2]);
         console.log('  ok índice de ownership (mappings deshabilitados no bloquean)');
+
+        // 128: lesson por defecto por nombre exacto; nunca pisa un mapeo existente
+        const seed = async (name: string, lesson: number | null) => (await client.query(`INSERT INTO class_types (name, fitpass_lesson_id) VALUES ($1,$2) RETURNING id`, [name, lesson])).rows[0].id as string;
+        const nav = await seed(' navakarana ', null); const flexKeep = await seed('Flex', 1); const salsa = await seed('Salsa', null);
+        const barreNull = await seed('Barre', null);
+        await run();
+        const lessonOf = async (id: string) => (await client.query(`SELECT fitpass_lesson_id AS l FROM class_types WHERE id=$1`, [id])).rows[0].l;
+        assert.equal(await lessonOf(nav), 46833); assert.equal(await lessonOf(flexKeep), 1, 'no pisa un mapeo existente');
+        assert.equal(await lessonOf(salsa), null, 'Salsa no se ofrece en FitPass'); assert.equal(await lessonOf(barreNull), 46820);
+        console.log('  ok migración 128 (lessons por defecto)');
 
         await client.query('ROLLBACK');
         console.log('test-fitpass-migrations: OK (revertido)');

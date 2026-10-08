@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { fitpassBookingHook } from '../lib/fitpass/availability.js';
 import { query, queryOne, pool } from '../config/database.js';
 import { logAction } from '../lib/audit.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
@@ -23,6 +24,8 @@ import { avisarReservaTotalPass } from '../lib/totalpass/alerta-admin.js';
 import { reflectFitpassAttendance } from '../lib/fitpass/attendance.js';
 
 const router = Router();
+// FitPass: tras reservar/cancelar empuja el cupo de la clase (solo si es dueña de una schedule).
+router.use(fitpassBookingHook);
 
 // Schema for Creating Booking
 const CreateBookingSchema = z.object({

@@ -19,6 +19,8 @@ const ClassTypeSchema = z.object({
     category: z.enum(['reformer', 'multi']).default('multi'),
     isActive: z.boolean().default(true),
     totalpass_default_spots: z.coerce.number().int().min(0).optional().default(0),
+    // Cupo FitPass por defecto (el trigger lo copia a channel_inventory al crear la clase).
+    fitpass_quota: z.coerce.number().int().min(0).max(500).optional().default(0),
 });
 
 // Update schema
@@ -34,7 +36,8 @@ router.get('/', async (req: Request, res: Response) => {
         let queryStr = `
       SELECT
         id, name, description, level, duration_minutes,
-        max_capacity, icon, color, category, is_active, totalpass_default_spots
+        max_capacity, icon, color, category, is_active, totalpass_default_spots,
+        fitpass_lesson_id, fitpass_quota
       FROM class_types
     `;
 
@@ -70,8 +73,8 @@ router.post('/', authenticate, requireRole('admin'), async (req: Request, res: R
         const newType = await queryOne(
             `INSERT INTO class_types (
         name, description, level, duration_minutes,
-        max_capacity, icon, color, category, is_active, totalpass_default_spots
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        max_capacity, icon, color, category, is_active, totalpass_default_spots, fitpass_quota
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *`,
             [
                 data.name,
@@ -84,6 +87,7 @@ router.post('/', authenticate, requireRole('admin'), async (req: Request, res: R
                 data.category,
                 data.isActive,
                 data.totalpass_default_spots ?? 0,
+                data.fitpass_quota ?? 0,
             ]
         );
 
@@ -159,6 +163,10 @@ router.put('/:id', authenticate, requireRole('admin'), async (req: Request, res:
         if (data.totalpass_default_spots !== undefined) {
             updates.push(`totalpass_default_spots = $${paramCount++}`);
             values.push(data.totalpass_default_spots);
+        }
+        if (data.fitpass_quota !== undefined) {
+            updates.push(`fitpass_quota = $${paramCount++}`);
+            values.push(data.fitpass_quota);
         }
 
         if (updates.length > 0) {
