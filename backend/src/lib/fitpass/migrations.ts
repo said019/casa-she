@@ -102,4 +102,35 @@ export const FITPASS_MIGRATIONS: FitpassMigration[] = [
             `CREATE INDEX IF NOT EXISTS idx_cron_job_logs_job_time ON cron_job_logs(job_name, executed_at DESC)`,
         ],
     },
+    {
+        n: 128,
+        name: 'lesson por defecto de FitPass por nombre de tipo',
+        statements: [
+            // Casa Shé tiene un tipo por familia y FitPass variantes por horario: este id es SOLO el
+            // default al CREAR una schedule nueva (publicación). Nunca pisa un mapeo existente.
+            `UPDATE class_types ct SET fitpass_lesson_id = d.lesson_id
+               FROM (VALUES
+                    ('Barre', 46820),
+                    ('Pilates Mat', 47206),
+                    ('Sculpt Full Body', 46821),
+                    ('Sculpt (Abs & Butt)', 47184),
+                    ('Sculpt', 46821),
+                    ('Power Abs', 47134),
+                    ('Mat Power Abs', 47182),
+                    ('Barre Funcional', 47189),
+                    ('Pilates Booty', 46819),
+                    ('Navakarana', 46833),
+                    ('Rocket Yoga', 46832),
+                    ('Flex', 46823),
+                    ('Flex & Flow', 46823),
+                    ('Power Vinyasa', 46831),
+                    ('Yoga Vinyasa', 46831),
+                    ('Yoga Dharma', 46834),
+                    ('Flow Yoga', 46835),
+                    ('Morning Flow', 46835),
+                    ('Inicios de Ashtanga', 46822)
+               ) AS d(name, lesson_id)
+              WHERE lower(trim(ct.name)) = lower(d.name) AND ct.fitpass_lesson_id IS NULL`,
+        ],
+    },
 ];

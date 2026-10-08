@@ -1,15 +1,16 @@
 /**
  * publish — adoptar y publicar clases de Casa Shé en FitPass.
  *
- *  - `adoptExistingFitpassSchedules(from,to,{dryRun})`: primer paso seguro en producción. Si el
- *    fingerprint (lessonId|fecha CDMX|HH:MM) de una clase empata con EXACTAMENTE UNA schedule
- *    activa del panel (y ninguna otra clase de Casa Shé comparte ese fingerprint), la clase
- *    reclama su ownership y el tope del canal = el cupo TOTAL que ya configuró el estudio.
- *    Ambiguo / sin match: solo se reporta. NUNCA crea nada en el panel.
+ *  - `adoptExistingFitpassSchedules(from,to,{dryRun})`: primer paso seguro en producción. El slot
+ *    (fecha CDMX + HH:MM) de una clase empata con una schedule activa del panel y la familia es
+ *    compatible (el panel usa variantes: "BARRE - ABS & BUTT" para el tipo "Barre"); con varias en
+ *    el mismo slot solo se adopta si la pareja es inequívoca. La clase reclama su ownership y el
+ *    tope del canal = el cupo TOTAL que ya configuró el estudio. Ambiguo / sin match: solo se
+ *    reporta. NUNCA crea nada en el panel.
  *  - `previewFitpassPublish`: dry-run completo (adoptaría / crearía / saltaría y por qué).
  *  - `publishClassToFitpass` / `extendFitpassWeek`: CREAN schedules nuevas; solo si
  *    FITPASS_PUBLISH_ENABLED=true (default apagado). Tras crear se re-lista y se reclama solo
- *    si el fingerprint devuelve exactamente 1 schedule (el POST devuelve HTML sin id confiable).
+ *    si aparece exactamente 1 schedule nueva (el POST devuelve HTML sin id confiable).
  */
 import { filas, type ClienteTx } from '../db-tx.js';
 import { GYM_DEFAULT_COACH } from '../gym-config.js';
@@ -17,8 +18,8 @@ import { localDateStr, addDaysToDateStr } from '../mx-time.js';
 import { withFitpassLock } from './locks.js';
 import { logFitpassCron } from './cron-log.js';
 import {
-    claimFitpassScheduleOwnership, findActiveSchedules, fpFingerprint, getFitpassScheduleOwner,
-    loadFitpassPlanClasses, planFitpassPublish, type FpListedSchedule, type FpPlanClassRow, type FpPlanItem,
+    claimFitpassScheduleOwnership, loadFitpassPlanClasses, loadOwnedScheduleIds, planFitpassPublish, scheduleSlot, slotKey,
+    type FpPlanClassRow, type FpPlanItem,
 } from './ownership.js';
 import { computeFitpassScheduleCapacity } from './availability.js';
 import {
@@ -76,12 +77,12 @@ export async function publishFitpassCore(window: { from: string; to: string }, o
     const classes = await loadFitpassPlanClasses(window.from, window.to, o.db);
     const schedules = await listWindow(o.ctx, window.from, window.to);
 
-    const allItems = await planFitpassPublish(classes, schedules, {
+    const allItems = planFitpassPublish(classes, schedules, {
         now,
         defaultCoach: GYM_DEFAULT_COACH,
         allowCreate: o.allowCreate,
         capacityFor: (c) => computeFitpassScheduleCapacity(c.fp_cap, c.capacity, c.total_booked, c.fp_booked),
-        ownerOf: (classId, sid) => getFitpassScheduleOwner(classId, sid, o.db),
+        owned: await loadOwnedScheduleIds(o.db),
         startsInPast: (c, n) => classStartedAlready(c, n),
     });
     // El filtro por clase va DESPUÉS del plan: si no, un fingerprint compartido con otra clase no se detectaría.
@@ -117,20 +118,26 @@ export async function publishFitpassCore(window: { from: string; to: string }, o
     return report;
 }
 
-/** Crea la schedule, re-lista y reclama SOLO si el fingerprint devuelve exactamente 1. */
+/**
+ * Crea la schedule (lesson POR DEFECTO del tipo), re-lista y reclama SOLO si aparece exactamente UNA
+ * schedule nueva de esa lesson en el slot (el POST devuelve HTML sin id confiable).
+ */
 async function createAndClaim(ctx: PanelCtx, cls: FpPlanClassRow, it: FpPlanItem, db?: ClienteTx): Promise<boolean> {
     const lessonId = Number(cls.lesson_id);
+    const day = cls.date.slice(0, 10);
+    const key = slotKey(day, cls.hhmm);
+    const before = new Set((await listWindow(ctx, day, day)).map((x) => Number(x.id)));
     await ctx.panel.createSchedule({
         gymId: ctx.gymId, lessonId,
         instructorName: (cls.coach || '').trim() || GYM_DEFAULT_COACH,
-        startDate: cls.date.slice(0, 10), lessonTime: cls.hhmm,
+        startDate: day, lessonTime: cls.hhmm,
         length: minutesBetween(cls.hhmm, cls.end_hhmm),
         lessonAvailability: it.availability!, multiple: false,
     });
-    const after = await listWindow(ctx, cls.date.slice(0, 10), cls.date.slice(0, 10));
-    const matches = findActiveSchedules(after, fpFingerprint(lessonId, cls.date, cls.hhmm));
-    if (matches.length !== 1) return false; // no se reclama a ciegas; el próximo ciclo la adopta si ya es única
-    await claimFitpassScheduleOwnership(cls.class_id, Number(matches[0].id), db);
+    const after = await listWindow(ctx, day, day);
+    const fresh = after.filter((x) => x.disabled !== true && !before.has(Number(x.id)) && Number(x.lesson?.id) === lessonId && scheduleSlot(x).key === key);
+    if (fresh.length !== 1) return false; // no se reclama a ciegas; el próximo ciclo la adopta si ya es única
+    await claimFitpassScheduleOwnership(cls.class_id, Number(fresh[0].id), db);
     return true;
 }
 

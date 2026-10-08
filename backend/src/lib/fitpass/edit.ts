@@ -16,7 +16,8 @@ import { filas, type ClienteTx } from '../db-tx.js';
 import { GYM_DEFAULT_COACH } from '../gym-config.js';
 import { localDateStr } from '../mx-time.js';
 import { computeFitpassScheduleCapacity } from './availability.js';
-import { cdmxDateTime, findActiveSchedules, fpFingerprint, getFitpassMapping, isRealCoach, scheduleFingerprint } from './ownership.js';
+import { cdmxDateTime, getFitpassMapping, isRealCoach, scheduleSlot, slotKey } from './ownership.js';
+import { familyCompatible } from './family.js';
 import { fitpassPublishEnabled, listWindow, minutesBetween, type PanelCtx } from './panel.js';
 
 export async function marcarEdicionFitpass(classIds: string[], db?: ClienteTx): Promise<number> {
@@ -34,14 +35,15 @@ export async function marcarEdicionFitpass(classIds: string[], db?: ClienteTx): 
 
 /** Valida ANTES del UPDATE local que el destino no esté ocupado por otra schedule. */
 export async function preflightFitpassClassEdit(
-    classId: string, dest: { date: string; hhmm: string; lessonId: number | null }, o: { ctx?: PanelCtx; db?: ClienteTx; enabled?: boolean } = {},
+    classId: string, dest: { date: string; hhmm: string; typeName: string }, o: { ctx?: PanelCtx; db?: ClienteTx; enabled?: boolean } = {},
 ): Promise<{ ok: true } | { ok: false; code: 'FITPASS_DESTINATION_OCCUPIED'; message: string }> {
-    if (!(o.enabled ?? fitpassPublishEnabled()) || !o.ctx || dest.lessonId == null) return { ok: true };
+    if (!(o.enabled ?? fitpassPublishEnabled()) || !o.ctx) return { ok: true };
     const m = await getFitpassMapping(classId, o.db);
     if (!m?.external_slot_id || !m.sync_enabled) return { ok: true };
     const list = await listWindow(o.ctx, dest.date, dest.date);
-    const fp = fpFingerprint(dest.lessonId, dest.date, dest.hhmm);
-    const otra = findActiveSchedules(list, fp).find((s) => String(s.id) !== String(m.external_slot_id));
+    const key = slotKey(dest.date, dest.hhmm);
+    const otra = list.find((s) => s.disabled !== true && String(s.id) !== String(m.external_slot_id)
+        && scheduleSlot(s).key === key && familyCompatible(dest.typeName, s.lesson?.name));
     return otra
         ? { ok: false, code: 'FITPASS_DESTINATION_OCCUPIED', message: `FitPass ya tiene otra clase en ese horario (schedule ${otra.id}); no se puede mover encima.` }
         : { ok: true };
@@ -51,7 +53,7 @@ export interface FpEditSummary { pendientes: number; sincronizadas: number; sinC
 
 interface EditRow {
     class_id: string; external_slot_id: string; date: string; hhmm: string; end_hhmm: string; status: string;
-    lesson_id: number | null; coach: string | null; capacity: number; fp_cap: number | null; total_booked: number; fp_booked: number;
+    lesson_id: number | null; type_name: string; coach: string | null; capacity: number; fp_cap: number | null; total_booked: number; fp_booked: number;
 }
 
 export async function procesarEdicionesFitpass(o: { ctx: PanelCtx; db?: ClienteTx; now?: Date; enabled?: boolean }): Promise<FpEditSummary> {
@@ -59,7 +61,7 @@ export async function procesarEdicionesFitpass(o: { ctx: PanelCtx; db?: ClienteT
     if (!(o.enabled ?? fitpassPublishEnabled())) return { ...s, skipped: 'publish-disabled' };
     const rows = await filas<EditRow>(o.db,
         `SELECT pcm.class_id, pcm.external_slot_id, c.date::text AS date, substr(c.start_time::text,1,5) AS hhmm,
-                substr(c.end_time::text,1,5) AS end_hhmm, c.status::text AS status, ct.fitpass_lesson_id AS lesson_id,
+                substr(c.end_time::text,1,5) AS end_hhmm, c.status::text AS status, ct.fitpass_lesson_id AS lesson_id, ct.name AS type_name,
                 i.display_name AS coach, c.max_capacity AS capacity, ci.max_spots AS fp_cap,
                 (SELECT count(*) FROM bookings b WHERE b.class_id = c.id AND b.status IN ('confirmed','checked_in'))::int AS total_booked,
                 (SELECT count(*) FROM bookings b WHERE b.class_id = c.id AND b.status IN ('confirmed','checked_in') AND b.channel = 'fitpass')::int AS fp_booked
@@ -96,22 +98,27 @@ export async function procesarEdicionesFitpass(o: { ctx: PanelCtx; db?: ClienteT
                 await filas(o.db, `UPDATE partner_class_mappings SET sync_status='skipped', sync_enabled=false, sync_error='disabled-in-panel', updated_at=NOW() WHERE class_id=$1 AND channel='fitpass'`, [r.class_id]);
                 s.fallidas++; continue;
             }
-            if (r.lesson_id == null) { s.fallidas++; await setErr(r.class_id, 'edit-failed: tipo-sin-lesson-fitpass'); continue; }
-            const fp = fpFingerprint(r.lesson_id, r.date, r.hhmm);
-            const otra = findActiveSchedules(schedules, fp).find((x) => Number(x.id) !== Number(sched.id));
+            // Misma schedule: conserva su lesson (variante) si sigue siendo de la familia del tipo; si el tipo
+            // cambió de familia usa el default del tipo nuevo.
+            const keepLesson = familyCompatible(r.type_name, sched.lesson?.name);
+            const lessonId = keepLesson ? Number(sched.lesson!.id) : r.lesson_id;
+            if (lessonId == null) { s.fallidas++; await setErr(r.class_id, 'edit-failed: tipo-sin-lesson-fitpass'); continue; }
+            const key = slotKey(r.date, r.hhmm);
+            const otra = schedules.find((x) => x.disabled !== true && Number(x.id) !== Number(sched.id)
+                && scheduleSlot(x).key === key && familyCompatible(r.type_name, x.lesson?.name));
             if (otra) { s.conflictos++; await setErr(r.class_id, `destination-occupied: schedule ${otra.id}`); continue; }
             const coach = isRealCoach(r.coach, GYM_DEFAULT_COACH) ? r.coach!.trim() : GYM_DEFAULT_COACH;
             const length = minutesBetween(r.hhmm, r.end_hhmm);
             const availability = computeFitpassScheduleCapacity(r.fp_cap, r.capacity, r.total_booked, r.fp_booked);
-            const igual = scheduleFingerprint(sched) === fp && (sched.instructor?.name || '').trim() === coach
+            const igual = scheduleSlot(sched).key === key && Number(sched.lesson?.id) === lessonId && (sched.instructor?.name || '').trim() === coach
                 && Number(sched.length) === length && Number(sched.lesson_availability) === availability;
             if (igual) { await setSynced(r.class_id); s.sinCambio++; continue; }
             await o.ctx.panel.updateSchedule(Number(sched.id), {
-                gymId: o.ctx.gymId, lessonId: r.lesson_id, instructorName: coach, startDate: r.date.slice(0, 10),
+                gymId: o.ctx.gymId, lessonId, instructorName: coach, startDate: r.date.slice(0, 10),
                 lessonTime: r.hhmm, length, lessonAvailability: availability, multiple: false,
             });
             const after = await listWindow(o.ctx, r.date.slice(0, 10), r.date.slice(0, 10));
-            const ok = after.find((x) => Number(x.id) === Number(sched.id) && x.disabled !== true && scheduleFingerprint(x) === fp);
+            const ok = after.find((x) => Number(x.id) === Number(sched.id) && x.disabled !== true && scheduleSlot(x).key === key);
             if (!ok) { s.fallidas++; await setErr(r.class_id, 'edit-failed: verify-failed'); continue; }
             await setSynced(r.class_id);
             s.sincronizadas++;

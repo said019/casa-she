@@ -14,7 +14,7 @@ import { withFitpassLock } from './locks.js';
 import { channelCapCeiling } from '../totalpass/caps.js';
 import { localDateStr, addDaysToDateStr } from '../mx-time.js';
 import { GYM_DEFAULT_COACH } from '../gym-config.js';
-import { cdmxDateTime, fpFingerprint, scheduleFingerprint, type FpListedSchedule } from './ownership.js';
+import { cdmxDateTime, scheduleSlot, slotKey, type FpListedSchedule } from './ownership.js';
 import { classStartedAlready, getPanelCtx, listWindow, type PanelCtx } from './panel.js';
 
 /** Capacidad TOTAL que recibe el schedule de FitPass. */
@@ -73,7 +73,7 @@ export async function reconcileOne(
     const sched = byId.get(Number(row.external_slot_id));
     if (!sched) return { outcome: 'skipped', reason: 'not-in-window' };
     if (sched.disabled === true) return { outcome: 'skipped', reason: 'disabled' }; // nunca re-habilitar
-    if (row.lesson_id == null || scheduleFingerprint(sched) !== fpFingerprint(row.lesson_id, row.date, row.hhmm)) {
+    if (scheduleSlot(sched).key !== slotKey(row.date, row.hhmm)) {
         return { outcome: 'skipped', reason: 'slot-mismatch' }; // edición pendiente: la mueve el outbox
     }
     const desired = computeFitpassScheduleCapacity(row.fp_cap, row.capacity, row.total_booked, row.fp_booked);

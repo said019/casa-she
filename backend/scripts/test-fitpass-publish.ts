@@ -12,6 +12,7 @@ import { FitPassHttpError } from '../src/lib/scrapers/fitpass.js';
 import { localDateTimeUtc } from '../src/lib/mx-time.js';
 import { GYM_DEFAULT_COACH } from '../src/lib/gym-config.js';
 import { cdmxDateTime, fpFingerprint, scheduleFingerprint, isRealCoach } from '../src/lib/fitpass/ownership.js';
+import { familyScore, familyCompatible } from '../src/lib/fitpass/family.js';
 import { computeFitpassScheduleCapacity, reconcileFitpassPoolCore } from '../src/lib/fitpass/availability.js';
 import { adoptExistingFitpassSchedules, previewFitpassPublish, publishClassToFitpass, publishFitpassCore, extendFitpassWeek } from '../src/lib/fitpass/publish.js';
 import { marcarCancelacionFitpass, procesarCancelacionesFitpass } from '../src/lib/fitpass/cancel.js';
@@ -34,17 +35,32 @@ assert.equal(isRealCoach('  ', GYM_DEFAULT_COACH), false);
 assert.equal(isRealCoach('Ana', GYM_DEFAULT_COACH), true);
 ok('fingerprint UTC->CDMX (antes y después de las 6pm)');
 
+// ── 1b. Familias: tipo de Casa Shé vs variante del panel ────────────────────
+for (const [casa, fpn] of [['Barre', 'BARRE - ABS & BUTT'], ['Barre', 'BARRE GAP'], ['Barre Funcional', 'BARRE - FULL BODY'], ['Pilates Mat', 'PILATES MAT - GAP'],
+    ['Power Abs', 'POWER ABS'], ['Mat Power Abs', 'MAT - POWER ABS'], ['Sculpt (Abs & Butt)', 'SCULPT ABS & BUTT'], ['Yoga Vinyasa', 'VINYASA YOGA'],
+    ['Power Vinyasa', 'VINYASA YOGA'], ['Navakarana', 'NAVAKARANANA YOGA'], ['Inicios de Ashtanga', 'ASHTANGA YOGA'], ['Flex & Flow', 'FLEX'], ['Yoga Dharma', 'DHARMA YOGA'], ['Morning Flow', 'FLOW YOGA']]) {
+    assert.ok(familyCompatible(casa, fpn), `${casa} ~ ${fpn}`);
+}
+for (const [casa, fpn] of [['Barre', 'SCULPT - POWER ABS'], ['Yoga Vinyasa', 'ROCKET YOGA'], ['Pilates Mat', 'BARRE GAP'], ['Salsa', 'BARRE'], ['Reformer Classic', 'PILATES MAT']]) {
+    assert.ok(!familyCompatible(casa, fpn), `${casa} !~ ${fpn}`);
+}
+assert.ok(familyScore('Barré', 'barre - gap') > 0, 'sin acentos ni mayúsculas');
+ok('familias: variantes compatibles, otras disciplinas y Salsa/Reformer no');
+
 // ── 2. Capacidad TOTAL (ceiling) ────────────────────────────────────────────
 assert.equal(computeFitpassScheduleCapacity(4, 10, 3, 2), 4, 'FP 2 + libres 2 = 4 total, no los libres');
 assert.equal(computeFitpassScheduleCapacity(8, 6, 5, 1), 2, 'la capacidad física manda');
 assert.equal(computeFitpassScheduleCapacity(0, 10, 4, 2), 2, 'cap 0 con 2 vendidas: techo = vendidas (FP ve 0 disponibles)');
 assert.equal(computeFitpassScheduleCapacity(null, 10, 4, 2), 2, 'canal sin fila: techo = vendidas');
 assert.equal(computeFitpassScheduleCapacity(null, 10, 0, 0), 0);
+assert.equal(computeFitpassScheduleCapacity(5, 9, 9, 3), 3, 'aforo subido +1 por sobrecupo FitPass (2A): techo = vendidas FP, nunca negativo');
+assert.equal(computeFitpassScheduleCapacity(5, 8, 9, 3), 3, 'total > capacidad: no sube de lo vendido');
 assert.equal(computeFitpassScheduleCapacity(5, 10, 0, 0, 2), 5, 'colchón no sube sobre el tope');
 ok('capacidad total: ceiling y caso cap-cero-vendido');
 
+const LESSON_NAMES: Record<number, string> = { 990001: 'BARRE - ABS & BUTT', 990002: 'VINYASA YOGA' };
 // ── Panel falso ─────────────────────────────────────────────────────────────
-interface FakeS { id: number; lesson_time: string; lesson_availability: number; length: number; lesson: { id: number }; instructor: { name: string }; disabled: boolean; parent_id: null }
+interface FakeS { id: number; lesson_time: string; lesson_availability: number; length: number; lesson: { id: number; name: string }; instructor: { name: string }; disabled: boolean; parent_id: null }
 function fakePanel(initial: FakeS[]) {
     const state = { schedules: [...initial], nextId: 9000, calls: [] as Array<{ op: string; id?: number; input?: any }>, cancelError: null as Error | null, duplicateOnCreate: false };
     const panel = {
@@ -54,7 +70,7 @@ function fakePanel(initial: FakeS[]) {
         async createSchedule(input: any) {
             state.calls.push({ op: 'create', input });
             const lt = localDateTimeUtc(input.startDate, input.lessonTime).toISOString();
-            const mk = () => ({ id: state.nextId++, lesson_time: lt, lesson_availability: input.lessonAvailability, length: input.length, lesson: { id: input.lessonId }, instructor: { name: input.instructorName }, disabled: false, parent_id: null } as FakeS);
+            const mk = () => ({ id: state.nextId++, lesson_time: lt, lesson_availability: input.lessonAvailability, length: input.length, lesson: { id: input.lessonId, name: LESSON_NAMES[input.lessonId] ?? 'X' }, instructor: { name: input.instructorName }, disabled: false, parent_id: null } as FakeS);
             state.schedules.push(mk());
             if (state.duplicateOnCreate) state.schedules.push(mk());
             return { status: 200, raw: '' };
@@ -65,7 +81,7 @@ function fakePanel(initial: FakeS[]) {
             if (s.disabled) throw new Error('TEST: se intentó actualizar una schedule disabled');
             s.lesson_time = localDateTimeUtc(input.startDate, input.lessonTime).toISOString();
             s.lesson_availability = input.lessonAvailability; s.length = input.length;
-            s.instructor = { name: input.instructorName }; s.lesson = { id: input.lessonId };
+            s.instructor = { name: input.instructorName }; s.lesson = { id: input.lessonId, name: LESSON_NAMES[input.lessonId] ?? s.lesson.name };
             return { status: 200, raw: '' };
         },
         async cancelSchedule(id: number) {
@@ -79,7 +95,7 @@ function fakePanel(initial: FakeS[]) {
 }
 const sched = (id: number, lesson: number, date: string, hhmm: string, avail: number, extra: Partial<FakeS> = {}): FakeS => ({
     id, lesson_time: localDateTimeUtc(date, hhmm).toISOString(), lesson_availability: avail, length: 50,
-    lesson: { id: lesson }, instructor: { name: 'Ana' }, disabled: false, parent_id: null, ...extra,
+    lesson: { id: lesson, name: LESSON_NAMES[lesson] }, instructor: { name: 'Ana' }, disabled: false, parent_id: null, ...extra,
 });
 
 async function main() {
@@ -95,8 +111,8 @@ async function main() {
         await q(`UPDATE instructors SET display_name = 'Coach Prueba' WHERE id = $1`, [ins.id]);
         const DATE = (await q(`SELECT (CURRENT_DATE + 400)::text AS d`))[0].d as string;
         const LESSON = 990001, LESSON_B = 990002;
-        const ct = (await q(`INSERT INTO class_types (name, fitpass_lesson_id, fitpass_quota) VALUES ('zz-fp-pub', $1, 0) RETURNING id`, [LESSON]))[0].id;
-        const ctB = (await q(`INSERT INTO class_types (name, fitpass_lesson_id, fitpass_quota) VALUES ('zz-fp-pub-b', $1, 0) RETURNING id`, [LESSON_B]))[0].id;
+        const ct = (await q(`INSERT INTO class_types (name, fitpass_lesson_id, fitpass_quota) VALUES ('zz-fp barre', $1, 0) RETURNING id`, [LESSON]))[0].id;
+        const ctB = (await q(`INSERT INTO class_types (name, fitpass_lesson_id, fitpass_quota) VALUES ('zz-fp yoga vinyasa', $1, 0) RETURNING id`, [LESSON_B]))[0].id;
         const ctNoLesson = (await q(`INSERT INTO class_types (name) VALUES ('zz-fp-nolesson') RETURNING id`))[0].id;
         const mk = async (type: string, hhmm: string, cap = 8, inst: string = ins.id) => (await q(
             `INSERT INTO classes (class_type_id, instructor_id, facility_id, date, start_time, end_time, max_capacity, status)
@@ -114,7 +130,8 @@ async function main() {
         const cS1 = await mk(ct, '13:00'); const cS2 = await mk(ct, '13:00', 8, ins2.id); // MISMO fingerprint -> compartido
         const cDis = await mk(ct, '14:00');    // solo una disabled -> no-match
         const cNo = await mk(ctNoLesson, '15:00');
-        const cOwned = await mk(ct, '16:00');  // schedule ya es de otra clase
+        const cOwned = await mk(ct, '16:00');
+        const cM = await mk(ct, '20:00'); // 1 clase y 1 schedule, pero de OTRA familia (Vinyasa): nunca se adopta  // schedule ya es de otra clase
         const otro = await mk(ct, '16:30');
         await q(`INSERT INTO partner_class_mappings (class_id, channel, external_slot_id, sync_status) VALUES ($1,'fitpass','1600','synced')`, [otro]);
         const fp = fakePanel([
@@ -123,9 +140,11 @@ async function main() {
             sched(5, LESSON, DATE, '13:00', 6), sched(7, LESSON, DATE, '14:00', 6, { disabled: true }),
             sched(1600, LESSON, DATE, '16:00', 6), sched(8, LESSON_B, DATE, '12:00', 4),
             sched(99, LESSON, DATE, '17:00', 6), // sin clase local
+            sched(98, LESSON_B, DATE, '20:00', 6),
         ]);
         const dry = await adoptExistingFitpassSchedules(DATE, DATE, { ctx: fp.ctx, db: client, dryRun: true });
         const by = (r: typeof dry, id: string) => r.items.find((i) => i.classId === id)!;
+        const real0 = (r: typeof dry, id: string) => by(r, id).action === 'skip';
         assert.equal(by(dry, cA).action, 'adopt'); assert.equal(by(dry, cA).scheduleId, 1);
         assert.equal(by(dry, cEve).action, 'adopt'); assert.equal(by(dry, cEve).scheduleId, 2);
         assert.equal(by(dry, cB).reason, 'ambiguous-schedules');
@@ -133,11 +152,17 @@ async function main() {
         assert.equal(by(dry, cS1).reason, 'shared-fingerprint'); assert.equal(by(dry, cS2).reason, 'shared-fingerprint');
         assert.equal(by(dry, cDis).reason, 'no-match', 'una schedule disabled no cuenta');
         assert.equal(by(dry, cNo).reason, 'no-lesson');
+        assert.equal(by(dry, cM).reason, 'family-mismatch');
+        assert.equal(real0(dry, cM), true);
         assert.equal(by(dry, cOwned).reason, 'schedule-owned');
-        assert.equal(by(dry, cD1).reason, 'no-match'); assert.equal(by(dry, cD2).action, 'adopt');
+        assert.equal(by(dry, cD1).reason, 'family-mismatch', 'Barre no adopta la schedule de Vinyasa del mismo horario'); assert.equal(by(dry, cD2).action, 'adopt'); assert.equal(by(dry, cD2).scheduleId, 8);
         assert.equal(await map(cA), undefined, 'dry-run no escribe');
         assert.equal(fp.state.calls.length, 0);
         assert.ok(dry.unmatchedSchedules >= 1);
+        await q(`INSERT INTO channel_inventory (class_id, channel, max_spots) VALUES ($1,'fitpass',4)`, [cM]);
+        const prevM = await previewFitpassPublish(DATE, DATE, { ctx: fp.ctx, db: client });
+        assert.equal(prevM.items.find((i) => i.classId === cM)!.action, 'create', 'Barre junto a un Vinyasa del panel: se crearía, no se adopta el ajeno');
+        await q(`DELETE FROM channel_inventory WHERE class_id=$1`, [cM]);
         const real = await adoptExistingFitpassSchedules(DATE, DATE, { ctx: fp.ctx, db: client, dryRun: false });
         assert.equal(real.counts.adopted, 3);
         assert.equal((await map(cA)).external_slot_id, '1');
@@ -259,7 +284,7 @@ async function main() {
         assert.equal(fp.state.schedules.find((s) => s.id === 500)!.lesson_time, localDateTimeUtc(DATE, '05:00').toISOString(), 'flag apagado: no se mueve');
         // anti-robo: destino ocupado por otra schedule
         fp.state.schedules.push(sched(501, LESSON, DATE, '05:30', 4));
-        const pre = await preflightFitpassClassEdit(cE, { date: DATE, hhmm: '05:30', lessonId: LESSON }, { ctx: fp.ctx, db: client, enabled: true });
+        const pre = await preflightFitpassClassEdit(cE, { date: DATE, hhmm: '05:30', typeName: 'zz-fp barre' }, { ctx: fp.ctx, db: client, enabled: true });
         assert.equal((pre as any).code, 'FITPASS_DESTINATION_OCCUPIED');
         const conf = await procesarEdicionesFitpass({ ctx: fp.ctx, db: client, enabled: true });
         assert.equal(conf.conflictos, 1);

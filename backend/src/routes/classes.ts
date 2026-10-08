@@ -958,13 +958,13 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
             try {
                 const ctx = await getPanelCtx();
                 if (ctx) {
-                    const dest = await queryOne<{ date: string; hhmm: string; lesson_id: number | null }>(
+                    const dest = await queryOne<{ date: string; hhmm: string; type_name: string }>(
                         `SELECT COALESCE($2::date, c.date)::text AS date, COALESCE($3::text, substr(c.start_time::text,1,5)) AS hhmm,
-                                ct.fitpass_lesson_id AS lesson_id
+                                ct.name AS type_name
                            FROM classes c JOIN class_types ct ON ct.id = COALESCE($4::uuid, c.class_type_id) WHERE c.id = $1`,
                         [id, data.date ?? null, data.startTime ?? null, data.classTypeId ?? null]);
                     if (dest) {
-                        const pre = await preflightFitpassClassEdit(id, { date: dest.date, hhmm: dest.hhmm, lessonId: dest.lesson_id }, { ctx });
+                        const pre = await preflightFitpassClassEdit(id, { date: dest.date, hhmm: dest.hhmm, typeName: dest.type_name }, { ctx });
                         if (!pre.ok) return res.status(409).json({ error: pre.message, code: pre.code });
                     }
                 }

@@ -14,6 +14,7 @@
  */
 import { filas, type ClienteTx } from '../db-tx.js';
 import { GYM_TIMEZONE } from '../mx-time.js';
+import { familyScore } from './family.js';
 
 export interface FpListedSchedule {
     id: number;
@@ -42,6 +43,13 @@ export function cdmxDateTime(iso: string | Date): { date: string; hhmm: string }
 export function fpFingerprint(lessonId: number, date: string, hhmm: string): string {
     return `${lessonId}|${date.slice(0, 10)}|${hhmm.slice(0, 5)}`;
 }
+
+/** Slot (fecha CDMX + HH:MM) de una schedule del panel. La ADOPCIÓN usa el slot, no la lesson. */
+export function scheduleSlot(s: FpListedSchedule): { date: string; hhmm: string; key: string } {
+    const { date, hhmm } = cdmxDateTime(s.lesson_time);
+    return { date, hhmm, key: `${date}|${hhmm}` };
+}
+export const slotKey = (date: string, hhmm: string): string => `${date.slice(0, 10)}|${hhmm.slice(0, 5)}`;
 
 /** Fingerprint de una schedule del panel (null si no trae lesson). */
 export function scheduleFingerprint(s: FpListedSchedule): string | null {
@@ -105,11 +113,16 @@ export async function claimFitpassScheduleOwnership(classId: string, scheduleId:
 }
 
 // ── Plan: qué se adoptaría / crearía / saltaría ──────────────────────────────
+//
+// La identidad de adopción es el SLOT (fecha CDMX + HH:MM), no la lesson: el panel de Casa Shé usa
+// variantes por horario ("BARRE - ABS & BUTT") y Casa Shé un solo tipo por familia. Con varias
+// clases/schedules en el mismo slot se desambigua por familia (family.ts); si sigue ambiguo, solo
+// se reporta. `fitpass_lesson_id` del tipo es el default únicamente para CREAR.
 
 export type FpPlanAction = 'adopt' | 'create' | 'skip';
 export type FpSkipReason =
     | 'already-owned' | 'past' | 'no-lesson' | 'shared-fingerprint' | 'ambiguous-schedules'
-    | 'schedule-owned' | 'no-match' | 'no-fitpass-cap' | 'no-real-coach';
+    | 'schedule-owned' | 'no-match' | 'no-fitpass-cap' | 'no-real-coach' | 'family-mismatch';
 
 export interface FpPlanItem {
     classId: string;
@@ -117,10 +130,11 @@ export interface FpPlanItem {
     hhmm: string;
     title: string;
     lessonId: number | null;
-    fingerprint: string | null;
+    slot: string;
     action: FpPlanAction;
     reason?: FpSkipReason;
     scheduleId?: number;
+    scheduleLesson?: string;
     /** adopt: cupo total configurado en el panel. create: cupo con el que se crearía. */
     availability?: number;
 }
@@ -146,7 +160,7 @@ export function isRealCoach(name: string | null | undefined, defaultCoach: strin
     return !!n && n.toLowerCase() !== defaultCoach.trim().toLowerCase() && !COACH_PLACEHOLDER.test(n);
 }
 
-/** Clases candidatas (programadas, en la ventana, con lesson mapeada) con sus conteos. */
+/** Clases programadas de la ventana con su tipo, coach, tope FitPass y conteos. */
 export async function loadFitpassPlanClasses(from: string, to: string, db?: ClienteTx): Promise<FpPlanClassRow[]> {
     return filas<FpPlanClassRow>(db,
         `SELECT c.id AS class_id, c.date::text AS date, substr(c.start_time::text,1,5) AS hhmm,
@@ -158,66 +172,101 @@ export async function loadFitpassPlanClasses(from: string, to: string, db?: Clie
            FROM classes c
            JOIN class_types ct ON ct.id = c.class_type_id
            LEFT JOIN instructors i ON i.id = c.instructor_id
-           LEFT JOIN partner_class_mappings pcm ON pcm.class_id = c.id AND pcm.channel = 'fitpass'
+           LEFT JOIN partner_class_mappings pcm ON pcm.class_id = c.id AND pcm.channel = 'fitpass' AND pcm.sync_enabled = true
            LEFT JOIN channel_inventory ci ON ci.class_id = c.id AND ci.channel = 'fitpass'
           WHERE c.status = 'scheduled' AND c.date BETWEEN $1::date AND $2::date
           ORDER BY c.date, c.start_time`, [from, to]);
 }
 
+/** Ids de schedules que ya tienen dueño (cualquier clase, mapping activo). */
+export async function loadOwnedScheduleIds(db?: ClienteTx): Promise<Set<number>> {
+    const rows = await filas<{ external_slot_id: string }>(db,
+        `SELECT external_slot_id FROM partner_class_mappings
+          WHERE channel = 'fitpass' AND external_slot_id IS NOT NULL AND sync_enabled = true`);
+    return new Set(rows.map((r) => Number(r.external_slot_id)));
+}
+
 export interface FpPlanOptions {
-    /** Instante "ahora" (tests). */
     now?: Date;
     defaultCoach: string;
     /** Capacidad a empujar al crear (computeFitpassScheduleCapacity). */
     capacityFor: (c: FpPlanClassRow) => number;
     /** Si false, nunca devuelve 'create' (solo adopción). */
     allowCreate: boolean;
-    /** Resolver ownership ajeno (tests inyectan; por defecto BD). */
-    ownerOf?: (classId: string, scheduleId: number) => Promise<string | null>;
+    /** Schedules que ya son de alguna clase. */
+    owned: Set<number>;
     startsInPast: (c: FpPlanClassRow, now: Date) => boolean;
 }
 
 /**
- * Plan puro (más lectura de dueños): para cada clase decide adoptar / crear / saltar.
- * Regla de oro: solo se adopta si el fingerprint empata con EXACTAMENTE UNA schedule activa
- * y EXACTAMENTE UNA clase de Casa Shé comparte ese fingerprint.
+ * Plan: para cada clase decide adoptar / crear / saltar. Reglas de oro:
+ *  - un slot con UNA clase elegible y UNA schedule libre adopta solo si la familia es compatible
+ *    (una clase de Barre jamás adopta la schedule de Yoga que comparte horario);
+ *  - con varias, adopta solo si la pareja es la única de mayor traslape de familia en AMBOS lados;
+ *  - lo demás se reporta (ambiguo), nunca se adivina; las schedules disabled y las ya dueñas se ignoran.
  */
-export async function planFitpassPublish(
-    classes: FpPlanClassRow[], schedules: FpListedSchedule[], opts: FpPlanOptions,
-): Promise<FpPlanItem[]> {
+export function planFitpassPublish(classes: FpPlanClassRow[], schedules: FpListedSchedule[], opts: FpPlanOptions): FpPlanItem[] {
     const now = opts.now ?? new Date();
-    const fpCount = new Map<string, number>();
-    for (const c of classes) {
-        if (c.lesson_id == null) continue;
-        const fp = fpFingerprint(c.lesson_id, c.date, c.hhmm);
-        fpCount.set(fp, (fpCount.get(fp) ?? 0) + 1);
+    const active = schedules.filter((s) => s.disabled !== true);
+    const schedBySlot = new Map<string, FpListedSchedule[]>();
+    for (const s of active) {
+        const k = scheduleSlot(s).key;
+        schedBySlot.set(k, [...(schedBySlot.get(k) ?? []), s]);
     }
+    const eligible = (c: FpPlanClassRow) => c.lesson_id != null && !c.mapped_slot && !opts.startsInPast(c, now);
+    const classesBySlot = new Map<string, FpPlanClassRow[]>();
+    for (const c of classes) {
+        if (!eligible(c)) continue;
+        const k = slotKey(c.date, c.hhmm);
+        classesBySlot.set(k, [...(classesBySlot.get(k) ?? []), c]);
+    }
+    const lessonName = (s: FpListedSchedule) => s.lesson?.name ?? '';
+
     const items: FpPlanItem[] = [];
     for (const c of classes) {
-        const base = { classId: c.class_id, date: c.date, hhmm: c.hhmm, title: c.title, lessonId: c.lesson_id };
-        const skip = (reason: FpSkipReason, extra: Partial<FpPlanItem> = {}): FpPlanItem =>
-            ({ ...base, fingerprint: null, action: 'skip', reason, ...extra });
+        const slot = slotKey(c.date, c.hhmm);
+        const b = { classId: c.class_id, date: c.date, hhmm: c.hhmm, title: c.title, lessonId: c.lesson_id, slot };
+        const skip = (reason: FpSkipReason, extra: Partial<FpPlanItem> = {}): FpPlanItem => ({ ...b, action: 'skip', reason, ...extra });
         if (c.lesson_id == null) { items.push(skip('no-lesson')); continue; }
-        const fp = fpFingerprint(c.lesson_id, c.date, c.hhmm);
-        const b = { ...base, fingerprint: fp };
-        if (c.mapped_slot) { items.push({ ...b, action: 'skip', reason: 'already-owned', scheduleId: Number(c.mapped_slot) }); continue; }
-        if (opts.startsInPast(c, now)) { items.push({ ...b, action: 'skip', reason: 'past' }); continue; }
-        if ((fpCount.get(fp) ?? 0) > 1) { items.push({ ...b, action: 'skip', reason: 'shared-fingerprint' }); continue; }
-        const matches = findActiveSchedules(schedules, fp);
-        if (matches.length > 1) { items.push({ ...b, action: 'skip', reason: 'ambiguous-schedules' }); continue; }
-        if (matches.length === 1) {
-            const sid = Number(matches[0].id);
-            const owner = opts.ownerOf ? await opts.ownerOf(c.class_id, sid) : null;
-            if (owner) { items.push({ ...b, action: 'skip', reason: 'schedule-owned', scheduleId: sid }); continue; }
-            items.push({ ...b, action: 'adopt', scheduleId: sid, availability: Number(matches[0].lesson_availability) });
+        if (c.mapped_slot) { items.push(skip('already-owned', { scheduleId: Number(c.mapped_slot) })); continue; }
+        if (opts.startsInPast(c, now)) { items.push(skip('past')); continue; }
+
+        const atSlot = schedBySlot.get(slot) ?? [];
+        const free = atSlot.filter((s) => !opts.owned.has(Number(s.id)));
+        const peers = classesBySlot.get(slot) ?? [c];
+        const compat = free.filter((s) => familyScore(c.title, lessonName(s)) > 0);
+
+        let resolved: FpListedSchedule | null = null;
+        if (peers.length === 1 && free.length === 1) {
+            if (compat.length === 1) resolved = compat[0];
+        } else if (compat.length > 0) {
+            const top = Math.max(...compat.map((s) => familyScore(c.title, lessonName(s))));
+            const best = compat.filter((s) => familyScore(c.title, lessonName(s)) === top);
+            if (best.length !== 1) { items.push(skip('ambiguous-schedules')); continue; }
+            const sc = best[0];
+            // El lado contrario también debe ser inequívoco: ninguna otra clase empata con esa schedule.
+            const rivals = peers.filter((p) => p.class_id !== c.class_id && familyScore(p.title, lessonName(sc)) >= familyScore(c.title, lessonName(sc)) && familyScore(p.title, lessonName(sc)) > 0);
+            if (rivals.length > 0) { items.push(skip('shared-fingerprint')); continue; }
+            resolved = sc;
+        }
+        if (!resolved) {
+            const own = atSlot.find((s) => opts.owned.has(Number(s.id)) && familyScore(c.title, lessonName(s)) > 0);
+            if (own) { items.push(skip('schedule-owned', { scheduleId: Number(own.id), scheduleLesson: lessonName(own) })); continue; }
+        }
+        if (resolved) {
+            items.push({ ...b, action: 'adopt', scheduleId: Number(resolved.id), scheduleLesson: lessonName(resolved), availability: Number(resolved.lesson_availability) });
             continue;
         }
-        // Sin schedule: ¿se podría crear?
-        if (!opts.allowCreate) { items.push({ ...b, action: 'skip', reason: 'no-match' }); continue; }
-        if (!(Number(c.fp_cap) > 0)) { items.push({ ...b, action: 'skip', reason: 'no-fitpass-cap' }); continue; }
-        if (!isRealCoach(c.coach, opts.defaultCoach)) { items.push({ ...b, action: 'skip', reason: 'no-real-coach' }); continue; }
+        // Sin schedule compatible en el slot: ¿se podría crear?
+        // Hay schedules libres en el slot pero de OTRA familia (p. ej. Yoga a la misma hora que Barre):
+        // nunca se adoptan; solo se reporta si no se puede crear.
+        if (!opts.allowCreate) { items.push(skip(free.length > 0 ? 'family-mismatch' : 'no-match')); continue; }
+        const sameFamilyPeers = peers.filter((p) => p.class_id !== c.class_id && familyScore(c.title, p.title) > 0);
+        if (sameFamilyPeers.length > 0) { items.push(skip('shared-fingerprint')); continue; }
+        if (!(Number(c.fp_cap) > 0)) { items.push(skip('no-fitpass-cap')); continue; }
+        if (!isRealCoach(c.coach, opts.defaultCoach)) { items.push(skip('no-real-coach')); continue; }
         const availability = opts.capacityFor(c);
-        if (!(availability > 0)) { items.push({ ...b, action: 'skip', reason: 'no-fitpass-cap' }); continue; }
+        if (!(availability > 0)) { items.push(skip('no-fitpass-cap')); continue; }
         items.push({ ...b, action: 'create', availability });
     }
     return items;
