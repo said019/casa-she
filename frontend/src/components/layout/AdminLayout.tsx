@@ -85,6 +85,7 @@ const sidebarItems: SidebarItem[] = [
         children: [
             { href: '/admin/bookings', label: 'Reservas' },
             { href: '/admin/bookings/waitlist', label: 'Lista de espera' },
+            { href: '/admin/bookings/fitpass', label: 'Asistentes Fitpass', logo: 'fitpass' },
         ],
     },
     {
@@ -185,6 +186,7 @@ const sidebarItems: SidebarItem[] = [
             { href: '/admin/settings/closed-days', label: 'Días cerrados' },
             { href: '/admin/settings/onboarding', label: 'Perfilador' },
             { href: '/admin/settings/totalpass', label: 'TotalPass', logo: 'totalpass' },
+            { href: '/admin/settings/fitpass', label: 'Fitpass', logo: 'fitpass' },
             { href: '/admin/audit', label: 'Bitácora' },
         ],
     },

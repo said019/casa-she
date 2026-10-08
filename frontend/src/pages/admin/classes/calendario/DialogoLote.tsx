@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { canalesConectados, CANALES, type CanalClave } from '@/lib/canales';
 import {
     fechaDeClase,
     horaCorta,
@@ -48,7 +49,7 @@ interface DialogoLoteProps {
 
 const DESPLAZAMIENTOS: Array<[number, string]> = [[-60, '−1 h'], [-30, '−30 min'], [0, 'Misma hora'], [30, '+30 min'], [60, '+1 h']];
 const TITULOS: Record<Exclude<AccionLote, 'cupo_canal' | 'cancelar'>, string> = { coach: 'Cambiar coach', mover: 'Mover o cambiar clase' };
-const reservasTotalpass = (c: Class) => Number(c.channels?.find((x) => x.channel === 'totalpass')?.booked ?? 0);
+const reservasCanal = (c: Class, canal: string) => Number(c.channels?.find((x) => x.channel === canal)?.booked ?? 0);
 
 /**
  * La ventana de cada acción en bloque: elige el cambio, pide la vista previa a
@@ -59,9 +60,12 @@ export function DialogoLote({ accion, onOpenChange, clases, classTypes, instruct
     const queryClient = useQueryClient();
     const ids = clases.map((c) => c.id);
     const coachesActuales = new Set(clases.map((c) => c.instructor_id));
-    const minimoCupo = Math.max(0, ...clases.map(reservasTotalpass));
+    const conectados = canalesConectados();
+    const [canal, setCanal] = useState<CanalClave>('totalpass');
+    const nombreCanal = CANALES[canal].nombre;
+    const minimoCupo = Math.max(0, ...clases.map((c) => reservasCanal(c, canal)));
     const maximoCupo = Math.min(...clases.map((c) => Number(c.max_capacity) || 0));
-    const cupoActual = clases.length ? Number(clases[0].channels?.find((x) => x.channel === 'totalpass')?.max ?? 0) : 0;
+    const cupoActual = clases.length ? Number(clases[0].channels?.find((x) => x.channel === canal)?.max ?? 0) : 0;
 
     const [coachId, setCoachId] = useState<string | null>(null);
     const [lugares, setLugares] = useState(Math.min(Math.max(cupoActual, minimoCupo), Math.max(maximoCupo, minimoCupo)));
@@ -76,7 +80,7 @@ export function DialogoLote({ accion, onOpenChange, clases, classTypes, instruct
     // Parámetros de la acción; null = todavía no hay nada que aplicar.
     const params: ParametrosLote | null =
         accion === 'coach' ? (coachId ? { instructorId: coachId } : null)
-        : accion === 'cupo_canal' ? { canal: 'totalpass', lugares }
+        : accion === 'cupo_canal' ? { canal, lugares }
         : accion === 'mover' ? (minutos !== 0 || tipoId !== 'mismo' ? { minutos, ...(tipoId !== 'mismo' ? { classTypeId: tipoId } : {}) } : null)
         : accion === 'cancelar' ? (motivo.trim() ? { motivo: motivo.trim() } : {})
         : null;
@@ -126,7 +130,7 @@ export function DialogoLote({ accion, onOpenChange, clases, classTypes, instruct
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[520px]">
                 <DialogHeader>
                     <DialogTitle className={cn('flex items-center gap-2 font-heading text-[28px] font-normal leading-tight', accion === 'cancelar' && 'text-destructive')}>
-                        {accion === 'cupo_canal' ? (<>Lugares para <ChannelLogo canal="totalpass" alto={16} /></>)
+                        {accion === 'cupo_canal' ? (<>Lugares para <ChannelLogo canal={canal} alto={16} /></>)
                             : accion === 'cancelar' ? `Cancelar ${nClases(clases.length)}`
                             : accion ? TITULOS[accion] : ''}
                     </DialogTitle>
@@ -164,6 +168,28 @@ export function DialogoLote({ accion, onOpenChange, clases, classTypes, instruct
 
                 {accion === 'cupo_canal' && (
                     <div className="space-y-2">
+                        {conectados.length > 1 && (
+                            <div role="radiogroup" aria-label="Plataforma" className="flex flex-wrap gap-2">
+                                {conectados.map((c) => (
+                                    <button
+                                        key={c.clave}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={canal === c.clave}
+                                        aria-label={c.nombre}
+                                        onClick={() => {
+                                            setCanal(c.clave);
+                                            const min = Math.max(0, ...clases.map((k) => reservasCanal(k, c.clave)));
+                                            const actual = clases.length ? Number(clases[0].channels?.find((x) => x.channel === c.clave)?.max ?? 0) : 0;
+                                            setLugares(Math.min(Math.max(actual, min), Math.max(maximoCupo, min)));
+                                        }}
+                                        className={cn('rounded-full border px-4 py-2', canal === c.clave ? 'border-casa-profundo bg-casa-avena' : 'border-casa-arena opacity-70')}
+                                    >
+                                        <ChannelLogo canal={c.clave} alto={12} />
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         <div className="flex items-center gap-4">
                             <Button type="button" variant="outline" className="h-12 w-12 rounded-[14px] text-xl" aria-label="Un lugar menos" disabled={lugares <= minimoCupo} onClick={() => setLugares((n) => n - 1)}>−</Button>
                             <span data-testid="cupo-lote" className="min-w-10 text-center font-heading text-5xl tabular-nums">{lugares}</span>
@@ -173,7 +199,7 @@ export function DialogoLote({ accion, onOpenChange, clases, classTypes, instruct
                         <p className="text-sm">
                             {minimoCupo > 0
                                 ? `No puede bajar de ${minimoCupo}: ya hay socias inscritas.`
-                                : 'Ninguna tiene socias todavía. En 0 la clase deja de ofrecerse en TotalPass.'}
+                                : `Ninguna tiene socias todavía. En 0 la clase deja de ofrecerse en ${nombreCanal}.`}
                         </p>
                     </div>
                 )}
@@ -233,11 +259,11 @@ export function DialogoLote({ accion, onOpenChange, clases, classTypes, instruct
                         {previa.isError && <p className="text-destructive">{getErrorMessage(previa.error)}</p>}
                         {r && (
                             <>
-                                <p>{textoAvisadas(accion!, r.resumen.alumnasAvisadas)}</p>
+                                <p>{textoAvisadas(accion!, r.resumen.alumnasAvisadas, canal)}</p>
                                 <p className="flex items-center gap-2">
-                                    <ChannelLogo canal="totalpass" alto={10} />
+                                    <ChannelLogo canal={accion === 'cupo_canal' ? canal : 'totalpass'} alto={10} />
                                     {accion === 'coach' && 'Se actualiza la coach; las socias conservan su lugar.'}
-                                    {accion === 'cupo_canal' && (lugares === 0 ? 'Deja de ofrecerse en TotalPass.' : `Hasta ${lugares} socias por clase.`)}
+                                    {accion === 'cupo_canal' && (lugares === 0 ? `Deja de ofrecerse en ${nombreCanal}.` : `Hasta ${lugares} socias por clase.`)}
                                     {accion === 'mover' && (r.resumen.sociasPierdenLugar === 0 ? 'Ninguna socia pierde su lugar.' : 'Mover la hora quita el lugar a las socias.')}
                                     {accion === 'cancelar' && 'Se retiran de TotalPass para que nadie más reserve.'}
                                 </p>
