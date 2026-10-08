@@ -56,6 +56,8 @@ import referralsRoutes from './routes/referrals.js';
 import pushRoutes from './routes/push.js';
 import adminPushRoutes from './routes/admin-push.js';
 import partnersRouter from './routes/partners.js';
+import partnersFitpassRouter from './routes/partners-fitpass.js';
+import { FITPASS_MIGRATIONS } from './lib/fitpass/migrations.js';
 import partnerWebhooksRouter from './routes/partner-webhooks.js';
 import stripeWebhook from './routes/stripe-webhook.js';
 import mercadopagoWebhook from './routes/mercadopago-webhook.js';
@@ -4404,6 +4406,15 @@ async function runStartupMigrations(): Promise<void> {
         console.log('  ✅ Migration 121: access_links');
     } catch (e) { console.error('Migration 121 error:', e); }
 
+    // ---- Migrations 122–127: integración FitPass (SQL en lib/fitpass/migrations.ts, probado en
+    // scripts/test-fitpass-migrations.ts). Cada una en su propio try/catch. ----
+    for (const m of FITPASS_MIGRATIONS) {
+        try {
+            for (const stmt of m.statements) await query(stmt);
+            console.log(`  ✅ Migration ${m.n}: ${m.name}`);
+        } catch (e) { console.error(`Migration ${m.n} error:`, e); }
+    }
+
   } finally {
     try { await lockClient.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]); } catch { /* noop */ }
     lockClient.release();
@@ -4462,6 +4473,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/reception', receptionDashboardRoutes);
 app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/partners/fitpass', partnersFitpassRouter);
 app.use('/api/partners', partnersRouter);
 // TotalPass — Fase 6: check-in de socios por webhook oficial (SIN auth de
 // sesión; TP no manda secreto/firma, la seguridad es el guard anti-SSRF interno).
