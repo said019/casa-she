@@ -33,6 +33,8 @@ import { syncTotalPassReservations } from '../lib/totalpass/source.js';
 import { withPgAdvisoryLock } from '../lib/totalpass/lock.js';
 import { localDateStr, addDaysToDateStr } from '../lib/mx-time.js';
 import { cdmxToday } from '../lib/schedule.js';
+import { runFitpassSyncCycle } from '../lib/fitpass/sync-cycle.js';
+import { getFitpassCreds } from '../lib/fitpass/credentials.js';
 
 // ============================================
 // TIPOS
@@ -853,6 +855,22 @@ async function totalpassImportJob(): Promise<void> {
 }
 
 /**
+ * FITPASS_SYNC — cada 2 min: snapshot de reservas del panel de FitPass + import + asistencia.
+ * Inerte salvo que el job esté EXPLÍCITAMENTE en CRON_JOBS (una lista vacía = "todos" NO lo
+ * enciende) y que las credenciales de FitPass existan y estén habilitadas. Se registra solo en
+ * cron_job_logs (lo hace el propio ciclo). Lock ocupado => skip retryable.
+ */
+async function fitpassSyncJob(): Promise<void> {
+    try {
+        if (!(await getFitpassCreds())) return; // sin credenciales o deshabilitado — inerte
+        const r = await runFitpassSyncCycle();
+        if (r.status !== 'ok') logJob('FITPASS_SYNC', `${r.status}${r.error ? `: ${r.error}` : ''}${r.retryable ? ' (se reintenta)' : ''}`);
+    } catch (error) {
+        logError('FITPASS_SYNC', error);
+    }
+}
+
+/**
  * Cada 10 min (:00,:10,…) — retira de TotalPass las clases que Casa Shé canceló
  * (o a las que se les apagó el cupo del canal).
  *
@@ -1138,6 +1156,13 @@ export function initializeCronJobs(): void {
     // Cada 10 min (:03,:13,...) - Empujar a TotalPass los cambios de clases editadas.
     job('TOTALPASS_RESYNC', '3,13,23,33,43,53 * * * *', () => { void totalpassResyncJob(); }, 'TOTALPASS_RESYNC - Cada 10 min');
 
+    // Cada 2 min - FitPass: reservas, asistencias y cancelaciones del panel (solo si está en CRON_JOBS).
+    if (listaBlanca.includes('FITPASS_SYNC')) {
+        job('FITPASS_SYNC', '*/2 * * * *', () => { void fitpassSyncJob(); }, 'FITPASS_SYNC - Cada 2 min');
+    } else {
+        console.log('  ⏸️  FITPASS_SYNC - omitido (requiere estar explícitamente en CRON_JOBS)');
+    }
+
     console.log('\n⏰ Cron Jobs inicializados correctamente\n');
 }
 
@@ -1166,6 +1191,7 @@ export const cronJobs = {
     totalpassImport: totalpassImportJob,
     totalpassRetire: totalpassRetireJob,
     totalpassResync: totalpassResyncJob,
+    fitpassSync: fitpassSyncJob,
 };
 
 export default initializeCronJobs;

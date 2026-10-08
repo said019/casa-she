@@ -12,6 +12,7 @@ import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { logAction } from '../lib/audit.js';
 import { verifyQrPayload } from '../lib/qr.js';
 import { cdmxWallClockToUtc } from '../lib/schedule.js';
+import { reflectFitpassAttendance } from '../lib/fitpass/attendance.js';
 
 const router = Router();
 
@@ -359,6 +360,7 @@ router.post('/qr', authenticate, requirePermission('checkin', ['instructor']), a
        RETURNING id, status, checked_in_at`,
       [req.user?.userId || null, booking.booking_id]
     );
+    if (updated) void reflectFitpassAttendance(updated.id);
 
     // Crear log de check-in
     await createCheckinLog({
@@ -549,6 +551,7 @@ router.post('/self', authenticate, async (req: Request, res: Response) => {
        RETURNING id, status, checked_in_at`,
       [validation.data.bookingId]
     );
+    if (updated) void reflectFitpassAttendance(updated.id);
 
     // Crear log de check-in
     await createCheckinLog({
@@ -690,6 +693,7 @@ router.post('/manual', authenticate, requirePermission('checkin', ['instructor']
        RETURNING id, status, checked_in_at`,
       [req.user?.userId, validation.data.bookingId]
     );
+    if (updated) void reflectFitpassAttendance(updated.id);
 
     await createCheckinLog({
       bookingId: booking.booking_id,
