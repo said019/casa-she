@@ -14,6 +14,7 @@ import { capacityError } from './schedule.js';
 import { queryOne } from '../config/database.js';
 import { cancelClassWithRefunds } from './cancel-class.js';
 import { setTotalpassCap } from './totalpass/caps.js';
+import { setFitpassCap } from './fitpass/caps.js';
 import { marcarResyncTotalpass } from './totalpass/resync.js';
 import { writeInAppNotification } from './in-app-notifications.js';
 import { sendWebPushToUser } from './web-push.js';
@@ -30,7 +31,7 @@ export const LoteSchema = z.object({
     accion: z.enum(ACCIONES_LOTE),
     vistaPrevia: z.boolean(),
     instructorId: z.string().uuid().optional(),
-    canal: z.literal('totalpass').optional(),
+    canal: z.enum(['totalpass', 'fitpass']).optional(),
     lugares: z.number().int().min(0).optional(),
     minutos: z.number().int().min(-180).max(180).refine((m) => m % 15 === 0, 'Múltiplo de 15 minutos').optional(),
     classTypeId: z.string().uuid().optional(),
@@ -398,6 +399,11 @@ async function aplicarLote(db: ClienteTx, e: EntradaLote, actor: ActorLote, ctx:
     }
 
     if (e.accion === 'cupo_canal') {
+        if (e.canal === 'fitpass') {
+            // FitPass: apagar el canal NO retira la clase (la schedule sigue; el pool empuja 0 disponibles).
+            for (const c of clases) await setFitpassCap(c.id, e.lugares!, db);
+            return t;
+        }
         for (const c of clases) await setTotalpassCap(c.id, e.lugares!, db);
         // 0 marca el retiro (dentro de setTotalpassCap); > 0 lo desmarca.
         t.retiro = e.lugares === 0;

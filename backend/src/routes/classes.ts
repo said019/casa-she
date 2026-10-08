@@ -18,6 +18,9 @@ import { errorDeCupoAlEditar } from '../lib/class-capacity.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { setTotalpassCap } from '../lib/totalpass/caps.js';
 import { dispararRetiroTotalpass } from '../lib/totalpass/retire.js';
+import { setFitpassCap } from '../lib/fitpass/caps.js';
+import { dispararDisponibilidadFitpass } from '../lib/fitpass/availability.js';
+import { publishClassToFitpass } from '../lib/fitpass/publish.js';
 import { marcarResyncTotalpass, dispararResyncTotalpass } from '../lib/totalpass/resync.js';
 import { copiarSemana, diasEntre } from '../lib/copy-week.js';
 import { CANALES_DE_CLASE_SQL } from '../lib/class-channels.js';
@@ -321,6 +324,7 @@ router.post('/bulk', authenticate, requireElevated, async (req: Request, res: Re
         void enviarAvisosDelLote(trasCommit).catch((e) => console.error('[classes-bulk] avisos fallaron:', e));
         if (trasCommit.retiro) dispararRetiroTotalpass();
         if (trasCommit.resync) dispararResyncTotalpass();
+        if (entrada.accion === 'cupo_canal' && entrada.canal === 'fitpass') for (const id of entrada.classIds) dispararDisponibilidadFitpass(id);
         await logAction(query, {
             adminUserId: req.user!.userId,
             actionType: `classes_bulk_${entrada.accion}`,
@@ -1029,13 +1033,17 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
     }
 });
 
-// PUT /api/classes/:id/channels — setear lugares de TotalPass para una clase.
+// PUT /api/classes/:id/channels — setear lugares de TotalPass y/o FitPass para una clase.
 // Admin + TODA la recepción (con scope de sucursal, igual que close-bookings).
 router.put('/:id/channels', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
     try {
-        const { totalpass } = req.body ?? {};
-        const n = Number(totalpass);
-        if (!Number.isInteger(n) || n < 0) return res.status(400).json({ error: 'totalpass debe ser un entero >= 0' });
+        const { totalpass, fitpass } = req.body ?? {};
+        const parseN = (v: unknown) => (v === undefined ? undefined : Number(v));
+        const tpN = parseN(totalpass);
+        const fpN = parseN(fitpass);
+        if (tpN === undefined && fpN === undefined) return res.status(400).json({ error: 'Indica totalpass y/o fitpass', code: 'CHANNEL_REQUIRED' });
+        if (tpN !== undefined && (!Number.isInteger(tpN) || tpN < 0)) return res.status(400).json({ error: 'totalpass debe ser un entero >= 0' });
+        if (fpN !== undefined && (!Number.isInteger(fpN) || fpN < 0)) return res.status(400).json({ error: 'fitpass debe ser un entero >= 0', code: 'FITPASS_INVALID' });
 
         const cls = await queryOne<{ id: string; facility_id: string | null }>(
             `SELECT id, facility_id FROM classes WHERE id = $1`,
@@ -1052,9 +1060,16 @@ router.put('/:id/channels', authenticate, requireRole('admin', 'super_admin', 'r
             }
         }
 
-        const result = await setTotalpassCap(req.params.id, n);
+        const result = tpN !== undefined ? await setTotalpassCap(req.params.id, tpN) : undefined;
         // Apagar el cupo (0) marca la clase para retiro; ejecutarlo al vuelo.
-        if (n === 0) dispararRetiroTotalpass();
+        if (tpN === 0) dispararRetiroTotalpass();
+        const fpResult = fpN !== undefined ? await setFitpassCap(req.params.id, fpN) : undefined;
+        if (fpResult) {
+            // Empuja el techo nuevo al panel (solo si la clase ya es dueña de una schedule).
+            dispararDisponibilidadFitpass(req.params.id);
+            // Subir el tope de 0 a N en una clase sin schedule: publicarla (solo con FITPASS_PUBLISH_ENABLED).
+            if (fpResult.max_spots > 0) void publishClassToFitpass(req.params.id).catch(() => { /* best-effort */ });
+        }
 
         try {
             await logAction(query, {
@@ -1062,19 +1077,21 @@ router.put('/:id/channels', authenticate, requireRole('admin', 'super_admin', 'r
                 actionType: 'class_totalpass_cap_updated',
                 entityType: 'class',
                 entityId: req.params.id,
-                description: `Cupo TotalPass actualizado a ${result.max_spots} lugares`,
-                newData: { classId: req.params.id, totalpass: result.max_spots },
+                description: [result ? `Cupo TotalPass actualizado a ${result.max_spots} lugares` : null,
+                    fpResult ? `Cupo FitPass actualizado a ${fpResult.max_spots} lugares` : null].filter(Boolean).join('; '),
+                newData: { classId: req.params.id, totalpass: result?.max_spots, fitpass: fpResult?.max_spots },
                 req,
             });
         } catch (auditErr) {
             console.error('[channels] audit failed (no bloquea):', auditErr);
         }
 
-        res.json({ ok: true, totalpass: result });
+        res.json({ ok: true, ...(result ? { totalpass: result } : {}), ...(fpResult ? { fitpass: fpResult } : {}) });
     } catch (e: any) {
-        if (e.code === 'CLASS_NOT_FOUND') return res.status(404).json({ error: 'Clase no encontrada' });
-        if (e.code === 'CAP_BELOW_BOOKED') return res.status(409).json({ error: `Ya hay ${e.booked} reservas TotalPass; no puedes bajar de ahí` });
-        if (e.code === 'CAP_EXCEEDS_CAPACITY') return res.status(400).json({ error: 'Los lugares TP no pueden exceder la capacidad de la clase' });
+        if (e.code === 'CLASS_NOT_FOUND') return res.status(404).json({ error: 'Clase no encontrada', code: e.code });
+        const plataforma = req.body?.fitpass !== undefined && req.body?.totalpass === undefined ? 'FitPass' : 'TotalPass';
+        if (e.code === 'CAP_BELOW_BOOKED') return res.status(409).json({ error: `Ya hay ${e.booked} reservas ${plataforma}; no puedes bajar de ahí`, code: e.code });
+        if (e.code === 'CAP_EXCEEDS_CAPACITY') return res.status(400).json({ error: `Los lugares ${plataforma} no pueden exceder la capacidad de la clase`, code: e.code });
         console.error('setTotalpassCap error:', e);
         res.status(500).json({ error: 'Error al guardar lugares TotalPass' });
     }
