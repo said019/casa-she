@@ -6,7 +6,9 @@
  *   DELETE /credentials               deshabilita (conserva credenciales cifradas)
  *   GET    /lessons                   disciplinas EN VIVO del panel de FitPass
  *   POST   /lessons/auto-map          class_types <- lessons por nombre normalizado + alias (nunca pisa mapeos manuales)
- *   PUT    /class-types/:id/lesson    {fitpass_lesson_id|null, fitpass_quota}
+ *   PUT    /class-types/:id/lesson    {fitpass_lesson_id?|null, fitpass_quota} (lesson omitida = se conserva)
+ *   GET    /publish-preview?from&to   dry-run: qué se adoptaría / crearía / saltaría (solo lectura)
+ *   POST   /adopt                     {from,to,dry_run=true}: reclama schedules existentes (nunca crea)
  *
  * Acceso: sólo cuentas admin / super_admin. `authenticate` mapea recepción -> role 'admin', así que
  * además se exige accountRole real (recepción NO administra credenciales de partners).
@@ -22,6 +24,8 @@ import {
     FitpassNotConfiguredError, maskEmail,
 } from '../lib/fitpass/credentials.js';
 import { autoMapLessons, setClassTypeLesson } from '../lib/fitpass/lessons.js';
+import { adoptExistingFitpassSchedules, previewFitpassPublish } from '../lib/fitpass/publish.js';
+import { localDateStr, addDaysToDateStr } from '../lib/mx-time.js';
 
 const router = Router();
 
@@ -177,6 +181,47 @@ router.put('/class-types/:id/lesson', ...guard, async (req: Request, res: Respon
     } catch (err) {
         console.error('[partners/fitpass] class-type lesson:', panelErrorMessage(err));
         res.status(500).json({ error: 'No se pudo guardar el mapeo' });
+    }
+});
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** from/to de la query o del body; default hoy..+14, máximo 31 días. */
+function parseWindow(src: any): { from: string; to: string } | { error: string } {
+    const from = String(src?.from || localDateStr());
+    const to = String(src?.to || addDaysToDateStr(from, 14));
+    if (!DATE_RE.test(from) || !DATE_RE.test(to) || to < from) return { error: 'Rango de fechas inválido (YYYY-MM-DD)' };
+    if (addDaysToDateStr(from, 31) < to) return { error: 'El rango máximo es de 31 días' };
+    return { from, to };
+}
+
+// GET /publish-preview?from&to — SOLO LECTURA: qué clases se adoptarían / crearían / saltarían y por qué.
+router.get('/publish-preview', ...guard, async (req: Request, res: Response) => {
+    const w = parseWindow(req.query);
+    if ('error' in w) return res.status(400).json({ error: w.error });
+    try {
+        res.json(await previewFitpassPublish(w.from, w.to));
+    } catch (err) {
+        handlePanelError(res, 'publish-preview', err);
+    }
+});
+
+// POST /adopt {from,to,dry_run?} — reclama schedules existentes (nunca crea). dry_run=true por defecto.
+router.post('/adopt', ...guard, async (req: Request, res: Response) => {
+    const w = parseWindow(req.body);
+    if ('error' in w) return res.status(400).json({ error: w.error });
+    const dryRun = req.body?.dry_run !== false;
+    try {
+        const report = await adoptExistingFitpassSchedules(w.from, w.to, { dryRun });
+        if (!dryRun) {
+            await logAction(query, {
+                adminUserId: req.user!.userId, actionType: 'fitpass_adopt', entityType: 'fitpass',
+                description: `Adopción de schedules FitPass ${w.from}..${w.to}: ${report.counts.adopted} adoptadas`,
+                newData: { ...w, counts: report.counts }, req,
+            });
+        }
+        res.json(report);
+    } catch (err) {
+        handlePanelError(res, 'adopt', err);
     }
 });
 

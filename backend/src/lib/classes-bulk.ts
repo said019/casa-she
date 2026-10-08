@@ -15,6 +15,7 @@ import { queryOne } from '../config/database.js';
 import { cancelClassWithRefunds } from './cancel-class.js';
 import { setTotalpassCap } from './totalpass/caps.js';
 import { setFitpassCap } from './fitpass/caps.js';
+import { marcarEdicionFitpass } from './fitpass/edit.js';
 import { marcarResyncTotalpass } from './totalpass/resync.js';
 import { writeInAppNotification } from './in-app-notifications.js';
 import { sendWebPushToUser } from './web-push.js';
@@ -389,6 +390,7 @@ async function aplicarLote(db: ClienteTx, e: EntradaLote, actor: ActorLote, ctx:
         await db.query(`UPDATE classes SET instructor_id = $1, updated_at = NOW() WHERE id = ANY($2::uuid[])`, [coach.id, ids]);
         // Editar en TotalPass: las socias conservan su lugar.
         t.resync = (await marcarResyncTotalpass(ids, db)) > 0;
+        await marcarEdicionFitpass(ids, db); // FitPass: outbox de edición (mismo schedule)
         for (const c of cambian) {
             avisar(c, 'Cambio de coach', `${c.tipo} del ${fechaLarga(c.fecha)} a las ${horaLegible(c.inicio)} ahora la da ${coach.nombre}.`);
             t.correosCoach.push({
@@ -426,6 +428,7 @@ async function aplicarLote(db: ClienteTx, e: EntradaLote, actor: ActorLote, ctx:
         // Con minutos ≠ 0 TotalPass la borra y la republica (las socias pierden lugar);
         // solo con el tipo, se edita.
         t.resync = (await marcarResyncTotalpass(ids, db)) > 0;
+        await marcarEdicionFitpass(ids, db); // FitPass: outbox de edición (mismo schedule)
         for (const c of clases) {
             const dia = fechaLarga(c.fecha);
             const horaNueva = horaLegible(deMin(aMin(c.inicio) + minutos));

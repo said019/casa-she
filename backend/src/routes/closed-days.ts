@@ -4,6 +4,7 @@ import { query, queryOne } from '../config/database.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { cancelClassWithRefunds } from '../lib/cancel-class.js';
 import { dispararRetiroTotalpass } from '../lib/totalpass/retire.js';
+import { dispararFitpassOutbox } from '../lib/fitpass/outbox.js';
 
 const router = Router();
 
@@ -84,7 +85,7 @@ router.post('/', authenticate, requireRole('admin', 'super_admin'), async (req: 
         // Día cerrado: ya se marcaron todas las clases del día, un solo barrido las
         // retira de TotalPass. Sin esto el estudio cerraba y TotalPass seguía
         // vendiendo lugares para ese día.
-        if (classesToCancel.length) dispararRetiroTotalpass();
+        if (classesToCancel.length) { dispararRetiroTotalpass(); dispararFitpassOutbox(); }
 
         res.status(201).json({
             closedDay: mapRow(row),

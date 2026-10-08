@@ -116,6 +116,9 @@ export async function reconcileFitpassPool(window?: { from?: string; to?: string
     const empty: FitpassPoolSummary = { evaluated: 0, changed: 0, unchanged: 0, failed: 0, skipped: 0, skippedReasons: {} };
     const from = window?.from ?? localDateStr();
     const to = window?.to ?? addDaysToDateStr(from, 21);
+    // Sin schedules dueñas en la ventana no hay nada que empujar: ni siquiera se hace login.
+    const [hay] = await filas<{ n: number }>(undefined, `SELECT count(*)::int AS n FROM (${POOL_SELECT} AND c.date BETWEEN $1::date AND $2::date LIMIT 1) x`, [from, to]);
+    if (!hay || hay.n === 0) return { ...empty, skipped_all: 'nothing-owned' };
     const out = await withFitpassLock('FP_MUTATE', async () =>
         withFitpassLock('FP_POOL', async () => {
             const ctx = await getPanelCtx();
@@ -164,4 +167,29 @@ export function dispararDisponibilidadFitpass(classId: string | null | undefined
     }, 1500);
     (t as any).unref?.();
     pendientes.set(classId, t);
+}
+
+/**
+ * Middleware para los routers de reservas: tras una mutación exitosa (reservar, cancelar,
+ * promover de lista de espera, reserva de recepción) empuja el cupo de esa clase a FitPass.
+ * Resuelve la clase por `classId` del body o por el id de la reserva en la URL. Best-effort:
+ * nunca afecta la respuesta; si algo no se logra, el pool de respaldo (cada 10 min) lo corrige.
+ */
+export function fitpassBookingHook(req: any, res: any, next: () => void): void {
+    if (req.method === 'GET' || req.method === 'OPTIONS' || req.method === 'HEAD') return next();
+    res.on('finish', () => {
+        if (res.statusCode >= 300) return;
+        void (async () => {
+            try {
+                let classId: string | null = typeof req.body?.classId === 'string' ? req.body.classId : null;
+                const bookingId = req.params?.id || (req.path.match(/^\/([0-9a-f-]{36})/i)?.[1] ?? null);
+                if (!classId && bookingId) {
+                    const [b] = await filas<{ class_id: string }>(undefined, `SELECT class_id FROM bookings WHERE id = $1`, [bookingId]);
+                    classId = b?.class_id ?? null;
+                }
+                dispararDisponibilidadFitpass(classId);
+            } catch { /* best-effort */ }
+        })();
+    });
+    next();
 }

@@ -1,5 +1,6 @@
 import { sendWebPushToUser, type WebPushPayload } from './web-push.js';
 import { marcarRetiroTotalpass } from './totalpass/retire.js';
+import { marcarCancelacionFitpass } from './fitpass/cancel.js';
 import { filas, type ClienteTx } from './db-tx.js';
 
 /** Aviso push a una alumna que todavía no se manda (cancelación dentro de un lote). */
@@ -63,6 +64,8 @@ export async function cancelClassWithRefunds(
     // cron. Sin esta línea la clase seguía viva y reservable en la app de TotalPass:
     // la socia reservaba una clase cancelada y llegaba al estudio sin que nadie supiera.
     await marcarRetiroTotalpass(classId, db);
+    // Igual para FitPass: outbox solo BD de la schedule DUEÑA (se cancela tras el commit).
+    await marcarCancelacionFitpass(classId, db);
 
     // Get all active bookings for this class
     const bookingsToCancel = await filas(

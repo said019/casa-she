@@ -18,6 +18,9 @@ import { errorDeCupoAlEditar } from '../lib/class-capacity.js';
 import { resolveRequestFacility } from '../lib/requestFacility.js';
 import { setTotalpassCap } from '../lib/totalpass/caps.js';
 import { dispararRetiroTotalpass } from '../lib/totalpass/retire.js';
+import { dispararFitpassOutbox } from '../lib/fitpass/outbox.js';
+import { marcarEdicionFitpass, preflightFitpassClassEdit } from '../lib/fitpass/edit.js';
+import { getPanelCtx, fitpassPublishEnabled } from '../lib/fitpass/panel.js';
 import { setFitpassCap } from '../lib/fitpass/caps.js';
 import { dispararDisponibilidadFitpass } from '../lib/fitpass/availability.js';
 import { publishClassToFitpass } from '../lib/fitpass/publish.js';
@@ -323,6 +326,7 @@ router.post('/bulk', authenticate, requireElevated, async (req: Request, res: Re
 
         void enviarAvisosDelLote(trasCommit).catch((e) => console.error('[classes-bulk] avisos fallaron:', e));
         if (trasCommit.retiro) dispararRetiroTotalpass();
+        dispararFitpassOutbox(); // cancelaciones y ediciones de FitPass marcadas por el lote
         if (trasCommit.resync) dispararResyncTotalpass();
         if (entrada.accion === 'cupo_canal' && entrada.canal === 'fitpass') for (const id of entrada.classIds) dispararDisponibilidadFitpass(id);
         await logAction(query, {
@@ -947,6 +951,28 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
             return res.json(existing);
         }
 
+        // FitPass: si la clase es dueña de una schedule y se mueve/cambia de tipo, validar ANTES del
+        // UPDATE local que el destino no esté ocupado por otra clase del panel (anti-robo).
+        // Solo con FITPASS_PUBLISH_ENABLED (la edición en FitPass está detrás de ese flag).
+        if (fitpassPublishEnabled() && (data.date !== undefined || data.startTime !== undefined || data.classTypeId !== undefined)) {
+            try {
+                const ctx = await getPanelCtx();
+                if (ctx) {
+                    const dest = await queryOne<{ date: string; hhmm: string; lesson_id: number | null }>(
+                        `SELECT COALESCE($2::date, c.date)::text AS date, COALESCE($3::text, substr(c.start_time::text,1,5)) AS hhmm,
+                                ct.fitpass_lesson_id AS lesson_id
+                           FROM classes c JOIN class_types ct ON ct.id = COALESCE($4::uuid, c.class_type_id) WHERE c.id = $1`,
+                        [id, data.date ?? null, data.startTime ?? null, data.classTypeId ?? null]);
+                    if (dest) {
+                        const pre = await preflightFitpassClassEdit(id, { date: dest.date, hhmm: dest.hhmm, lessonId: dest.lesson_id }, { ctx });
+                        if (!pre.ok) return res.status(409).json({ error: pre.message, code: pre.code });
+                    }
+                }
+            } catch (preErr) {
+                console.error('[fitpass] preflight de edición falló (no bloquea):', (preErr as Error).message);
+            }
+        }
+
         values.push(id);
         const horarioAntes = await horarioDeClase(id);
         const result = await queryOne(
@@ -954,6 +980,9 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
              WHERE id = $${paramCount} RETURNING *`,
             values
         );
+
+        // Cambió la capacidad: el techo que ve FitPass cambia (solo si la clase es dueña de una schedule).
+        if (data.maxCapacity !== undefined) dispararDisponibilidadFitpass(id);
 
         // Cambió el día o la hora: avisar a las alumnas de la app (in-app + push), igual
         // que los cambios en bloque. Sin esto la alumna llegaba a la hora vieja.
@@ -970,6 +999,7 @@ router.put('/:id', authenticate, requireElevated, async (req: Request, res: Resp
         if (tocaTotalpass) {
             const marcadas = await marcarResyncTotalpass([id]);
             if (marcadas) dispararResyncTotalpass();
+            if (await marcarEdicionFitpass([id])) dispararFitpassOutbox();
         }
 
         // Cambio de instructor: audit + advertencia si el mes ya tiene nómina pagada.
@@ -1216,6 +1246,7 @@ router.post('/:id/change-instructor', authenticate, requireElevated, async (req:
         if (tocadas.length) {
             const marcadas = await marcarResyncTotalpass(tocadas);
             if (marcadas) dispararResyncTotalpass();
+            if (await marcarEdicionFitpass(tocadas)) dispararFitpassOutbox();
         }
 
         await logAction(query, {
@@ -1276,6 +1307,7 @@ router.delete('/:id', authenticate, requireElevated, async (req: Request, res: R
             // Ya quedaron marcadas TODAS las clases de la serie: un solo barrido las
             // retira de TotalPass en segundos (si falla, el cron lo retoma).
             dispararRetiroTotalpass();
+            dispararFitpassOutbox();
             try {
                 await logAction(query, {
                     adminUserId: req.user!.userId,
@@ -1320,6 +1352,7 @@ router.delete('/:id', authenticate, requireElevated, async (req: Request, res: R
         // Quitarla de TotalPass enseguida: mientras siga publicada allá, una socia
         // puede reservar una clase que ya no existe.
         dispararRetiroTotalpass();
+        dispararFitpassOutbox();
 
         // Aviso al coach (fuera de la app) de que su clase se canceló.
         try {
@@ -1417,6 +1450,7 @@ router.post('/:id/substitute', authenticate, requireRole('admin'), async (req: R
         // La socia de TotalPass ve el nombre del coach en su app: empujarle el cambio.
         const marcadasSub = await marcarResyncTotalpass([id]);
         if (marcadasSub) dispararResyncTotalpass();
+        if (await marcarEdicionFitpass([id])) dispararFitpassOutbox();
 
         // Record substitution
         await queryOne(`
