@@ -25,7 +25,8 @@ assert.ok(valido({ accion: 'cancelar', classIds: Array.from({ length: 200 }, (_,
 assert.ok(!valido({ accion: 'coach' }), 'coach exige instructorId');
 assert.ok(valido({ accion: 'coach', instructorId: uuid(9) }));
 assert.ok(!valido({ accion: 'cupo_canal', canal: 'totalpass' }), 'cupo exige lugares');
-assert.ok(!valido({ accion: 'cupo_canal', canal: 'fitpass', lugares: 2 }), 'solo canales conectados');
+assert.ok(valido({ accion: 'cupo_canal', canal: 'fitpass', lugares: 2 }), 'FitPass ya es un canal conectado');
+assert.ok(!valido({ accion: 'cupo_canal', canal: 'wellhub', lugares: 2 }), 'solo canales conectados');
 assert.ok(!valido({ accion: 'cupo_canal', canal: 'totalpass', lugares: -1 }));
 assert.ok(valido({ accion: 'cupo_canal', canal: 'totalpass', lugares: 0 }));
 assert.ok(!valido({ accion: 'mover' }), 'mover exige minutos o tipo');

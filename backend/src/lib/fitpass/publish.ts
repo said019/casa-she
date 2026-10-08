@@ -73,11 +73,10 @@ async function setAdoptedCap(classId: string, availability: number, capacity: nu
 export async function publishFitpassCore(window: { from: string; to: string }, o: PublishCoreOpts): Promise<PublishReport> {
     const now = o.now ?? new Date();
     const report = emptyReport(window.from, window.to, o.dryRun);
-    let classes = await loadFitpassPlanClasses(window.from, window.to, o.db);
-    if (o.classIds) classes = classes.filter((c) => o.classIds!.includes(c.class_id));
+    const classes = await loadFitpassPlanClasses(window.from, window.to, o.db);
     const schedules = await listWindow(o.ctx, window.from, window.to);
 
-    const items = await planFitpassPublish(classes, schedules, {
+    const allItems = await planFitpassPublish(classes, schedules, {
         now,
         defaultCoach: GYM_DEFAULT_COACH,
         allowCreate: o.allowCreate,
@@ -85,6 +84,8 @@ export async function publishFitpassCore(window: { from: string; to: string }, o
         ownerOf: (classId, sid) => getFitpassScheduleOwner(classId, sid, o.db),
         startsInPast: (c, n) => classStartedAlready(c, n),
     });
+    // El filtro por clase va DESPUÉS del plan: si no, un fingerprint compartido con otra clase no se detectaría.
+    const items = o.classIds ? allItems.filter((i) => o.classIds!.includes(i.classId)) : allItems;
     report.items = items;
     const byClass = new Map(classes.map((c) => [c.class_id, c]));
     for (const it of items) {
