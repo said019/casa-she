@@ -38,6 +38,8 @@ export interface FitpassSyncCycleOptions {
     fetchRows?: (from: Date, to: Date) => Promise<FitpassImportRow[]>;
     /** Inyección para tests: reemplaza la reconciliación de asistencia. */
     reconcileAttendance?: () => Promise<{ pending: number; ok: number; failed: number }>;
+    /** Solo tests: cliente transaccional para el import (SAVEPOINT por fila). */
+    importDb?: import('pg').PoolClient;
     /** false = no escribe en cron_job_logs (dry-run). */
     log?: boolean;
 }
@@ -87,7 +89,7 @@ export async function runFitpassSyncCycle(opts: FitpassSyncCycleOptions = {}): P
         };
         if (rows.length > 0) {
             try {
-                imp = await importFitpassReservations(rows, opts.actorUserId ?? null);
+                imp = await importFitpassReservations(rows, opts.actorUserId ?? null, { db: opts.importDb });
             } catch (e) {
                 return { status: 'import-failed', retryable: true, fetched: rows.length, error: (e as Error).message };
             }

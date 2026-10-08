@@ -7,6 +7,13 @@
  *   GET    /lessons                   disciplinas EN VIVO del panel de FitPass
  *   POST   /lessons/auto-map          class_types <- lessons por nombre normalizado + alias (nunca pisa mapeos manuales)
  *   PUT    /class-types/:id/lesson    {fitpass_lesson_id|null, fitpass_quota}
+ *   GET    /attendees?date=           (recepción) asistentes FitPass del día
+ *   POST   /attendees                 (recepción) {classId, displayName, fitpassMemberRef?}
+ *   DELETE /attendees/:bookingId      (recepción) {reason?}
+ *   POST   /bulk-import               {rows[]} -> 409 FITPASS_SYNC_LOCKED si hay un ciclo en curso
+ *   POST   /import-reservations       {from_date?, to_date?} importa del panel (bajo FP_SYNC_CYCLE)
+ *   POST   /sync-now                  ciclo completo -> {ok, summary}
+ *   GET    /sync-status               {last_run_at, success, details}
  *
  * Acceso: sólo cuentas admin / super_admin. `authenticate` mapea recepción -> role 'admin', así que
  * además se exige accountRole real (recepción NO administra credenciales de partners).
@@ -22,6 +29,15 @@ import {
     FitpassNotConfiguredError, maskEmail,
 } from '../lib/fitpass/credentials.js';
 import { autoMapLessons, setClassTypeLesson } from '../lib/fitpass/lessons.js';
+import { queryOne } from '../config/database.js';
+import { hasPermission } from '../lib/permissions.js';
+import { withFitpassLock } from '../lib/fitpass/locks.js';
+import {
+    FitpassError, importFitpassReservations, registerFitpassAttendee, cancelFitpassAttendee,
+    listFitpassAttendeesForDate, type FitpassErrorCode,
+} from '../lib/fitpass/source.js';
+import { runFitpassSyncCycle, getFitpassSyncStatus } from '../lib/fitpass/sync-cycle.js';
+import { localDateStr } from '../lib/mx-time.js';
 
 const router = Router();
 
@@ -176,6 +192,156 @@ router.put('/class-types/:id/lesson', ...guard, async (req: Request, res: Respon
     } catch (err) {
         console.error('[partners/fitpass] class-type lesson:', panelErrorMessage(err));
         res.status(500).json({ error: 'No se pudo guardar el mapeo' });
+    }
+});
+
+// ── Recepción: asistentes del día ───────────────────────────────────────────
+// Recepción tiene role operativo 'admin' (authenticate lo mapea); el rol REAL está en accountRole.
+async function requireReceptionOrAdmin(req: Request, res: Response, next: NextFunction) {
+    const acct = req.user?.accountRole;
+    if (acct === 'admin' || acct === 'super_admin') return next();
+    if (acct !== 'reception') return res.status(403).json({ error: 'Acceso denegado' });
+    try {
+        const row = await queryOne<{ role: string; permissions: unknown; is_reception_master: boolean }>(
+            `SELECT role, permissions, is_reception_master FROM users WHERE id=$1`, [req.user!.userId]);
+        if (row && hasPermission(row as any, 'reservas')) return next();
+        return res.status(403).json({ error: 'No tienes permiso para esta acción.' });
+    } catch (err) {
+        console.error('[partners/fitpass] permiso recepción:', panelErrorMessage(err));
+        return res.status(500).json({ error: 'Error de autorización' });
+    }
+}
+const receptionGuard = [authenticate, requireRole('admin', 'super_admin'), requireReceptionOrAdmin];
+
+function fitpassErrorStatus(code: FitpassErrorCode): number {
+    switch (code) {
+        case 'CLASS_NOT_FOUND': return 404;
+        case 'CLASS_FULL': case 'FITPASS_QUOTA_EXHAUSTED': return 409;
+        default: return 400;
+    }
+}
+
+router.get('/attendees', ...receptionGuard, async (req: Request, res: Response) => {
+    const date = String(req.query.date || localDateStr());
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'date debe ser YYYY-MM-DD' });
+    try {
+        res.json(await listFitpassAttendeesForDate(date));
+    } catch (err) {
+        console.error('[partners/fitpass] attendees:', panelErrorMessage(err));
+        res.status(500).json({ error: 'Error al obtener asistentes FitPass' });
+    }
+});
+
+const registerSchema = z.object({
+    classId: z.string().uuid(),
+    displayName: z.string().trim().min(2).max(120),
+    fitpassMemberRef: z.string().max(50).optional(),
+});
+
+router.post('/attendees', ...receptionGuard, async (req: Request, res: Response) => {
+    const parsed = registerSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten().fieldErrors });
+    try {
+        const result = await registerFitpassAttendee({ ...parsed.data, actorUserId: req.user!.userId });
+        res.status(201).json(result);
+    } catch (err) {
+        if (err instanceof FitpassError) return res.status(fitpassErrorStatus(err.code)).json({ error: err.message, code: err.code });
+        console.error('[partners/fitpass] register attendee:', panelErrorMessage(err));
+        res.status(500).json({ error: 'Error al registrar asistente FitPass' });
+    }
+});
+
+router.delete('/attendees/:bookingId', ...receptionGuard, async (req: Request, res: Response) => {
+    const id = String(req.params.bookingId);
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return res.status(400).json({ error: 'ID de reserva inválido' });
+    try {
+        const reason = String(req.body?.reason || 'Cancelado por recepción').slice(0, 300);
+        const done = await cancelFitpassAttendee(id, reason, req.user!.userId);
+        if (!done) return res.status(404).json({ error: 'Reserva FitPass no encontrada' });
+        res.json({ message: 'Asistente FitPass cancelado' });
+    } catch (err) {
+        console.error('[partners/fitpass] cancel attendee:', panelErrorMessage(err));
+        res.status(500).json({ error: 'Error al cancelar asistente' });
+    }
+});
+
+// ── Importación ─────────────────────────────────────────────────────────────
+const bulkRowSchema = z.object({
+    sourceRef: z.string().min(1).max(120).optional(),
+    displayName: z.string().trim().min(2).max(120),
+    fitpassMemberRef: z.string().max(50).optional(),
+    classId: z.string().uuid().optional(),
+    classLookup: z.object({
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date debe ser YYYY-MM-DD'),
+        startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'startTime debe ser HH:MM o HH:MM:SS'),
+        className: z.string().max(120).optional(),
+        fitpassLessonId: z.number().int().positive().optional(),
+        coachName: z.string().max(120).optional(),
+    }).optional(),
+    status: z.enum(['reserved', 'attended', 'cancelled']),
+}).refine((r) => !!r.classId || !!r.classLookup, { message: 'classId o classLookup requerido', path: ['classId'] });
+
+const LOCKED = { error: 'FitPass se está sincronizando. Reintenta en unos segundos.', code: 'FITPASS_SYNC_LOCKED', retryable: true };
+
+router.post('/bulk-import', ...guard, async (req: Request, res: Response) => {
+    const parsed = z.object({ rows: z.array(bulkRowSchema).min(1).max(1000) }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ error: 'Datos inválidos', details: parsed.error.flatten().fieldErrors });
+    try {
+        const result = await withFitpassLock('FP_SYNC_CYCLE', () => importFitpassReservations(parsed.data.rows, req.user!.userId));
+        if (result === null || result.skipped === 'locked') return res.status(409).json(LOCKED);
+        res.json(result);
+    } catch (err) {
+        console.error('[partners/fitpass] bulk-import:', panelErrorMessage(err));
+        res.status(500).json({ error: 'Error al importar reservas FitPass' });
+    }
+});
+
+const importWindowSchema = z.object({
+    from_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    to_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+
+/** Forma Hundred: {ok, fetched, created, updated, cancelled, skipped, failed, errors}. */
+router.post('/import-reservations', ...guard, async (req: Request, res: Response) => {
+    const parsed = importWindowSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ error: 'Fechas inválidas (YYYY-MM-DD)' });
+    const { from_date, to_date } = parsed.data;
+    if (from_date && to_date && from_date > to_date) return res.status(400).json({ error: 'from_date no puede ser posterior a to_date' });
+    try {
+        const creds = await getFitpassCredentialsStatus();
+        if (!creds.is_enabled) return res.json({ ok: true, disabled: true, fetched: 0 });
+        const r = await runFitpassSyncCycle({
+            from: from_date ? new Date(`${from_date}T12:00:00Z`) : undefined,
+            to: to_date ? new Date(`${to_date}T12:00:00Z`) : undefined,
+            actorUserId: req.user!.userId,
+            reconcileAttendance: async () => ({ pending: 0, ok: 0, failed: 0 }),
+        });
+        if (r.status === 'cycle-skipped') return res.status(409).json(LOCKED);
+        if (r.status === 'no-creds') return res.json({ ok: true, disabled: true, fetched: 0 });
+        if (r.status === 'fetch-failed') return res.status(502).json({ error: 'FITPASS_PANEL_ERROR', message: r.error });
+        res.json({ ok: r.status === 'ok', fetched: r.fetched ?? 0, ...(r.import ?? {}), errors: r.errors ?? [] });
+    } catch (err) {
+        handlePanelError(res, 'import-reservations', err);
+    }
+});
+
+router.post('/sync-now', ...guard, async (_req: Request, res: Response) => {
+    try {
+        const r = await runFitpassSyncCycle({ actorUserId: _req.user!.userId });
+        if (r.status === 'cycle-skipped') return res.status(409).json(LOCKED);
+        if (r.status === 'no-creds') return res.status(409).json({ error: 'FITPASS_NOT_CONFIGURED', code: 'FITPASS_NOT_CONFIGURED', message: r.error });
+        res.json({ ok: r.status === 'ok', summary: r });
+    } catch (err) {
+        handlePanelError(res, 'sync-now', err);
+    }
+});
+
+router.get('/sync-status', ...guard, async (_req: Request, res: Response) => {
+    try {
+        res.json(await getFitpassSyncStatus());
+    } catch (err) {
+        console.error('[partners/fitpass] sync-status:', panelErrorMessage(err));
+        res.status(500).json({ error: 'Error al leer el estado de la sincronización' });
     }
 });
 
