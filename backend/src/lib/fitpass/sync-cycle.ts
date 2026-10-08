@@ -12,7 +12,7 @@
 import { query } from '../../config/database.js';
 import { FitPassScraper, type FitpassImportRow } from '../scrapers/fitpass.js';
 import { addDays } from '../mx-time.js';
-import { getFitpassCreds } from './credentials.js';
+import { getFitpassScraper, FitpassNotConfiguredError } from './credentials.js';
 import { withFitpassLock } from './locks.js';
 import { logFitpassCron } from './cron-log.js';
 import { importFitpassReservations, type FitpassImportResult } from './source.js';
@@ -100,10 +100,12 @@ export function attachLessonIds(rows: FitpassImportRow[], lessons: Array<{ id: n
 }
 
 async function defaultFetch(from: Date, to: Date): Promise<FitpassImportRow[]> {
-    const creds = await getFitpassCreds();
-    if (!creds) throw new NoCredsError();
-    const scraper = new FitPassScraper(creds.panelUrl);
-    await scraper.login({ email: creds.email, password: creds.password });
+    // Sesión compartida del proceso (un solo login a la vez, compartido con POOL/RETRY/rutas).
+    let scraper: FitPassScraper;
+    try { scraper = await getFitpassScraper(); } catch (e) {
+        if (e instanceof FitpassNotConfiguredError) throw new NoCredsError();
+        throw e;
+    }
     const rows = await scraper.fetchReservationsRows(from, to);
     try {
         return attachLessonIds(rows, await scraper.fetchLessons());

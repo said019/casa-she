@@ -22,6 +22,7 @@
  */
 import { pool } from '../src/config/database.js';
 import { FitPassScraper } from '../src/lib/scrapers/fitpass.js';
+import { safeErrorMessage } from '../src/lib/scrapers/sanitize.js';
 import {
     getFitpassCreds, getFitpassCredentialsStatus, getFitpassScraper, saveFitpassCreds, maskEmail,
 } from '../src/lib/fitpass/credentials.js';
@@ -39,7 +40,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Quita de cualquier texto lo que no debe salir nunca (password del entorno, tokens CSRF, cookies). */
 function redact(text: unknown): string {
-    let s = text instanceof Error ? text.message : String(text ?? '');
+    let s = text instanceof Error ? safeErrorMessage(text) : String(text ?? '');
     const pw = process.env.FITPASS_PASSWORD;
     if (pw && pw.length >= 3) s = s.split(pw).join('[redacted]');
     return s

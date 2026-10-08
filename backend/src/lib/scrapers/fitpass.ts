@@ -23,6 +23,7 @@
 import { BaseScraper, ScraperCreds, ScraperRunResult } from './base.js';
 import { localDateStr } from '../mx-time.js';
 import * as cheerio from 'cheerio';
+import { FitPassHttpError, sanitizeError } from './sanitize.js';
 
 const DEFAULT_BASE = 'https://admin2.fitpass.com';
 
@@ -47,13 +48,7 @@ export interface FitpassScheduleInput {
     timezone?: string;          // default 'Etc/GMT+6'
 }
 
-/** Error HTTP de una mutación del panel; `status` permite tratar 404/410 como idempotente. */
-export class FitPassHttpError extends Error {
-    constructor(message: string, public readonly status: number) {
-        super(message);
-        this.name = 'FitPassHttpError';
-    }
-}
+export { FitPassHttpError, sanitizeError, safeErrorMessage } from './sanitize.js';
 
 export type FitpassAttendanceState = 'attended' | 'no_show';
 
@@ -349,6 +344,9 @@ export class FitPassScraper extends BaseScraper {
     constructor(panelUrl?: string) {
         super('fitpass');
         this.base = (panelUrl || DEFAULT_BASE).replace(/\/+$/, '');
+        // Todo error de red/HTTP sale sanitizado: un AxiosError crudo trae el form del login
+        // (password en claro + authenticity_token) en config.data.
+        this.http.interceptors.response.use(undefined, (e) => Promise.reject(sanitizeError(e)));
     }
 
     protected getReservationPageLimit(): number {
@@ -557,7 +555,7 @@ export class FitPassScraper extends BaseScraper {
         });
 
         if (res.status !== 201 && res.status !== 200) {
-            throw new FitPassHttpError(`FitPass createSchedule failed (${res.status}): ${String(res.data).slice(0, 200)}`, res.status);
+            throw new FitPassHttpError(`FitPass createSchedule failed (${res.status})`, res.status);
         }
         return { status: res.status, raw: String(res.data) };
     }
@@ -593,7 +591,7 @@ export class FitPassScraper extends BaseScraper {
             },
         );
         if (res.status !== 200) {
-            throw new FitPassHttpError(`FitPass markAttendance failed (${res.status}): ${String(res.data).slice(0, 200)}`, res.status);
+            throw new FitPassHttpError(`FitPass markAttendance failed (${res.status})`, res.status);
         }
         return { status: res.status, raw: String(res.data) };
     }
@@ -642,7 +640,7 @@ export class FitPassScraper extends BaseScraper {
             },
         );
         if (res.status !== 200) {
-            throw new FitPassHttpError(`FitPass markNoAttendance failed (${res.status}): ${String(res.data).slice(0, 200)}`, res.status);
+            throw new FitPassHttpError(`FitPass markNoAttendance failed (${res.status})`, res.status);
         }
         return { status: res.status, raw: String(res.data) };
     }
@@ -697,7 +695,7 @@ export class FitPassScraper extends BaseScraper {
             validateStatus: (s) => s < 500,
         });
         if (res.status >= 400) {
-            throw new FitPassHttpError(`FitPass updateSchedule(${id}) failed (${res.status}): ${String(res.data).slice(0, 200)}`, res.status);
+            throw new FitPassHttpError(`FitPass updateSchedule(${id}) failed (${res.status})`, res.status);
         }
         return { status: res.status, raw: String(res.data) };
     }
@@ -734,7 +732,7 @@ export class FitPassScraper extends BaseScraper {
             },
         );
         if (res.status >= 400) {
-            throw new FitPassHttpError(`FitPass cancelSchedule(${id}) failed (${res.status}): ${String(res.data).slice(0, 120)}`, res.status);
+            throw new FitPassHttpError(`FitPass cancelSchedule(${id}) failed (${res.status})`, res.status);
         }
         return { status: res.status };
     }

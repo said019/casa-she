@@ -33,6 +33,7 @@ import { reconcileFitpassPool } from '../lib/fitpass/availability.js';
 import { extendFitpassWeek } from '../lib/fitpass/publish.js';
 import { retryFitpassOutbox } from '../lib/fitpass/outbox.js';
 import { logFitpassCron } from '../lib/fitpass/cron-log.js';
+import { safeErrorMessage } from '../lib/scrapers/sanitize.js';
 // <<< FITPASS 2B
 import { resincronizarClasesPendientes } from '../lib/totalpass/resync.js';
 import { syncTotalPassReservations } from '../lib/totalpass/source.js';
@@ -67,10 +68,12 @@ function logJob(jobName: string, message: string): void {
 
 function logError(jobName: string, error: unknown): void {
     const timestamp = new Date().toISOString();
-    console.error(`[CRON ${jobName}] ${timestamp} - ERROR:`, error);
+    // Nunca el objeto crudo: un AxiosError arrastra config.data (credenciales del login).
+    const safe = safeErrorMessage(error);
+    console.error(`[CRON ${jobName}] ${timestamp} - ERROR:`, safe);
     jobStatus[jobName] = {
         ...jobStatus[jobName],
-        lastError: String(error),
+        lastError: safe,
     };
 }
 
@@ -778,7 +781,7 @@ async function fitpassPoolJob(): Promise<void> {
         await logFitpassCron(jobName, !r.failed && r.skipped_all !== 'lock-busy', r);
     } catch (error) {
         logError(jobName, error);
-        await logFitpassCron(jobName, false, String(error));
+        await logFitpassCron(jobName, false, safeErrorMessage(error));
     }
 }
 
@@ -790,7 +793,7 @@ async function fitpassExtendWeekJob(): Promise<void> {
         logJob(jobName, JSON.stringify('counts' in r ? r.counts : r));
     } catch (error) {
         logError(jobName, error);
-        await logFitpassCron(jobName, false, String(error));
+        await logFitpassCron(jobName, false, safeErrorMessage(error));
     }
 }
 
@@ -804,7 +807,7 @@ async function fitpassRetryJob(): Promise<void> {
         await logFitpassCron(jobName, !(r.cancel?.fallidas || r.edit?.fallidas), r);
     } catch (error) {
         logError(jobName, error);
-        await logFitpassCron(jobName, false, String(error));
+        await logFitpassCron(jobName, false, safeErrorMessage(error));
     }
 }
 // <<< FITPASS 2B

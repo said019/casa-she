@@ -39,6 +39,7 @@ import {
     listFitpassAttendeesForDate, type FitpassErrorCode,
 } from '../lib/fitpass/source.js';
 import { runFitpassSyncCycle, getFitpassSyncStatus } from '../lib/fitpass/sync-cycle.js';
+import { safeErrorMessage } from '../lib/scrapers/sanitize.js';
 import { localDateStr, addDaysToDateStr } from '../lib/mx-time.js';
 import { adoptExistingFitpassSchedules, previewFitpassPublish } from '../lib/fitpass/publish.js';
 
@@ -56,8 +57,7 @@ const guard = [authenticate, requireRole('admin', 'super_admin'), requireAccount
 
 /** Mensaje seguro para el cliente (nunca eco de password/cookies/CSRF). */
 function panelErrorMessage(err: unknown): string {
-    const msg = err instanceof Error ? err.message : String(err);
-    return msg.replace(/authenticity_token=[^&\s]+/gi, 'authenticity_token=[redacted]').slice(0, 300);
+    return safeErrorMessage(err);
 }
 
 function handlePanelError(res: Response, label: string, err: unknown) {
