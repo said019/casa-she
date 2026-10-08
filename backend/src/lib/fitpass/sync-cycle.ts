@@ -3,7 +3,7 @@
  *
  *   FP_SYNC_CYCLE ─ login + fetchReservationsRows(hoy-1 → hoy+14, CDMX)
  *                 ─ importFitpassReservations (FP_IMPORT)
- *                 ─ afterImport()  <- punto de extensión: 2B/integración cuelga aquí reconcileFitpassPool
+ *                 ─ afterImport()  <- por defecto reconcileFitpassPool (empuja el cupo con las reservas recién importadas)
  *                 ─ reconcileFitpassAttendance (reintenta asistencias pendientes)
  *
  * Si el import falla o se omite NO se llama a afterImport (no se publica cupo con un snapshot viejo).
@@ -17,12 +17,26 @@ import { withFitpassLock } from './locks.js';
 import { logFitpassCron } from './cron-log.js';
 import { importFitpassReservations, type FitpassImportResult } from './source.js';
 import { reconcileFitpassAttendance } from './attendance.js';
+import { reconcileFitpassPool, type FitpassPoolSummary } from './availability.js';
 
 export const FITPASS_SYNC_JOB = 'FITPASS_SYNC';
 
-let defaultAfterImport: (() => Promise<void>) | null = null;
-/** Registra el hook por defecto (lo usa el cron). 2B/integración: setFitpassAfterImportHook(reconcilePoolAndPush). */
-export function setFitpassAfterImportHook(fn: (() => Promise<void>) | null): void {
+/**
+ * Hook por defecto: reconcilia el cupo de FitPass con las reservas recién importadas.
+ *
+ * Locks: el ciclo mantiene FP_SYNC_CYCLE (y FP_IMPORT ya se liberó al terminar el import). El pool toma
+ * FP_MUTATE -> FP_POOL, que el ciclo NO tiene; ninguna ruta toma FP_MUTATE y luego FP_SYNC_CYCLE, y todos los
+ * locks son try-lock (nunca esperan), así que no hay auto-bloqueo posible. Si FP_MUTATE/FP_POOL están ocupados
+ * por otro proceso (publicar, outbox, cron del pool) el resumen trae `skipped_all: 'lock-busy'`: no es un
+ * error, el ciclo siguiente (2 min) o el cron FITPASS_POOL lo reintenta.
+ */
+export async function reconcilePoolAfterImport(): Promise<FitpassPoolSummary> {
+    return reconcileFitpassPool();
+}
+
+let defaultAfterImport: (() => Promise<unknown>) | null = reconcilePoolAfterImport;
+/** Reemplaza (o con null quita) el hook por defecto del ciclo. */
+export function setFitpassAfterImportHook(fn: (() => Promise<unknown>) | null): void {
     defaultAfterImport = fn;
 }
 
@@ -33,7 +47,7 @@ export interface FitpassSyncCycleOptions {
     to?: Date;
     actorUserId?: string | null;
     /** Hook tras un import exitoso (p. ej. reconcileFitpassPool de la fase 2B). */
-    afterImport?: () => Promise<void>;
+    afterImport?: () => Promise<unknown>;
     /** Inyección para tests: reemplaza login+fetch. */
     fetchRows?: (from: Date, to: Date) => Promise<FitpassImportRow[]>;
     /** Inyección para tests: reemplaza la reconciliación de asistencia. */
@@ -54,6 +68,10 @@ export interface FitpassSyncCycleResult {
     overbooked?: number;
     overbookedRefs?: string[];
     attendance?: { pending: number; ok: number; failed: number };
+    /** resultado del hook afterImport (por defecto el resumen de reconcileFitpassPool) */
+    pool?: unknown;
+    /** el hook no pudo correr por un lock ocupado; se reintenta en el próximo ciclo */
+    poolRetry?: boolean;
     error?: string;
 }
 
@@ -133,9 +151,12 @@ export async function runFitpassSyncCycle(opts: FitpassSyncCycleOptions = {}): P
             return { status: 'import-failed', retryable: false, ...base, errors, error: `${imp.summary.failed} fallos de importación` };
         }
         const hook = opts.afterImport ?? defaultAfterImport;
+        let pool: unknown;
+        let poolRetry = false;
         if (hook) {
             try {
-                await hook();
+                pool = await hook();
+                poolRetry = (pool as FitpassPoolSummary | undefined)?.skipped_all === 'lock-busy';
             } catch (e) {
                 return { status: 'after-import-failed', retryable: true, ...base, error: (e as Error).message };
             }
@@ -146,7 +167,7 @@ export async function runFitpassSyncCycle(opts: FitpassSyncCycleOptions = {}): P
         } catch (e) {
             console.error('[fitpass-sync] reconcile asistencia:', (e as Error).message);
         }
-        return { status: 'ok', retryable: false, ...base, attendance };
+        return { status: 'ok', retryable: false, ...base, attendance, ...(pool !== undefined ? { pool } : {}), ...(poolRetry ? { poolRetry } : {}) };
     });
 
     const final: FitpassSyncCycleResult = result ?? { status: 'cycle-skipped', retryable: true, error: 'ciclo en curso (lock ocupado); se reintentará' };

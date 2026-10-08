@@ -300,6 +300,11 @@ async function main() {
     const held = await withFitpassLock('FP_SYNC_CYCLE', async () =>
         runFitpassSyncCycle({ log: false, fetchRows: async () => { fetched = true; return []; } }));
     assert.equal(held!.status, 'cycle-skipped'); assert.equal(held!.retryable, true); assert.equal(fetched, false);
+    // hook por defecto = reconcileFitpassPool, sin auto-bloqueo bajo FP_SYNC_CYCLE (toma FP_MUTATE/FP_POOL, no ese lock)
+    const dflt = await runFitpassSyncCycle({ log: false, fetchRows: async () => [], reconcileAttendance: async () => ({ pending: 0, ok: 0, failed: 0 }) });
+    assert.equal(dflt.status, 'ok'); assert.ok(dflt.pool && typeof (dflt.pool as any).evaluated === 'number', 'el ciclo reporta el resumen del pool');
+    const busy = await withFitpassLock('FP_MUTATE', () => runFitpassSyncCycle({ log: false, fetchRows: async () => [], afterImport: async () => ({ skipped_all: 'lock-busy' }), reconcileAttendance: async () => ({ pending: 0, ok: 0, failed: 0 }) }));
+    assert.equal(busy!.status, 'ok'); assert.equal(busy!.poolRetry, true, 'lock ocupado del pool = skip retryable, no error');
     // bitácora
     const before = Number((await pool.query(`SELECT count(*)::int AS n FROM cron_job_logs WHERE job_name='FITPASS_SYNC'`)).rows[0].n);
     await runFitpassSyncCycle({ fetchRows: async () => [] });
