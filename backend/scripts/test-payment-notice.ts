@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { consultarAviso } from '../src/lib/paymentNoticeClient.js';
+
+const now = () => new Date('2026-10-16T18:00:00Z');
+const options = {baseUrl: 'https://walletclub.com.mx', token: 'test-server-only', now};
+const valid = {fecha: '2026-10-16', ciclo: '2026-10', texto: 'Recordatorio informativo'};
+let requested = false;
+const fetchImpl: typeof fetch = async (_url, init) => {
+    requested = true;
+    assert.equal((init?.headers as Record<string,string>).Authorization, 'Bearer test-server-only');
+    return new Response(JSON.stringify({aviso: valid}));
+};
+assert.deepEqual(await consultarAviso({...options, fetchImpl}), valid);
+assert.equal(requested, true);
+assert.equal(await consultarAviso({...options, token: undefined, fetchImpl}), null);
+assert.equal(await consultarAviso({...options, fetchImpl: async () => {throw new Error('offline');}}), null);
+assert.equal(await consultarAviso({...options, fetchImpl: async () => new Response('{bad')}), null);
+assert.equal(await consultarAviso({...options, now: () => new Date('2026-10-17T18:00:00Z'), fetchImpl}), null);
+const route = readFileSync(new URL('../src/routes/paymentNotice.ts', import.meta.url), 'utf8');
+assert.match(route, /router\.get\('\/platform-payment-notice', authenticate/);
+assert.match(route, /isNoticeAdmin\(req\.user\?\.accountRole\)/);
+assert.match(route, /role === 'admin' \|\| role === 'super_admin'/);
+assert.match(route, /status\(403\)/);
+const layout = readFileSync(new URL('../../frontend/src/components/layout/AdminLayout.tsx', import.meta.url), 'utf8');
+assert.match(layout, /user\?\.account_role \?\? user\?\.role/);
+const ui = readFileSync(new URL('../../frontend/src/components/admin/PaymentNotice.tsx', import.meta.url), 'utf8');
+assert.match(ui, /getStoredToken\(\)/);
+assert.match(ui, /VITE_API_URL/);
+assert.match(ui, /Dialog open=/);
+assert.match(ui, /setDismissed\(key\)/);
+assert.doesNotMatch(ui, /WALLET_CLUB_NOTICE_TOKEN/);
+console.log('Payment notice: client behavior and auth/UI wiring checks passed');

@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import CasaSheLogo from '@/components/CasaSheLogo';
+import { PaymentNotice } from '@/components/admin/PaymentNotice';
 import { RECEPTION_ENABLED } from '@/config/features';
 import { AdminBreadcrumbs } from '@/components/layout/AdminBreadcrumbs';
 import { AdminSearch } from '@/components/admin/AdminSearch';
@@ -706,6 +707,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                         <div className="mb-5">
                             <AdminBreadcrumbs />
                         </div>
+                        <PaymentNotice role={user?.account_role ?? user?.role} />
                         {children}
                     </div>
                 </main>
