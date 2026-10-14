@@ -13,6 +13,7 @@ export function montarAviso(elemento,{endpoint,fetchImpl=fetch,onNotice=()=>{}})
     const timeout=setTimeout(()=>ownController.abort(),2500);
     try{
       const r=await fetchImpl(url.href,{credentials:'same-origin',cache:'no-store',signal:controller.signal});
+      if(disposed || request!==current)return;
       if(!r.ok){hide();return;}const a=(await r.json())?.aviso;
       if(disposed || request!==current)return;
       if(!a || typeof a.texto!=='string' || a.texto.length>300){hide();return;}
@@ -21,7 +22,7 @@ export function montarAviso(elemento,{endpoint,fetchImpl=fetch,onNotice=()=>{}})
       due.setUTCDate(due.getUTCDate()-1);
       if(today!==a.fecha && today!==due.toISOString().slice(0,10)){hide();return;}
       elemento.textContent=a.texto;elemento.hidden=false;lastDate=today;onNotice(a);
-    }catch{if(request===current)hide();}finally{clearTimeout(timeout);}
+    }catch{if(!disposed && request===current)hide();}finally{clearTimeout(timeout);}
   }
   const visible=()=>{if(!document.hidden)refresh();};
   const periodic=setInterval(visible,300000);
