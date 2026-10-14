@@ -8,17 +8,18 @@ export function montarAviso(elemento,{endpoint,fetchImpl=fetch,onNotice=()=>{}})
   elemento.setAttribute('role','status');hide();
   async function refresh(){
     if(disposed)return;
-    hide();controller?.abort();controller=new AbortController();const current=++request;
+    controller?.abort();controller=new AbortController();const current=++request;
     const ownController=controller;
     const timeout=setTimeout(()=>ownController.abort(),2500);
     try{
       const r=await fetchImpl(url.href,{credentials:'same-origin',cache:'no-store',signal:controller.signal});
-      if(!r.ok)return;const a=(await r.json())?.aviso;
-      if(disposed || request!==current || !a || typeof a.texto!=='string' || a.texto.length>300)return;
+      if(!r.ok){hide();return;}const a=(await r.json())?.aviso;
+      if(disposed || request!==current)return;
+      if(!a || typeof a.texto!=='string' || a.texto.length>300){hide();return;}
       const today=localDate(),due=new Date(a.fecha+'T00:00:00Z');
-      if(!Number.isFinite(due.getTime()) || due.toISOString().slice(0,10)!==a.fecha)return;
+      if(!Number.isFinite(due.getTime()) || due.toISOString().slice(0,10)!==a.fecha){hide();return;}
       due.setUTCDate(due.getUTCDate()-1);
-      if(today!==a.fecha && today!==due.toISOString().slice(0,10))return;
+      if(today!==a.fecha && today!==due.toISOString().slice(0,10)){hide();return;}
       elemento.textContent=a.texto;elemento.hidden=false;lastDate=today;onNotice(a);
     }catch{if(request===current)hide();}finally{clearTimeout(timeout);}
   }

@@ -1,3 +1,4 @@
+import { usePaymentNoticeFrequency } from './usePaymentNoticeFrequency';
 import {getStoredToken} from '../../lib/api';
 import {useEffect,useRef,useState} from 'react';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '../ui/dialog';
@@ -20,11 +21,11 @@ export function PaymentNotice({role}:{role?:string}) {
       },
     });
   },[allowed]);
+  const key=usePaymentNoticeFrequency(notice,allowed);
   if(!allowed)return null;
-  const key=notice?`${notice.fecha}:${notice.texto}`:'';
   return <>
     <div className="hidden" aria-hidden="true"><div ref={ref} hidden/></div>
-    <Dialog open={!!notice&&dismissed!==key} onOpenChange={open=>{if(!open)setDismissed(key);}}>
+    <Dialog open={!!notice&&!!key&&dismissed!==key} onOpenChange={open=>{if(!open)setDismissed(key);}}>
       <DialogContent className="rounded-2xl max-w-md p-6 sm:p-8">
         <p className="text-xs uppercase tracking-widest text-muted-foreground">Tu plataforma · Recordatorio</p>
         <DialogTitle>Fecha de pago de tu plataforma</DialogTitle>
