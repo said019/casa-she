@@ -21,7 +21,7 @@ export interface ServidorLocal {
 
 const dormir = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-export async function levantarServidorLocal(puerto: number): Promise<ServidorLocal> {
+export async function levantarServidorLocal(puerto: number, options: { whatsappUnavailable?: boolean } = {}): Promise<ServidorLocal> {
     const origen = process.env.E2E_BASE_ORIGEN || 'casa_she';
     const base = `casa_she_test_${process.pid}_${Date.now()}`;
     let ultimoError = '';
@@ -48,7 +48,9 @@ export async function levantarServidorLocal(puerto: number): Promise<ServidorLoc
             PORT: String(puerto),
             NODE_ENV: 'development',
             FRONTEND_URL: 'http://localhost:4173',
-            ENABLE_CRON_JOBS: 'false', CRON_JOBS: 'NINGUNO', DISABLE_WHATSAPP: 'true',
+            ENABLE_CRON_JOBS: 'false', CRON_JOBS: 'NINGUNO', DISABLE_WHATSAPP: options.whatsappUnavailable ? 'false' : 'true',
+            // An unsupported provider returns false without any external connection.
+            WHATSAPP_PROVIDER: options.whatsappUnavailable ? 'unavailable-local-test' : 'evolution',
             RESEND_API_KEY: '', ADMIN_ALERT_EMAIL: '', ADMIN_ALERT_WHATSAPP: '',
             MP_ACCESS_TOKEN: '', STRIPE_SECRET_KEY: '', EVOLUTION_API_KEY: '', EVOLUTION_API_URL: '',
             VAPID_PUBLIC_KEY: '', VAPID_PRIVATE_KEY: '',

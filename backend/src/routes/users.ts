@@ -674,7 +674,7 @@ router.post('/', requireRole('admin', 'super_admin', 'reception'), async (req: R
         ]);
 
         const emailSent = emailResult.status === 'fulfilled' && !!emailResult.value;
-        const whatsappSent = whatsappResult.status === 'fulfilled';
+        const whatsappSent = whatsappResult.status === 'fulfilled' && whatsappResult.value === true;
 
         if (emailResult.status === 'rejected') {
             console.error('Welcome email failed:', emailResult.reason);
@@ -840,7 +840,7 @@ router.post('/:id/resend-credentials', requireRole('admin', 'super_admin', 'rece
         ]);
 
         const emailSent = !!target.email && emailResult.status === 'fulfilled' && !!emailResult.value;
-        const whatsappSent = !!target.phone && whatsappResult.status === 'fulfilled';
+        const whatsappSent = !!target.phone && whatsappResult.status === 'fulfilled' && whatsappResult.value === true;
 
         if (emailResult.status === 'rejected') {
             console.error('Resend credentials email failed:', emailResult.reason);
