@@ -21,10 +21,11 @@ async function main() {
         const ts = Date.now();
         const clave = 'Clave-Admin-1';
         const hash = await bcrypt.hash(clave, 4);
+        let phoneSequence = 0;
         const mk = async (rol: string, tag: string) => (await sql(
             `INSERT INTO users (email, phone, display_name, role, password_hash, is_active, temp_password)
              VALUES ($1, $2, $3, $4, $5, true, true) RETURNING id, email`,
-            [`${tag}-${ts}@acceso.test`, `55${String(ts).slice(-8)}`.slice(0, 10), `Daniela ${tag}`, rol, hash]))[0];
+            [`${tag}-${ts}@acceso.test`, `55${String(ts + phoneSequence++).slice(-8)}`, `Daniela ${tag}`, rol, hash]))[0];
         const admin = await mk('admin', 'adm');
         const recep = await mk('reception', 'rec');
         const otroAdmin = await mk('admin', 'adm2');

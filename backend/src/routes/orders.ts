@@ -678,7 +678,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                 await query(`DELETE FROM orders WHERE id = $1`, [order.id]);
                 return res.status(503).json({ error: 'Pago con tarjeta no disponible' });
             }
-            const user = await queryOne<{ display_name: string; email: string }>(
+            const user = await queryOne<{ display_name: string; email: string | null }>(
                 `SELECT display_name, email FROM users WHERE id = $1`, [userId]);
             try {
                 const pref = await createPreference({
@@ -1329,7 +1329,7 @@ router.post('/:id/reject', authenticate, requireRole('admin', 'super_admin'), as
 
             // Get updated order + user info for notifications
             const updatedOrder = await queryOne(`SELECT * FROM orders_with_details WHERE id = $1`, [id]);
-            const orderUser = await queryOne<{ display_name: string; email: string; phone: string }>(
+            const orderUser = await queryOne<{ display_name: string; email: string | null; phone: string }>(
                 `SELECT display_name, email, phone FROM users WHERE id = $1`,
                 [order.user_id]
             );
@@ -1343,7 +1343,7 @@ router.post('/:id/reject', authenticate, requireRole('admin', 'super_admin'), as
                 const planName = plan?.name || 'tu plan';
 
                 // Email
-                sendOrderRejectedEmail({
+                if (orderUser.email) sendOrderRejectedEmail({
                     to: orderUser.email,
                     clientName: orderUser.display_name,
                     orderNumber: order.order_number,

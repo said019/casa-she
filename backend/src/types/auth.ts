@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ClientEmailSchema, ClientPhoneSchema } from '../lib/loginIdentity.js';
 
 // User role enum - includes all system roles
 export const UserRole = z.enum(['client', 'instructor', 'admin', 'super_admin', 'reception']);
@@ -7,7 +8,7 @@ export type UserRole = z.infer<typeof UserRole>;
 // User interface matching database
 export interface User {
     id: string;
-    email: string;
+    email: string | null;
     phone: string;
     display_name: string;
     photo_url: string | null;
@@ -33,16 +34,14 @@ export interface UserWithPassword extends User {
 
 // Registration schema
 export const RegisterSchema = z.object({
-    email: z.string().email('Email inválido'),
+    email: ClientEmailSchema,
     password: z
         .string()
         .min(8, 'La contraseña debe tener al menos 8 caracteres')
         .regex(/[A-Z]/, 'La contraseña debe contener al menos una mayúscula')
         .regex(/[0-9]/, 'La contraseña debe contener al menos un número'),
     displayName: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-    phone: z
-        .string()
-        .regex(/^\+52[0-9]{10}$/, 'Teléfono debe ser formato mexicano: +52XXXXXXXXXX'),
+    phone: ClientPhoneSchema,
     dateOfBirth: z.string().optional(),
     acceptsTerms: z.boolean().refine(val => val === true, 'Debes aceptar los términos'),
     acceptsCommunications: z.boolean().default(false),
@@ -53,16 +52,18 @@ export type RegisterInput = z.infer<typeof RegisterSchema>;
 
 // Login schema
 export const LoginSchema = z.object({
-    email: z.string().email('Email inválido'),
+    identifier: z.string().trim().min(1).optional(),
+    email: z.string().trim().min(1).optional(),
     password: z.string().min(1, 'La contraseña es requerida'),
-});
+}).refine(data => !!(data.identifier || data.email), 'WhatsApp o correo requerido');
 
 export type LoginInput = z.infer<typeof LoginSchema>;
 
 // Forgot password schema
 export const ForgotPasswordSchema = z.object({
-    email: z.string().email('Email inválido'),
-});
+    identifier: z.string().trim().min(1).optional(),
+    email: z.string().trim().min(1).optional(),
+}).refine(data => !!(data.identifier || data.email), 'WhatsApp o correo requerido');
 
 export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
 
@@ -84,7 +85,7 @@ export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
 // edit del usuario reenviando su phone original tirar 400.
 export const UpdateProfileSchema = z.object({
     displayName: z.string().min(2).optional(),
-    email: z.string().email('Email inválido').optional(),
+    email: ClientEmailSchema.optional(),
     phone: z.string().min(8).max(20).optional(),
     dateOfBirth: z.string().optional().nullable(),
     emergencyContactName: z.string().optional().nullable(),
@@ -100,7 +101,7 @@ export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
 // JWT Payload
 export interface JwtPayload {
     userId: string;
-    email: string;
+    email: string | null;
     role: UserRole;
     /** Rol real; `role` puede elevarse a admin durante una petición operativa. */
     accountRole?: UserRole;

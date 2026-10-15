@@ -77,7 +77,7 @@ async function crearLinkEn(
 
 type FilaLink = {
     id: string; user_id: string; expires_at: Date; used_at: Date | null; revoked_at: Date | null;
-    display_name: string; email: string; is_active: boolean | null;
+    display_name: string; email: string | null; is_active: boolean | null;
 };
 
 function estadoDe(f: FilaLink | undefined): EstadoLink | null {
@@ -99,7 +99,7 @@ const SELECT_LINK = `
 export async function consultarLinkAcceso(
     token: string,
     db: AccessDb = pool,
-): Promise<{ ok: true; nombre: string; email: string } | { ok: false; code: EstadoLink }> {
+): Promise<{ ok: true; nombre: string; email: string | null } | { ok: false; code: EstadoLink }> {
     if (typeof token !== 'string' || token.length < 20 || token.length > 200) {
         return { ok: false, code: 'LINK_INVALIDO' };
     }

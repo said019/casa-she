@@ -23,6 +23,7 @@ import { sendInstructorMagicLink, sendPasswordResetEmail, sendClientWelcomeEmail
 import { sendClientWelcome, sendWhatsAppMessage } from '../lib/whatsapp.js';
 import { z } from 'zod';
 import { consultarLinkAcceso, usarLinkAcceso } from '../lib/accessLinks.js';
+import { normalizeLoginPhone } from '../lib/loginIdentity.js';
 
 const router = Router();
 
@@ -85,7 +86,7 @@ router.post('/register', async (req: Request, res: Response) => {
         // Check if user already exists
         const existingUser = await queryOne<User>(
             'SELECT id FROM users WHERE email = $1',
-            [email.toLowerCase()]
+            [email]
         );
 
         if (existingUser) {
@@ -97,7 +98,7 @@ router.post('/register', async (req: Request, res: Response) => {
 
         // Check if phone already exists
         const existingPhone = await queryOne<User>(
-            'SELECT id FROM users WHERE phone = $1',
+            'SELECT id FROM users WHERE normalize_login_phone(phone) = $1',
             [phone]
         );
 
@@ -130,7 +131,7 @@ router.post('/register', async (req: Request, res: Response) => {
         accepts_communications, date_of_birth, receive_reminders,
         receive_promotions, receive_weekly_summary, onboarding_required,
         onboarding_completed_at, onboarding_invite_dismissed_at, created_at, updated_at`,
-            [email.toLowerCase(), passwordHash, displayName, phone, acceptsCommunications, dateOfBirth || null]
+            [email, passwordHash, displayName, phone, acceptsCommunications, dateOfBirth || null]
         );
 
         if (!result) {
@@ -183,17 +184,17 @@ router.post('/register', async (req: Request, res: Response) => {
         }
 
         // Send welcome email + WhatsApp (fire and forget)
-        sendClientWelcomeEmail({
-            to: email.toLowerCase(),
+        if (email) sendClientWelcomeEmail({
+            to: email,
             clientName: displayName,
-            email: email.toLowerCase(),
+            email,
             temporaryPassword: password,
         }).catch(err => console.error('Error sending welcome email:', err));
 
         sendClientWelcome(
             phone,
             displayName,
-            email.toLowerCase(),
+            email,
             password,
         ).catch(err => console.error('Error sending welcome WhatsApp:', err));
 
@@ -212,6 +213,7 @@ router.post('/register', async (req: Request, res: Response) => {
             token,
         });
     } catch (error) {
+        if ((error as any)?.code === '23505') return res.status(409).json({ error: 'Correo o teléfono ya registrado', code: 'YA_EXISTE' });
         console.error('Register error:', error);
         res.status(500).json({ error: 'Error al crear la cuenta' });
     }
@@ -231,10 +233,12 @@ router.post('/login', async (req: Request, res: Response) => {
             });
         }
 
-        const { email, password } = validation.data;
+        const { password } = validation.data;
+        const identifier = (validation.data.identifier || validation.data.email!).trim().toLowerCase();
+        const phone = normalizeLoginPhone(identifier);
 
         // Find user with password
-        const user = await queryOne<User & { password_hash: string; is_active: boolean }>(
+        const matches = await query<User & { password_hash: string; is_active: boolean }>(
             `SELECT
         id, email, phone, display_name, photo_url, role,
         emergency_contact_name, emergency_contact_phone, health_notes,
@@ -243,31 +247,24 @@ router.post('/login', async (req: Request, res: Response) => {
         is_reception_master, permissions, is_active, temp_password,
         password_hash
       FROM users
-      WHERE email = $1`,
-            [email.toLowerCase()]
+      WHERE ${identifier.includes('@') ? 'lower(trim(email)) = $1' : 'normalize_login_phone(phone) = $1'} LIMIT 2`,
+            [identifier.includes('@') ? identifier : phone]
         );
+        const user = matches.length === 1 ? matches[0] : null;
 
-        if (!user) {
+        if (!user || !user.password_hash) {
             return res.status(401).json({
                 error: 'Credenciales inválidas',
-                message: 'Email o contraseña incorrectos',
+                message: 'WhatsApp, correo o contraseña incorrectos',
             });
         }
 
         // Verify password
         const isValidPassword = await bcrypt.compare(password, user.password_hash);
-        if (!isValidPassword) {
+        if (!isValidPassword || user.is_active === false) {
             return res.status(401).json({
                 error: 'Credenciales inválidas',
-                message: 'Email o contraseña incorrectos',
-            });
-        }
-
-        // Cuenta desactivada (baja de staff o cliente baneado): no se puede iniciar sesión.
-        if (user.is_active === false) {
-            return res.status(403).json({
-                error: 'Cuenta desactivada',
-                message: 'Tu cuenta está desactivada. Contacta al estudio.',
+                message: 'WhatsApp, correo o contraseña incorrectos',
             });
         }
 
@@ -369,18 +366,21 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
             });
         }
 
-        const { email } = validation.data;
+        const identifier = (validation.data.identifier || validation.data.email!).trim().toLowerCase();
+        const phone = normalizeLoginPhone(identifier);
 
         // Find user
-        const user = await queryOne<{ id: string; email: string; phone: string | null; display_name: string }>(
-            'SELECT id, email, phone, display_name FROM users WHERE email = $1',
-            [email.toLowerCase()]
+        const matches = await query<{ id: string; email: string | null; phone: string | null; display_name: string; is_active: boolean }>(
+            `SELECT id, email, phone, display_name, is_active FROM users
+             WHERE ${identifier.includes('@') ? 'lower(trim(email)) = $1' : 'normalize_login_phone(phone) = $1'} LIMIT 2`,
+            [identifier.includes('@') ? identifier : phone]
         );
+        const user = matches.length === 1 && matches[0].is_active !== false ? matches[0] : null;
 
         // Always return success to prevent email enumeration
         if (!user) {
             return res.json({
-                message: 'Si el email existe, recibirás instrucciones para restablecer tu contraseña',
+                message: 'Si la cuenta existe, recibirás instrucciones para restablecer tu contraseña',
             });
         }
 
@@ -392,8 +392,8 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
         const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
 
         // Send email in background to prevent request timeout
-        sendPasswordResetEmail({
-            to: email,
+        if (user.email) sendPasswordResetEmail({
+            to: user.email,
             resetLink,
         }).catch(emailError => {
             console.error('Failed to send reset email:', emailError);
@@ -415,9 +415,7 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
         }
 
         res.json({
-            message: 'Si el email existe, recibirás instrucciones para restablecer tu contraseña',
-            // Only in development:
-            ...(process.env.NODE_ENV === 'development' && { token: resetToken }),
+            message: 'Si la cuenta existe, recibirás instrucciones para restablecer tu contraseña',
         });
     } catch (error) {
         console.error('Forgot password error:', error);

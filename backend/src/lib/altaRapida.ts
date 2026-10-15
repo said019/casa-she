@@ -10,7 +10,7 @@ import { z } from 'zod';
 import type { Pool } from 'pg';
 import { crearLinkAcceso } from './accessLinks.js';
 import { asignarMembresiaEnTx } from './asignarMembresia.js';
-import { normalizeMxPhone } from './guestUser.js';
+import { ClientEmailSchema, ClientPhoneSchema } from './loginIdentity.js';
 import {
     evaluarInscripcion, inscribirEnClase, ClaseNoEncontradaError, SinCreditosAlInscribirError,
 } from './inscripcion.js';
@@ -22,11 +22,8 @@ import { cdmxToday } from './schedule.js';
 
 export const AltaRapidaSchema = z.object({
     nombre: z.string().trim().min(2, 'El nombre debe tener al menos 2 caracteres').max(80, 'El nombre es muy largo'),
-    email: z.string().trim().toLowerCase().email('Correo inválido').max(255),
-    telefono: z.string().trim().refine(
-        (t) => normalizeMxPhone(t).length === 10,
-        'El WhatsApp debe tener 10 dígitos (o con lada)',
-    ),
+    email: ClientEmailSchema,
+    telefono: ClientPhoneSchema,
     classId: z.string().uuid(),
     planId: z.string().uuid().optional(),
     cortesia: z.boolean().optional(),
@@ -65,8 +62,8 @@ export async function altaRapida(
     input: AltaRapidaInput,
     actor: { userId: string },
 ): Promise<AltaRapidaResultado> {
-    const email = input.email.toLowerCase();
-    const telefono = normalizeMxPhone(input.telefono);
+    const email = input.email;
+    const telefono = input.telefono;
     const cortesia = input.cortesia === true;
 
     const client = await pool.connect();
@@ -82,7 +79,7 @@ export async function altaRapida(
             `SELECT id, display_name, role, lower(email) = $1 AS por_email
                FROM users
               WHERE lower(email) = $1
-                 OR right(regexp_replace(COALESCE(phone, ''), '\\D', '', 'g'), 10) = $2
+                 OR normalize_login_phone(phone) = $2
               ORDER BY (lower(email) = $1) DESC
               LIMIT 1`,
             [email, telefono],
@@ -158,8 +155,8 @@ export async function altaRapida(
         if (e instanceof SinCreditosAlInscribirError) throw new AltaRapidaError(400, { error: e.message });
         if (e instanceof MembershipDailyLimitError) throw new AltaRapidaError(e.status, { error: e.message, code: e.code });
         // Carrera residual: el correo se registró entre el chequeo y el INSERT (UNIQUE).
-        if ((e as any)?.code === '23505' && String((e as any).constraint || '').includes('email')) {
-            throw new AltaRapidaError(409, { error: 'Esta alumna ya está registrada', code: 'YA_EXISTE', coincidencia: 'email' });
+        if ((e as any)?.code === '23505') {
+            throw new AltaRapidaError(409, { error: 'Esta alumna ya está registrada', code: 'YA_EXISTE' });
         }
         throw e;
     } finally {
