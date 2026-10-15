@@ -23,6 +23,11 @@ try {
     const edited = await http(srv.api, 'PUT', `/users/${id}`, token, { email: '', displayName: 'Sin Correo Editada' });
     assert.equal(edited.status, 200, `nullable profile: ${JSON.stringify(edited.json)}`);
     assert.equal(edited.json.user.email, null);
+    for (const phone of ['abcdefgh', '999525577000001', 'letters5577000001']) {
+        const invalidEdit = await http(srv.api, 'PUT', `/users/${id}`, token, { phone });
+        assert.equal(invalidEdit.status, 400, `phone-only profile update: ${JSON.stringify(invalidEdit.json)}`);
+        assert.equal((await sql('SELECT phone FROM users WHERE id=$1', [id]))[0].phone, '5577000001');
+    }
     for (const identifier of ['5577000001', '+52 55 7700 0001', '5215577000001']) {
         const login = await request('/auth/login', { identifier, password });
         assert.equal(login.status, 200, JSON.stringify(login.json));
@@ -33,6 +38,16 @@ try {
         assert.equal(profile.json.user.email, null);
     }
     assert.equal((await request('/auth/login', { email: ' WHATSAPP-ADMIN@TEST.LOCAL ', password })).status, 200);
+    const clientToken = (await request('/auth/login', { identifier: '5577000001', password })).json.token;
+    await sql('UPDATE users SET temp_password=true WHERE id=$1', [id]);
+    for (const phone of ['+15577000003', 'letters5577000001']) {
+        const onboard = await request('/auth/complete-onboarding', { newPassword: password, displayName: 'Sin Correo', phone }, clientToken);
+        assert.equal(onboard.status, 400, `onboarding invalid phone: ${JSON.stringify(onboard.json)}`);
+        assert.equal((await sql('SELECT phone FROM users WHERE id=$1', [id]))[0].phone, '5577000001');
+    }
+    const onboard = await request('/auth/complete-onboarding', { newPassword: password, displayName: 'Sin Correo', phone: '+52 55 7700 0001' }, clientToken);
+    assert.equal(onboard.status, 200, JSON.stringify(onboard.json));
+    assert.equal(onboard.json.user.phone, '5577000001');
     await sql('UPDATE users SET phone=$1 WHERE id=$2', ['+52 1 55 7700 0001', id]);
     assert.equal((await request('/auth/login', { identifier: '5577000001', password })).status, 200, 'legacy stored phone');
     await sql(`INSERT INTO users(email,phone,display_name,role,password_hash,is_active)

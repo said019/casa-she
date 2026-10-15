@@ -580,7 +580,8 @@ router.post('/complete-onboarding', authenticate, async (req: Request, res: Resp
     try {
         const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
         const displayName = typeof req.body?.displayName === 'string' ? req.body.displayName.trim() : '';
-        const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
+        const suppliedPhone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
+        const phone = req.user!.accountRole === 'client' ? normalizeLoginPhone(suppliedPhone) : suppliedPhone;
 
         if (newPassword.length < 6) {
             return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
@@ -620,6 +621,7 @@ router.post('/complete-onboarding', authenticate, async (req: Request, res: Resp
 
         res.json({ message: 'Acceso completado', user: updated });
     } catch (error) {
+        if ((error as any)?.code === '23505') return res.status(409).json({ error: 'Correo o teléfono ya registrado', code: 'YA_EXISTE' });
         console.error('Complete onboarding error:', error);
         res.status(500).json({ error: 'Error al completar el acceso' });
     }

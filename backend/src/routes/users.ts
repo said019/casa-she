@@ -1037,6 +1037,20 @@ router.put('/:id', async (req: Request, res: Response) => {
         }
 
         const data = validation.data;
+        if (data.phone !== undefined || data.email !== undefined) {
+            const target = await queryOne<{ role: string; email: string | null; phone: string | null }>(
+                'SELECT role, email, phone FROM users WHERE id=$1', [id]);
+            if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
+            if (target.role === 'client' && data.phone !== undefined) {
+                const phone = ClientPhoneSchema.safeParse(data.phone);
+                if (!phone.success) return res.status(400).json({ error: 'WhatsApp inválido: usa 10 dígitos o la lada +52' });
+                data.phone = phone.data;
+            }
+            const nextEmail = data.email === undefined ? target.email : data.email;
+            if (nextEmail === null && (target.role !== 'client' || !ClientPhoneSchema.safeParse(data.phone ?? target.phone).success)) {
+                return res.status(400).json({ error: 'Se requiere correo o un WhatsApp válido para la clienta.' });
+            }
+        }
 
         // Build dynamic update query
         const updates: string[] = [];
@@ -1049,12 +1063,6 @@ router.put('/:id', async (req: Request, res: Response) => {
         }
         if (data.email !== undefined) {
             const normalizedEmail = data.email;
-            if (normalizedEmail === null) {
-                const target = await queryOne<{ role: string; phone: string | null }>('SELECT role, phone FROM users WHERE id=$1', [id]);
-                if (target && (target.role !== 'client' || !ClientPhoneSchema.safeParse(data.phone ?? target.phone).success)) {
-                    return res.status(400).json({ error: 'Se requiere correo o un WhatsApp válido para la clienta.' });
-                }
-            }
             const taken = await queryOne<{ id: string }>(
                 `SELECT id FROM users WHERE lower(email) = $1 AND id <> $2`,
                 [normalizedEmail, id]
