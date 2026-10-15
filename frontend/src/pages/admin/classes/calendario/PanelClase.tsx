@@ -31,6 +31,9 @@ import { attendeeBookedBy, getInitials, whatsAppDeAsistente } from './formato';
 import { estiloDeLugar, etiquetaCupoLarga, lugaresDeClase, type Lugar } from './lugares';
 import { colorPuntoAlumna } from './colores';
 import { InscribirAlumna } from './InscribirAlumna';
+import { ClienteMembresiasDialog, type ClienteAgenda } from './ClienteMembresiasDialog';
+import { RegistrarClienteDialog } from './RegistrarClienteDialog';
+import { ResumenMembresia } from './ResumenMembresia';
 
 interface PanelClaseProps {
     /** La clase con sus datos vigentes: el padre la vuelve a leer de la lista al refrescar. */
@@ -58,6 +61,9 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
     const queryClient = useQueryClient();
     const user = useAuthStore((s) => s.user);
     const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+    const isStaff = isAdmin || user?.role === 'reception';
+    const [registering, setRegistering] = useState(false);
+    const [managed, setManaged] = useState<(ClienteAgenda & { membershipId?: string }) | null>(null);
     const [companionHost, setCompanionHost] = useState<Attendee | null>(null);
     const [attendeesTab, setAttendeesTab] = useState<'reservado' | 'espera' | 'cancelado'>('reservado');
     // Alumna recién inscrita: se resalta unos segundos en "Inscritas".
@@ -213,6 +219,7 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
                         <span className="break-words">{attendee.display_name}</span>
                         <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">Ver perfil</span>
                     </Link>
+                    <ResumenMembresia attendee={attendee} />
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                         {attendee.is_free_booking
                             ? <Badge variant="outline" className="text-[10px] border-balance-gold/50 text-balance-gold">Invitada</Badge>
@@ -231,6 +238,7 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
                 </div>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-casa-arena/60 pt-3">
+                {isStaff && (!attendee.membership_summary || attendee.membership_summary.owner_id === attendee.user_id) && <Button size="sm" variant="outline" aria-label={`Gestionar membresía de ${attendee.display_name}`} onClick={() => setManaged({ id: attendee.user_id, display_name: attendee.display_name, membershipId: attendee.membership_summary?.membership_id })}>Gestionar membresía</Button>}
                 {['admin', 'super_admin', 'reception'].includes(user?.role || '') && <Button size="icon" variant="outline" aria-label={`Invitadas de ${attendee.display_name}`} title="Invitadas" onClick={() => setCompanionHost(attendee)}><Users className="h-4 w-4" /></Button>}
                 {/* Escribirle por WhatsApp. Importa sobre todo con las socias de
                     TotalPass: reservaron desde su app y el estudio no las conoce. */}
@@ -387,7 +395,8 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
                         )}
 
                         {/* Inscribir alumna: busca, muestra créditos de la bolsa de la clase, inscribe o vende */}
-                        {!cancelada && clase && (
+                        {isStaff && clase && <Button variant="outline" onClick={() => setRegistering(true)}>Registrar cliente</Button>}
+                        {!cancelada && clase && isStaff && (
                             <InscribirAlumna
                                 clase={clase}
                                 onInscrita={(userId) => {
@@ -397,6 +406,7 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
                                 }}
                                 onDeshecha={() => { setResaltada(null); refetchAttendees(); }}
                                 onRegistrarNueva={onRegistrarNueva}
+                                onGestionar={(cliente) => setManaged(cliente)}
                             />
                         )}
 
@@ -520,6 +530,8 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
                     </div>
                 </SheetContent>
             </Sheet>
+            {isStaff && clase && registering && <RegistrarClienteDialog open={registering} onOpenChange={setRegistering} classId={clase.id} onTransaction={onRegistrarNueva} onBooked={(id) => { setResaltada(id); refetchAttendees(); }} />}
+            {isStaff && managed && <ClienteMembresiasDialog cliente={managed} open onOpenChange={(v) => { if (!v) setManaged(null); }} associatedMembershipId={managed.membershipId} classId={managed.membershipId ? undefined : clase?.id} onBooked={(id) => { setResaltada(id); refetchAttendees(); }} />}
 
             <CancelBookingDialog
                 bookingId={cancelBookingId}

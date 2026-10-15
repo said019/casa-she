@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api, { getErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,13 +23,15 @@ import {
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { Loader2, Coins, AlertCircle } from 'lucide-react';
 
-type Bucket = 'reformer_remaining' | 'multi_remaining' | 'classes_remaining';
+type Bucket = 'reformer_remaining' | 'multi_remaining';
 
 interface AdjustCreditsMembership {
     id: string;
     reformer_remaining?: number | null;
     multi_remaining?: number | null;
     classes_remaining?: number | null;
+    reformer_credits?: number | null;
+    multi_credits?: number | null;
 }
 
 /**
@@ -53,6 +55,8 @@ export function AdjustCreditsDialog({
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
 }) {
+    const queryClient = useQueryClient();
+    const [stale, setStale] = useState(false);
     const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
     const isControlled = controlledOpen !== undefined;
     const open = isControlled ? controlledOpen : uncontrolledOpen;
@@ -60,26 +64,24 @@ export function AdjustCreditsDialog({
         if (!isControlled) setUncontrolledOpen(v);
         onOpenChange?.(v);
     };
-    // Solo se ofrecen los buckets que el plan realmente tiene. Ningún plan activo
-    // usa el genérico (classes_remaining); solo aparece en membresías legacy que NO
-    // tienen reformer/multi. "Full/ilimitado" cae al fallback para poder otorgar.
+    // Solo bolsas finitas y categorías permitidas. Las bolsas ilimitadas nunca
+    // se convierten a finitas; classes_remaining es un total derivado.
     const availableBuckets: Bucket[] = (() => {
         const out: Bucket[] = [];
-        if (typeof membership.reformer_remaining === 'number') out.push('reformer_remaining');
-        if (typeof membership.multi_remaining === 'number') out.push('multi_remaining');
-        if (out.length === 0 && typeof membership.classes_remaining === 'number') out.push('classes_remaining');
-        if (out.length === 0) out.push('reformer_remaining', 'multi_remaining');
+        if (typeof membership.reformer_remaining === 'number' && membership.reformer_credits !== 0) out.push('reformer_remaining');
+        if (typeof membership.multi_remaining === 'number' && membership.multi_credits !== 0) out.push('multi_remaining');
         return out;
     })();
-    const defaultBucket = availableBuckets[0];
+    const defaultBucket = availableBuckets[0] ?? 'reformer_remaining';
 
     const [bucket, setBucket] = useState<Bucket>(defaultBucket);
     const [delta, setDelta] = useState<number>(0);
     const [reason, setReason] = useState('');
     const sinLimite = useHasPermission('creditos_sin_limite'); // master/admin: sin tope de ±3
 
-    const current = membership[bucket] ?? 0;
-    const next = Math.max(0, current + delta);
+    const current = membership[bucket];
+    const next = typeof current === 'number' ? current + delta : NaN;
+    const valid = !stale && availableBuckets.includes(bucket) && Number.isInteger(next) && next >= 0 && Number.isInteger(delta) && (sinLimite || Math.abs(delta) <= 3);
 
     // Cada vez que se abre (incluido cambio de membresía en modo controlado), arranca limpio.
     useEffect(() => {
@@ -87,6 +89,7 @@ export function AdjustCreditsDialog({
             setBucket(defaultBucket);
             setDelta(0);
             setReason('');
+            setStale(false);
         }
     }, [open, membership.id, defaultBucket]);
 
@@ -94,6 +97,7 @@ export function AdjustCreditsDialog({
         mutationFn: async () => {
             const payload: Record<string, unknown> = { reason };
             payload[bucket] = next;
+            payload[`expected_${bucket}`] = current;
             return api.patch(`/memberships/${membership.id}/credits`, payload);
         },
         onSuccess: () => {
@@ -103,7 +107,15 @@ export function AdjustCreditsDialog({
             setReason('');
             onDone();
         },
-        onError: (e) => toast.error(getErrorMessage(e)),
+        onError: async (e: any) => {
+            if (e?.response?.status === 409 && e?.response?.data?.code === 'CREDITS_CHANGED') {
+                setStale(true);
+                setDelta(0);
+                await queryClient.invalidateQueries({ queryKey: ['memberships'] });
+                onDone();
+                toast.error('El saldo cambió. Revisa el saldo actualizado antes de volver a ajustar.');
+            } else toast.error(getErrorMessage(e));
+        },
     });
 
     return (
@@ -130,6 +142,8 @@ export function AdjustCreditsDialog({
                     </span>
                 </div>
                 <div className="space-y-3 mt-3">
+                    {availableBuckets.length === 0 && <p role="status">Este plan es ilimitado; no tiene créditos finitos para ajustar.</p>}
+                    {stale && <div role="alert">El saldo cambió. Revisa el saldo actualizado y vuelve a abrir el ajuste.<Button variant="outline" onClick={() => setOpen(false)}>Cerrar</Button></div>}
                     <div className="space-y-1">
                         <Label>Bucket</Label>
                         <Select value={bucket} onValueChange={(v) => setBucket(v as Bucket)}>
@@ -139,12 +153,12 @@ export function AdjustCreditsDialog({
                             <SelectContent>
                                 {availableBuckets.map((b) => (
                                     <SelectItem key={b} value={b}>
-                                        {b === 'reformer_remaining' ? 'Salsa' : b === 'multi_remaining' ? 'Clases' : 'Clases (sin categoría)'}
+                                        {b === 'reformer_remaining' ? 'Salsa' : 'Clases'}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
-                        <p className="text-xs text-muted-foreground">Saldo actual: {current} → nuevo: {next}</p>
+                        <p className="text-xs text-muted-foreground">Saldo actual: {current ?? 'Ilimitado'} → nuevo: {Number.isFinite(next) ? next : 'No editable'}</p>
                     </div>
                     <div className="space-y-1">
                         <Label>Cambio</Label>
@@ -152,7 +166,8 @@ export function AdjustCreditsDialog({
                             <Input
                                 type="number"
                                 value={delta}
-                                onChange={(e) => setDelta(Math.trunc(Number(e.target.value)) || 0)}
+                                onChange={(e) => setDelta(Number(e.target.value))}
+                                disabled={availableBuckets.length === 0 || stale}
                                 placeholder="Ej. 10 para agregar, -10 para quitar"
                             />
                         ) : (
@@ -164,6 +179,7 @@ export function AdjustCreditsDialog({
                                         variant={delta === d ? 'default' : 'outline'}
                                         size="sm"
                                         onClick={() => setDelta(d)}
+                                        disabled={availableBuckets.length === 0 || stale}
                                     >
                                         {d > 0 ? `+${d}` : d}
                                     </Button>
@@ -185,7 +201,7 @@ export function AdjustCreditsDialog({
                     <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
                     <Button
                         onClick={() => adjust.mutate()}
-                        disabled={adjust.isPending || delta === 0 || reason.trim().length < 5}
+                        disabled={adjust.isPending || !valid || delta === 0 || reason.trim().length < 5}
                     >
                         {adjust.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                         Aplicar

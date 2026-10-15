@@ -42,7 +42,7 @@ async function waitForHealth(timeoutMs = 90_000) {
 /** Crea usuario con password conocida. role: client|admin */
 async function mkUser(email: string, role: string, hash: string): Promise<string> {
     const u = await one(
-        `INSERT INTO users (email,phone,display_name,role,password_hash) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+        `INSERT INTO users (email,phone,display_name,role,password_hash,reglamento_accepted_at) VALUES ($1,$2,$3,$4,$5,NOW()) RETURNING id`,
         [email, `55${Date.now()}${Math.floor(Math.random() * 90 + 10)}`.slice(0, 12), `WL ${role}`, role, hash]);
     return u.id;
 }
@@ -281,6 +281,8 @@ async function main() {
         const hoyMx = (await one(`SELECT (NOW() AT TIME ZONE 'America/Mexico_City')::date::text AS d`)).d;
         const clsDone = await mkClass(hoyMx, '08:00', 5); classIds.push(clsDone);
         await pool.query(`UPDATE classes SET status='completed', instructor_id=$2 WHERE id=$1`, [clsDone, inst1.id]);
+        // Payroll only counts classes that actually have an attendee.
+        await pool.query(`INSERT INTO bookings (class_id,user_id,status,is_free_booking) VALUES ($1,$2,'checked_in',true)`, [clsDone, userIds[1]]);
         const mes = (await one(`SELECT to_char(date_trunc('month', date), 'YYYY-MM') AS m FROM classes WHERE id=$1`, [clsDone])).m;
 
         const payrollAntes = await http('GET', `/coach-payroll?month=${mes}`, tokAdmin);

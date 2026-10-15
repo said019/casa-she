@@ -53,7 +53,7 @@ router.get('/', async (req: Request, res: Response) => {
             // Pagos: nombre/email del cliente, referencia o monto
             query(
                 `SELECT p.id, p.amount, p.currency, p.payment_method, p.status,
-                        COALESCE(p.completed_at, p.created_at) AS created_at,
+                        COALESCE(p.paid_at, p.completed_at, p.created_at) AS created_at,
                         u.id AS user_id, u.display_name AS user_name
                  FROM payments p
                  JOIN users u ON p.user_id = u.id
@@ -61,7 +61,7 @@ router.get('/', async (req: Request, res: Response) => {
                     OR u.email ILIKE $1
                     OR p.reference ILIKE $1
                     OR CAST(p.amount AS TEXT) ILIKE $1
-                 ORDER BY COALESCE(p.completed_at, p.created_at) DESC
+                 ORDER BY COALESCE(p.paid_at, p.completed_at, p.created_at) DESC
                  LIMIT 5`,
                 [like]
             ),

@@ -52,7 +52,7 @@ export async function getStaffSales(
       SELECT pay.processed_by AS staff_id, COUNT(*) AS n, COALESCE(SUM(pay.amount),0) AS amount
       FROM payments pay
       WHERE pay.membership_id IS NOT NULL AND pay.status = 'completed'
-        AND (COALESCE(pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date
+        AND (COALESCE(pay.paid_at, pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date
       GROUP BY pay.processed_by
     ),
     pmemb AS (
@@ -61,7 +61,7 @@ export async function getStaffSales(
       JOIN memberships m ON m.id = pay.membership_id
       JOIN plans pl ON pl.id = m.plan_id
       WHERE pay.membership_id IS NOT NULL AND pay.status = 'completed' AND pl.is_active = true
-        AND (COALESCE(pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date
+        AND (COALESCE(pay.paid_at, pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date
       GROUP BY pay.processed_by
     ),
     prod AS (
@@ -82,7 +82,7 @@ export async function getStaffSales(
     LEFT JOIN memb  ON memb.staff_id  = u.id
     LEFT JOIN pmemb ON pmemb.staff_id = u.id
     LEFT JOIN prod  ON prod.staff_id  = u.id
-    WHERE u.role = ANY($3::text[]) AND u.is_active = true
+    WHERE u.role::text = ANY($3::text[]) AND u.is_active = true
     ORDER BY u.display_name
   `, [from, to, roles]);
   return rows as StaffSalesRow[];
@@ -98,7 +98,7 @@ export async function getStaffSalesDetail(
   const exec = opts.exec ?? query;
   const memberships = await exec<any>(`
     SELECT pay.id AS payment_id,
-           TO_CHAR((COALESCE(pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date, 'YYYY-MM-DD') AS created_at,
+           TO_CHAR((COALESCE(pay.paid_at, pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date, 'YYYY-MM-DD') AS created_at,
            cu.display_name AS member_name,
            pl.name AS plan_name,
            pay.amount::float AS amount,
@@ -108,7 +108,7 @@ export async function getStaffSalesDetail(
     JOIN plans pl ON pl.id = m.plan_id AND pl.is_active = true
     JOIN users cu ON cu.id = pay.user_id
     WHERE pay.processed_by = $1 AND pay.membership_id IS NOT NULL AND pay.status = 'completed'
-      AND (COALESCE(pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date
+      AND (COALESCE(pay.paid_at, pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date
     ORDER BY 2 DESC, 1
   `, [staffId, from, to]);
 

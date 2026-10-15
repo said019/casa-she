@@ -14,6 +14,7 @@ import { PlanLabel } from '@/components/brands/PlanLabel';
 import { useIsElevated } from '@/hooks/useIsElevated';
 import { getMembershipPaymentMethods, GRATIS_REASON_MIN_LENGTH } from '@/lib/membershipPaymentMethods';
 import { studioTodayForInput } from '@/lib/date';
+import type { ClienteAgenda } from './ClienteMembresiasDialog';
 
 /** Lo que responde GET /api/classes/:id/candidatas (misma regla que admin-book). */
 type Candidata = {
@@ -44,6 +45,7 @@ const VENDIBLE = ['sin_membresia', 'sin_creditos', 'otro_estudio'];
 const venceCorto = (iso: string) => format(parseISO(`${iso}T00:00:00`), "d MMM", { locale: es }).replace('.', '');
 
 interface InscribirAlumnaProps {
+    onGestionar?: (cliente: ClienteAgenda) => void;
     clase: Class;
     /** Se llama al inscribir (o al deshacer) para que el panel recargue inscritas y resalte a la alumna. */
     onInscrita: (userId: string) => void;
@@ -57,7 +59,7 @@ interface InscribirAlumnaProps {
  * queda en la bolsa de ESTA clase (o el motivo por el que no puede), e inscribe o vende un
  * paquete ahí mismo. La regla viene del backend (lib/inscripcion.ts), la misma de admin-book.
  */
-export function InscribirAlumna({ clase, onInscrita, onDeshecha, onRegistrarNueva }: InscribirAlumnaProps) {
+export function InscribirAlumna({ clase, onInscrita, onDeshecha, onRegistrarNueva, onGestionar }: InscribirAlumnaProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [texto, setTexto] = useState('');
@@ -222,6 +224,7 @@ export function InscribirAlumna({ clase, onInscrita, onDeshecha, onRegistrarNuev
                                         )}
                                     </div>
                                     <div className="flex shrink-0 flex-col items-stretch gap-1.5">
+                                        {onGestionar && <Button size="sm" variant="outline" aria-label={`Gestionar membresía de ${c.nombre}`} onClick={() => onGestionar({ id: c.userId, display_name: c.nombre })}>Gestionar membresía</Button>}
                                         {puede && (
                                             <Button size="sm" className="h-8" disabled={inscribir.isPending} onClick={() => inscribirA(c)}>
                                                 {inscribir.isPending && inscribir.variables?.userId === c.userId
@@ -229,7 +232,7 @@ export function InscribirAlumna({ clase, onInscrita, onDeshecha, onRegistrarNuev
                                                     : cortesia ? 'Inscribir (cortesía)' : 'Inscribir'}
                                             </Button>
                                         )}
-                                        {VENDIBLE.includes(c.estado) && (
+                                        {!onGestionar && VENDIBLE.includes(c.estado) && (
                                             <Button
                                                 size="sm" variant="outline" className="h-8"
                                                 aria-expanded={vendiendo === c.userId}

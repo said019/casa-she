@@ -11,7 +11,7 @@
 import { awardPaymentLoyaltyPoints, consumeFounderFirstPackageDiscount } from './loyalty.js';
 import { openShiftForUser } from './openShift.js';
 import { manualDiscountNote, type ManualPriceAdjustmentResult } from './manual-price-adjustment.js';
-import { addDaysToDate } from './schedule.js';
+import { addDaysToDate, cdmxToday } from './schedule.js';
 import { resolveStaffMembershipDates } from './membershipActivation.js';
 
 type Tx = { query: (text: string, params?: any[]) => Promise<{ rows: any[]; rowCount?: number | null }> };
@@ -21,6 +21,8 @@ export interface AsignarMembresiaParams {
     plan: any; // fila completa de plans
     startDate: string;
     endDate?: string;
+    paymentDate?: string;
+    respectExplicitDates?: boolean;
     status: 'active' | 'pending_payment' | 'pending_activation';
     /** Ya normalizado ('bank_transfer' → 'transfer'); null = sin pago. */
     paymentMethod: string | null;
@@ -55,6 +57,7 @@ export async function asignarMembresiaEnTx(
             durationDays: Number(plan.duration_days || 0),
             requestedStartDate: p.startDate,
             requestedEndDate: p.endDate,
+            respectExplicitDates: p.respectExplicitDates,
         });
         start = dates.startDate;
         end = dates.endDate;
@@ -108,11 +111,16 @@ export async function asignarMembresiaEnTx(
                     : (notes || null);
 
         const shiftA = await openShiftForUser(actorUserId || '');
+        const historicalPayment = !!p.paymentDate && p.paymentDate < cdmxToday();
+        const staffFacility = !shiftA?.facility_id && actorUserId
+            ? (await client.query('SELECT default_facility_id FROM users WHERE id=$1', [actorUserId])).rows[0]?.default_facility_id
+            : null;
         const payResult = await client.query(
             `INSERT INTO payments (
             user_id, membership_id, amount, currency,
-            payment_method, reference, notes, status, processed_by, shift_id, facility_id
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', $8, $9, $10)
+            payment_method, reference, notes, status, processed_by, shift_id, facility_id, paid_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', $8, $9, $10,
+              CASE WHEN $11::date IS NULL THEN NOW() ELSE ($11::date + TIME '12:00') AT TIME ZONE 'America/Mexico_City' END)
           RETURNING id`,
             [
                 userId,
@@ -123,8 +131,9 @@ export async function asignarMembresiaEnTx(
                 null,
                 paymentNotes,
                 actorUserId,
-                shiftA?.id || null,
-                shiftA?.facility_id || null,
+                historicalPayment ? null : shiftA?.id || null,
+                shiftA?.facility_id || staffFacility || null,
+                p.paymentDate || null,
             ],
         );
 

@@ -129,8 +129,8 @@ router.get('/dashboard', authenticate, requireRole(...STAFF), async (req: Reques
             LEFT JOIN memberships m ON m.id = p.membership_id
             WHERE p.membership_id IS NOT NULL
               AND p.status = 'completed'
-              AND p.created_at >= ($1::date)::timestamp AT TIME ZONE 'America/Mexico_City'
-              AND p.created_at <  (($1::date) + INTERVAL '1 day')::timestamp AT TIME ZONE 'America/Mexico_City'
+              AND COALESCE(p.paid_at, p.completed_at, p.created_at) >= ($1::date)::timestamp AT TIME ZONE 'America/Mexico_City'
+              AND COALESCE(p.paid_at, p.completed_at, p.created_at) < (($1::date) + INTERVAL '1 day')::timestamp AT TIME ZONE 'America/Mexico_City'
               AND ($2::uuid IS NULL OR m.facility_id = $2::uuid OR m.facility_id IS NULL)
             GROUP BY p.payment_method`,
             [today, facilityId]);

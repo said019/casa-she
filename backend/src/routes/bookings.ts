@@ -1653,6 +1653,13 @@ router.get('/class/:classId', authenticate, requireRole('admin', 'instructor', '
                 b.id as booking_id, b.status, b.checked_in_at, b.waitlist_position,
                 u.id as user_id, u.display_name, u.email, u.photo_url, u.phone,
                 m.id as membership_id, p.name as plan_name, b.is_free_booking,
+                CASE WHEN m.id IS NULL OR b.channel IN ('totalpass', 'fitpass') THEN NULL ELSE json_build_object(
+                    'membership_id', m.id, 'owner_id', m.user_id, 'plan_name', p.name,
+                    'status', m.status, 'start_date', m.start_date::text, 'end_date', m.end_date::text,
+                    'attended', COALESCE(usage.attended, 0), 'reserved', COALESCE(usage.reserved, 0),
+                    'reformer_remaining', m.reformer_remaining, 'multi_remaining', m.multi_remaining,
+                    'reformer_credits', p.reformer_credits, 'multi_credits', p.multi_credits
+                ) END AS membership_summary,
                 b.booked_by,
                 bb.display_name as booked_by_name,
                 bb.role as booked_by_role,
@@ -1666,6 +1673,15 @@ router.get('/class/:classId', authenticate, requireRole('admin', 'instructor', '
              LEFT JOIN users bb ON bb.id = b.booked_by
              LEFT JOIN memberships m ON b.membership_id = m.id
              LEFT JOIN plans p ON m.plan_id = p.id
+             LEFT JOIN (
+                 SELECT bx.membership_id, bx.user_id,
+                     COUNT(*) FILTER (WHERE bx.status = 'checked_in')::int AS attended,
+                     COUNT(*) FILTER (WHERE bx.status = 'confirmed' AND cx.status = 'scheduled'
+                         AND cx.date + cx.start_time > NOW() AT TIME ZONE 'America/Mexico_City')::int AS reserved
+                 FROM bookings bx JOIN classes cx ON cx.id = bx.class_id
+                 WHERE bx.membership_id IN (SELECT membership_id FROM bookings WHERE class_id = $1)
+                 GROUP BY bx.membership_id, bx.user_id
+             ) usage ON usage.membership_id = b.membership_id AND usage.user_id = b.user_id
              WHERE b.class_id = $1 ${includeCancelled ? '' : `AND b.status != 'cancelled'`}
              ORDER BY b.waitlist_position ASC NULLS FIRST, u.display_name ASC`,
             [req.params.classId]

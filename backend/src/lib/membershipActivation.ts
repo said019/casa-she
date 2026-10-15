@@ -85,6 +85,8 @@ export async function resolveStaffMembershipDates(
     durationDays: number;
     requestedStartDate?: string | null;
     requestedEndDate?: string | null;
+    /** Calendar assignment: staff-entered dates are authoritative, including today. */
+    respectExplicitDates?: boolean;
     today?: string;
   },
 ): Promise<{
@@ -98,7 +100,7 @@ export async function resolveStaffMembershipDates(
   const requestedStart = rawStart == null || rawStart === '' ? today : civilDate(rawStart);
   if (!requestedStart) throw new MembershipDateInputError('Fecha de inicio inválida (formato YYYY-MM-DD).');
 
-  const automatic = requestedStart === today;
+  const automatic = requestedStart === today && !input.respectExplicitDates;
   const resolved = await resolvePaidMembershipDates(db, {
     userId: input.userId,
     durationDays: input.durationDays,

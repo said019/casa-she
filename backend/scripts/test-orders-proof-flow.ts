@@ -191,6 +191,7 @@ async function main() {
     // 6) Activar CON paymentMethod → 200 y pago registrado
     const actOk = await http('POST', `/memberships/${membershipId}/activate`, adminTok, {
       paymentMethod: 'transfer', notifyMember: false, generateWalletPass: false,
+      startDate: (await one(`SELECT (NOW() AT TIME ZONE 'America/Mexico_City')::date::text AS date`)).date,
     });
     assert.equal(actOk.status, 200, `activate con paymentMethod: ${JSON.stringify(actOk.json)}`);
     const pay = await one(`SELECT id FROM payments WHERE membership_id = $1 AND status = 'completed'`, [membershipId]);
