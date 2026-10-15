@@ -4,7 +4,7 @@ export type UserRole = 'client' | 'instructor' | 'admin' | 'super_admin' | 'rece
 // User interface
 export interface User {
     id: string;
-    email: string;
+    email: string | null;
     phone: string;
     display_name: string;
     full_name?: string; // Alias for display_name for compatibility
@@ -128,13 +128,14 @@ export interface AdminStats {
 
 // Login credentials
 export interface LoginCredentials {
-    email: string;
+    identifier?: string;
+    email?: string;
     password: string;
 }
 
 // Registration data
 export interface RegisterData {
-    email: string;
+    email?: string;
     password: string;
     displayName: string;
     phone: string;

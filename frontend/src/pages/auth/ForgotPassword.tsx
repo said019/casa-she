@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 
 const forgotPasswordSchema = z.object({
-    email: z.string().email('Email inválido'),
+    identifier: z.string().trim().min(1, 'Ingresa tu correo o WhatsApp'),
 });
 
 type ForgotPasswordForm = z.infer<typeof forgotPasswordSchema>;
@@ -51,8 +51,8 @@ export default function ForgotPassword() {
         return (
             <AuthShell
                 eyebrow="Casa Shé"
-                title="Revisa tu correo"
-                subtitle="Si existe una cuenta con ese email, recibirás instrucciones para restablecer tu contraseña."
+                title="Revisa tus mensajes"
+                subtitle="Si existe una cuenta con ese correo o WhatsApp, recibirás instrucciones para restablecer tu contraseña por WhatsApp o correo."
                 footer={
                     <Link
                         to="/login"
@@ -102,20 +102,21 @@ export default function ForgotPassword() {
                 )}
 
                 <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="identifier">Correo o WhatsApp</Label>
                     <div className="relative">
                         <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-bmb-dark/40" />
                         <Input
-                            id="email"
-                            type="email"
-                            placeholder="tu@email.com"
+                            id="identifier"
+                            type="text"
+                            autoComplete="username"
+                            placeholder="tu@email.com o 55 1234 5678"
                             className={fieldClass}
-                            {...register('email')}
+                            {...register('identifier')}
                             disabled={isLoading}
                         />
                     </div>
-                    {errors.email && (
-                        <p className="text-sm text-destructive">{errors.email.message}</p>
+                    {errors.identifier && (
+                        <p className="text-sm text-destructive">{errors.identifier.message}</p>
                     )}
                 </div>
 

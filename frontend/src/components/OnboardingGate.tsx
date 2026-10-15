@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import api, { getErrorMessage } from '@/lib/api';
+import { normalizeLoginPhone } from '@/lib/loginIdentity';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +29,8 @@ export function OnboardingGate() {
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!displayName.trim()) { toast({ variant: 'destructive', title: 'Falta tu nombre' }); return; }
-        if (phone.replace(/\D/g, '').length < 10) { toast({ variant: 'destructive', title: 'Teléfono inválido', description: 'Debe tener 10 dígitos.' }); return; }
+        const clientPhone = normalizeLoginPhone(phone);
+        if (user?.role === 'client' ? !clientPhone : phone.replace(/\D/g, '').length < 10) { toast({ variant: 'destructive', title: 'Teléfono inválido', description: 'Usa 10 dígitos o la lada +52.' }); return; }
         if (pw.length < 6) { toast({ variant: 'destructive', title: 'Contraseña muy corta', description: 'Mínimo 6 caracteres.' }); return; }
         if (pw !== pw2) { toast({ variant: 'destructive', title: 'Las contraseñas no coinciden' }); return; }
         setSubmitting(true);
@@ -36,7 +38,7 @@ export function OnboardingGate() {
             await api.post('/auth/complete-onboarding', {
                 newPassword: pw,
                 displayName: displayName.trim(),
-                phone: phone.trim(),
+                phone: user?.role === 'client' ? clientPhone : phone.trim(),
             });
             await checkAuth(); // refresca: temp_password=false → AuthGuard desmonta este gate
             toast({ title: '¡Listo!', description: 'Tu acceso quedó configurado.' });

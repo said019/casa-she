@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { clientPhoneSchema, optionalClientEmailSchema } from '@/lib/loginIdentity';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '@/stores/authStore';
 import AuthShell from '@/components/auth/AuthShell';
@@ -26,10 +27,8 @@ import {
 
 const registerSchema = z.object({
     displayName: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-    email: z.string().email('Email inválido'),
-    phone: z
-        .string()
-        .regex(/^\+52[0-9]{10}$/, 'Formato: +52 seguido de 10 dígitos'),
+    email: optionalClientEmailSchema,
+    phone: clientPhoneSchema,
     password: z
         .string()
         .min(8, 'Mínimo 8 caracteres')
@@ -87,28 +86,10 @@ export default function Register() {
         return () => clearError();
     }, [clearError]);
 
-    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        let value = e.target.value;
-        value = value.replace(/[^\d+]/g, '');
-        if (!value.startsWith('+52') && value.length > 0) {
-            if (value.startsWith('52')) {
-                value = '+' + value;
-            } else if (value.startsWith('+')) {
-                value = '+52' + value.substring(1);
-            } else {
-                value = '+52' + value;
-            }
-        }
-        if (value.length > 13) {
-            value = value.substring(0, 13);
-        }
-        e.target.value = value;
-    };
-
     const onSubmit = async (data: RegisterForm) => {
         try {
             await registerUser({
-                email: data.email,
+                email: data.email || undefined,
                 password: data.password,
                 displayName: data.displayName,
                 phone: data.phone,
@@ -165,7 +146,7 @@ export default function Register() {
                     </motion.div>
 
                     <motion.div {...fieldMotion} transition={{ duration: 0.28, delay: 0.08, ease: easeOut }} className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
+                        <Label htmlFor="email">Correo (opcional)</Label>
                         <div className="relative">
                             <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-bmb-dark/40" />
                             <Input
@@ -183,7 +164,7 @@ export default function Register() {
                     </motion.div>
 
                     <motion.div {...fieldMotion} transition={{ duration: 0.28, delay: 0.12, ease: easeOut }} className="space-y-2">
-                        <Label htmlFor="phone">Teléfono</Label>
+                        <Label htmlFor="phone">WhatsApp</Label>
                         <div className="relative">
                             <Phone className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-bmb-dark/40" />
                             <Input
@@ -192,10 +173,6 @@ export default function Register() {
                                 placeholder="+524271234567"
                                 className={fieldClass}
                                 {...register('phone')}
-                                onChange={(e) => {
-                                    handlePhoneChange(e);
-                                    register('phone').onChange(e);
-                                }}
                                 disabled={isLoading}
                             />
                         </div>

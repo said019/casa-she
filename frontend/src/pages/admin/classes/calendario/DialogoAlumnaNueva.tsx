@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Check, Copy, Loader2, MessageCircle } from 'lucide-react';
 import api, { getErrorMessage } from '@/lib/api';
+import { normalizeLoginPhone } from '@/lib/loginIdentity';
 import { cn } from '@/lib/utils';
 import type { Class } from '@/types/class';
 import { enlaceAccesoWhatsApp, mensajeAccesoWhatsApp } from '@/lib/whatsapp';
@@ -107,16 +108,16 @@ export function DialogoAlumnaNueva({ clase, open, onOpenChange, nombreInicial = 
     const cuando = clase
         ? `${clase.class_type_name ?? 'Clase'} · ${fechaLarga(clase.date)} · ${formatClassTime(clase.start_time)}`
         : '';
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
-    const telefonoOk = telefono.replace(/\D/g, '').length >= 10;
+    const emailOk = !email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
+    const telefonoOk = normalizeLoginPhone(telefono) !== null;
     const nombreOk = nombre.trim().length >= 2 && nombre.trim().length <= 80;
     const puedeEnviar = !!clase && nombreOk && telefonoOk && emailOk && (!!plan || cortesia);
 
     const registrar = useMutation({
         mutationFn: async () => (await api.post('/users/alta-rapida', {
             nombre: nombre.trim(),
-            email: email.trim(),
-            telefono: telefono.trim(),
+            email: email.trim() || undefined,
+            telefono: normalizeLoginPhone(telefono),
             classId: clase!.id,
             ...(cortesia ? { cortesia: true } : { planId, metodoPago: metodo }),
         })).data as { user: { id: string; display_name: string }; acceso: { url: string } },
@@ -205,16 +206,16 @@ export function DialogoAlumnaNueva({ clase, open, onOpenChange, nombreInicial = 
                                 <span className="text-sm font-semibold">WhatsApp</span>
                                 <span className="flex gap-1.5">
                                     <span className="flex h-11 items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">+52</span>
-                                    <Input aria-label="WhatsApp" type="tel" inputMode="tel" value={telefono}
+                                    <Input aria-label="WhatsApp" required type="tel" inputMode="tel" value={telefono}
                                         onChange={(e) => setTelefono(e.target.value)} placeholder="55 1234 5678" className="h-11 flex-1" />
                                 </span>
-                                <span className="text-xs text-muted-foreground">Ahí le llega su acceso. Si el número o el correo ya existen, te ofrecemos su ficha.</span>
+                                <span className="text-xs text-muted-foreground">Usa 10 dígitos o la lada +52. Entra con su WhatsApp y contraseña. Si el número o el correo ya existen, te ofrecemos su ficha.</span>
                             </label>
                             <label className="block space-y-1.5">
-                                <span className="text-sm font-semibold">Correo</span>
-                                <Input aria-label="Correo" type="email" required value={email}
+                                <span className="text-sm font-semibold">Correo (opcional)</span>
+                                <Input aria-label="Correo (opcional)" type="email" value={email}
                                     onChange={(e) => setEmail(e.target.value)} autoComplete="off" className="h-11" />
-                                <span className="text-xs text-muted-foreground">Con este correo entra a la app.</span>
+                                <span className="text-xs text-muted-foreground">También podrá entrar con este correo. Al terminar puedes compartir su link para crear la contraseña.</span>
                             </label>
 
                             {existente && (

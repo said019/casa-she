@@ -46,7 +46,7 @@ interface Migration {
   id: string;
   user_id: string;
   display_name: string;
-  email: string;
+  email: string | null;
   phone: string;
   plan_name: string;
   plan_class_limit: number | null;
@@ -155,7 +155,7 @@ export default function MigrationsList() {
   const filteredMigrations = migrations.filter(
     (m) =>
       m.display_name.toLowerCase().includes(search.toLowerCase()) ||
-      m.email.toLowerCase().includes(search.toLowerCase()) ||
+      (m.email || '').toLowerCase().includes(search.toLowerCase()) ||
       m.phone.includes(search)
   );
 

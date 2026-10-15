@@ -157,9 +157,10 @@ export default function MemberNew() {
 
                 <div className="rounded-md border bg-white/70 p-3 space-y-2 text-sm">
                   <p className="font-medium">Notificaciones automáticas:</p>
-                  <div className={newClientResult.emailSent ? 'text-success' : 'text-destructive'}>
+                  <div className={!newClientResult.user.email ? 'text-muted-foreground' : newClientResult.emailSent ? 'text-success' : 'text-destructive'}>
                     {newClientResult.emailSent
                       ? '✓ Email de bienvenida enviado'
+                      : !newClientResult.user.email ? '— Sin correo registrado'
                       : '✗ No se pudo enviar el email — entrega la contraseña manualmente'}
                   </div>
                   <div className={newClientResult.whatsappSent ? 'text-success' : 'text-destructive'}>
