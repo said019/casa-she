@@ -42,7 +42,7 @@ async function waitForHealth(timeoutMs = 90_000) {
 /** Crea usuario con password conocida. role: client|admin */
 async function mkUser(email: string, role: string, hash: string): Promise<string> {
     const u = await one(
-        `INSERT INTO users (email,phone,display_name,role,password_hash) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+        `INSERT INTO users (email,phone,display_name,role,password_hash,reglamento_accepted_at) VALUES ($1,$2,$3,$4,$5,NOW()) RETURNING id`,
         [email, `55${Date.now()}${Math.floor(Math.random() * 90 + 10)}`.slice(0, 12), `WL ${role}`, role, hash]);
     return u.id;
 }
