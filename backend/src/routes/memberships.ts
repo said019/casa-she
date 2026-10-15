@@ -257,6 +257,7 @@ router.get('/', authenticate, requireRole('admin', 'super_admin', 'reception'), 
              u.display_name as user_name, u.email as user_email, u.phone as user_phone,
              p.name as plan_name, p.price as plan_price, p.currency as plan_currency, p.duration_days as plan_duration_days,
              p.class_limit as credits_total,
+             p.reformer_credits, p.multi_credits,
              CASE WHEN m.reformer_remaining IS NULL OR m.multi_remaining IS NULL THEN NULL
                   ELSE m.reformer_remaining + m.multi_remaining END as credits_remaining,
              ab.display_name as activated_by_name,

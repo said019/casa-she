@@ -281,6 +281,8 @@ async function main() {
         const hoyMx = (await one(`SELECT (NOW() AT TIME ZONE 'America/Mexico_City')::date::text AS d`)).d;
         const clsDone = await mkClass(hoyMx, '08:00', 5); classIds.push(clsDone);
         await pool.query(`UPDATE classes SET status='completed', instructor_id=$2 WHERE id=$1`, [clsDone, inst1.id]);
+        // Payroll only counts classes that actually have an attendee.
+        await pool.query(`INSERT INTO bookings (class_id,user_id,status,is_free_booking) VALUES ($1,$2,'checked_in',true)`, [clsDone, userIds[1]]);
         const mes = (await one(`SELECT to_char(date_trunc('month', date), 'YYYY-MM') AS m FROM classes WHERE id=$1`, [clsDone])).m;
 
         const payrollAntes = await http('GET', `/coach-payroll?month=${mes}`, tokAdmin);

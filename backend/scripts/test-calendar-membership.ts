@@ -39,7 +39,7 @@ try {
         const response = await call('GET', `/bookings/class/${upcoming.id}`);
         assert.equal(response.status, 200);
         const summary = response.json.find((r: any) => r.user_id === owner.id).membership_summary;
-        assert.deepEqual(summary, { membership_id: membership.id, owner_id: owner.id, plan_name: plan.name, status: 'active', start_date: dates.today, end_date: dates.expiry, attended: 1, reserved: 1, reformer_remaining: 3, multi_remaining: 7 });
+        assert.deepEqual(summary, { membership_id: membership.id, owner_id: owner.id, plan_name: plan.name, status: 'active', start_date: dates.today, end_date: dates.expiry, attended: 1, reserved: 1, reformer_remaining: 3, multi_remaining: 7, reformer_credits: 3, multi_credits: 7 });
         assert.equal(response.json.find((r: any) => r.user_id === guest.id).membership_summary.attended, 1);
     });
     await test('credits return updated derived balance and atomically audit', async () => {

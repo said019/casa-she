@@ -82,7 +82,7 @@ export async function getStaffSales(
     LEFT JOIN memb  ON memb.staff_id  = u.id
     LEFT JOIN pmemb ON pmemb.staff_id = u.id
     LEFT JOIN prod  ON prod.staff_id  = u.id
-    WHERE u.role = ANY($3::text[]) AND u.is_active = true
+    WHERE u.role::text = ANY($3::text[]) AND u.is_active = true
     ORDER BY u.display_name
   `, [from, to, roles]);
   return rows as StaffSalesRow[];
