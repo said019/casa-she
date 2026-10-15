@@ -26,9 +26,9 @@ async function main() {
             `INSERT INTO users (email, phone, display_name, role, password_hash, is_active, temp_password)
              VALUES ($1, $2, $3, $4, $5, true, false) RETURNING id, email`,
             [`${tag}-${ts}@alta.test`, tel, `Test ${tag}`, rol, hash]))[0];
-        const recep = await mk('reception', 'rec', '5500000001');
-        const existente = await mk('client', 'exi', '5500000002');
-        const clienta = await mk('client', 'cli', '5500000003');
+        const recep = await mk('reception', 'rec', '5591970001');
+        const existente = await mk('client', 'exi', '5591970002');
+        const clienta = await mk('client', 'cli', '5591970003');
         const login = async (email: string) => (await http(A, 'POST', '/auth/login', undefined, { email, password: clave })).json.token as string;
         const tRecep = await login(recep.email);
         const tClienta = await login(clienta.email);
@@ -65,7 +65,6 @@ async function main() {
         assert.equal((await http(A, 'POST', '/users/alta-rapida', tClienta, body(1))).status, 403, 'una clienta no da de alta');
         const antesValid = await conteos();
         for (const [que, b] of [
-            ['sin correo', { ...body(2), email: undefined }],
             ['correo inválido', body(2, { email: 'no-es-correo' })],
             ['nombre corto', body(2, { nombre: 'A' })],
             ['nombre largo', body(2, { nombre: 'x'.repeat(81) })],
@@ -141,7 +140,7 @@ async function main() {
 
         // ---- Duplicado por teléfono (otro formato, con lada): 409 sin escribir ----
         const dupTel = await http(A, 'POST', '/users/alta-rapida', tRecep,
-            body(13, { telefono: '+52 (55) 0000-0002' }));
+            body(13, { telefono: '+52 (55) 9197-0002' }));
         assert.equal(dupTel.status, 409);
         assert.equal(dupTel.json.code, 'YA_EXISTE');
         assert.equal(dupTel.json.userId, existente.id);
@@ -149,11 +148,11 @@ async function main() {
         assert.deepEqual(await conteos(), d0, 'duplicado por teléfono: no escribe nada');
 
         // ---- Coincidencia con alguien que NO es clienta (staff): no se revela quién es ----
-        const staff = await mk('admin', 'stf', '5500000004');
+        const staff = await mk('admin', 'stf', '5591970004');
         const dStaff = await conteos();
         for (const [que, extra] of [
             ['correo', { email: staff.email.toUpperCase(), telefono: '5599887755' }],
-            ['teléfono', { telefono: '5500000004' }],
+            ['teléfono', { telefono: '5591970004' }],
         ] as const) {
             const dupStaff = await http(A, 'POST', '/users/alta-rapida', tRecep, body(14, extra));
             assert.equal(dupStaff.status, 409, `staff por ${que}`);

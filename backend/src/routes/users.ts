@@ -23,6 +23,7 @@ import { isValidTag } from '../lib/clientTags.js';
 import { findOrCreateGuest } from '../lib/guestUser.js';
 import { crearLinkAcceso } from '../lib/accessLinks.js';
 import { altaRapida, AltaRapidaSchema, AltaRapidaError } from '../lib/altaRapida.js';
+import { ClientEmailSchema, ClientPhoneSchema } from '../lib/loginIdentity.js';
 
 const router = Router();
 
@@ -582,9 +583,9 @@ router.post('/:id/founder/reset', requireRole('admin', 'super_admin'), async (re
 // POST /api/users - Create new user (admin only)
 // ============================================
 const CreateMemberSchema = z.object({
-    email: z.string().trim().toLowerCase().email('Email inválido'),
+    email: ClientEmailSchema,
     displayName: z.string().trim().min(2, 'El nombre debe tener al menos 2 caracteres'),
-    phone: z.string().transform(value => value.replace(/\D/g, '').slice(-10)).refine(value => value.length === 10, 'Teléfono inválido'),
+    phone: ClientPhoneSchema,
     password: z.string().min(8).optional(),
     dateOfBirth: z.string().optional(),
     acceptsCommunications: z.boolean().optional().default(false),
@@ -619,7 +620,7 @@ router.post('/', requireRole('admin', 'super_admin', 'reception'), async (req: R
 
         const matches = await query<{ id: string; display_name: string; role: string }>(
             `SELECT id, display_name, role FROM users WHERE lower(trim(email))=$1
-                OR right(regexp_replace(COALESCE(phone,''), '\\D', '', 'g'),10)=$2 LIMIT 2`, [email, phone]);
+                OR normalize_login_phone(phone)=$2 LIMIT 2`, [email, phone]);
         if (matches.length) {
             const existing = matches.length === 1 && matches[0].role === 'client' ? matches[0] : null;
             return res.status(409).json({ error: 'Correo o teléfono ya registrado', code: 'YA_EXISTE',
@@ -638,7 +639,7 @@ router.post('/', requireRole('admin', 'super_admin', 'reception'), async (req: R
         emergency_contact_name, emergency_contact_phone, health_notes,
         accepts_communications, date_of_birth, receive_reminders,
         receive_promotions, receive_weekly_summary, created_at, updated_at`,
-            [email.toLowerCase(), passwordHash, displayName, phone, acceptsCommunications ?? false, dateOfBirth || null]
+            [email, passwordHash, displayName, phone, acceptsCommunications ?? false, dateOfBirth || null]
         );
 
         if (!user) {
@@ -663,21 +664,21 @@ router.post('/', requireRole('admin', 'super_admin', 'reception'), async (req: R
         const actualPassword = password || generatedPassword;
 
         const [emailResult, whatsappResult] = await Promise.allSettled([
-            sendClientWelcomeEmail({
-                to: email.toLowerCase(),
+            email ? sendClientWelcomeEmail({
+                to: email,
                 clientName: displayName,
-                email: email.toLowerCase(),
+                email,
                 temporaryPassword: actualPassword,
-            }),
-            sendClientWelcome(phone, displayName, email.toLowerCase(), actualPassword, undefined, waInstance),
+            }) : Promise.resolve(null),
+            sendClientWelcome(phone, displayName, email, actualPassword, undefined, waInstance),
         ]);
 
         const emailSent = emailResult.status === 'fulfilled' && !!emailResult.value;
-        const whatsappSent = whatsappResult.status === 'fulfilled';
+        const whatsappSent = whatsappResult.status === 'fulfilled' && whatsappResult.value === true;
 
         if (emailResult.status === 'rejected') {
             console.error('Welcome email failed:', emailResult.reason);
-        } else if (!emailResult.value) {
+        } else if (email && !emailResult.value) {
             console.error('Welcome email did not send (returned null) — check RESEND_API_KEY');
         }
         if (whatsappResult.status === 'rejected') {
@@ -691,6 +692,7 @@ router.post('/', requireRole('admin', 'super_admin', 'reception'), async (req: R
             ...(password ? {} : { tempPassword: generatedPassword }),
         });
     } catch (error) {
+        if ((error as any)?.code === '23505') return res.status(409).json({ error: 'Correo o teléfono ya registrado', code: 'YA_EXISTE' });
         console.error('Create user error:', error);
         res.status(500).json({ error: 'Error al crear usuario' });
     }
@@ -764,7 +766,7 @@ router.post('/:id/resend-credentials', requireRole('admin', 'super_admin', 'rece
         const { id } = req.params;
 
         const target = await queryOne<{
-            id: string; email: string; phone: string | null; display_name: string; role: string;
+            id: string; email: string | null; phone: string | null; display_name: string; role: string;
         }>(
             'SELECT id, email, phone, display_name, role FROM users WHERE id = $1',
             [id]
@@ -833,12 +835,12 @@ router.post('/:id/resend-credentials', requireRole('admin', 'super_admin', 'rece
                     }))
                 : Promise.resolve(null),
             target.phone
-                ? sendClientWelcome(target.phone, target.display_name, target.email || target.phone, newPassword, undefined, waInstance)
+                ? sendClientWelcome(target.phone, target.display_name, target.email, newPassword, undefined, waInstance)
                 : Promise.resolve(null),
         ]);
 
         const emailSent = !!target.email && emailResult.status === 'fulfilled' && !!emailResult.value;
-        const whatsappSent = !!target.phone && whatsappResult.status === 'fulfilled';
+        const whatsappSent = !!target.phone && whatsappResult.status === 'fulfilled' && whatsappResult.value === true;
 
         if (emailResult.status === 'rejected') {
             console.error('Resend credentials email failed:', emailResult.reason);
@@ -894,7 +896,7 @@ router.post('/alta-rapida', requireRole('admin', 'super_admin', 'reception'), as
                     [validation.data.classId],
                 );
                 // Correo con el link solo si Resend está configurado (la función no lanza).
-                await sendAccesoAlumnaEmail({
+                if (r.user.email) await sendAccesoAlumnaEmail({
                     to: r.user.email, clientName: r.user.display_name, url: r.acceso.url,
                     clase: c ? `${c.nombre} el ${c.fecha} a las ${c.hora}` : null,
                 });
@@ -1035,6 +1037,20 @@ router.put('/:id', async (req: Request, res: Response) => {
         }
 
         const data = validation.data;
+        if (data.phone !== undefined || data.email !== undefined) {
+            const target = await queryOne<{ role: string; email: string | null; phone: string | null }>(
+                'SELECT role, email, phone FROM users WHERE id=$1', [id]);
+            if (!target) return res.status(404).json({ error: 'Usuario no encontrado' });
+            if (target.role === 'client' && data.phone !== undefined) {
+                const phone = ClientPhoneSchema.safeParse(data.phone);
+                if (!phone.success) return res.status(400).json({ error: 'WhatsApp inválido: usa 10 dígitos o la lada +52' });
+                data.phone = phone.data;
+            }
+            const nextEmail = data.email === undefined ? target.email : data.email;
+            if (nextEmail === null && (target.role !== 'client' || !ClientPhoneSchema.safeParse(data.phone ?? target.phone).success)) {
+                return res.status(400).json({ error: 'Se requiere correo o un WhatsApp válido para la clienta.' });
+            }
+        }
 
         // Build dynamic update query
         const updates: string[] = [];
@@ -1046,7 +1062,7 @@ router.put('/:id', async (req: Request, res: Response) => {
             values.push(data.displayName);
         }
         if (data.email !== undefined) {
-            const normalizedEmail = data.email.trim().toLowerCase();
+            const normalizedEmail = data.email;
             const taken = await queryOne<{ id: string }>(
                 `SELECT id FROM users WHERE lower(email) = $1 AND id <> $2`,
                 [normalizedEmail, id]
@@ -1132,6 +1148,7 @@ router.put('/:id', async (req: Request, res: Response) => {
             user
         });
     } catch (error) {
+        if ((error as any)?.code === '23505') return res.status(409).json({ error: 'Correo o teléfono ya registrado', code: 'YA_EXISTE' });
         console.error('Update user error:', error);
         res.status(500).json({ error: 'Error al actualizar usuario' });
     }

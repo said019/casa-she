@@ -30,6 +30,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { BotonAccesoWhatsApp } from '@/components/clients/BotonAccesoWhatsApp';
 import api, { getErrorMessage } from '@/lib/api';
+import { normalizeLoginPhone, optionalClientEmailSchema } from '@/lib/loginIdentity';
 import { useIsElevated } from '@/hooks/useIsElevated';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import {
@@ -55,7 +56,7 @@ const mxn = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' 
 interface ClientRow {
     id: string;
     display_name: string;
-    email: string;
+    email: string | null;
     tags?: string[] | null;
     reception_notes?: string | null;
     health_notes?: string | null;
@@ -112,15 +113,16 @@ function NewClientDialog({ onCreated }: { onCreated: () => void }) {
     const create = useMutation({
         mutationFn: async () => {
             const res = await api.post('/users', {
-                email: form.email.trim(),
+                email: form.email.trim() || undefined,
                 displayName: form.displayName.trim(),
-                phone: form.phone.trim(),
+                phone: normalizeLoginPhone(form.phone),
                 acceptsCommunications: true,
             });
             return res.data;
         },
-        onSuccess: () => {
-            toast.success('Usuario registrado. Recibió un correo con su contraseña temporal.');
+        onSuccess: (data) => {
+            const channels = [data.whatsappSent && 'WhatsApp', data.emailSent && 'correo'].filter(Boolean);
+            toast.success(channels.length ? `Usuario registrado. Acceso enviado por ${channels.join(' y ')}.` : 'Usuario registrado. Comparte su link de acceso desde la ficha.');
             setForm({ email: '', displayName: '', phone: '' });
             setOpen(false);
             onCreated();
@@ -148,7 +150,7 @@ function NewClientDialog({ onCreated }: { onCreated: () => void }) {
                             placeholder="Nombre Apellido" />
                     </div>
                     <div className="space-y-1">
-                        <Label htmlFor="nc-email">Email</Label>
+                        <Label htmlFor="nc-email">Correo (opcional)</Label>
                         <Input id="nc-email" type="email" value={form.email}
                             onChange={(e) => setForm({ ...form, email: e.target.value })}
                             placeholder="usuario@correo.com" />
@@ -166,9 +168,9 @@ function NewClientDialog({ onCreated }: { onCreated: () => void }) {
                         onClick={() => create.mutate()}
                         disabled={
                             create.isPending ||
-                            !form.email.trim() ||
+                            !optionalClientEmailSchema.safeParse(form.email).success ||
                             !form.displayName.trim() ||
-                            form.phone.trim().length < 8
+                            !normalizeLoginPhone(form.phone)
                         }
                     >
                         {create.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
@@ -823,7 +825,11 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
     const resendCredentials = useMutation({
         mutationFn: async () =>
             api.post(`/users/${client!.id}/resend-credentials`, elevated ? { whatsappKey: waKey } : {}),
-        onSuccess: () => toast.success('Credenciales enviadas por WhatsApp y email'),
+        onSuccess: (res) => {
+            const channels = [res.data.whatsappSent && 'WhatsApp', res.data.emailSent && 'correo'].filter(Boolean);
+            if (channels.length) toast.success(`Credenciales enviadas por ${channels.join(' y ')}.`);
+            else toast.error('No se pudieron entregar las credenciales. Comparte el link de acceso desde la ficha.');
+        },
         onError: (e) => toast.error(getErrorMessage(e)),
     });
 
@@ -859,7 +865,7 @@ function ClientDrawer({ client, onClose }: { client: ClientRow | null; onClose: 
                                 <h3 className="font-medium">Información</h3>
                                 {!editingInfo ? (
                                     <Button variant="ghost" size="sm" onClick={() => {
-                                        setForm({ displayName: client.display_name, email: client.email, phone: client.phone });
+                                        setForm({ displayName: client.display_name, email: client.email || '', phone: client.phone });
                                         setEditingInfo(true);
                                     }}>
                                         <Pencil className="h-3 w-3 mr-1" /> Editar

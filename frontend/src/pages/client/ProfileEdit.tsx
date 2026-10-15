@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { clientPhoneSchema } from '@/lib/loginIdentity';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { ClientLayout } from '@/components/layout/ClientLayout';
@@ -22,11 +23,7 @@ import { Camera, Loader2 } from 'lucide-react';
 
 const profileSchema = z.object({
   displayName: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-  phone: z
-    .string()
-    .regex(/^\+52[0-9]{10}$/, 'Formato: +52 seguido de 10 dígitos')
-    .optional()
-    .or(z.literal('')),
+  phone: clientPhoneSchema,
   dateOfBirth: z.string().optional().or(z.literal('')),
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),
@@ -60,7 +57,6 @@ export default function ProfileEdit() {
     register,
     handleSubmit,
     reset,
-    setValue,
     formState: { errors },
   } = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
@@ -157,25 +153,6 @@ export default function ProfileEdit() {
   const initials = (data?.user?.display_name || authUser?.display_name || '?')
     .split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
-  const handlePhoneChange = (event: ChangeEvent<HTMLInputElement>) => {
-    let value = event.target.value;
-    value = value.replace(/[^\d+]/g, '');
-    if (!value.startsWith('+52') && value.length > 0) {
-      if (value.startsWith('52')) {
-        value = `+${value}`;
-      } else if (value.startsWith('+')) {
-        value = `+52${value.substring(1)}`;
-      } else {
-        value = `+52${value}`;
-      }
-    }
-    if (value.length > 13) {
-      value = value.substring(0, 13);
-    }
-    event.target.value = value;
-    setValue('phone', value, { shouldValidate: true });
-  };
-
   const onSubmit = (values: ProfileForm) => {
     if (!authUser?.id) return;
     const payload: UpdateProfileData = {
@@ -263,7 +240,7 @@ export default function ProfileEdit() {
 
                   <div className="space-y-2">
                     <Label htmlFor="phone">Teléfono</Label>
-                    <Input id="phone" {...register('phone', { onChange: handlePhoneChange })} />
+                    <Input id="phone" type="tel" {...register('phone')} />
                     {errors.phone && (
                       <p className="text-xs text-destructive">{errors.phone.message}</p>
                     )}

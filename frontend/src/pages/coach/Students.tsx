@@ -19,7 +19,7 @@ import { esCanal } from '@/lib/canales';
 interface Student {
     user_id: string;
     display_name: string;
-    email: string;
+    email: string | null;
     phone: string | null;
     photo_url: string | null;
     total_classes: number;
@@ -71,7 +71,7 @@ export default function CoachStudents() {
         ? students.filter(
               (s) =>
                   s.display_name.toLowerCase().includes(search.toLowerCase()) ||
-                  s.email.toLowerCase().includes(search.toLowerCase()) ||
+                  (s.email || '').toLowerCase().includes(search.toLowerCase()) ||
                   (s.phone && s.phone.includes(search)),
           )
         : students;

@@ -18,11 +18,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, UserPlus, Info, Search, UserCheck, X } from 'lucide-react';
 import api from '@/lib/api';
+import { clientPhoneSchema, optionalClientEmailSchema } from '@/lib/loginIdentity';
 
 const newClientSchema = z.object({
   displayName: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-  email: z.string().email('Email inválido'),
-  phone: z.string().min(8, 'Teléfono inválido'),
+  email: optionalClientEmailSchema,
+  phone: clientPhoneSchema,
   password: z.string().min(8, 'Mínimo 8 caracteres').optional().or(z.literal('')),
   dateOfBirth: z.string().optional().or(z.literal('')),
   acceptsCommunications: z.boolean().default(false),
@@ -35,7 +36,7 @@ type NewClientForm = z.infer<typeof newClientSchema>;
 interface ExistingClient {
   id: string;
   display_name: string;
-  email: string;
+  email: string | null;
   phone: string;
 }
 
@@ -108,7 +109,7 @@ export const NewClientForm = ({ onSubmit, isLoading, onCancel }: NewClientFormPr
     setSearchTerm('');
     // Auto-fill form
     setValue('displayName', client.display_name);
-    setValue('email', client.email);
+    setValue('email', client.email || '');
     setValue('phone', client.phone);
   };
 
@@ -130,7 +131,7 @@ export const NewClientForm = ({ onSubmit, isLoading, onCancel }: NewClientFormPr
           <strong>Usuario Nuevo:</strong> Solo se creará la cuenta del usuario.
           Para asignarle una membresía, deberás realizar una venta desde "Ventas" o activar
           una membresía manualmente desde "Membresías".
-          Al crear el usuario, se le enviará un <strong>correo y WhatsApp</strong> con sus datos de acceso.
+          Puede entrar con su <strong>WhatsApp y contraseña</strong>. Intentaremos enviar sus datos de acceso por WhatsApp y, si lo registra, correo.
         </AlertDescription>
       </Alert>
 
@@ -228,7 +229,7 @@ export const NewClientForm = ({ onSubmit, isLoading, onCancel }: NewClientFormPr
 
           <div className="space-y-2">
             <Label htmlFor="email">
-              Email <span className="text-destructive">*</span>
+              Correo (opcional)
             </Label>
             <Input
               id="email"

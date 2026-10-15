@@ -146,7 +146,7 @@ test('editar vigencia existente conserva motivo y membresía asociada', async ({
 async function register(page: Page) {
     await page.getByRole('button', { name: 'Registrar cliente', exact: true }).click();
     await page.getByLabel('Nombre completo', { exact: true }).fill('Laura Nueva');
-    await page.getByLabel('Correo', { exact: true }).fill('laura@example.test');
+    await page.getByLabel('Correo (opcional)', { exact: true }).fill('laura@example.test');
     await page.getByLabel('WhatsApp', { exact: true }).fill('5512345670');
     await page.getByRole('button', { name: 'Crear cliente', exact: true }).click();
 }

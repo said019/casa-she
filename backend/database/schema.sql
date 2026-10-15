@@ -65,7 +65,7 @@ CREATE TYPE wallet_platform AS ENUM ('apple', 'google');
 -- ----------------------------------------
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    email VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE,
     phone VARCHAR(20) NOT NULL,
     display_name VARCHAR(255) NOT NULL,
     photo_url TEXT,

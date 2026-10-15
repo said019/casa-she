@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 const loginSchema = z.object({
-    email: z.string().email('Email inválido'),
+    identifier: z.string().trim().min(1, 'Ingresa tu correo o WhatsApp'),
     password: z.string().min(1, 'La contraseña es requerida'),
 });
 
@@ -83,7 +83,7 @@ export default function Login() {
 
     const onSubmit = async (data: LoginForm) => {
         try {
-            await login(data as any);
+            await login({ identifier: data.identifier!, password: data.password! });
         } catch {
             // Error is handled by the store
         }
@@ -120,20 +120,21 @@ export default function Login() {
                     transition={{ duration: 0.28, delay: 0.08, ease: easeOut }}
                     className="space-y-2"
                 >
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="identifier">Correo o WhatsApp</Label>
                     <div className="relative">
                         <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-bmb-dark/40" />
                         <Input
-                            id="email"
-                            type="email"
-                            placeholder="tu@email.com"
+                            id="identifier"
+                            type="text"
+                            autoComplete="username"
+                            placeholder="tu@email.com o 55 1234 5678"
                             className={fieldClass}
-                            {...register('email')}
+                            {...register('identifier')}
                             disabled={isLoading}
                         />
                     </div>
-                    {errors.email && (
-                        <p className="text-sm text-destructive">{errors.email.message}</p>
+                    {errors.identifier && (
+                        <p className="text-sm text-destructive">{errors.identifier.message}</p>
                     )}
                 </motion.div>
 

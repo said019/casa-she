@@ -216,7 +216,7 @@ export async function sendCancellationNotice(
 export async function sendClientWelcome(
     phone: string,
     clientName: string,
-    email: string,
+    email: string | null,
     tempPassword: string,
     facilityName?: string,
     // Instancia explícita (sucursal) para mandar; si se da, gana sobre facilityName.
@@ -228,7 +228,8 @@ export async function sendClientWelcome(
     const message = `🎉 *¡Bienvenida a Casa Shé!*\n\n` +
         `Hola ${clientName}!\n\n` +
         `Tu cuenta ha sido creada. Aquí están tus datos de acceso:\n\n` +
-        `📧 *Email:* ${email}\n` +
+        `📱 *WhatsApp para iniciar sesión:* ${phone}\n` +
+        (email ? `📧 *También puedes usar tu correo:* ${email}\n` : '') +
         `🔑 *Contraseña:* ${tempPassword}\n\n` +
         `Ingresa a la app y cambia tu contraseña en tu primer acceso.\n\n` +
         `¡Te esperamos en el studio! 🧘✨`;

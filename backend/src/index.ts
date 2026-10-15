@@ -41,6 +41,7 @@ import discountCodeRoutes from './routes/discount-codes.js';
 import evolutionRoutes from './routes/evolution.js';
 import webhookEvolutionRoutes from './routes/webhook-evolution.js';
 import migrationRoutes from './routes/migrations.js';
+import { clientIdentityDDL } from './lib/loginIdentity.js';
 import productRoutes from './routes/products.js';
 import barRoutes from './routes/bar.js';
 import salesRoutes from './routes/sales.js';
@@ -4508,6 +4509,7 @@ runStartupMigrations()
         await query(classIntensityDDL);
         await query(companionDDL);
         await query(calendarMembershipDDL);
+        await query(clientIdentityDDL);
         app.listen(PORT, () => {
             console.log(`
 🚀 Casa Shé API Server
