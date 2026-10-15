@@ -15,6 +15,19 @@ try {
     const adminLogin = await request('/auth/login', { email: 'whatsapp-admin@test.local', password });
     const token = adminLogin.json.token;
     assert.ok(token);
+    const staff = await request('/users/reception', { email: 'new-staff-whatsapp@test.local', display_name: 'Nueva Recepción', password }, token);
+    assert.equal(staff.status, 201, `staff without phone: ${JSON.stringify(staff.json)}`);
+    await sql(`INSERT INTO users(email,phone,display_name,role,password_hash,is_active)
+        VALUES('sentinel-staff1@test.local','0000000000','Staff Sentinel','reception',$1,true),
+              ('sentinel-staff2@test.local','0000000000','Staff Sentinel Dos','reception',$1,true)`, [hash]);
+    const sentinel = (await sql(`SELECT id FROM users WHERE email='sentinel-staff1@test.local'`))[0];
+    const staffEdit = await http(srv.api, 'PUT', `/users/${sentinel.id}`, token, { email: 'sentinel-edited@test.local' });
+    assert.equal(staffEdit.status, 200, JSON.stringify(staffEdit.json));
+    for (const phone of ['0000000000', '+520000000000', '5210000000000']) {
+        assert.equal((await sql('SELECT normalize_login_phone($1) AS phone', [phone]))[0].phone, null);
+        assert.equal((await request('/users', { displayName: 'No Sentinel', phone, password }, token)).status, 400);
+        assert.equal((await request('/auth/login', { identifier: phone, password })).status, 401);
+    }
     const created = await request('/users', { displayName: 'Sin Correo', phone: '5577000001', password }, token);
     assert.equal(created.status, 201, `standalone optional email: ${JSON.stringify(created.json)}`);
     const id = created.json.user.id;

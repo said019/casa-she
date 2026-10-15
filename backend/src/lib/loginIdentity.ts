@@ -5,6 +5,9 @@ export function normalizeLoginPhone(value: string): string | null {
     const text = value.trim();
     if (!/^\+?[0-9 ()-]+$/.test(text)) return null;
     const digits = text.replace(/[ ()-]/g, '').replace(/^\+/, '');
+    // Legacy staff use this sentinel when no phone was supplied. It is never
+    // an account identity, with or without a Mexican country-code prefix.
+    if (/^(?:52|521)?0{10}$/.test(digits)) return null;
     if (/^[0-9]{10}$/.test(digits) && !text.startsWith('+')) return digits;
     if (/^52[0-9]{10}$/.test(digits)) return digits.slice(2);
     if (/^521[0-9]{10}$/.test(digits)) return digits.slice(3);
@@ -28,6 +31,7 @@ BEGIN
     IF original IS NULL OR original !~ '^\\+?[0-9 ()-]+$' THEN RETURN NULL; END IF;
     cleaned := regexp_replace(original, '[ ()-]', '', 'g');
     cleaned := regexp_replace(cleaned, '^\\+', '');
+    IF cleaned ~ '^(52|521)?0{10}$' THEN RETURN NULL; END IF;
     IF cleaned ~ '^[0-9]{10}$' AND left(original,1) <> '+' THEN RETURN cleaned; END IF;
     IF cleaned ~ '^52[0-9]{10}$' THEN RETURN substr(cleaned,3); END IF;
     IF cleaned ~ '^521[0-9]{10}$' THEN RETURN substr(cleaned,4); END IF;
