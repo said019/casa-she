@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { ClienteMembresiasDialog, type ClienteAgenda } from './ClienteMembresiasDialog';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Check, Copy, Loader2, MessageCircle } from 'lucide-react';
@@ -65,7 +65,7 @@ function fechaLarga(fecha: string): string {
  */
 export function DialogoAlumnaNueva({ clase, open, onOpenChange, nombreInicial = '', onInscrita }: Props) {
     const { toast } = useToast();
-    const navigate = useNavigate();
+    const [managed, setManaged] = useState<ClienteAgenda | null>(null);
     const queryClient = useQueryClient();
     const [nombre, setNombre] = useState('');
     const [telefono, setTelefono] = useState('');
@@ -84,6 +84,7 @@ export function DialogoAlumnaNueva({ clase, open, onOpenChange, nombreInicial = 
         setNombre(nombreInicial.trim());
         setTelefono(''); setEmail(''); setPlanId(''); setMetodo('cash'); setMandarAcceso(true);
         setExistente(null); setListo(null); setCopiado(false);
+        setManaged(null);
         enCurso.current = false;
     }, [open, nombreInicial]);
 
@@ -149,9 +150,7 @@ export function DialogoAlumnaNueva({ clase, open, onOpenChange, nombreInicial = 
     };
 
     const abrirFicha = (userId: string) => {
-        onOpenChange(false);
-        const enRecepcion = window.location.pathname.startsWith('/reception');
-        navigate(enRecepcion ? `/reception/clientes?focus=${userId}` : `/admin/members/${userId}`);
+        setManaged({ id: userId, display_name: existente?.nombre ?? nombre });
     };
 
     const datosMensaje = clase && listo ? {
@@ -182,6 +181,8 @@ export function DialogoAlumnaNueva({ clase, open, onOpenChange, nombreInicial = 
         const quedan = creditos === null ? 'ilimitadas' : `le quedan ${Math.max(creditos - 1, 0)}`;
         return `${listo.plan.name} cobrado en ${m} · ${quedan}`;
     };
+
+    if (managed) return <ClienteMembresiasDialog cliente={managed} open={open} onOpenChange={onOpenChange} classId={clase?.id} onBooked={onInscrita} />;
 
     return (
         <Dialog open={open} onOpenChange={(v) => { if (!registrar.isPending) onOpenChange(v); }}>
@@ -222,7 +223,7 @@ export function DialogoAlumnaNueva({ clase, open, onOpenChange, nombreInicial = 
                                         {existente.nombre ? <><strong>{existente.nombre}</strong> ya está registrada</> : 'Ya existe una cuenta registrada'} con ese {existente.coincidencia === 'email' ? 'correo' : 'teléfono'}.
                                     </p>
                                     {existente.userId && (
-                                        <Button type="button" size="sm" onClick={() => abrirFicha(existente.userId!)}>Abrir su ficha</Button>
+                                        <Button type="button" size="sm" onClick={() => abrirFicha(existente.userId!)}>Gestionar cliente existente</Button>
                                     )}
                                 </div>
                             )}

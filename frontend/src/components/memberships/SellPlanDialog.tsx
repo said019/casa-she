@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api, { getErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useIsElevated } from '@/hooks/useIsElevated';
 import { getMembershipPaymentMethods } from '@/lib/membershipPaymentMethods';
-import { addDaysForInput } from '@/lib/date';
+import { addDaysForInput, studioTodayForInput } from '@/lib/date';
+import { Input } from '@/components/ui/input';
 import { planClassLabel } from '@/lib/credits';
 import { ManualPriceAdjustmentFields } from '@/components/payments/ManualPriceAdjustmentFields';
 import { calculateManualDiscount, MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH, type ManualDiscountType } from '@/lib/manualDiscount';
@@ -26,6 +27,8 @@ interface Plan {
     currency: string;
     duration_days: number;
     class_limit: number | null;
+    is_active?: boolean;
+    is_internal?: boolean;
 }
 
 interface SellPlanDialogProps {
@@ -34,9 +37,10 @@ interface SellPlanDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onSold?: () => void;
+    calendarMode?: boolean;
 }
 
-export default function SellPlanDialog({ userId, userName, open, onOpenChange, onSold }: SellPlanDialogProps) {
+export default function SellPlanDialog({ userId, userName, open, onOpenChange, onSold, calendarMode = false }: SellPlanDialogProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const isElevated = useIsElevated();
@@ -50,9 +54,13 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
     const [discountValue, setDiscountValue] = useState('');
     const [assignStartDate, setAssignStartDate] = useState('');
     const [assignEndDate, setAssignEndDate] = useState('');
+    const [endEdited, setEndEdited] = useState(false);
+    const [paymentDate, setPaymentDate] = useState(studioTodayForInput());
+    const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+    const attempt = useRef<{ payload: string; key: string } | null>(null);
     const isGratis = paymentMethod === 'gratis';
 
-    const { data: plans } = useQuery<Plan[]>({
+    const { data: plans, isLoading, isError, refetch } = useQuery<Plan[]>({
         queryKey: ['plans'],
         queryFn: async () => (await api.get('/plans')).data,
     });
@@ -68,39 +76,52 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
             setDiscountValue('');
             setAssignStartDate('');
             setAssignEndDate('');
+            setEndEdited(false);
+            setPaymentDate(studioTodayForInput());
+            setPaymentConfirmed(false);
+            attempt.current = null;
         }
     }, [open]);
 
-    // Vencimiento = inicio + duración del plan, SIEMPRE automático (no editable a mano).
-    // Si quieren otra vigencia, que cambien el plan. Se recalcula al cambiar inicio o plan.
+    // La agenda permite conservar un vencimiento acordado; los demás consumidores
+    // mantienen el cálculo automático existente.
     const selectedPlan = plans?.find((p) => p.id === selectedPlanId);
     const adjustment = calculateManualDiscount(selectedPlan?.price ?? 0, discountEnabled && !isGratis, discountType, discountValue);
     const adjustmentNeedsComment = isGratis || discountEnabled;
     const adjustmentValid = (!discountEnabled || adjustment.valid) &&
         (!adjustmentNeedsComment || assignReason.trim().length >= MANUAL_ADJUSTMENT_COMMENT_MIN_LENGTH);
     useEffect(() => {
+        if (calendarMode && endEdited) return;
         if (selectedPlan?.duration_days && assignStartDate) {
             setAssignEndDate(addDaysForInput(assignStartDate, selectedPlan.duration_days));
         } else {
             setAssignEndDate('');
         }
-    }, [selectedPlan?.duration_days, assignStartDate]);
+    }, [selectedPlan?.duration_days, assignStartDate, calendarMode, endEdited]);
 
     const assignMutation = useMutation({
-        mutationFn: async () => api.post('/memberships/assign', {
-            userId,
-            planId: selectedPlanId,
-            status: 'active',
-            paymentMethod,
-            startDate: assignStartDate,
-            endDate: assignEndDate || undefined,
-            reason: adjustmentNeedsComment ? assignReason.trim() : undefined,
-            ...(!isGratis && discountEnabled ? {
-                discountType,
-                discountValue: Number(discountValue),
-            } : {}),
-        }),
+        mutationFn: async () => {
+            const payload = {
+                userId,
+                planId: selectedPlanId,
+                status: 'active',
+                paymentMethod,
+                startDate: assignStartDate,
+                endDate: assignEndDate || undefined,
+                ...(calendarMode ? { paymentDate, respectExplicitDates: true } : {}),
+                reason: adjustmentNeedsComment ? assignReason.trim() : undefined,
+                ...(!isGratis && discountEnabled ? {
+                    discountType,
+                    discountValue: Number(discountValue),
+                } : {}),
+            };
+            if (!calendarMode) return api.post('/memberships/assign', payload);
+            const serialized = JSON.stringify(payload);
+            if (attempt.current?.payload !== serialized) attempt.current = { payload: serialized, key: crypto.randomUUID() };
+            return api.post('/memberships/assign', { ...payload, idempotencyKey: attempt.current.key });
+        },
         onSuccess: () => {
+            attempt.current = null;
             queryClient.invalidateQueries({ queryKey: ['users'] });
             toast({ title: 'Plan asignado', description: 'El plan se asignó correctamente.' });
             onOpenChange(false);
@@ -113,7 +134,7 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Vender / asignar plan</DialogTitle>
                     <DialogDescription>
@@ -122,6 +143,8 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">
+                    {isLoading && <p role="status">Cargando planes…</p>}
+                    {isError && <p role="alert">No se pudieron cargar los planes. <Button variant="outline" onClick={() => refetch()}>Reintentar</Button></p>}
                     <div className="space-y-2">
                         <Label htmlFor="sell-plan">Plan</Label>
                         <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
@@ -129,7 +152,7 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
                                 <SelectValue placeholder="Selecciona un plan" />
                             </SelectTrigger>
                             <SelectContent>
-                                {plans?.map((plan) => (
+                                {plans?.filter(p => !calendarMode || (!p.is_internal && p.is_active !== false)).map((plan) => (
                                     <SelectItem key={plan.id} value={plan.id}>
                                         {plan.name} - ${plan.price} {plan.currency} ({plan.duration_days} días)
                                     </SelectItem>
@@ -138,13 +161,17 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
                         </Select>
                     </div>
 
-                    <MembershipStartPicker
+                    {calendarMode ? <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="space-y-1">Inicio de vigencia<Input aria-label="Inicio de vigencia" type="date" value={assignStartDate} onChange={e => setAssignStartDate(e.target.value)} /></label>
+                        <label className="space-y-1">Fin de vigencia<Input aria-label="Fin de vigencia" type="date" min={assignStartDate} value={assignEndDate} onChange={e => { setEndEdited(true); setAssignEndDate(e.target.value); }} /></label>
+                        <label className="space-y-1">Fecha de pago<Input aria-label="Fecha de pago" type="date" max={studioTodayForInput()} value={paymentDate} onChange={e => setPaymentDate(e.target.value)} /></label>
+                    </div> : <MembershipStartPicker
                         id="sell-start"
                         value={assignStartDate}
                         onChange={setAssignStartDate}
                         durationDays={selectedPlan?.duration_days}
                         disabled={assignMutation.isPending}
-                    />
+                    />}
 
                     <div className="space-y-2">
                         <Label htmlFor="sell-method">Método de pago</Label>
@@ -173,6 +200,7 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
                         onDiscountValueChange={setDiscountValue}
                         onCommentChange={setAssignReason}
                     />
+                    {calendarMode && !isGratis && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={paymentConfirmed} onChange={e => setPaymentConfirmed(e.target.checked)} />Confirmo que el pago ya fue recibido</label>}
 
                     {selectedPlan && (
                         <div className="p-3 bg-muted rounded-md text-sm">
@@ -194,6 +222,7 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
                         disabled={
                             !selectedPlanId ||
                             !assignStartDate ||
+                            (calendarMode && (!assignEndDate || assignEndDate < assignStartDate || !paymentDate || paymentDate > studioTodayForInput() || (!isGratis && !paymentConfirmed))) ||
                             assignMutation.isPending ||
                             !adjustmentValid
                         }

@@ -26,6 +26,11 @@ export interface Attendee {
     /** 'app' | 'totalpass' | 'wellhub' | 'fitpass' — de dónde vino la reserva. */
     channel?: string | null;
     totalpass_checkin_confirmed?: boolean;
+    membership_summary?: {
+        membership_id: string; owner_id: string; plan_name: string; status: string;
+        start_date: string | null; end_date: string | null; attended: number; reserved: number;
+        reformer_remaining: number | null; multi_remaining: number | null;
+    } | null;
 }
 
 /** Lo que devuelve /classes/copy-week, en vista previa y en la copia real. */
