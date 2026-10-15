@@ -1657,7 +1657,8 @@ router.get('/class/:classId', authenticate, requireRole('admin', 'instructor', '
                     'membership_id', m.id, 'owner_id', m.user_id, 'plan_name', p.name,
                     'status', m.status, 'start_date', m.start_date::text, 'end_date', m.end_date::text,
                     'attended', COALESCE(usage.attended, 0), 'reserved', COALESCE(usage.reserved, 0),
-                    'reformer_remaining', m.reformer_remaining, 'multi_remaining', m.multi_remaining
+                    'reformer_remaining', m.reformer_remaining, 'multi_remaining', m.multi_remaining,
+                    'reformer_credits', p.reformer_credits, 'multi_credits', p.multi_credits
                 ) END AS membership_summary,
                 b.booked_by,
                 bb.display_name as booked_by_name,

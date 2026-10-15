@@ -30,6 +30,7 @@ export interface Attendee {
         membership_id: string; owner_id: string; plan_name: string; status: string;
         start_date: string | null; end_date: string | null; attended: number; reserved: number;
         reformer_remaining: number | null; multi_remaining: number | null;
+        reformer_credits?: number | null; multi_credits?: number | null;
     } | null;
 }
 
