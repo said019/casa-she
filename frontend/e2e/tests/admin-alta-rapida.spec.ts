@@ -48,11 +48,11 @@ test.describe("Calendario de recepción – alumna nueva", () => {
 
     const alta = page.getByTestId("dialogo-alumna-nueva");
     await expect(alta.getByLabel("Nombre completo", { exact: true })).toHaveValue(nombre); // precargado con lo buscado
-    // Sin correo no se puede registrar.
+    // El correo es opcional, pero también se conserva el alta con correo.
     await alta.getByLabel("WhatsApp", { exact: true }).fill("55 1234 9876");
     await alta.getByRole("radio", { name: /Cortesía/ }).click();
-    await expect(alta.getByRole("button", { name: "Registrar, cobrar e inscribir" })).toBeDisabled();
-    await alta.getByLabel("Correo", { exact: true }).fill(correo);
+    await expect(alta.getByRole("button", { name: "Registrar, cobrar e inscribir" })).toBeEnabled();
+    await alta.getByLabel("Correo (opcional)", { exact: true }).fill(correo);
     await expect(alta.getByRole("button", { name: "Registrar, cobrar e inscribir" })).toBeEnabled();
     await expect(alta.getByRole("checkbox", { name: /acceso por WhatsApp/ })).toBeChecked();
     await alta.getByRole("button", { name: "Registrar, cobrar e inscribir" }).click();
@@ -96,10 +96,10 @@ test.describe("Calendario de recepción – alumna nueva", () => {
     await panel.getByRole("combobox", { name: /Buscar alumna/ }).fill(nombre);
     await panel.getByRole("button", { name: /Registrar alumna nueva/ }).click();
     await alta.getByLabel("WhatsApp", { exact: true }).fill("5599887711");
-    await alta.getByLabel("Correo", { exact: true }).fill(correo.toUpperCase());
+    await alta.getByLabel("Correo (opcional)", { exact: true }).fill(correo.toUpperCase());
     await alta.getByRole("radio", { name: /Cortesía/ }).click();
     await alta.getByRole("button", { name: "Registrar, cobrar e inscribir" }).click();
     await expect(alta.getByRole("alert")).toContainText("ya está registrada con ese correo");
-    await expect(alta.getByRole("button", { name: "Abrir su ficha" })).toBeVisible();
+    await expect(alta.getByRole("button", { name: "Gestionar cliente existente" })).toBeVisible();
   });
 });

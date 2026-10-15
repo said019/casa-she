@@ -46,3 +46,16 @@ await page.getByRole('button',{name:/Entrar/}).click();
 ## Decisiones y alcance
 
 El usuario aprobó explícitamente WhatsApp + contraseña, correo opcional, implementar/probar/publicar; no se requiere nueva aprobación de diseño. Se reutiliza checkout aislado limpio existente en /private/tmp/casa-oct14.F4GmSG/repo, sin tocar iCloud ni crear worktree nuevo. No OTP, cambio de proveedor, fusión de clientes ni edición manual de cuentas de producción.
+
+## Verificación previa a publicación — 15 de octubre de 2026
+
+- Tasks 1 y 2 completadas, con revisión de especificación y calidad aprobadas. La revisión final corrigió también el estado de entrega de WhatsApp: un resultado `false` ya no se reporta como enviado.
+- `backend npm run build` y `frontend npm run build`: PASS.
+- `npx tsx scripts/test-whatsapp-login.ts`: PASS, incluyendo correo nulo, normalización, contraseña incorrecta, identidades ambiguas, carreras, perfil, onboarding y compatibilidad del teléfono ficticio histórico de staff.
+- `npx tsx scripts/test-whatsapp-delivery.ts`: PASS, HTTP real local para creación y reenvío con proveedor de prueba que devuelve false sin contactar servicios externos.
+- `npm run test:calendar-membership`: 15 grupos PASS.
+- Runner de regresiones backend: 61/62 PASS inicialmente; onboarding se repitió después de corregir el teléfono ficticio de staff y pasó. Todas las 62 suites verificadas, incluidas reservas, membresías, FitPass y TotalPass.
+- Playwright `whatsapp-login.spec.ts calendar-client-memberships.spec.ts agenda-detail-profile.spec.ts --workers=2`: 48/48 PASS en escritorio y móvil. La primera ejecución detectó seis selectores antiguos `Correo`; se actualizaron a `Correo (opcional)` y se repitió la ejecución completa.
+- El typecheck independiente del frontend conserva cuatro errores preexistentes; no se añadieron errores nuevos. El build de producción pasa.
+- `./scripts/e2e-local.sh e2e/tests/admin-alta-rapida.spec.ts --project=chromium --workers=1`: PASS contra base desechable, incluyendo alta, enlace, creación de contraseña, entrada y detección de duplicado. Se actualizó además el selector antiguo de gestión del cliente existente.
+- Ninguna prueba creó clientes, reservas ni envió mensajes en producción. Publicación y comprobación de Railway pendientes al registrar esta evidencia.
