@@ -17,7 +17,7 @@ router.get('/cash-payments-today', authenticate, requireRole('admin'), async (_r
                 COUNT(*) as payments_today,
                 COALESCE(SUM(amount), 0) as amount_today
              FROM payments
-             WHERE DATE(created_at AT TIME ZONE 'America/Mexico_City') = studio_today()
+             WHERE DATE(COALESCE(paid_at, completed_at, created_at) AT TIME ZONE 'America/Mexico_City') = studio_today()
                AND payment_method IN ('cash', 'transfer')
                AND status = 'completed'`
         );

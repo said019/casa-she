@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { query, queryOne, pool } from '../config/database.js';
 import { logAction } from '../lib/audit.js';
+import { adjustMembershipCredits, MembershipCreditError } from '../lib/membershipCredits.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { z } from 'zod';
 import { sendMembershipActivatedEmail } from '../services/email.js';
@@ -9,7 +10,6 @@ import { sendMembershipActivatedNotice } from '../lib/whatsapp.js';
 import { awardPaymentLoyaltyPoints, reversePaymentLoyaltyPoints, consumeFounderFirstPackageDiscount } from '../lib/loyalty.js';
 import { notifyMembershipRenewed, notifyPointsEarnedExternal } from '../lib/notifications.js';
 import { sendWebPushToUser } from '../lib/web-push.js';
-import { hasPermission } from '../lib/permissions.js';
 import { isElevated } from '../lib/elevation.js';
 import { openShiftForUser } from '../lib/openShift.js';
 import { manualDiscountNote, resolveManualPriceAdjustment } from '../lib/manual-price-adjustment.js';
@@ -261,17 +261,19 @@ router.get('/', authenticate, requireRole('admin', 'super_admin', 'reception'), 
                   ELSE m.reformer_remaining + m.multi_remaining END as credits_remaining,
              ab.display_name as activated_by_name,
              pay.processed_by_name,
-             pay.provider as pay_provider
+             pay.provider as pay_provider,
+             pay.payment_date
       FROM memberships m
       JOIN users u ON m.user_id = u.id
       JOIN plans p ON m.plan_id = p.id
       LEFT JOIN users ab ON ab.id = m.activated_by
       LEFT JOIN LATERAL (
-          SELECT pu.display_name AS processed_by_name, pm.provider
+          SELECT pu.display_name AS processed_by_name, pm.provider,
+                 (COALESCE(pm.paid_at, pm.completed_at, pm.created_at) AT TIME ZONE 'America/Mexico_City')::date::text AS payment_date
           FROM payments pm
           LEFT JOIN users pu ON pu.id = pm.processed_by
-          WHERE pm.membership_id = m.id
-          ORDER BY pm.created_at DESC
+          WHERE pm.membership_id = m.id AND pm.status = 'completed'
+          ORDER BY COALESCE(pm.paid_at, pm.completed_at, pm.created_at) DESC, pm.created_at DESC
           LIMIT 1
       ) pay ON true
       WHERE 1=1
@@ -353,12 +355,15 @@ router.get('/pending', authenticate, requireRole('admin', 'super_admin', 'recept
 // POST /api/memberships/assign - Assign membership manually (Admin)
 // ============================================
 const AssignMembershipSchema = z.object({
+    idempotencyKey: z.string().min(16).max(128).regex(/^[A-Za-z0-9_-]+$/).optional(),
+    respectExplicitDates: z.boolean().default(false),
     userId: z.string().uuid(),
     planId: z.string().uuid(),
     // El staff debe elegir explícitamente si inicia hoy o en otra fecha.
     startDate: dateString,
     // Vencimiento explícito opcional: si no viene, se calcula start + plan.duration_days.
     endDate: dateString.optional(),
+    paymentDate: dateString.refine(value => value <= cdmxToday(), 'La fecha de pago no puede ser futura').optional(),
     status: z.enum(['active', 'pending_payment', 'pending_activation']).default('active'),
     paymentMethod: z.enum(['cash', 'transfer', 'card', 'online', 'bank_transfer', 'gratis']).optional(),
     // Motivo obligatorio cuando paymentMethod === 'gratis' (cortesía $0).
@@ -394,7 +399,10 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
             });
         }
 
-        const { userId, planId, startDate, endDate, status, paymentMethod, reason, discountType, discountValue, notes } = validation.data;
+        const { userId, planId, startDate, endDate, paymentDate, status, paymentMethod, reason, discountType, discountValue, notes } = validation.data;
+        if (endDate && endDate < startDate) return res.status(400).json({ error: 'El vencimiento no puede ser anterior al inicio.' });
+        if (paymentDate && !paymentMethod) return res.status(400).json({ error: 'La fecha de pago requiere un método de pago.' });
+        if (status === 'pending_payment' && paymentMethod) return res.status(400).json({ error: 'Una membresía pendiente de pago no puede registrar un pago completado.' });
 
         // Cortesía $0 ('gratis'): solo elevados (admin/super_admin o recepción master) y motivo obligatorio.
         const isGratis = paymentMethod === 'gratis';
@@ -409,7 +417,7 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
         }
 
         // Get plan details
-        const plan = await queryOne('SELECT * FROM plans WHERE id = $1', [planId]);
+        const plan = await queryOne('SELECT * FROM plans WHERE id = $1 AND is_active = true', [planId]);
         if (!plan) {
             return res.status(404).json({ error: 'Plan no encontrado' });
         }
@@ -429,9 +437,26 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
         try {
             await client.query('BEGIN');
 
+            const idempotencyKey = validation.data.idempotencyKey;
+            const requestHash = createHash('sha256').update(JSON.stringify(validation.data)).digest('hex');
+            if (idempotencyKey) {
+                await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`calendar-assign:${req.user!.userId}:${idempotencyKey}`]);
+                const previous = (await client.query(`SELECT request_hash, membership_id FROM membership_assignment_requests WHERE actor_id=$1 AND request_key=$2`, [req.user!.userId, idempotencyKey])).rows[0];
+                if (previous) {
+                    if (previous.request_hash !== requestHash) {
+                        await client.query('ROLLBACK');
+                        return res.status(409).json({ code: 'IDEMPOTENCY_CONFLICT', error: 'Esta solicitud ya se usó con otros datos.' });
+                    }
+                    const saved = (await client.query('SELECT * FROM memberships WHERE id=$1', [previous.membership_id])).rows[0];
+                    await client.query('COMMIT');
+                    return res.status(200).json(saved);
+                }
+            }
+
             // Membresía + pago + puntos: lógica compartida con el alta rápida (lib/asignarMembresia.ts).
             const asignada = await asignarMembresiaEnTx(client, {
                 userId, plan, startDate, endDate, status,
+                paymentDate, respectExplicitDates: validation.data.respectExplicitDates,
                 paymentMethod: paymentMethod === 'bank_transfer' ? 'transfer' : (paymentMethod || null),
                 isGratis, gratisReason, notes, manualAdjustment,
                 actorUserId: req.user?.userId ?? null,
@@ -440,6 +465,8 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
             const purchasePointsAwarded = asignada.purchasePointsAwarded;
             start = asignada.start;
             end = asignada.end;
+
+            if (idempotencyKey) await client.query(`INSERT INTO membership_assignment_requests(actor_id,request_key,request_hash,membership_id) VALUES ($1,$2,$3,$4)`, [req.user!.userId, idempotencyKey, requestHash, membership.id]);
 
             await client.query('COMMIT');
 
@@ -493,6 +520,7 @@ router.post('/assign', authenticate, requireRole('admin', 'super_admin', 'recept
                     user_id: membership.user_id,
                     status: membership.status,
                     payment_method: membership.payment_method,
+                    start_date: start, end_date: end, payment_date: paymentMethod ? (paymentDate ?? cdmxToday()) : null,
                     ...(isGratis ? { gratis: true, reason: gratisReason } : {}),
                     ...(manualAdjustment.applied ? {
                         discount_type: manualAdjustment.discountType,
@@ -1374,121 +1402,10 @@ router.patch('/:id/dates', authenticate, requireRole('admin', 'super_admin', 're
 // ============================================
 router.patch('/:id/credits', authenticate, requireRole('admin', 'super_admin', 'reception'), async (req: Request, res: Response) => {
     try {
-        const { id } = req.params;
-        const { classes_remaining, reformer_remaining, multi_remaining, reason } = req.body;
-        const role = req.user!.role;
-
-        // Validate each field present in the body
-        const validate = (name: string, val: unknown) => {
-            if (val !== undefined && val !== null && (typeof val !== 'number' || val < 0 || !Number.isInteger(val))) {
-                return `${name} debe ser un entero >= 0 o null`;
-            }
-            return null;
-        };
-        const errs = [
-            validate('classes_remaining', classes_remaining),
-            validate('reformer_remaining', reformer_remaining),
-            validate('multi_remaining', multi_remaining),
-        ].filter(Boolean);
-        if (errs.length) return res.status(400).json({ error: errs.join('; ') });
-
-        // At least one field must be present
-        if (classes_remaining === undefined && reformer_remaining === undefined && multi_remaining === undefined) {
-            return res.status(400).json({ error: 'Proporciona al menos uno: reformer_remaining, multi_remaining o classes_remaining' });
-        }
-
-        const membership = await queryOne('SELECT * FROM memberships WHERE id = $1', [id]);
-        if (!membership) {
-            return res.status(404).json({ error: 'Membresía no encontrada' });
-        }
-
-        // Reglas específicas para recepción: motivo obligatorio y |delta| ≤ 3 por bucket.
-        // Reception master y admin (o reception con creditos_sin_limite) no tienen límite de delta;
-        // motivo sigue obligatorio para recepción normal.
-        const meRow = await queryOne<{ role: string; permissions: unknown; is_reception_master: boolean }>(
-            `SELECT role, permissions, is_reception_master FROM users WHERE id = $1`, [req.user!.userId]
-        );
-        const sinLimite = hasPermission({ role: meRow?.role, permissions: meRow?.permissions, is_reception_master: meRow?.is_reception_master }, 'creditos_sin_limite');
-        if (!sinLimite) {
-            const reasonText = typeof reason === 'string' ? reason.trim() : '';
-            if (reasonText.length < 5) {
-                return res.status(400).json({ error: 'Recepción debe incluir un motivo (mínimo 5 caracteres) para ajustar créditos.' });
-            }
-            const checkDelta = (label: string, before: number | null | undefined, after: number | null | undefined) => {
-                if (after === undefined) return null;
-                const b = before == null ? 0 : Number(before);
-                const a = after == null ? 0 : Number(after);
-                const delta = Math.abs(a - b);
-                if (delta > 3) {
-                    return `Recepción solo puede ajustar hasta ±3 créditos por movimiento en ${label} (intentaste ±${delta}). Pide a admin.`;
-                }
-                return null;
-            };
-            const deltaErrs = [
-                checkDelta('reformer_remaining', (membership as any).reformer_remaining, reformer_remaining),
-                checkDelta('multi_remaining', (membership as any).multi_remaining, multi_remaining),
-                checkDelta('classes_remaining', (membership as any).classes_remaining, classes_remaining),
-            ].filter(Boolean);
-            if (deltaErrs.length) return res.status(403).json({ error: deltaErrs.join('; ') });
-        }
-
-        // Build dynamic SET clause for whichever fields are present
-        const setClauses: string[] = [];
-        const params: unknown[] = [];
-        if (reformer_remaining !== undefined) {
-            params.push(reformer_remaining);
-            setClauses.push(`reformer_remaining = $${params.length}`);
-        }
-        if (multi_remaining !== undefined) {
-            params.push(multi_remaining);
-            setClauses.push(`multi_remaining = $${params.length}`);
-        }
-        if (classes_remaining !== undefined) {
-            params.push(classes_remaining);
-            setClauses.push(`classes_remaining = $${params.length}`);
-        }
-        params.push(id);
-        const updated = await queryOne(
-            `UPDATE memberships SET ${setClauses.join(', ')}, updated_at = NOW() WHERE id = $${params.length} RETURNING *`,
-            params
-        );
-
-        // classes_remaining es DERIVADA (legacy/display): recomputar desde los buckets
-        // para que nunca quede desincronizada. Ninguna regla de reserva la usa.
-        await query(
-            `UPDATE memberships
-                SET classes_remaining = CASE
-                    WHEN reformer_remaining IS NULL OR multi_remaining IS NULL THEN NULL
-                    ELSE reformer_remaining + multi_remaining END
-              WHERE id = $1`,
-            [id]
-        );
-
-        const reasonText = typeof reason === 'string' && reason.trim() ? reason.trim() : null;
-        await logAction(query, {
-            adminUserId: req.user!.userId,
-            actionType: 'credits_modified',
-            entityType: 'membership',
-            entityId: id,
-            description: reasonText
-                ? `Ajuste de créditos por ${role}: ${reasonText}`
-                : `Ajuste de créditos por ${role}`,
-            oldData: {
-                reformer_remaining: (membership as any).reformer_remaining,
-                multi_remaining: (membership as any).multi_remaining,
-                classes_remaining: (membership as any).classes_remaining,
-            },
-            newData: {
-                reformer_remaining: (updated as any).reformer_remaining,
-                multi_remaining: (updated as any).multi_remaining,
-                classes_remaining: (updated as any).classes_remaining,
-                reason: reasonText,
-            },
-            req,
-        });
-
+        const updated = await adjustMembershipCredits(pool, req.params.id, req.body, req.user!, req);
         res.json(updated);
     } catch (error) {
+        if (error instanceof MembershipCreditError) return res.status(error.status).json({ error: error.message, ...(error.code ? { code: error.code } : {}) });
         console.error('Adjust credits error:', error);
         res.status(500).json({ error: 'Error al ajustar créditos' });
     }

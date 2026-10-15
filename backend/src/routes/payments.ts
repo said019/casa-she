@@ -42,7 +42,7 @@ const buildPaymentsQuery = (status?: string, search?: string, startDate?: string
       p.notes,
       p.status,
       p.processed_by,
-      COALESCE(p.completed_at, p.created_at) as created_at,
+      COALESCE(p.paid_at, p.completed_at, p.created_at) as created_at,
       u.display_name as user_name,
       u.email as user_email,
       pl.name as plan_name
@@ -71,12 +71,12 @@ const buildPaymentsQuery = (status?: string, search?: string, startDate?: string
     }
 
     if (startDate) {
-        queryStr += ` AND COALESCE(p.completed_at, p.created_at) >= $${paramCount++}`;
+        queryStr += ` AND COALESCE(p.paid_at, p.completed_at, p.created_at) >= $${paramCount++}`;
         params.push(startDate);
     }
 
     if (endDate) {
-        queryStr += ` AND COALESCE(p.completed_at, p.created_at) <= $${paramCount++}`;
+        queryStr += ` AND COALESCE(p.paid_at, p.completed_at, p.created_at) <= $${paramCount++}`;
         params.push(endDate);
     }
 
@@ -85,7 +85,7 @@ const buildPaymentsQuery = (status?: string, search?: string, startDate?: string
         params.push(paymentMethod);
     }
 
-    queryStr += ` ORDER BY COALESCE(p.completed_at, p.created_at) DESC`;
+    queryStr += ` ORDER BY COALESCE(p.paid_at, p.completed_at, p.created_at) DESC`;
 
     return { queryStr, params };
 };
@@ -262,11 +262,11 @@ router.get('/reports', async (req: Request, res: Response) => {
         let paramCount = 1;
 
         if (startDate) {
-            dateFilter += ` AND COALESCE(transaction_date, created_at) >= $${paramCount++}`;
+            dateFilter += ` AND COALESCE(paid_at, completed_at, created_at) >= $${paramCount++}`;
             params.push(startDate);
         }
         if (endDate) {
-            dateFilter += ` AND COALESCE(transaction_date, created_at) <= $${paramCount++}`;
+            dateFilter += ` AND COALESCE(paid_at, completed_at, created_at) <= $${paramCount++}`;
             params.push(endDate);
         }
 

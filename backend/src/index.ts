@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import { pool } from './config/database.js';
 import { classIntensityDDL } from './lib/classIntensity.js';
 import { companionDDL } from './lib/companionSchema.js';
+import { calendarMembershipDDL } from './lib/calendarMembershipSchema.js';
 import companionRoutes from './routes/companions.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
@@ -4506,6 +4507,7 @@ runStartupMigrations()
         // class reads. Never accept traffic before this succeeds.
         await query(classIntensityDDL);
         await query(companionDDL);
+        await query(calendarMembershipDDL);
         app.listen(PORT, () => {
             console.log(`
 🚀 Casa Shé API Server

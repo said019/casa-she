@@ -582,9 +582,9 @@ router.post('/:id/founder/reset', requireRole('admin', 'super_admin'), async (re
 // POST /api/users - Create new user (admin only)
 // ============================================
 const CreateMemberSchema = z.object({
-    email: z.string().email('Email inválido'),
-    displayName: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-    phone: z.string().min(8, 'Teléfono inválido'),
+    email: z.string().trim().toLowerCase().email('Email inválido'),
+    displayName: z.string().trim().min(2, 'El nombre debe tener al menos 2 caracteres'),
+    phone: z.string().transform(value => value.replace(/\D/g, '').slice(-10)).refine(value => value.length === 10, 'Teléfono inválido'),
     password: z.string().min(8).optional(),
     dateOfBirth: z.string().optional(),
     acceptsCommunications: z.boolean().optional().default(false),
@@ -617,14 +617,13 @@ router.post('/', requireRole('admin', 'super_admin', 'reception'), async (req: R
             }
         }
 
-        const existingUser = await queryOne<User>('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
-        if (existingUser) {
-            return res.status(409).json({ error: 'Email ya registrado' });
-        }
-
-        const existingPhone = await queryOne<User>('SELECT id FROM users WHERE phone = $1', [phone]);
-        if (existingPhone) {
-            return res.status(409).json({ error: 'Teléfono ya registrado' });
+        const matches = await query<{ id: string; display_name: string; role: string }>(
+            `SELECT id, display_name, role FROM users WHERE lower(trim(email))=$1
+                OR right(regexp_replace(COALESCE(phone,''), '\\D', '', 'g'),10)=$2 LIMIT 2`, [email, phone]);
+        if (matches.length) {
+            const existing = matches.length === 1 && matches[0].role === 'client' ? matches[0] : null;
+            return res.status(409).json({ error: 'Correo o teléfono ya registrado', code: 'YA_EXISTE',
+                ...(existing ? { existingUser: { id: existing.id, display_name: existing.display_name } } : {}) });
         }
 
         const generatedPassword = password || randomBytes(6).toString('base64url');

@@ -39,7 +39,7 @@ router.get('/overview', authenticate, requireRole('admin'), async (req: Request,
         const monthlyRevenue = await queryOne(
             `SELECT COALESCE(SUM(total), 0) as total FROM (
                 SELECT SUM(amount) as total FROM payments
-                WHERE (COALESCE(completed_at, created_at) AT TIME ZONE 'America/Mexico_City')::date BETWEEN $1::date AND $2::date
+                WHERE (COALESCE(paid_at, completed_at, created_at) AT TIME ZONE 'America/Mexico_City')::date BETWEEN $1::date AND $2::date
                   AND status = 'completed'
                 UNION ALL
                 SELECT SUM(amount) as total FROM event_registrations
@@ -108,7 +108,7 @@ router.get('/overview', authenticate, requireRole('admin'), async (req: Request,
              FROM payments pay
              JOIN memberships m ON pay.membership_id = m.id
              JOIN plans pl ON m.plan_id = pl.id
-             WHERE (COALESCE(pay.completed_at, pay.created_at) AT TIME ZONE 'America/Mexico_City')::date BETWEEN $1::date AND $2::date
+             WHERE (COALESCE(pay.paid_at, pay.completed_at, pay.created_at) AT TIME ZONE 'America/Mexico_City')::date BETWEEN $1::date AND $2::date
                AND pay.status = 'completed'
                AND pl.class_limit > 0`,
             [periodStart, periodEnd]
@@ -133,8 +133,8 @@ router.get('/overview', authenticate, requireRole('admin'), async (req: Request,
                 SELECT COALESCE(SUM(total), 0) as total FROM (
                     SELECT SUM(amount) as total FROM payments
                     WHERE status = 'completed'
-                      AND (COALESCE(completed_at, created_at) AT TIME ZONE 'America/Mexico_City') >= month_date
-                      AND (COALESCE(completed_at, created_at) AT TIME ZONE 'America/Mexico_City') < month_date + INTERVAL '1 month'
+                      AND (COALESCE(paid_at, completed_at, created_at) AT TIME ZONE 'America/Mexico_City') >= month_date
+                      AND (COALESCE(paid_at, completed_at, created_at) AT TIME ZONE 'America/Mexico_City') < month_date + INTERVAL '1 month'
                     UNION ALL
                     SELECT SUM(amount) as total FROM event_registrations
                     WHERE status = 'confirmed' AND amount > 0
@@ -292,7 +292,7 @@ router.get('/revenue', authenticate, requireRole('admin'), async (req: Request, 
         const PAY_FROM = `FROM payments pay
                 LEFT JOIN memberships m ON pay.membership_id = m.id
                 LEFT JOIN orders o ON pay.order_id = o.id`;
-        const PAY_WHERE = `(COALESCE(pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date
+        const PAY_WHERE = `(COALESCE(pay.paid_at, pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date
                   AND pay.status = 'completed'`;
         const facClause = fac ? ` AND ${FAC} = $3` : '';
         const params: unknown[] = fac ? [start, end, fac] : [start, end];
@@ -308,7 +308,7 @@ router.get('/revenue', authenticate, requireRole('admin'), async (req: Request, 
         // Daily revenue (payments + events)
         const daily = await query(
             `SELECT date, SUM(total) as total, SUM(count) as count FROM (
-                SELECT (COALESCE(pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date as date, SUM(pay.amount) as total, COUNT(*) as count
+                SELECT (COALESCE(pay.paid_at, pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date as date, SUM(pay.amount) as total, COUNT(*) as count
                 ${PAY_FROM}
                 WHERE ${PAY_WHERE}${facClause}
                 GROUP BY 1
@@ -674,7 +674,7 @@ router.get('/profit-by-facility', authenticate, requireRole('admin'), async (req
              FROM payments pay
              LEFT JOIN memberships m ON pay.membership_id = m.id
              LEFT JOIN orders o ON pay.order_id = o.id
-             WHERE (COALESCE(pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date
+             WHERE (COALESCE(pay.paid_at, pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date
                AND pay.status = 'completed'
                AND COALESCE(pay.facility_id, m.facility_id, o.facility_id) IS NOT NULL
              GROUP BY 1`,
@@ -789,12 +789,12 @@ router.get('/revenue-by-type', authenticate, requireRole('admin'), async (req: R
             SELECT 'Membresías' AS type, COALESCE(SUM(pay.amount),0)::float AS total, COUNT(*)::int AS count
             FROM payments pay
             WHERE pay.membership_id IS NOT NULL AND pay.status = 'completed'
-              AND (COALESCE(pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date BETWEEN $1 AND $2
+              AND (COALESCE(pay.paid_at, pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date BETWEEN $1 AND $2
             UNION ALL
             SELECT 'Productos', COALESCE(SUM(pay.amount),0)::float, COUNT(*)::int
             FROM payments pay
             WHERE pay.order_id IS NOT NULL AND pay.status = 'completed'
-              AND (COALESCE(pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date BETWEEN $1 AND $2
+              AND (COALESCE(pay.paid_at, pay.completed_at, pay.created_at) AT TIME ZONE '${TZ}')::date BETWEEN $1 AND $2
             UNION ALL
             SELECT 'Eventos', COALESCE(SUM(amount),0)::float, COUNT(*)::int
             FROM event_registrations

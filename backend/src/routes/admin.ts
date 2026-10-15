@@ -75,7 +75,7 @@ router.get('/stats', async (req: Request, res: Response) => {
           SELECT p.amount, COALESCE(o.card_fee_amount, 0) AS card_fee_amount
           FROM payments p
           LEFT JOIN orders o ON o.id = p.order_id
-          WHERE (COALESCE(p.completed_at, p.created_at) AT TIME ZONE 'America/Mexico_City')::date = $1
+          WHERE (COALESCE(p.paid_at, p.completed_at, p.created_at) AT TIME ZONE 'America/Mexico_City')::date = $1
             AND p.status = 'completed'
           UNION ALL
           SELECT amount, 0 AS card_fee_amount

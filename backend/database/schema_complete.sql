@@ -595,6 +595,7 @@ CREATE TABLE IF NOT EXISTS payments (
     notes          TEXT,
     status         VARCHAR(50) DEFAULT 'completed',
     processed_by   UUID REFERENCES users(id),
+    paid_at        TIMESTAMP WITH TIME ZONE,
     created_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
