@@ -475,12 +475,14 @@ function AdjustCreditsDialog({ membership, onDone }: { membership: ClientMembers
         return out;
     })();
     const [bucket, setBucket] = useState<Bucket>(availableBuckets[0]);
-    const [delta, setDelta] = useState<number>(0);
+    const [change, setChange] = useState('0');
+    const delta = /^-?\d+$/.test(change) ? Number(change) : NaN;
+    const setDelta = (value: number) => setChange(String(value));
     const [reason, setReason] = useState('');
     const sinLimite = useHasPermission('creditos_sin_limite'); // master/admin: sin tope de ±3
 
     const current = membership[bucket] ?? 0;
-    const next = Math.max(0, current + delta);
+    const next = current + delta;
 
     const adjust = useMutation({
         mutationFn: async () => {
@@ -540,8 +542,8 @@ function AdjustCreditsDialog({ membership, onDone }: { membership: ClientMembers
                         {sinLimite ? (
                             <Input
                                 type="number"
-                                value={delta}
-                                onChange={(e) => setDelta(Math.trunc(Number(e.target.value)) || 0)}
+                                value={change}
+                                onChange={(e) => setChange(e.target.value)}
                                 placeholder="Ej. 10 para agregar, -10 para quitar"
                             />
                         ) : (
@@ -570,7 +572,7 @@ function AdjustCreditsDialog({ membership, onDone }: { membership: ClientMembers
                     <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
                     <Button
                         onClick={() => adjust.mutate()}
-                        disabled={adjust.isPending || delta === 0 || reason.trim().length < 5}
+                        disabled={adjust.isPending || !Number.isInteger(delta) || !Number.isInteger(next) || next < 0 || (!sinLimite && Math.abs(delta) > 3) || delta === 0 || reason.trim().length < 5}
                     >
                         {adjust.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                         Aplicar
