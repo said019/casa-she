@@ -75,7 +75,10 @@ export function AdjustCreditsDialog({
     const defaultBucket = availableBuckets[0] ?? 'reformer_remaining';
 
     const [bucket, setBucket] = useState<Bucket>(defaultBucket);
-    const [delta, setDelta] = useState<number>(0);
+    // Preserve intermediate input (empty / minus sign) while typing a deduction.
+    const [change, setChange] = useState('0');
+    const delta = /^-?\d+$/.test(change) ? Number(change) : NaN;
+    const setDelta = (value: number) => setChange(String(value));
     const [reason, setReason] = useState('');
     const sinLimite = useHasPermission('creditos_sin_limite'); // master/admin: sin tope de ±3
 
@@ -145,7 +148,7 @@ export function AdjustCreditsDialog({
                     {availableBuckets.length === 0 && <p role="status">Este plan es ilimitado; no tiene créditos finitos para ajustar.</p>}
                     {stale && <div role="alert">El saldo cambió. Revisa el saldo actualizado y vuelve a abrir el ajuste.<Button variant="outline" onClick={() => setOpen(false)}>Cerrar</Button></div>}
                     <div className="space-y-1">
-                        <Label>Bucket</Label>
+                        <Label>Categoría</Label>
                         <Select value={bucket} onValueChange={(v) => setBucket(v as Bucket)}>
                             <SelectTrigger>
                                 <SelectValue />
@@ -163,13 +166,23 @@ export function AdjustCreditsDialog({
                     <div className="space-y-1">
                         <Label>Cambio</Label>
                         {sinLimite ? (
+                            <div className="space-y-2">
+                            <div className="flex gap-2">
+                                <Button type="button" variant="outline" disabled={availableBuckets.length === 0 || stale} onClick={() => setDelta(-Math.max(1, Math.abs(Number.isFinite(delta) ? delta : 1)))}>Quitar clases</Button>
+                                <Button type="button" variant="outline" disabled={availableBuckets.length === 0 || stale} onClick={() => setDelta(Math.max(1, Math.abs(Number.isFinite(delta) ? delta : 1)))}>Agregar clases</Button>
+                            </div>
                             <Input
                                 type="number"
-                                value={delta}
-                                onChange={(e) => setDelta(Number(e.target.value))}
+                                aria-label="Cambio de créditos"
+                                step="1"
+                                value={change}
+                                onChange={(e) => setChange(e.target.value)}
                                 disabled={availableBuckets.length === 0 || stale}
                                 placeholder="Ej. 10 para agregar, -10 para quitar"
                             />
+                            <p className="text-xs text-muted-foreground">Para quitar 2 clases, escribe -2. Para agregar 2, escribe 2.</p>
+                            {Number.isFinite(next) && next < 0 && <p role="alert" className="text-sm text-destructive">No puedes quitar más clases que el saldo disponible.</p>}
+                            </div>
                         ) : (
                             <div className="flex items-center gap-2">
                                 {[-3, -2, -1, 1, 2, 3].map((d) => (

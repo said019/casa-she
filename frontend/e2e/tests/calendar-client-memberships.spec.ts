@@ -100,6 +100,31 @@ test('asignación permite fecha real de pago y vigencia manual sin salir de agen
     await page.screenshot({ path: `/private/tmp/casa-calendar-membership-${test.info().project.name}.png`, fullPage: true });
 });
 
+test('quitar clases permite saldo cero y bloquea descuentos mayores al saldo', async ({ page }) => {
+    const state = await setup(page);
+    await page.getByRole('button', { name: 'Gestionar membresía de Ana Prueba' }).click();
+    await page.getByRole('button', { name: 'Ajustar créditos', exact: true }).click();
+    const dialog = page.getByRole('dialog').last();
+    await dialog.getByRole('combobox').click();
+    await page.getByRole('option', { name: 'Clases', exact: true }).click();
+    const input = dialog.getByRole('spinbutton');
+    await dialog.getByRole('button', { name: 'Quitar clases', exact: true }).click();
+    await expect(input).toHaveValue('-1');
+    await dialog.getByRole('button', { name: 'Agregar clases', exact: true }).click();
+    await expect(input).toHaveValue('1');
+    await input.fill('-5');
+    await dialog.getByLabel('Motivo (mínimo 5 caracteres)').fill('Corrección de clases usadas');
+    await expect(dialog.getByRole('alert')).toContainText('No puedes quitar más');
+    await expect(dialog.getByRole('button', { name: 'Aplicar', exact: true })).toBeDisabled();
+    await input.fill('');
+    await expect(dialog.getByRole('button', { name: 'Aplicar', exact: true })).toBeDisabled();
+    await input.fill('-4');
+    await expect(dialog.getByText('Saldo actual: 4 → nuevo: 0')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Aplicar', exact: true }).click();
+    await expect.poll(() => state.adjustments.length).toBe(1);
+    expect(state.adjustments[0]).toMatchObject({ multi_remaining: 0, expected_multi_remaining: 4 });
+});
+
 test('ajustar saldo conserva motivo y comparación contra saldo visto', async ({ page }) => {
     const state = await setup(page);
     await page.getByRole('button', { name: 'Gestionar membresía de Ana Prueba' }).click();
@@ -107,7 +132,9 @@ test('ajustar saldo conserva motivo y comparación contra saldo visto', async ({
     const dialog = page.getByRole('dialog').last();
     await dialog.getByRole('combobox').click();
     await page.getByRole('option', { name: 'Clases', exact: true }).click();
-    await dialog.getByRole('spinbutton').fill('-2');
+    await dialog.getByRole('spinbutton').fill('');
+    await dialog.getByRole('spinbutton').pressSequentially('-2');
+    await expect(dialog.getByRole('spinbutton')).toHaveValue('-2');
     await expect(dialog.getByRole('button', { name: 'Aplicar', exact: true })).toBeDisabled();
     await dialog.getByLabel('Motivo (mínimo 5 caracteres)').fill('Clases consumidas antes del registro');
     await dialog.getByRole('button', { name: 'Aplicar', exact: true }).click();
