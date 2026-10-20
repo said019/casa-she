@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-/** Mexican login identity: never truncate arbitrary international numbers. */
+/** Login identity: Mexican numbers as 10 digits; foreign ones (explicit +lada) as "+<digits>". */
 export function normalizeLoginPhone(value: string): string | null {
     const text = value.trim();
     if (!/^\+?[0-9 ()-]+$/.test(text)) return null;
@@ -11,6 +11,8 @@ export function normalizeLoginPhone(value: string): string | null {
     if (/^[0-9]{10}$/.test(digits) && !text.startsWith('+')) return digits;
     if (/^52[0-9]{10}$/.test(digits)) return digits.slice(2);
     if (/^521[0-9]{10}$/.test(digits)) return digits.slice(3);
+    // Extranjero: solo con "+" explícito y lada distinta de México; se guarda como "+<lada><número>".
+    if (text.startsWith('+') && /^[1-9][0-9]{7,14}$/.test(digits) && !digits.startsWith('52')) return `+${digits}`;
     return null;
 }
 
@@ -19,7 +21,7 @@ export const ClientEmailSchema = z.preprocess(
     z.string().trim().toLowerCase().email('Email inválido').max(255).nullable(),
 );
 export const ClientPhoneSchema = z.string().refine(value => normalizeLoginPhone(value) !== null,
-    'WhatsApp inválido: usa 10 dígitos o la lada +52').transform(value => normalizeLoginPhone(value)!);
+    'WhatsApp inválido: usa 10 dígitos o la lada del país (+52, +1…)').transform(value => normalizeLoginPhone(value)!);
 
 export const clientIdentityDDL = `
 ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
@@ -35,6 +37,7 @@ BEGIN
     IF cleaned ~ '^[0-9]{10}$' AND left(original,1) <> '+' THEN RETURN cleaned; END IF;
     IF cleaned ~ '^52[0-9]{10}$' THEN RETURN substr(cleaned,3); END IF;
     IF cleaned ~ '^521[0-9]{10}$' THEN RETURN substr(cleaned,4); END IF;
+    IF left(original,1) = '+' AND cleaned ~ '^[1-9][0-9]{7,14}$' AND cleaned !~ '^52' THEN RETURN '+' || cleaned; END IF;
     RETURN NULL;
 END $$;
 CREATE OR REPLACE FUNCTION guard_user_identity() RETURNS trigger LANGUAGE plpgsql AS $$

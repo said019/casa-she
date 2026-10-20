@@ -5,6 +5,7 @@ import axios from 'axios';
 import { Check, Copy, Loader2, MessageCircle } from 'lucide-react';
 import api, { getErrorMessage } from '@/lib/api';
 import { normalizeLoginPhone } from '@/lib/loginIdentity';
+import { LADAS, telefonoConLada } from '@/lib/ladas';
 import { cn } from '@/lib/utils';
 import type { Class } from '@/types/class';
 import { enlaceAccesoWhatsApp, mensajeAccesoWhatsApp } from '@/lib/whatsapp';
@@ -69,6 +70,7 @@ export function DialogoAlumnaNueva({ clase, open, onOpenChange, nombreInicial = 
     const [managed, setManaged] = useState<ClienteAgenda | null>(null);
     const queryClient = useQueryClient();
     const [nombre, setNombre] = useState('');
+    const [lada, setLada] = useState('52');
     const [telefono, setTelefono] = useState('');
     const [email, setEmail] = useState('');
     const [planId, setPlanId] = useState<string>('');          // '' = nada elegido, 'cortesia' = sin paquete
@@ -83,7 +85,7 @@ export function DialogoAlumnaNueva({ clase, open, onOpenChange, nombreInicial = 
     useEffect(() => {
         if (!open) return;
         setNombre(nombreInicial.trim());
-        setTelefono(''); setEmail(''); setPlanId(''); setMetodo('cash'); setMandarAcceso(true);
+        setLada('52'); setTelefono(''); setEmail(''); setPlanId(''); setMetodo('cash'); setMandarAcceso(true);
         setExistente(null); setListo(null); setCopiado(false);
         setManaged(null);
         enCurso.current = false;
@@ -109,7 +111,8 @@ export function DialogoAlumnaNueva({ clase, open, onOpenChange, nombreInicial = 
         ? `${clase.class_type_name ?? 'Clase'} · ${fechaLarga(clase.date)} · ${formatClassTime(clase.start_time)}`
         : '';
     const emailOk = !email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
-    const telefonoOk = normalizeLoginPhone(telefono) !== null;
+    const telefonoCompleto = telefonoConLada(lada, telefono);
+    const telefonoOk = normalizeLoginPhone(telefonoCompleto) !== null;
     const nombreOk = nombre.trim().length >= 2 && nombre.trim().length <= 80;
     const puedeEnviar = !!clase && nombreOk && telefonoOk && emailOk && (!!plan || cortesia);
 
@@ -117,13 +120,13 @@ export function DialogoAlumnaNueva({ clase, open, onOpenChange, nombreInicial = 
         mutationFn: async () => (await api.post('/users/alta-rapida', {
             nombre: nombre.trim(),
             email: email.trim() || undefined,
-            telefono: normalizeLoginPhone(telefono),
+            telefono: normalizeLoginPhone(telefonoCompleto),
             classId: clase!.id,
             ...(cortesia ? { cortesia: true } : { planId, metodoPago: metodo }),
         })).data as { user: { id: string; display_name: string }; acceso: { url: string } },
         onSuccess: (r) => {
             setListo({
-                userId: r.user.id, nombre: r.user.display_name, telefono: telefono.trim(),
+                userId: r.user.id, nombre: r.user.display_name, telefono: normalizeLoginPhone(telefonoCompleto) ?? telefonoCompleto,
                 plan, metodo, url: r.acceso.url, mandarAcceso,
             });
             queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -205,11 +208,14 @@ export function DialogoAlumnaNueva({ clase, open, onOpenChange, nombreInicial = 
                             <label className="block space-y-1.5">
                                 <span className="text-sm font-semibold">WhatsApp</span>
                                 <span className="flex gap-1.5">
-                                    <span className="flex h-11 items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">+52</span>
+                                    <select aria-label="Lada del país" value={lada} onChange={(e) => setLada(e.target.value)}
+                                        className="h-11 w-24 rounded-md border border-input bg-muted px-2 text-sm">
+                                        {LADAS.map((l) => <option key={l.lada} value={l.lada}>+{l.lada} {l.pais}</option>)}
+                                    </select>
                                     <Input aria-label="WhatsApp" required type="tel" inputMode="tel" value={telefono}
                                         onChange={(e) => setTelefono(e.target.value)} placeholder="55 1234 5678" className="h-11 flex-1" />
                                 </span>
-                                <span className="text-xs text-muted-foreground">Usa 10 dígitos o la lada +52. Entra con su WhatsApp y contraseña. Si el número o el correo ya existen, te ofrecemos su ficha.</span>
+                                <span className="text-xs text-muted-foreground">Elige la lada del país (México por default). Entra con su WhatsApp y contraseña. Si el número o el correo ya existen, te ofrecemos su ficha.</span>
                             </label>
                             <label className="block space-y-1.5">
                                 <span className="text-sm font-semibold">Correo (opcional)</span>

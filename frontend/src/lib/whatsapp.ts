@@ -29,6 +29,8 @@ export interface DatosMensajeWhatsApp {
  */
 function normalizarTelefono(telefono?: string | null): string | null {
     const digitos = (telefono || '').replace(/\D/g, '');
+    // Con "+" explícito ya trae su lada (p. ej. alumnas extranjeras guardadas como +1…).
+    if ((telefono || '').trim().startsWith('+') && digitos.length >= 8) return digitos;
     if (digitos.length < 10) return null;
     // 10 dígitos = número nacional: se le antepone la lada de México. Si trae
     // más, ya viene con lada (propia o extranjera) y se respeta tal cual.
