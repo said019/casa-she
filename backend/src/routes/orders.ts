@@ -11,6 +11,7 @@ import { sendMembershipActivatedNotice, sendWhatsAppMessage } from '../lib/whats
 import { awardPaymentLoyaltyPoints, awardReferralBonus, reversePaymentLoyaltyPoints, reverseReferralBonus, consumeSampleClassDiscount, canBuySamplePlan } from '../lib/loyalty.js';
 import { toDbClient } from '../lib/membershipSelection.js';
 import { notifyMembershipRenewed, notifyPointsEarnedExternal } from '../lib/notifications.js';
+import { notifyAdminsOfStudioOrder } from '../lib/studio-order-alert.js';
 import { mpConfigured, createPreference, syncPayment } from '../lib/mercadopago.js';
 import { finalizePaidOrder } from '../lib/orderFulfillment.js';
 import { ImageStorageError, subirComprobante } from '../lib/imageStorage.js';
@@ -699,6 +700,11 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
                 await query(`DELETE FROM orders WHERE id = $1`, [order.id]);
                 return res.status(502).json({ error: 'CARD_PAYMENT_FAILED' });
             }
+        }
+
+        // Only after the order transaction commits. Cash is pending collection, not paid.
+        if (payment_method === 'cash') {
+            void notifyAdminsOfStudioOrder(plan.name, Number(order.total_amount));
         }
 
         // Return with plan info

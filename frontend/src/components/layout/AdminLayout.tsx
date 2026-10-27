@@ -597,7 +597,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                                                         </div>
                                                     );
 
-                                                    const label = n.type === 'payment'
+                                                    const label = n.type === 'studio_order'
+                                                        ? `${n.title} · Pago pendiente en estudio: $${Number(n.detail).toLocaleString('es-MX')}`
+                                                        : n.type === 'payment'
                                                         ? `Pago de $${parseFloat(n.title).toLocaleString('es-MX')} (${n.detail})`
                                                         : n.type === 'membership'
                                                             ? `Membresía "${n.title}" (${n.detail})`
@@ -614,7 +616,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                                                             )}
                                                             onClick={() => {
                                                                 setNotifOpen(false);
-                                                                if (n.user_id) navigate(`/admin/members/${n.user_id}`);
+                                                                if (n.type === 'studio_order') navigate('/admin/payments');
+                                                                else if (n.user_id) navigate(`/admin/members/${n.user_id}`);
                                                             }}
                                                         >
                                                             {icon}
