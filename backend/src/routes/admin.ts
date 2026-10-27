@@ -285,6 +285,7 @@ router.get('/notifications', async (req: Request, res: Response) => {
     try {
         // Combine recent events from payments, memberships, and bookings
         const notifications = await query(`
+            SELECT * FROM (
             (
                 SELECT
                     p.id,
@@ -299,6 +300,18 @@ router.get('/notifications', async (req: Request, res: Response) => {
                 JOIN users u ON p.user_id = u.id
                 ORDER BY p.created_at DESC
                 LIMIT 10
+            )
+            UNION ALL
+            (
+                SELECT o.id, 'studio_order' as type, pl.name as title,
+                    o.total_amount::text as detail, o.status::text as status,
+                    u.display_name as user_name, o.created_at, o.user_id
+                FROM orders o
+                JOIN users u ON u.id = o.user_id
+                JOIN plans pl ON pl.id = o.plan_id
+                WHERE o.payment_method = 'cash' AND o.status IN ('pending_payment', 'pending_verification')
+                ORDER BY o.created_at DESC
+                LIMIT 20
             )
             UNION ALL
             (
@@ -335,8 +348,9 @@ router.get('/notifications', async (req: Request, res: Response) => {
                 ORDER BY b.created_at DESC
                 LIMIT 10
             )
-            ORDER BY created_at DESC
-            LIMIT 20
+            ) activity
+            ORDER BY CASE WHEN type = 'studio_order' THEN 0 ELSE 1 END, created_at DESC
+            LIMIT 40
         `);
 
         // Count unread (items from last 24 hours)
@@ -344,7 +358,8 @@ router.get('/notifications', async (req: Request, res: Response) => {
             SELECT (
                 (SELECT COUNT(*) FROM payments WHERE created_at > NOW() - INTERVAL '24 hours') +
                 (SELECT COUNT(*) FROM memberships WHERE created_at > NOW() - INTERVAL '24 hours') +
-                (SELECT COUNT(*) FROM bookings WHERE created_at > NOW() - INTERVAL '24 hours')
+                (SELECT COUNT(*) FROM bookings WHERE created_at > NOW() - INTERVAL '24 hours') +
+                (SELECT COUNT(*) FROM orders WHERE payment_method = 'cash' AND status IN ('pending_payment', 'pending_verification'))
             ) as count
         `);
 

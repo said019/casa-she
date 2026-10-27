@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { studioOrderAlert } from '../src/lib/studio-order-alert.js';
+const alert = studioOrderAlert('Clase muestra', 150);
+assert.equal(alert.url, '/admin/payments');
+assert.match(alert.title, /pendiente/);
+assert.match(alert.body, /Clase muestra/);
+assert.match(alert.body, /150/);
+const admin = readFileSync(new URL('../src/routes/admin.ts', import.meta.url), 'utf8');
+assert.match(admin, /'studio_order' as type/);
+assert.match(admin, /o\.status IN \('pending_payment', 'pending_verification'\)/);
+const orders = readFileSync(new URL('../src/routes/orders.ts', import.meta.url), 'utf8');
+assert(orders.indexOf('void notifyAdminsOfStudioOrder') > orders.indexOf("await dbClient.query('COMMIT')"));
+assert.match(orders, /if \(payment_method === 'cash'\) \{\s*void notifyAdminsOfStudioOrder/);
+const ui = readFileSync(new URL('../../frontend/src/components/layout/AdminLayout.tsx', import.meta.url), 'utf8');
+assert.match(ui, /n.type === 'studio_order'\) navigate\('\/admin\/payments'\)/);
+console.log('Studio order alert: 8 checks passed');
