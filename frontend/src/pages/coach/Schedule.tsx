@@ -82,6 +82,8 @@ export default function CoachSchedule() {
             return response.data;
         },
         enabled: showAll || !!instructorId,
+        refetchInterval: 15000,
+        staleTime: 0,
     });
 
     // ¿La clase es del coach logueado? En "Mis clases" todas lo son; en "Todas"

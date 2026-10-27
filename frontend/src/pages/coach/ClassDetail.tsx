@@ -26,6 +26,7 @@ import { useAuthStore } from '@/stores/authStore';
 interface Attendee {
     booking_id: string;
     status: string;
+    channel?: string | null;
     waitlist_position: number | null;
     checked_in_at: string | null;
     user_id: string;
@@ -82,6 +83,7 @@ export default function CoachClassDetail() {
             return response.data;
         },
         enabled: !!classId,
+        refetchInterval: 15000,
     });
 
     // For admin: use the class's own instructor_id; for coaches: use their own
@@ -90,13 +92,16 @@ export default function CoachClassDetail() {
         : instructorData?.id;
 
     // Fetch attendees (read-only roster)
-    const { data: attendeesData, isLoading: loadingAttendees } = useQuery<{ confirmed: Attendee[]; waitlist: Attendee[] }>({
+    const { data: attendeesData, isLoading: loadingAttendees, isError: attendeesError, refetch: refreshAttendees } = useQuery<{ confirmed: Attendee[]; waitlist: Attendee[] }>({
         queryKey: ['class-attendees', classId, instructorId],
         queryFn: async () => {
             const response = await api.get(`/instructors/${instructorId}/classes/${classId}/attendees`);
             return response.data;
         },
         enabled: !!classId && !!instructorId,
+        staleTime: 0,
+        refetchInterval: 15000,
+        refetchOnWindowFocus: 'always',
     });
 
     const getInitials = (name: string) =>
@@ -194,7 +199,12 @@ export default function CoachClassDetail() {
                             </p>
                         </CardHeader>
                         <CardContent>
-                            {loadingAttendees ? (
+                            {attendeesError ? (
+                                <div role="alert" className="py-4 text-center">
+                                    <p>No pudimos cargar las reservas. Esto no significa que la clase esté vacía.</p>
+                                    <Button variant="outline" onClick={() => refreshAttendees()}>Reintentar</Button>
+                                </div>
+                            ) : loadingAttendees ? (
                                 <div className="flex justify-center py-8">
                                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                 </div>
@@ -206,7 +216,9 @@ export default function CoachClassDetail() {
                             ) : (
                                 <div className="space-y-2">
                                     {confirmed.map((attendee) => {
-                                        const planLabel = attendee.plan_name || attendee.membership_name;
+                                        const planLabel = attendee.channel === 'fitpass' ? 'FitPass'
+                                            : attendee.channel === 'totalpass' ? 'TotalPass'
+                                            : attendee.plan_name || attendee.membership_name;
                                         return (
                                             <div
                                                 key={attendee.booking_id}
