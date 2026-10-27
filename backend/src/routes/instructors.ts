@@ -1185,8 +1185,9 @@ router.get('/:id/classes/:classId/attendees', authenticate, requireSelfInstructo
                 b.status,
                 b.waitlist_position,
                 b.checked_in_at,
+                b.channel,
                 u.id AS user_id,
-                u.display_name,
+                COALESCE(NULLIF(u.display_name, ''), 'Invitada de plataforma') AS display_name,
                 u.email,
                 u.phone,
                 u.photo_url,
@@ -1195,7 +1196,7 @@ router.get('/:id/classes/:classId/attendees', authenticate, requireSelfInstructo
                 u.alert_flag,
                 u.alert_message
             FROM bookings b
-            JOIN users u ON b.user_id = u.id
+            LEFT JOIN users u ON b.user_id = u.id
             WHERE b.class_id = $1 AND b.status != 'cancelled'
             ORDER BY 
                 CASE b.status 
@@ -1627,13 +1628,14 @@ router.get('/:id/history/:classId/attendees', authenticate, requireSelfInstructo
                 b.id as booking_id,
                 b.status,
                 b.checked_in_at,
+                b.channel,
                 u.id as user_id,
-                u.display_name,
+                COALESCE(NULLIF(u.display_name, ''), 'Invitada de plataforma') AS display_name,
                 u.email,
                 u.phone,
                 u.photo_url
             FROM bookings b
-            JOIN users u ON b.user_id = u.id
+            LEFT JOIN users u ON b.user_id = u.id
             WHERE b.class_id = $1
             ORDER BY b.status DESC, u.display_name ASC
         `, [classId]);

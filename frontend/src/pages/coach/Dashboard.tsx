@@ -83,6 +83,8 @@ export default function CoachDashboard() {
             }
         },
         enabled: isAdmin || !!instructorId,
+        refetchInterval: 15000,
+        staleTime: 0,
     });
 
     // Fetch stats (admin uses a general approach)
