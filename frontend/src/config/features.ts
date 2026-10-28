@@ -7,3 +7,4 @@
  * a aparecer en la UI (nav admin, dashboard de cajas, reportes, etc.).
  */
 export const RECEPTION_ENABLED = false;
+export const CLIENT_REWARDS_ENABLED = false;
