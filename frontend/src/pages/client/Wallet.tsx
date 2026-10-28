@@ -201,6 +201,7 @@ export default function WalletClub() {
     error: rewardsError,
   } = useQuery<LoyaltyReward[]>({
     queryKey: ['loyalty-rewards'],
+    enabled: CLIENT_REWARDS_ENABLED,
     queryFn: async () => (await api.get('/loyalty/rewards')).data,
   });
 
@@ -263,7 +264,7 @@ export default function WalletClub() {
                 </div>
                 <h1 className="text-3xl font-semibold tracking-[-0.04em] text-balance-dark sm:text-4xl">Programa de lealtad</h1>
                 <p className="mt-1 max-w-[58ch] text-sm text-balance-dark/62">
-                  Tus puntos, recompensas y progreso en Casa Shé.
+                  Tus puntos y progreso en Casa Shé.
                 </p>
               </div>
               <div className="flex flex-col gap-2 sm:items-end">
@@ -308,16 +309,16 @@ export default function WalletClub() {
                       Lealtad Casa Shé
                     </div>
                     <p className="mt-3 text-sm text-muted-foreground">
-                      Gana puntos al asistir a clases y canjéalos por beneficios del studio.
+                      Consulta los puntos de tus visitas al studio.
                     </p>
                     <div className="mt-5 rounded-[1rem] bg-[hsl(var(--card))]/80 p-4">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">Puntos disponibles</p>
                       <p className="mt-1 text-3xl font-semibold text-balance-olive">{pointsBalance} pts</p>
                     </div>
                   </div>
-                  <Button className="w-full rounded-full bg-balance-olive text-balance-cream hover:bg-balance-olive/90" asChild>
+                  {CLIENT_REWARDS_ENABLED && <Button className="w-full rounded-full bg-balance-olive text-balance-cream hover:bg-balance-olive/90" asChild>
                     <Link to="/app/wallet/rewards">Ver recompensas</Link>
-                  </Button>
+                  </Button>}
                   <Button variant="outline" className="w-full rounded-full border-balance-olive/25 bg-balance-cream/45 hover:bg-balance-olive/8" asChild>
                     <Link to="/app/wallet/history">Ver historial de puntos</Link>
                   </Button>
@@ -407,8 +408,8 @@ export default function WalletClub() {
           </Card>
 
           {/* Rewards + Recent activity */}
-          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <Card className="rounded-[1.75rem] border-balance-sand/65 bg-[hsl(var(--card))]/88 shadow-[0_18px_58px_-50px_rgba(51,42,34,0.58)]">
+          <div className={`grid gap-6 ${CLIENT_REWARDS_ENABLED ? 'lg:grid-cols-[1.1fr_0.9fr]' : ''}`}>
+            {CLIENT_REWARDS_ENABLED && <Card className="rounded-[1.75rem] border-balance-sand/65 bg-[hsl(var(--card))]/88 shadow-[0_18px_58px_-50px_rgba(51,42,34,0.58)]">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Gift className="h-5 w-5 text-balance-olive" />
@@ -456,7 +457,7 @@ export default function WalletClub() {
                   </div>
                 )}
               </CardContent>
-            </Card>
+            </Card>}
 
             <Card className="rounded-[1.75rem] border-balance-sand/65 bg-[hsl(var(--card))]/88 shadow-[0_18px_58px_-50px_rgba(51,42,34,0.58)]">
               <CardHeader className="flex flex-row items-center gap-2">
@@ -494,3 +495,4 @@ export default function WalletClub() {
     </AuthGuard>
   );
 }
+import { CLIENT_REWARDS_ENABLED } from '@/config/features';

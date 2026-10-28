@@ -37,7 +37,6 @@ import BookClassConfirm from "./pages/client/BookClassConfirm";
 import MyBookings from "./pages/client/MyBookings";
 import ClassBookingDetail from "./pages/client/ClassBookingDetail";
 import WalletClub from "./pages/client/Wallet";
-import WalletRewards from "./pages/client/WalletRewards";
 import WalletHistory from "./pages/client/WalletHistory";
 import ClientProfile from "./pages/client/Profile";
 import ProfileEdit from "./pages/client/ProfileEdit";
@@ -277,7 +276,7 @@ const App = () => (
             <Route path="/app/classes/:bookingId" element={<ClassBookingDetail />} />
             <Route path="/app/classes/:bookingId/spot" element={<Navigate to="/app/classes" replace />} />
             <Route path="/app/wallet" element={<WalletClub />} />
-            <Route path="/app/wallet/rewards" element={<WalletRewards />} />
+            <Route path="/app/wallet/rewards" element={<Navigate to="/app/wallet" replace />} />
             <Route path="/app/wallet/history" element={<WalletHistory />} />
             <Route path="/app/profile" element={<ClientProfile />} />
             <Route path="/app/profile/edit" element={<ProfileEdit />} />
