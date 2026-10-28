@@ -100,6 +100,7 @@ function getPlanCardMeta(name: string): PlanCardMeta | undefined {
 function isCasaSheMembership(plan: Plan) {
   const name = plan.name.toLowerCase();
   return (
+    name.includes('mensual ilimitado') ||
     name.includes('membresía 360') ||
     name.includes('membresia 360') ||
     name.includes('membresía black') ||

@@ -72,7 +72,7 @@ export const DEFAULT_RULES: OnboardingRules = {
     '1x': 'Paquete 5',
     '2x': 'Paquete 8',
     '3x': 'Paquete 12',
-    '4x': 'Membresía 360',
+    '4x': 'Mensual ilimitado + 1 servicio',
   },
   reasons: {
     'Pilates Mat': 'Control, core y postura desde el primer día.',
@@ -186,7 +186,8 @@ export function recommend(
     : null;
 
   const configuredPlan = rules.planByFrequency[answers.frequency];
-  const planName = configuredPlan === 'Clase de prueba' ? 'Drop-in' : configuredPlan;
+  const planName = configuredPlan === 'Clase de prueba' ? 'Drop-in'
+    : configuredPlan === 'Membresía 360' ? 'Mensual ilimitado + 1 servicio' : configuredPlan;
   const planRow = catalog.plans[planName];
   const plan = { plan_id: planRow?.id ?? null, name: planName, price: planRow?.price ?? null };
 

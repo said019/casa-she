@@ -3619,7 +3619,7 @@ async function runStartupMigrations(): Promise<void> {
     // admin cree después.
     // ===========================================================================
     try {
-        const CS_PLANS = ['Drop-in', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Mensual ilimitado', 'Membresía 360', 'Membresía Black', 'Salsa · 1 clase', 'Salsa · 4 clases'];
+        const CS_PLANS = ['Drop-in', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Mensual ilimitado', 'Mensual ilimitado + 1 servicio', 'Membresía Black', 'Salsa · 1 clase', 'Salsa · 4 clases'];
         const CS_TYPES = CASA_SHE_OFFICIAL_CLASS_TYPES.map((type) => type.name);
 
         // Reglamento obligatorio: marca de aceptación por usuaria (NULL = no aceptado aún).
@@ -3884,6 +3884,17 @@ async function runStartupMigrations(): Promise<void> {
         await query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS included_services INTEGER NOT NULL DEFAULT 0`);
         await query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS included_workshops INTEGER NOT NULL DEFAULT 0`);
         await query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS service_options JSONB NOT NULL DEFAULT '[]'::jsonb`);
+        // New offer with its own ID; existing 360 memberships retain their original benefits.
+        await query(`INSERT INTO plans
+            (name,description,price,currency,duration_days,class_limit,reformer_credits,multi_credits,
+             included_services,included_workshops,service_options,features,is_active,is_internal,sort_order,color,package_type)
+            SELECT 'Mensual ilimitado + 1 servicio',
+                'Clases ilimitadas y un servicio a elegir: Cosmiatría o Nutrición.',
+                3800,'MXN',30,NULL,0,NULL,1,0,
+                '["Cosmiatría","Nutrición"]'::jsonb,
+                '["Clases ilimitadas","1 servicio a elegir: Cosmiatría o Nutrición","Vigencia de 30 días"]'::jsonb,
+                true,false,6,'#AE4836','mixto'
+            WHERE NOT EXISTS (SELECT 1 FROM plans WHERE name='Mensual ilimitado + 1 servicio')`);
         await query(`ALTER TABLE user_benefits ADD COLUMN IF NOT EXISTS source_membership_id UUID REFERENCES memberships(id) ON DELETE CASCADE`);
         await query(`ALTER TABLE user_benefits ADD COLUMN IF NOT EXISTS source_slot INTEGER`);
         await query(`ALTER TABLE user_benefits ADD COLUMN IF NOT EXISTS used_on_event_registration_id UUID REFERENCES event_registrations(id) ON DELETE SET NULL`);
