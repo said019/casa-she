@@ -91,6 +91,8 @@ export function useSemanaClases() {
 
     const getClassesForDay = (day: Date) => {
         return classes?.filter(c => {
+            // Hide cancelled sessions in both calendar layouts, retaining the raw history.
+            if (c.status === 'cancelled') return false;
             const dateStr = (c.date || '').split('T')[0];
             const dateMatch = isSameDay(parseISO(dateStr + 'T00:00:00'), day);
             const typeMatch = classTypeFilter === 'all' || c.class_type_id === classTypeFilter;
