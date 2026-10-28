@@ -61,8 +61,12 @@ export default function SellPlanDialog({ userId, userName, open, onOpenChange, o
     const isGratis = paymentMethod === 'gratis';
 
     const { data: plans, isLoading, isError, refetch } = useQuery<Plan[]>({
-        queryKey: ['plans'],
+        queryKey: ['plans', 'assignable'],
         queryFn: async () => (await api.get('/plans')).data,
+        enabled: open,
+        staleTime: 0,
+        refetchOnMount: 'always',
+        refetchInterval: open ? 30_000 : false,
     });
 
     // Reset al abrir
