@@ -26,8 +26,8 @@ async function loadCatalog(): Promise<OnboardingCatalog> {
     [['Pilates Mat', 'Barre', 'Sculpt', 'Yoga', 'Yoga Ashtanga', 'Yoga Vinyasa', 'Flex', 'Salsa']]
   );
   const plans = await query<{ id: string; name: string; price: number }>(
-    `SELECT id, name, price FROM plans WHERE name = ANY($1::text[])`,
-    [['Clase de prueba', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Membresía 360']]
+    `SELECT id, name, price FROM plans WHERE is_active = true AND name = ANY($1::text[])`,
+    [['Drop-in', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Membresía 360']]
   );
   const disciplines: OnboardingCatalog['disciplines'] = {};
   for (const c of cts) disciplines[c.name] = { id: c.id };
