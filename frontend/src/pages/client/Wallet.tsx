@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { CLIENT_REWARDS_ENABLED } from '@/config/features';
 import { format, parseISO } from 'date-fns';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { ClientLayout } from '@/components/layout/ClientLayout';
@@ -495,4 +496,3 @@ export default function WalletClub() {
     </AuthGuard>
   );
 }
-import { CLIENT_REWARDS_ENABLED } from '@/config/features';
