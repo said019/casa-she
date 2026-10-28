@@ -40,6 +40,20 @@ import SellPlanDialog from '@/components/memberships/SellPlanDialog';
 import { AdjustCreditsDialog } from '@/components/clients/AdjustCreditsDialog';
 import { isMembershipScheduled } from '@/lib/membershipStatus';
 import { PlanLabel } from '@/components/brands/PlanLabel';
+import { WhatsAppIcon } from '@/components/WhatsAppIcon';
+import { enlaceWhatsApp } from '@/lib/whatsapp';
+
+function UserWhatsApp({ user }: { user: Pick<User, 'phone' | 'display_name'> }) {
+    const href = enlaceWhatsApp({ telefono: user.phone, nombre: user.display_name });
+    if (!href) return null;
+    return <Button asChild variant="ghost" size="icon" className="h-11 w-11 text-[#245C40] hover:bg-[#245C40]/10">
+        <a href={href} target="_blank" rel="noopener noreferrer"
+            title={`Escribir a ${user.display_name} por WhatsApp`}
+            aria-label={`Escribir a ${user.display_name} por WhatsApp`}>
+            <WhatsAppIcon className="h-5 w-5" />
+        </a>
+    </Button>;
+}
 
 interface FacilityOpt {
     id: string;
@@ -388,6 +402,7 @@ export default function ClientsList() {
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right">
+                                                <UserWhatsApp user={user} />
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
                                                         <Button variant="ghost" className="h-8 w-8 p-0">
@@ -500,7 +515,8 @@ export default function ClientsList() {
                                             </div>
                                         </div>
                                     </Link>
-                                    <div className="absolute right-2 top-3">
+                                    <div className="absolute right-2 top-3 flex flex-col items-center">
+                                        <UserWhatsApp user={user} />
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" className="h-8 w-8 p-0">
