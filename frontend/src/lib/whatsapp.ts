@@ -27,8 +27,10 @@ export interface DatosMensajeWhatsApp {
  * Devuelve el enlace, o null si no hay un teléfono utilizable (así quien llama
  * simplemente no pinta el botón).
  */
-function normalizarTelefono(telefono?: string | null): string | null {
+export function normalizarTelefono(telefono?: string | null): string | null {
     const digitos = (telefono || '').replace(/\D/g, '');
+    // Fitpass imports may contain synthetic IDs such as +00000362058.
+    if (!digitos || digitos.startsWith('0') || digitos.length > 15) return null;
     // Con "+" explícito ya trae su lada (p. ej. alumnas extranjeras guardadas como +1…).
     if ((telefono || '').trim().startsWith('+') && digitos.length >= 8) return digitos;
     if (digitos.length < 10) return null;

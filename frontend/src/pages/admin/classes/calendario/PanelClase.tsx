@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
-    Loader2, Calendar as CalendarIcon, Plus, Minus, Users, UserRound, Trash2, Check, Edit, Phone, MessageCircle, Clock, MapPin, X, RotateCcw, Lock, Unlock,
+    Loader2, Calendar as CalendarIcon, Plus, Minus, Users, UserRound, Trash2, Check, Edit, Phone, Clock, MapPin, X, RotateCcw, Lock, Unlock,
 } from 'lucide-react';
 import api, { getErrorMessage } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -28,6 +28,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { useToast } from '@/components/ui/use-toast';
 import type { Attendee } from './tipos';
 import { attendeeBookedBy, getInitials, whatsAppDeAsistente } from './formato';
+import { WhatsAppIcon } from '@/components/WhatsAppIcon';
 import { estiloDeLugar, etiquetaCupoLarga, lugaresDeClase, type Lugar } from './lugares';
 import { colorPuntoAlumna } from './colores';
 import { InscribirAlumna } from './InscribirAlumna';
@@ -244,17 +245,17 @@ export function PanelClase({ clase, open, onOpenChange, onEditar, onCambiarCoach
                     TotalPass: reservaron desde su app y el estudio no las conoce. */}
                 {(() => {
                     const wa = whatsAppDeAsistente(attendee, clase);
-                    if (!wa) return null;
+                    if (!wa) return <span className="text-xs text-muted-foreground">Sin WhatsApp válido · actualiza su teléfono en el perfil</span>;
                     return (
                         <Button
                             asChild
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]"
+                            size="sm"
+                            variant="outline"
+                            className="min-h-11 gap-2 border-[#245C40]/30 text-[#245C40] hover:bg-[#245C40]/10"
                             title={`Escribir a ${attendee.display_name} por WhatsApp`}
                         >
                             <a href={wa} target="_blank" rel="noopener noreferrer" aria-label={`Escribir a ${attendee.display_name} por WhatsApp`}>
-                                <MessageCircle className="h-4 w-4" />
+                                <WhatsAppIcon className="h-5 w-5" /> WhatsApp
                             </a>
                         </Button>
                     );
