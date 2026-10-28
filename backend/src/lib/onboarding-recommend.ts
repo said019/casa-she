@@ -68,7 +68,7 @@ export const DEFAULT_RULES: OnboardingRules = {
     avanzada: W(1, 2, 3, 2, 2),
   },
   planByFrequency: {
-    probar: 'Clase de prueba',
+    probar: 'Drop-in',
     '1x': 'Paquete 5',
     '2x': 'Paquete 8',
     '3x': 'Paquete 12',
@@ -185,7 +185,8 @@ export function recommend(
     ? { class_type_id: catalog.disciplines.Salsa.id, name: 'Salsa' }
     : null;
 
-  const planName = rules.planByFrequency[answers.frequency];
+  const configuredPlan = rules.planByFrequency[answers.frequency];
+  const planName = configuredPlan === 'Clase de prueba' ? 'Drop-in' : configuredPlan;
   const planRow = catalog.plans[planName];
   const plan = { plan_id: planRow?.id ?? null, name: planName, price: planRow?.price ?? null };
 
