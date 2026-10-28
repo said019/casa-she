@@ -9,6 +9,7 @@ import UpdatePrompt from "@/components/UpdatePrompt";
 
 // Public pages
 import Index from "./pages/Index";
+import PersonalAssistance from './components/PersonalAssistance';
 import BioLink, { BioContact, BioLocation, BioPackages, BioReserve, BioSchedule, BioSpace } from "./pages/BioLink";
 import { BioCheckoutFinalize, BioGuestCheckout } from "./pages/BioGuestCheckout";
 import CasaSheLanding from "./pages/CasaSheLanding";
@@ -229,6 +230,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <ManifestSwitcher />
+        <PersonalAssistance />
         <AuthInitializer>
           <Routes>
             {/* Public Routes */}

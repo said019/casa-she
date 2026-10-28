@@ -7,6 +7,19 @@ import { invalidateCache, getSetting, setSetting } from '../lib/settings.js';
 
 const router = Router();
 
+// Only the studio's public WhatsApp; never expose the complete settings object.
+router.get('/public-contact', async (_req: Request, res: Response) => {
+    try {
+        const row = await queryOne<{ whatsapp: string | null }>(
+            `SELECT value->'social_media'->>'whatsapp' AS whatsapp
+             FROM system_settings WHERE key='studio_info'`
+        );
+        res.json({ whatsapp: row?.whatsapp || null });
+    } catch {
+        res.status(500).json({ error: 'No se pudo obtener el contacto del estudio' });
+    }
+});
+
 // ============================================
 // BOOKING ENABLED — interruptor global de reservas de clientas. Lo prenden/apagan
 // admin + recepción MASTER (requireElevated). Lo lee cualquier usuario autenticado.

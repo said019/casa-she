@@ -24,7 +24,7 @@ assert.ok(!/wa\.me\/52525538861972/.test(enlaceWhatsApp({ ...base, telefono: '52
 assert.match(enlaceWhatsApp({ ...base, telefono: '+1 555 123 4567' })!, /wa\.me\/15551234567\?/);
 
 // Sin teléfono utilizable: null, para que no se pinte el botón.
-for (const t of [null, undefined, '', '   ', '55 1234', 'sin número']) {
+for (const t of [null, undefined, '', '   ', '55 1234', 'sin número', '+00000362058', '+00000691610', '+1234567890123456']) {
     assert.equal(enlaceWhatsApp({ ...base, telefono: t as string }), null, `debió ser null con "${t}"`);
 }
 
