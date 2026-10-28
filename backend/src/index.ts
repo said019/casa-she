@@ -3619,7 +3619,7 @@ async function runStartupMigrations(): Promise<void> {
     // admin cree después.
     // ===========================================================================
     try {
-        const CS_PLANS = ['Clase de prueba', 'Drop-in', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Membresía 360', 'Membresía Black', 'Salsa · 1 clase', 'Salsa · 4 clases'];
+        const CS_PLANS = ['Clase de prueba', 'Drop-in', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Mensual ilimitado', 'Membresía 360', 'Membresía Black', 'Salsa · 1 clase', 'Salsa · 4 clases'];
         const CS_TYPES = CASA_SHE_OFFICIAL_CLASS_TYPES.map((type) => type.name);
 
         // Reglamento obligatorio: marca de aceptación por usuaria (NULL = no aceptado aún).
