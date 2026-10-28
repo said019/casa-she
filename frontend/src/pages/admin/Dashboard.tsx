@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/layout/AdminLayout';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 import { BookingToggleCard } from '@/components/admin/BookingToggleCard';
 import { CajaStatusCard } from '@/components/admin/CajaStatusCard';
+import { BirthdayMessage } from '@/components/admin/BirthdayMessage';
 import { RECEPTION_ENABLED } from '@/config/features';
 import api from '@/lib/api';
 import type { AdminStats, Membership } from '@/types/auth';
@@ -306,9 +307,8 @@ export default function AdminDashboard() {
                                     const isPast = day < today.getDate();
 
                                     return (
-                                        <Link
+                                        <div
                                             key={b.id}
-                                            to={`/admin/members/${b.id}`}
                                             className={`flex items-center gap-3 rounded-[1.15rem] p-3 transition-all duration-200 active:scale-[0.995] ${
                                                 isToday
                                                     ? 'bg-balance-dark text-balance-cream'
@@ -317,6 +317,7 @@ export default function AdminDashboard() {
                                                     : 'bg-balance-cream/72 hover:bg-balance-cream'
                                             }`}
                                         >
+                                            <Link to={`/admin/members/${b.id}`} className="flex min-w-0 flex-1 items-center gap-3">
                                             <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold tabular-nums ${
                                                 isToday ? 'bg-balance-cream text-balance-dark' : 'bg-balance-sand/35 text-balance-dark'
                                             }`}>
@@ -328,7 +329,9 @@ export default function AdminDashboard() {
                                                     {isToday ? 'Cumple años hoy' : `${day} de ${format(bday, 'MMMM', { locale: es })}`}
                                                 </p>
                                             </div>
-                                        </Link>
+                                            </Link>
+                                            <BirthdayMessage client={b} />
+                                        </div>
                                     );
                                 })}
                             </div>
