@@ -115,6 +115,7 @@ export default function ClientsList() {
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(0);
     const [membershipStatus, setMembershipStatus] = useState('');
+    const [platform, setPlatform] = useState('');
     const [filterPlanId, setFilterPlanId] = useState('');
     const [tag, setTag] = useState('');
     const [facilityId, setFacilityId] = useState('');
@@ -128,7 +129,7 @@ export default function ClientsList() {
     const queryClient = useQueryClient();
 
     const { data, isLoading } = useQuery<UsersListResponse>({
-        queryKey: ['users', debouncedSearch, page, membershipStatus, filterPlanId, tag, facilityId, sort],
+        queryKey: ['users', debouncedSearch, page, membershipStatus, filterPlanId, tag, facilityId, sort, platform],
         queryFn: async () => {
             const params = new URLSearchParams();
             if (debouncedSearch) params.append('search', debouncedSearch);
@@ -140,6 +141,7 @@ export default function ClientsList() {
             if (membershipStatus) params.append('membershipStatus', membershipStatus);
             if (filterPlanId) params.append('planId', filterPlanId);
             if (tag) params.append('tag', tag);
+            if (platform) params.append('platform', platform);
             if (facilityId) params.append('facilityId', facilityId);
             if (sort) params.append('sort', sort);
 
@@ -231,6 +233,14 @@ export default function ClientsList() {
                             />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                            <Select value={platform || 'all'} onValueChange={v => { setPlatform(v === 'all' ? '' : v); setPage(0); }}>
+                                <SelectTrigger aria-label="Filtrar usuarios por plataforma"><SelectValue placeholder="Plataforma" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todas las plataformas</SelectItem>
+                                    <SelectItem value="fitpass">Fitpass</SelectItem>
+                                    <SelectItem value="totalpass">TotalPass</SelectItem>
+                                </SelectContent>
+                            </Select>
                             <Select
                                 value={membershipStatus || 'all'}
                                 onValueChange={(v) => { setMembershipStatus(v === 'all' ? '' : v); setPage(0); }}

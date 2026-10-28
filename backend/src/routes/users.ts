@@ -1162,8 +1162,11 @@ router.get('/', requireRole('admin', 'super_admin', 'reception'), async (req: Re
         let { role } = req.query;
         const {
             search, limit = 50, offset = 0, withMembership,
-            membershipStatus, planId, facilityId, tag, sort, withCounts,
+            membershipStatus, planId, facilityId, tag, sort, withCounts, platform,
         } = req.query;
+        if (platform !== undefined && platform !== 'fitpass' && platform !== 'totalpass') {
+            return res.status(400).json({ error: 'Plataforma inválida' });
+        }
 
         // Defensa: recepción solo enumera clientes, no staff. Forzamos role='client'
         // independientemente de lo que venga en el query (404 si pide otro role).
@@ -1220,6 +1223,11 @@ router.get('/', requireRole('admin', 'super_admin', 'reception'), async (req: Re
         if (tag) {
             where += ` AND $${paramCount++} = ANY(u.tags)`;
             params.push(tag);
+        }
+        if (platform) {
+            where += ` AND EXISTS (SELECT 1 FROM bookings platform_booking
+                WHERE platform_booking.user_id = u.id AND platform_booking.channel = $${paramCount++})`;
+            params.push(platform);
         }
         if (planId) {
             where += ` AND m.plan_id = $${paramCount++}`;
