@@ -1,16 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import api from '@/lib/api';
 import { normalizarTelefono } from '@/lib/whatsapp';
 import { WhatsAppIcon } from './WhatsAppIcon';
 
 export default function PersonalAssistance() {
+  const { pathname } = useLocation();
+  const visible = ['/', '/landing', '/bio', '/bio-link', '/inicio-clasico', '/bio/contacto'].includes(pathname);
   const { data } = useQuery<{ whatsapp: string | null }>({
     queryKey: ['public-contact'],
     queryFn: async () => (await api.get('/settings/public-contact')).data,
     staleTime: 60_000,
+    enabled: visible,
   });
   const phone = normalizarTelefono(data?.whatsapp);
-  if (!phone) return null;
+  if (!visible || !phone) return null;
   return <a
     href={`https://wa.me/${phone}?text=${encodeURIComponent('Hola Casa Shé, me gustaría recibir asistencia personal.')}`}
     target="_blank" rel="noopener noreferrer"

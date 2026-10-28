@@ -9,7 +9,6 @@ import StudioGallery from "@/components/StudioGallery";
 import Location from "@/components/Location";
 import Footer from "@/components/Footer";
 import { Reveal } from "@/components/Reveal";
-import PersonalAssistance from '@/components/PersonalAssistance';
 
 const Index = () => {
   return (
@@ -24,7 +23,6 @@ const Index = () => {
       <Reveal><StudioGallery /></Reveal>
       <Reveal><Location /></Reveal>
       <Footer />
-      <PersonalAssistance />
     </main>
   );
 };
