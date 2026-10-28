@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { reservationIdentity, tpLocalTime } from '../src/lib/totalpass/reservation-identity.js';
+const ref='ef4f6cdf-44df-4dc2-9146-c95a32e00152';
+const event:any={id:42,title:'Old name',EventOccurrences:[{eventOccurrenceUuid:'occ',externalReference:ref,eventDate:'2026-10-28T18:00:00Z',startTime:'06:00 PM'}]};
+const slot:any={event:{id:42,title:'Renamed'},slotDate:'2026-10-28',startTime:'18:00'};
+assert.deepEqual(reservationIdentity(slot,[event]),{occurrenceId:'occ',classId:ref});
+assert.equal(reservationIdentity({...slot,event:{id:43}},[event]).classId,null);
+assert.equal(reservationIdentity({...slot,startTime:'17:00'},[event]).classId,null);
+assert.equal(reservationIdentity({...slot,slotDate:'2026-10-29'},[event]).classId,null);
+assert.equal(reservationIdentity(slot,[event,event]).classId,null);
+assert.equal(reservationIdentity({...slot,eventOccurrenceUuid:'occ'},[event]).classId,ref);
+assert.equal(tpLocalTime('12:00 AM'),'00:00');assert.equal(tpLocalTime('12:00 PM'),'12:00');
+assert.equal(tpLocalTime('06:00 PM'),'18:00');assert.equal(tpLocalTime('18:00:00'),'18:00');
+assert.equal(tpLocalTime('25:00'),'');assert.equal(tpLocalTime('12:61'),'');
+console.log('12 identity/time checks passed');

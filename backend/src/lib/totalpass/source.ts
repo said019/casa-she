@@ -38,7 +38,12 @@ import {
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
+import { reservationIdentity, tpLocalTime } from './reservation-identity.js';
+import type { TotalPassOfficialEvent } from './client.js';
+
 export interface TotalPassImportRow {
+    occurrenceId?: string | null;
+    classId?: string | null;
     sourceRef: string;          // slot._id — llave de idempotencia
     classTitle: string;         // = class_types.name
     date: string;               // 'YYYY-MM-DD'
@@ -88,15 +93,16 @@ export function esSlotVivo(status: unknown): boolean {
     return s !== 'canceled' && s !== 'cancelled' && s !== 'denied';
 }
 
-export function extractOfficialReservationRows(slots: TotalPassOfficialSlot[]): TotalPassImportRow[] {
+export function extractOfficialReservationRows(slots: TotalPassOfficialSlot[], events: TotalPassOfficialEvent[] = []): TotalPassImportRow[] {
     return (slots || [])
         .filter((slot) => String(slot.status || '').toLowerCase() === 'confirmed')
         .filter((slot) => Boolean(slot._id))
         .map((slot) => ({
+            ...reservationIdentity(slot, events),
             sourceRef: String(slot._id),
             classTitle: String(slot.event?.title || '').trim(),
             date: String(slot.slotDate || '').slice(0, 10),
-            startTime: String(slot.startTime || '').slice(0, 5),
+            startTime: tpLocalTime(slot.startTime),
             displayName: String(slot.user?.name || '').trim() || 'Cliente TotalPass',
             email: slot.user?.email ? String(slot.user.email) : null,
             phone: slot.user?.phone ? String(slot.user.phone) : null,
@@ -256,7 +262,7 @@ export async function importTotalPassReservations(rows: TotalPassImportRow[]): P
     for (const row of rows) {
         try {
             // (1) Empatar la clase Casa Shé por título + fecha + hora.
-            const cls = await queryOne<{
+            const candidates = await query<{
                 id: string;
                 max_capacity: number;
                 current_bookings: number;
@@ -268,14 +274,23 @@ export async function importTotalPassReservations(rows: TotalPassImportRow[]): P
                    FROM classes c
                    JOIN class_types ct ON ct.id = c.class_type_id
                    LEFT JOIN instructors i ON i.id = c.instructor_id
-                  WHERE ct.name = $1
+                  WHERE (
+                    (($4::text IS NOT NULL OR $5::text IS NOT NULL) AND
+                      (c.id::text = $5 OR EXISTS (
+                        SELECT 1 FROM partner_class_mappings pcm
+                        WHERE pcm.class_id = c.id AND pcm.channel = 'totalpass'
+                          AND pcm.external_occurrence_id = $4
+                      )))
+                    OR ($4::text IS NULL AND $5::text IS NULL AND ct.name = $1)
+                  )
                     AND c.date = $2::date
                     AND c.start_time::text LIKE $3
                     AND c.status <> 'cancelled'
                   ORDER BY c.created_at ASC
-                  LIMIT 1`,
-                [row.classTitle, row.date, `${row.startTime}%`],
+                  LIMIT 2`,
+                [row.classTitle, row.date, `${row.startTime}%`, row.occurrenceId || null, row.classId || null],
             );
+            const cls = candidates.length === 1 ? candidates[0] : null;
             if (!cls) {
                 summary.skippedNoClass++;
                 console.warn(`[tp-import] sin clase para ${row.classTitle} ${row.date} ${row.startTime}`);
@@ -420,7 +435,9 @@ export async function syncTotalPassReservations(): Promise<TpSyncResult> {
         throw err;
     }
 
-    const rows = extractOfficialReservationRows(slots);
+    // Stable occurrence identity survives renamed classes; do not guess by hour/coach.
+    const events = await client.listEvents();
+    const rows = extractOfficialReservationRows(slots, events);
     const summary = await importTotalPassReservations(rows);
 
     // ── Reconciliación de cancelaciones ──────────────────────────────────────
@@ -442,7 +459,7 @@ export async function syncTotalPassReservations(): Promise<TpSyncResult> {
     for (const slot of slots || []) {
         const title = String(slot.event?.title || '').trim();
         const date = String(slot.slotDate || '').slice(0, 10);
-        const hhmm = String(slot.startTime || '').slice(0, 5);
+        const hhmm = tpLocalTime(slot.startTime);
         if (title && date && hhmm) readClassKeys.add(tpClassKey(title, date, hhmm));
     }
 
