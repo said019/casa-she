@@ -8,7 +8,7 @@ export default function CancellationPolicy() {
         queryKey: ['cancellation-policy'],
         queryFn: async () => (await api.get('/settings/cancellation-policy')).data,
     });
-    const minHours = Number(policy?.min_hours ?? 12);
+    const minHours = Number(policy?.min_hours ?? 5);
     return (
         <div className="min-h-screen bg-muted/20">
             <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b pt-[env(safe-area-inset-top)]">
@@ -32,16 +32,23 @@ export default function CancellationPolicy() {
                                 <h1 className="font-heading text-3xl lg:text-4xl font-bold">Política de cancelación</h1>
                             </div>
                             <p className="text-muted-foreground">
-                                Última actualización: 27 de abril de 2026
+                                Última actualización: 28 de octubre de 2026
                             </p>
                             <p className="text-muted-foreground leading-relaxed">
-                                En Casa Shé cuidamos el tiempo de cada alumna y coach. Las clases tienen
-                                solo 6 lugares, por eso cada reserva ocupa un crédito.
+                                En Casa Shé cuidamos el tiempo de cada alumna y coach. Cancelar a tiempo
+                                permite que otra alumna aproveche tu lugar.
                             </p>
                         </div>
 
                         <div className="space-y-6">
                             <h2 className="font-heading text-2xl font-semibold">Reglas</h2>
+                            <div className="p-5 rounded-xl border">
+                                <h3 className="font-semibold text-base mb-1">Clase muestra: sin devolución de dinero</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                    El pago de la clase muestra no es reembolsable. La devolución de un crédito
+                                    por cancelar a tiempo no es un reembolso de dinero.
+                                </p>
+                            </div>
 
                             <div className="flex items-start gap-4 p-5 rounded-xl border bg-emerald-50/50 border-emerald-200 dark:bg-emerald-950/10 dark:border-emerald-800">
                                 <CheckCircle2 className="w-6 h-6 text-emerald-600 mt-0.5 shrink-0" />

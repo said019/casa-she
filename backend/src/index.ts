@@ -1097,7 +1097,7 @@ async function runStartupMigrations(): Promise<void> {
     try {
         await query(`
             INSERT INTO system_settings (key, value)
-            VALUES ('booking_policies', '{"max_advance_days": 30, "cancellation_hours": 12, "no_show_penalty": true}'::jsonb)
+            VALUES ('booking_policies', '{"max_advance_days": 30, "cancellation_hours": 5, "no_show_penalty": true}'::jsonb)
             ON CONFLICT (key) DO UPDATE
             SET value = system_settings.value || jsonb_build_object('max_advance_days', 30)
         `);
@@ -1850,11 +1850,23 @@ async function runStartupMigrations(): Promise<void> {
                 )
         `, [JSON.stringify({
             enabled: true,
-            min_hours: 4,
+            min_hours: 5,
             refund_credit_on_cancel: true,
             cancellations_per_membership: 2,
             late_cancel_message: 'Esta clase ya no puede cancelarse a tiempo para recuperar tu crédito.',
         })]);
+
+        // Align both settings once; later administrative configuration remains editable.
+        await query(`DO $policy$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM migration_flags WHERE name='casa_cancellation_5h_20261028') THEN
+                    UPDATE system_settings SET value = value || '{"min_hours":5,"enabled":true,"refund_credit_on_cancel":true}'::jsonb,
+                        updated_at=NOW() WHERE key='cancellation_policy';
+                    UPDATE system_settings SET value = value || '{"cancellation_hours":5}'::jsonb,
+                        updated_at=NOW() WHERE key='booking_policies';
+                    INSERT INTO migration_flags(name) VALUES ('casa_cancellation_5h_20261028');
+                END IF;
+            END $policy$`);
 
         // Drop and recreate the function (idempotent). Se dropean firmas previas (3 y 4 args)
         // para poder recrear con la firma de 5 args (p_force) sin overloads ambiguos.
@@ -1972,7 +1984,7 @@ async function runStartupMigrations(): Promise<void> {
                 --   Free-class bookings NEVER refund (no credit was deducted).
                 IF v_booking.is_free_booking OR (v_booking.is_companion_booking AND v_booking.consumed_category IS NULL) THEN
                     v_should_refund := false;
-                ELSIF p_force_refund IS NOT NULL THEN
+                ELSIF p_is_admin AND p_force_refund IS NOT NULL THEN
                     -- Override explícito del staff (el switch "Devolver crédito" del diálogo).
                     -- Manda sobre la lógica automática (clase gratis nunca devuelve, va antes).
                     v_should_refund := p_force_refund;
@@ -2018,6 +2030,7 @@ async function runStartupMigrations(): Promise<void> {
                 UPDATE user_benefits
                    SET status = 'active', used_at = NULL, used_by = NULL, used_on_booking_id = NULL
                  WHERE used_on_booking_id = p_booking_id
+                   AND (v_hours >= v_min_hours OR p_is_admin)
                    AND status = 'used'
                    AND expires_at > NOW();
 
@@ -2135,7 +2148,7 @@ async function runStartupMigrations(): Promise<void> {
                 out_error_code := NULL;
                 IF v_booking.is_free_booking OR (v_booking.is_companion_booking AND v_booking.consumed_category IS NULL) THEN
                     out_would_refund := false;
-                    out_reason := 'Esta reserva no consumió créditos. Si hubo un pago, recepción revisará su devolución.';
+                    out_reason := 'Esta reserva no consumió créditos. Cancelar no genera una devolución de dinero; la clase muestra no es reembolsable.';
                 ELSIF p_is_admin THEN
                     out_would_refund := true;
                     out_reason := 'Admin siempre devuelve crédito';
@@ -3606,7 +3619,7 @@ async function runStartupMigrations(): Promise<void> {
     // admin cree después.
     // ===========================================================================
     try {
-        const CS_PLANS = ['Clase de prueba', 'Drop-in', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Membresía 360', 'Membresía Black', 'Salsa · 1 clase', 'Salsa · 4 clases'];
+        const CS_PLANS = ['Clase de prueba', 'Drop-in', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Mensual ilimitado', 'Membresía 360', 'Membresía Black', 'Salsa · 1 clase', 'Salsa · 4 clases'];
         const CS_TYPES = CASA_SHE_OFFICIAL_CLASS_TYPES.map((type) => type.name);
 
         // Reglamento obligatorio: marca de aceptación por usuaria (NULL = no aceptado aún).

@@ -871,7 +871,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
             const cancelPolicy = await queryOne<{ value: { min_hours?: number } }>(
                 "SELECT value FROM system_settings WHERE key = 'cancellation_policy'"
             );
-            const cancelHours = Number(cancelPolicy?.value?.min_hours ?? 4);
+            const cancelHours = Number(cancelPolicy?.value?.min_hours ?? 5);
 
             if (shouldSend) {
                 const user = await queryOne<{ display_name: string; phone: string; email: string }>(
