@@ -43,7 +43,7 @@ export function CancelBookingDialog({ bookingId, open, onClose, onCancelled, for
         enabled: open && !!bookingId && !force,
     });
 
-    const minHours = preview?.minHours ?? 12;
+    const minHours = preview?.minHours ?? 5;
     const withinWindow = !!preview && preview.hoursUntilClass != null && preview.hoursUntilClass >= minHours;
 
     // El servidor es la fuente canónica para decidir la devolución sugerida.

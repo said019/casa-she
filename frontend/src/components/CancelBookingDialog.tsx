@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 
 interface CancelPreview {
+  minHours: number | null;
   willRefund: boolean;
   hoursUntilClass: number;
   cancellationsUsed: number;
@@ -146,8 +147,9 @@ export function CancelBookingDialog({
             <div className="rounded-lg bg-muted/30 p-3 text-[11px] text-muted-foreground leading-relaxed">
               <p className="font-medium text-xs mb-1">Política de cancelación:</p>
               <ul className="list-disc list-inside space-y-0.5">
-                <li>Cancelar con <strong>+12 horas</strong> de anticipación = reembolso de crédito</li>
-                <li>Cancelar con <strong>menos de 12 horas</strong> = sin reembolso</li>
+                <li>Cancelar con <strong>al menos {preview?.minHours ?? 5} horas</strong> de anticipación = devolución de crédito</li>
+                <li>Cancelar con <strong>menos de {preview?.minHours ?? 5} horas</strong> = sin devolución de crédito</li>
+                <li>La clase muestra no tiene devolución de dinero.</li>
                 <li>No asistir a clase descuenta el crédito reservado</li>
               </ul>
             </div>

@@ -21,7 +21,7 @@ export default function Terms() {
         queryKey: ['cancellation-policy'],
         queryFn: async () => (await api.get('/settings/cancellation-policy')).data,
     });
-    const minHours = Number(policy?.min_hours ?? 12);
+    const minHours = Number(policy?.min_hours ?? 5);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -168,8 +168,9 @@ export default function Terms() {
                                 <div className="space-y-3">
                                     <h3 className="font-medium text-lg">Política de Cancelación</h3>
                                     <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
-                                        <li>Cancelaciones con más de {minHours} {minHours === 1 ? 'hora' : 'horas'} de antelación no generan cargo.</li>
-                                        <li>Cancelaciones tardías (menos de {minHours} {minHours === 1 ? 'hora' : 'horas'}) resultarán en la pérdida de la clase o un cargo por "late cancel".</li>
+                                        <li>Cancelaciones con al menos {minHours} {minHours === 1 ? 'hora' : 'horas'} de anticipación devuelven el crédito al paquete.</li>
+                                        <li>Cancelaciones con menos de {minHours} {minHours === 1 ? 'hora' : 'horas'} de anticipación no devuelven el crédito.</li>
+                                        <li>La clase muestra no tiene devolución de dinero. Devolver un crédito no equivale a reembolsar el pago.</li>
                                         <li>La inasistencia sin cancelación ("no-show") resultará en la pérdida de la clase y posibles penalizaciones.</li>
                                     </ul>
                                 </div>

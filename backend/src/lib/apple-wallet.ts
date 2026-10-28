@@ -360,7 +360,7 @@ function readPemFile(filePath: string): string {
     return match ? match[0].trim() : raw;
 }
 
-function buildTempModelDir(m: MembershipData, style: typeof PLAN_STYLES.basico, cancelInfo: { minHours: number; maxCancel: number } = { minHours: 12, maxCancel: 2 }): string {
+function buildTempModelDir(m: MembershipData, style: typeof PLAN_STYLES.basico, cancelInfo: { minHours: number; maxCancel: number } = { minHours: 5, maxCancel: 2 }): string {
     const base = fs.mkdtempSync(path.join(os.tmpdir(), 'apple-pass-'));
     const dir = base + '.pass';
     fs.mkdirSync(dir, { recursive: true });
@@ -486,7 +486,7 @@ export async function buildApplePassBuffer(membershipId: string): Promise<Buffer
         "SELECT value FROM system_settings WHERE key = 'cancellation_policy'"
     );
     const cancelInfo = {
-        minHours: Number(cancelPol?.value?.min_hours ?? 12),
+        minHours: Number(cancelPol?.value?.min_hours ?? 5),
         maxCancel: Number(cancelPol?.value?.cancellations_per_membership ?? 2),
     };
     const modelDir = buildTempModelDir(m, style, cancelInfo);
