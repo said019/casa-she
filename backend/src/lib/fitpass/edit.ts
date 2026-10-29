@@ -18,7 +18,7 @@ import { localDateStr } from '../mx-time.js';
 import { computeFitpassScheduleCapacity } from './availability.js';
 import { cdmxDateTime, getFitpassMapping, isRealCoach, scheduleSlot, slotKey } from './ownership.js';
 import { familyCompatible } from './family.js';
-import { fitpassPublishEnabled, listWindow, minutesBetween, type PanelCtx } from './panel.js';
+import { fitpassPublishEnabled, listWindow, minutesBetween, classStartedAlready, type PanelCtx } from './panel.js';
 
 export async function marcarEdicionFitpass(classIds: string[], db?: ClienteTx): Promise<number> {
     if (!classIds.length) return 0;
@@ -79,8 +79,11 @@ export async function procesarEdicionesFitpass(o: { ctx: PanelCtx; db?: ClienteT
         `UPDATE partner_class_mappings SET sync_status = 'synced', sync_error = NULL, last_synced_at = NOW(), updated_at = NOW(),
                 metadata = COALESCE(metadata,'{}'::jsonb) - 'fitpass_edit' WHERE class_id = $1 AND channel = 'fitpass'`, [id]);
 
-    const live = rows.filter((r) => r.status === 'scheduled');
-    for (const r of rows.filter((x) => x.status !== 'scheduled')) {
+    const past = rows.filter((r) => classStartedAlready(r, o.now ?? new Date()));
+    for (const r of past) await filas(o.db, `UPDATE partner_class_mappings SET sync_status='skipped', sync_enabled=false, sync_error='past-edit-not-applied', updated_at=NOW() WHERE class_id=$1 AND channel='fitpass'`, [r.class_id]);
+    const future = rows.filter((r) => !past.includes(r));
+    const live = future.filter((r) => r.status === 'scheduled');
+    for (const r of future.filter((x) => x.status !== 'scheduled')) {
         await filas(o.db, `UPDATE partner_class_mappings SET sync_status = 'pending_delete', updated_at = NOW() WHERE class_id = $1 AND channel = 'fitpass'`, [r.class_id]);
         s.aCancelar++;
     }
@@ -98,10 +101,9 @@ export async function procesarEdicionesFitpass(o: { ctx: PanelCtx; db?: ClienteT
                 await filas(o.db, `UPDATE partner_class_mappings SET sync_status='skipped', sync_enabled=false, sync_error='disabled-in-panel', updated_at=NOW() WHERE class_id=$1 AND channel='fitpass'`, [r.class_id]);
                 s.fallidas++; continue;
             }
-            // Misma schedule: conserva su lesson (variante) si sigue siendo de la familia del tipo; si el tipo
-            // cambió de familia usa el default del tipo nuevo.
+            // La disciplina configurada del tipo es autoritativa. Si falta, solo conservar una variante compatible.
             const keepLesson = familyCompatible(r.type_name, sched.lesson?.name);
-            const lessonId = keepLesson ? Number(sched.lesson!.id) : r.lesson_id;
+            const lessonId = r.lesson_id ?? (keepLesson ? Number(sched.lesson!.id) : null);
             if (lessonId == null) { s.fallidas++; await setErr(r.class_id, 'edit-failed: tipo-sin-lesson-fitpass'); continue; }
             const key = slotKey(r.date, r.hhmm);
             const otra = schedules.find((x) => x.disabled !== true && Number(x.id) !== Number(sched.id)
@@ -118,7 +120,9 @@ export async function procesarEdicionesFitpass(o: { ctx: PanelCtx; db?: ClienteT
                 lessonTime: r.hhmm, length, lessonAvailability: availability, multiple: false,
             });
             const after = await listWindow(o.ctx, r.date.slice(0, 10), r.date.slice(0, 10));
-            const ok = after.find((x) => Number(x.id) === Number(sched.id) && x.disabled !== true && scheduleSlot(x).key === key);
+            const ok = after.find((x) => Number(x.id) === Number(sched.id) && x.disabled !== true && scheduleSlot(x).key === key
+                && Number(x.lesson?.id) === lessonId && (x.instructor?.name || '').trim() === coach
+                && Number(x.length) === length && Number(x.lesson_availability) === availability);
             if (!ok) { s.fallidas++; await setErr(r.class_id, 'edit-failed: verify-failed'); continue; }
             await setSynced(r.class_id);
             s.sincronizadas++;

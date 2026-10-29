@@ -9,7 +9,7 @@
  * genéricas (mat, abs, yoga) = 1. 'pilates' y 'mat' son la misma familia (se expanden entre sí); una familia
  * incompatible (sin disciplina compartida) puntúa 0 y nunca empata.
  */
-export const FAMILY_KEYWORDS = ['barre', 'pilates', 'mat', 'sculpt', 'abs', 'vinyasa', 'dharma', 'rocket', 'ashtanga', 'navakarana', 'flow', 'flex', 'yoga'] as const;
+export const FAMILY_KEYWORDS = ['barre', 'pilates', 'mat', 'sculpt', 'abs', 'vinyasa', 'dharma', 'rocket', 'ashtanga', 'navakarana', 'flow', 'flex', 'yoga', 'salsa'] as const;
 // El tipo "Pilates Mat" de Casa Shé aparece en el panel como "MAT FULL BODY", "MAT ABS Y BUTT"…: 'mat' expande a
 // 'pilates' (disciplina, peso 3) en familyKeywords, así que 'mat' solo aporta como genérica.
 const SECONDARY = new Set<string>(['mat', 'abs', 'yoga']);
