@@ -36,7 +36,7 @@ assert.equal(isRealCoach('Ana', GYM_DEFAULT_COACH), true);
 ok('fingerprint UTC->CDMX (antes y después de las 6pm)');
 
 // ── 1b. Familias: tipo de Casa Shé vs variante del panel ────────────────────
-for (const [casa, fpn] of [['Barre', 'BARRE - ABS & BUTT'], ['Barre', 'BARRE GAP'], ['Barre Funcional', 'BARRE - FULL BODY'], ['Pilates Mat', 'PILATES MAT - GAP'], ['Pilates Mat', 'MAT FULL BODY'], ['Pilates Mat', 'MAT ABS Y BUTT'], ['Pilates Booty', 'PILATES MAT ABS & BUTT'],
+for (const [casa, fpn] of [['Salsa', 'Salsa'], ['Barre', 'BARRE - ABS & BUTT'], ['Barre', 'BARRE GAP'], ['Barre Funcional', 'BARRE - FULL BODY'], ['Pilates Mat', 'PILATES MAT - GAP'], ['Pilates Mat', 'MAT FULL BODY'], ['Pilates Mat', 'MAT ABS Y BUTT'], ['Pilates Booty', 'PILATES MAT ABS & BUTT'],
     ['Power Abs', 'POWER ABS'], ['Mat Power Abs', 'MAT - POWER ABS'], ['Sculpt (Abs & Butt)', 'SCULPT ABS & BUTT'], ['Yoga Vinyasa', 'VINYASA YOGA'],
     ['Power Vinyasa', 'VINYASA YOGA'], ['Navakarana', 'NAVAKARANANA YOGA'], ['Inicios de Ashtanga', 'ASHTANGA YOGA'], ['Flex & Flow', 'FLEX'], ['Yoga Dharma', 'DHARMA YOGA'], ['Morning Flow', 'FLOW YOGA']]) {
     assert.ok(familyCompatible(casa, fpn), `${casa} ~ ${fpn}`);
@@ -306,6 +306,26 @@ async function main() {
         assert.equal(cdmxDateTime(s500.lesson_time).hhmm, '05:30');
         assert.equal((await map(cE)).sync_status, 'synced'); assert.equal((await map(cE)).external_slot_id, '500');
         ok('edición: preflight anti-robo, conflicto visible, mueve la misma schedule, detrás del flag');
+        s500.lesson = { id: LESSON + 999, name: 'BARRE GAP' };
+        await marcarEdicionFitpass([cE], client);
+        const variant = await procesarEdicionesFitpass({ctx:fp.ctx,db:client,enabled:true});
+        assert.equal(variant.sincronizadas,1);
+        assert.equal(s500.lesson.id,LESSON);
+        const update = fp.ctx.panel.updateSchedule;
+        fp.ctx.panel.updateSchedule = async () => ({status:200,raw:''});
+        await q(`UPDATE classes SET end_time=end_time+interval '5 minutes' WHERE id=$1`,[cE]);
+        await marcarEdicionFitpass([cE],client);
+        const ignored = await procesarEdicionesFitpass({ctx:fp.ctx,db:client,enabled:true});
+        assert.equal(ignored.fallidas,1);
+        assert.equal((await map(cE)).sync_status,'pending_resync');
+        fp.ctx.panel.updateSchedule = update;
+        await q(`UPDATE classes SET date='2020-01-01' WHERE id=$1`,[cE]);
+        const callsBefore = fp.state.calls.length;
+        await procesarEdicionesFitpass({ctx:fp.ctx,db:client,enabled:true});
+        assert.equal(fp.state.calls.length,callsBefore);
+        assert.equal((await map(cE)).sync_error,'past-edit-not-applied');
+        ok('edición: variante correcta, respuesta 200 sin cambio falla, histórico no se modifica');
+
 
         // ── 8. Tope por API / lote ─────────────────────────────────────────
         const cT = await mk(ct, '04:00', 6);
