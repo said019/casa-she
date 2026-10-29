@@ -56,6 +56,10 @@ const LESSONS_HUNDRED = `<table><tbody>
     assert.deepEqual(parseReservacionesHtml(reservationsHtml([])), []);
     assert.deepEqual(parseReservacionesHtml('<turbo-stream><template><div class="empty-state">No hay reservaciones</div></template></turbo-stream>'), []);
     ok('reservaciones: vacío reconocible = []');
+    const emptyPanel = '<turbo-stream action="update" target="search_result"><template><div>Sin datos que mostrar</div></template></turbo-stream>';
+    assert.deepEqual(parseReservacionesHtml(emptyPanel), []);
+    assert.throws(() => parseReservacionesHtml(emptyPanel.replace('search_result', 'login')), /reconocible/);
+    ok('vacío real del panel aceptado únicamente en search_result');
 
     assert.throws(() => parseReservacionesHtml('<html>login</html>'), /Turbo Stream/);
     assert.throws(() => parseReservacionesHtml('<turbo-stream><template><table><tbody><tr><td>1</td><td>x</td></tr></tbody></table></template></turbo-stream>'), /incompleta|reconocible/);
@@ -134,6 +138,16 @@ class StubScraper extends FitPassScraper {
 }
 
 (async () => {
+    {
+        const expired = new StubScraper(() => ({ status: 200, data: '<input name="login_user[email]">' }));
+        await assert.rejects(() => expired.fetchReservationsRows(new Date(), new Date()), (e: unknown) => e instanceof FitPassHttpError && e.status === 401);
+        const paged = new StubScraper((c) => ({ status: 200, data: new URL(c.url).searchParams.has('pagination[page]')
+            ? '<turbo-stream action="update" target="search_result"><template>Sin datos que mostrar</template></turbo-stream>'
+            : reservationsHtml(Array.from({ length: 30 }, (_, i) => i + 1)) }));
+        assert.equal((await paged.fetchReservationsRows(new Date(), new Date())).length, 30);
+        ok('sesión vencida y última página vacía real');
+    }
+
     // Paginación: página 1 llena (30), página 2 corta -> 35 filas, params correctos
     {
         const urls: string[] = [];

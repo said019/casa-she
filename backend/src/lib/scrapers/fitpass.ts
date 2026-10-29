@@ -230,6 +230,10 @@ export function parseReservacionesHtml(html: string): Record<string, unknown>[] 
     const explicitEmpty = $('.empty-state, .no-results, [data-empty-state], td[colspan]')
         .toArray()
         .some((element) => isKnownEmptyText($(element).text()));
+    // Verified panel empty response: update search_result with “Sin datos que mostrar”.
+    // Scope it to the reservations target and exact text, never treat login/error HTML as empty.
+    const emptySearchResult = /<turbo-stream\b[^>]*\btarget=["']search_result["']/i.test(source)
+        && normalizeLabel($.root().text()) === 'sin datos que mostrar';
     const tables = $('table').toArray();
     const hasReservationHeaders = (table: any) => {
         const headers = $(table).find('th').toArray()
@@ -253,7 +257,7 @@ export function parseReservacionesHtml(html: string): Record<string, unknown>[] 
         if (firstNonemptyRow) {
             throw new Error('FitPass: fila de reservación incompleta en una tabla no reconocible');
         }
-        if (explicitEmpty) return out;
+        if (explicitEmpty || emptySearchResult) return out;
         throw new Error('FitPass: Turbo Stream de reservaciones no contiene una tabla reconocible');
     }
 
@@ -423,6 +427,9 @@ export class FitPassScraper extends BaseScraper {
                 responseType: 'text',
                 headers: { 'Accept': 'text/vnd.turbo-stream.html, text/html, application/xhtml+xml' },
             });
+            if (res.status === 401 || /name=["']login_user\[(?:email|password)\]["']/i.test(String(res.data))) {
+                throw new FitPassHttpError('FitPass: sesión vencida al consultar reservaciones', 401);
+            }
             if (res.status >= 400) {
                 throw new Error(`FitPass: GET reservaciones/search failed (${res.status}, página ${page})`);
             }

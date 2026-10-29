@@ -4,7 +4,7 @@
  * Check-in en Casa Shé de una reserva channel='fitpass' => POST /attendance_lists/{external_ref}/attend
  * (_method=patch) y marca partner_metadata.fp_attended_at. Fire-and-forget: si falla (típico: check-in antes
  * de que empiece la clase => 404) el check-in local ya quedó y reconcileFitpassAttendance lo reintenta
- * (checked_in de las últimas 36 h, clase ya iniciada, sin fp_attended_at).
+ * (clase iniciada hace menos de 48 h, sin fp_attended_at).
  */
 import { pool, query } from '../../config/database.js';
 import { FitPassScraper, fitpassAttendanceResponseMatches } from '../scrapers/fitpass.js';
@@ -63,9 +63,11 @@ export async function reflectFitpassAttendance(bookingIds: string | string[]): P
         const ids = Array.isArray(bookingIds) ? bookingIds : [bookingIds];
         if (!ids.length) return;
         const r = await pool.query<{ id: string; external_ref: string }>(
-            `SELECT id, external_ref FROM bookings
-              WHERE id = ANY($1::uuid[]) AND channel='fitpass' AND external_ref IS NOT NULL
-                AND status='checked_in' AND partner_metadata->>'fp_attended_at' IS NULL`, [ids]);
+            `SELECT b.id, b.external_ref FROM bookings b JOIN classes c ON c.id=b.class_id
+              WHERE b.id = ANY($1::uuid[]) AND channel='fitpass' AND external_ref IS NOT NULL
+                AND b.status='checked_in' AND b.partner_metadata->>'fp_attended_at' IS NULL
+                AND (c.date+c.start_time) > (now() AT TIME ZONE 'America/Mexico_City') - interval '48 hours'
+                AND (c.date+c.start_time) <= (now() AT TIME ZONE 'America/Mexico_City')`, [ids]);
         if (!r.rows.length) return;
         const scraper = await loginScraper();
         if (!scraper) return;
@@ -85,13 +87,13 @@ export async function reflectFitpassAttendance(bookingIds: string | string[]): P
 export interface PendingAttendance { id: string; external_ref: string }
 
 /** Selección de pendientes (expuesta para tests). */
-export async function selectPendingFitpassAttendance(): Promise<PendingAttendance[]> {
-    const r = await pool.query<PendingAttendance>(
+export async function selectPendingFitpassAttendance(db: Pick<typeof pool, 'query'> = pool): Promise<PendingAttendance[]> {
+    const r = await db.query<PendingAttendance>(
         `SELECT b.id, b.external_ref
            FROM bookings b JOIN classes c ON c.id=b.class_id
           WHERE b.channel='fitpass' AND b.external_ref IS NOT NULL
             AND b.status='checked_in'
-            AND b.checked_in_at >= now() - interval '36 hours'
+            AND (c.date + c.start_time) > (now() AT TIME ZONE 'America/Mexico_City') - interval '48 hours'
             AND (c.date + c.start_time) <= (now() AT TIME ZONE 'America/Mexico_City')
             AND b.partner_metadata->>'fp_attended_at' IS NULL
           ORDER BY b.checked_in_at ASC`);
@@ -100,18 +102,25 @@ export async function selectPendingFitpassAttendance(): Promise<PendingAttendanc
 
 export async function reconcileFitpassAttendance(
     scraperOverride?: Attender,
-): Promise<{ pending: number; ok: number; failed: number }> {
+): Promise<{ pending: number; ok: number; failed: number; expired: number }> {
+    // Keep expired records visible for manual reconciliation, without endlessly POSTing them.
+    const expiredResult = await pool.query<{ n: number }>(`SELECT count(*)::int AS n
+        FROM bookings b JOIN classes c ON c.id=b.class_id
+        WHERE b.channel='fitpass' AND b.external_ref IS NOT NULL AND b.status='checked_in'
+        AND b.partner_metadata->>'fp_attended_at' IS NULL
+        AND (c.date+c.start_time) <= (now() AT TIME ZONE 'America/Mexico_City') - interval '48 hours'`);
+    const expired = expiredResult.rows[0]?.n ?? 0;
     const pending = await selectPendingFitpassAttendance();
-    if (!pending.length) return { pending: 0, ok: 0, failed: 0 };
+    if (!pending.length) return { pending: 0, ok: 0, failed: 0, expired };
     let scraper: Attender | null = scraperOverride ?? null;
     if (!scraper) {
         try {
             scraper = await loginScraper();
         } catch (e) {
             console.error('[fp-reconcile] login error:', (e as Error).message);
-            return { pending: pending.length, ok: 0, failed: pending.length };
+            return { pending: pending.length, ok: 0, failed: pending.length, expired };
         }
-        if (!scraper) return { pending: pending.length, ok: 0, failed: 0 };
+        if (!scraper) return { pending: pending.length, ok: 0, failed: pending.length, expired };
     }
     let ok = 0, failed = 0;
     for (const b of pending) {
@@ -119,5 +128,5 @@ export async function reconcileFitpassAttendance(
         if (res.ok) { await markOk(b.id); ok++; }
         else { failed++; await markFail(b.id, res.reason ?? String(res.status ?? 'unknown')); }
     }
-    return { pending: pending.length, ok, failed };
+    return { pending: pending.length, ok, failed, expired };
 }

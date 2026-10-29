@@ -213,7 +213,7 @@ export function planFitpassPublish(classes: FpPlanClassRow[], schedules: FpListe
         const k = scheduleSlot(s).key;
         schedBySlot.set(k, [...(schedBySlot.get(k) ?? []), s]);
     }
-    const eligible = (c: FpPlanClassRow) => c.lesson_id != null && !c.mapped_slot && !opts.startsInPast(c, now);
+    const eligible = (c: FpPlanClassRow) => !c.mapped_slot && !opts.startsInPast(c, now);
     const classesBySlot = new Map<string, FpPlanClassRow[]>();
     for (const c of classes) {
         if (!eligible(c)) continue;
@@ -227,7 +227,6 @@ export function planFitpassPublish(classes: FpPlanClassRow[], schedules: FpListe
         const slot = slotKey(c.date, c.hhmm);
         const b = { classId: c.class_id, date: c.date, hhmm: c.hhmm, title: c.title, lessonId: c.lesson_id, slot };
         const skip = (reason: FpSkipReason, extra: Partial<FpPlanItem> = {}): FpPlanItem => ({ ...b, action: 'skip', reason, ...extra });
-        if (c.lesson_id == null) { items.push(skip('no-lesson')); continue; }
         if (c.mapped_slot) { items.push(skip('already-owned', { scheduleId: Number(c.mapped_slot) })); continue; }
         if (opts.startsInPast(c, now)) { items.push(skip('past')); continue; }
 
@@ -261,6 +260,7 @@ export function planFitpassPublish(classes: FpPlanClassRow[], schedules: FpListe
         // Hay schedules libres en el slot pero de OTRA familia (p. ej. Yoga a la misma hora que Barre):
         // nunca se adoptan; solo se reporta si no se puede crear.
         if (!opts.allowCreate) { items.push(skip(free.length > 0 ? 'family-mismatch' : 'no-match')); continue; }
+        if (c.lesson_id == null) { items.push(skip('no-lesson')); continue; }
         const sameFamilyPeers = peers.filter((p) => p.class_id !== c.class_id && familyScore(c.title, p.title) > 0);
         if (sameFamilyPeers.length > 0) { items.push(skip('shared-fingerprint')); continue; }
         if (!(Number(c.fp_cap) > 0)) { items.push(skip('no-fitpass-cap')); continue; }

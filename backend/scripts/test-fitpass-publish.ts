@@ -11,7 +11,7 @@ import { FITPASS_MIGRATIONS } from '../src/lib/fitpass/migrations.js';
 import { FitPassHttpError } from '../src/lib/scrapers/fitpass.js';
 import { localDateTimeUtc } from '../src/lib/mx-time.js';
 import { GYM_DEFAULT_COACH } from '../src/lib/gym-config.js';
-import { cdmxDateTime, fpFingerprint, scheduleFingerprint, isRealCoach } from '../src/lib/fitpass/ownership.js';
+import { cdmxDateTime, fpFingerprint, scheduleFingerprint, isRealCoach, planFitpassPublish } from '../src/lib/fitpass/ownership.js';
 import { familyScore, familyCompatible } from '../src/lib/fitpass/family.js';
 import { computeFitpassScheduleCapacity, reconcileFitpassPoolCore } from '../src/lib/fitpass/availability.js';
 import { adoptExistingFitpassSchedules, previewFitpassPublish, publishClassToFitpass, publishFitpassCore, extendFitpassWeek } from '../src/lib/fitpass/publish.js';
@@ -98,6 +98,14 @@ const sched = (id: number, lesson: number, date: string, hhmm: string, avail: nu
     lesson: { id: lesson, name: LESSON_NAMES[lesson] }, instructor: { name: 'Ana' }, disabled: false, parent_id: null, ...extra,
 });
 
+{
+    const row = {class_id:'unmapped',date:'2031-03-10',hhmm:'09:00',end_hhmm:'09:50',title:'Pilates Mat',coach:'Ana',capacity:7,lesson_id:null,mapped_slot:null,fp_cap:null,total_booked:0,fp_booked:0};
+    const opts = {defaultCoach:'Studio',allowCreate:true,owned:new Set<number>(),startsInPast:()=>false,capacityFor:()=>7};
+    assert.equal(planFitpassPublish([row],[sched(987,47206,row.date,row.hhmm,4,{lesson:{id:47206,name:'PILATES MAT'}})],opts)[0].action,'adopt');
+    assert.equal(planFitpassPublish([row],[],opts)[0].reason,'no-lesson');
+    ok('sin lesson_id permite adoptar horario existente, nunca crear uno');
+}
+
 async function main() {
     const client = await pool.connect();
     try {
@@ -151,7 +159,7 @@ async function main() {
         assert.equal(by(dry, cC).reason, 'no-match');
         assert.equal(by(dry, cS1).reason, 'shared-fingerprint'); assert.equal(by(dry, cS2).reason, 'shared-fingerprint');
         assert.equal(by(dry, cDis).reason, 'no-match', 'una schedule disabled no cuenta');
-        assert.equal(by(dry, cNo).reason, 'no-lesson');
+        assert.equal(by(dry, cNo).reason, 'no-match');
         assert.equal(by(dry, cM).reason, 'family-mismatch');
         assert.equal(real0(dry, cM), true);
         assert.equal(by(dry, cOwned).reason, 'schedule-owned');

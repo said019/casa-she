@@ -40,7 +40,7 @@ export function setFitpassAfterImportHook(fn: (() => Promise<unknown>) | null): 
     defaultAfterImport = fn;
 }
 
-export type FitpassSyncCycleStatus = 'ok' | 'cycle-skipped' | 'no-creds' | 'fetch-failed' | 'import-failed' | 'after-import-failed';
+export type FitpassSyncCycleStatus = 'ok' | 'partial' | 'cycle-skipped' | 'no-creds' | 'fetch-failed' | 'import-failed' | 'after-import-failed';
 
 export interface FitpassSyncCycleOptions {
     from?: Date;
@@ -67,7 +67,7 @@ export interface FitpassSyncCycleResult {
     /** reservas importadas por encima del aforo (max_capacity +1): el dueño debe verlas */
     overbooked?: number;
     overbookedRefs?: string[];
-    attendance?: { pending: number; ok: number; failed: number };
+    attendance?: { pending: number; ok: number; failed: number; expired?: number };
     /** resultado del hook afterImport (por defecto el resumen de reconcileFitpassPool) */
     pool?: unknown;
     /** el hook no pudo correr por un lock ocupado; se reintenta en el próximo ciclo */
@@ -164,11 +164,21 @@ export async function runFitpassSyncCycle(opts: FitpassSyncCycleOptions = {}): P
             }
         }
         let attendance: FitpassSyncCycleResult['attendance'];
+        let attendanceError: string | undefined;
         try {
             attendance = await (opts.reconcileAttendance ?? reconcileFitpassAttendance)();
         } catch (e) {
             console.error('[fitpass-sync] reconcile asistencia:', (e as Error).message);
+            attendanceError = 'No se pudo verificar la sincronización de asistencias';
         }
+        const issues = [
+            attendanceError,
+            attendance?.failed ? `${attendance.failed} asistencias pendientes de confirmar en Fitpass` : undefined,
+            attendance?.expired ? `${attendance.expired} asistencias fuera de la ventana de 48h: requieren conciliación manual` : undefined,
+            (pool as FitpassPoolSummary | undefined)?.failed ? 'Falló la actualización de cupos' : undefined,
+        ].filter(Boolean);
+        if (issues.length) return { status: 'partial', retryable: !!attendanceError || !!attendance?.failed || !!(pool as FitpassPoolSummary | undefined)?.failed,
+            ...base, attendance, pool, error: issues.join('; ') };
         return { status: 'ok', retryable: false, ...base, attendance, ...(pool !== undefined ? { pool } : {}), ...(poolRetry ? { poolRetry } : {}) };
     });
 

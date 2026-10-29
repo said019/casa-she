@@ -226,7 +226,7 @@ async function main() {
 
         // ── asistencia: selección del reconciliador ─────────────────────────
         // (usa pool, que no ve la tx: se prueba la SQL sobre el mismo cliente reimplementando vía función con db)
-        const pastD = '2020-01-01';
+        const pastD = (await one(`SELECT ((now() AT TIME ZONE 'America/Mexico_City') - interval '1 day')::date::text AS d`)).d;
         const cPast = (await one(`INSERT INTO classes (class_type_id, instructor_id, date, start_time, end_time, max_capacity)
                                   VALUES ($1,$2,$3,'09:00','09:50',8) RETURNING id`, [ctA.id, inst.id, pastD])).id;
         const mkB = async (ref: string, status: string, ageH: number, extra = '{}', cls = cPast) => {
@@ -235,17 +235,13 @@ async function main() {
                                VALUES ($1,$2,$3,'fitpass',$4, now() - ($5 || ' hours')::interval, $6::jsonb) RETURNING id`, [cls, u.id, status, ref, String(ageH), extra])).id as string;
         };
         const pend = await mkB('3001', 'checked_in', 2);
-        const old = await mkB('3002', 'checked_in', 40);                               // fuera de 36h
+        const expiredClass = (await one(`INSERT INTO classes (class_type_id,instructor_id,date,start_time,end_time,max_capacity) VALUES ($1,$2,'2020-01-01','09:00','09:50',8) RETURNING id`, [ctA.id,inst.id])).id;
+        const old = await mkB('3002', 'checked_in', 0, '{}', expiredClass);                               // fuera de 36h
         const done = await mkB('3003', 'checked_in', 2, '{"fp_attended_at":"2026-01-01"}'); // ya reflejada
         const future = await mkB('3004', 'checked_in', 1, '{}', cA);                  // clase aún no empieza (2031)
         const conf = await mkB('3005', 'confirmed', 2);                                // no hizo check-in
         // la función usa pool; para ver la tx, ejecutamos su misma consulta en el cliente
-        const sel = await rows(
-            `SELECT b.id FROM bookings b JOIN classes c ON c.id=b.class_id
-              WHERE b.channel='fitpass' AND b.external_ref IS NOT NULL AND b.status='checked_in'
-                AND b.checked_in_at >= now() - interval '36 hours'
-                AND (c.date + c.start_time) <= (now() AT TIME ZONE 'America/Mexico_City')
-                AND b.partner_metadata->>'fp_attended_at' IS NULL`);
+        const sel = await att.selectPendingFitpassAttendance(db);
         const ids = new Set(sel.map((x: any) => x.id));
         assert.ok(ids.has(pend)); assert.ok(!ids.has(old)); assert.ok(!ids.has(done)); assert.ok(!ids.has(future)); assert.ok(!ids.has(conf));
         console.log('  ok selección de asistencia pendiente');
@@ -262,7 +258,7 @@ async function main() {
     const ins = (await pool.query(`INSERT INTO instructors (user_id, display_name) VALUES ($1,'RC Inst') RETURNING id`, [iu.id])).rows[0];
     const ct = (await pool.query(`INSERT INTO class_types (name, max_capacity) VALUES ('ZZ RC', 8) RETURNING id`)).rows[0];
     let cleanupUsers: string[] = [];
-    const cl = (await pool.query(`INSERT INTO classes (class_type_id, instructor_id, date, start_time, end_time, max_capacity) VALUES ($1,$2,'2020-01-02','09:00','09:50',8) RETURNING id`, [ct.id, ins.id])).rows[0];
+    const cl = (await pool.query(`INSERT INTO classes (class_type_id, instructor_id, date, start_time, end_time, max_capacity) VALUES ($1,$2,((now() AT TIME ZONE 'America/Mexico_City') - interval '1 day')::date,'09:00','09:50',8) RETURNING id`, [ct.id, ins.id])).rows[0];
     try {
         const extraUsers: string[] = [];
         const mkb = async (ref: string) => {
@@ -308,6 +304,11 @@ async function main() {
         afterImport: async () => { order.push('after'); }, reconcileAttendance: async () => { order.push('att'); return { pending: 0, ok: 0, failed: 0 }; },
     });
     assert.equal(res.status, 'ok'); assert.deepEqual(order, ['fetch', 'after', 'att']);
+    for (const attendance of [{pending:1,ok:0,failed:1}, {pending:0,ok:0,failed:0,expired:2}]) {
+        const partial = await runFitpassSyncCycle({log:false,fetchRows:async()=>[],afterImport:async()=>undefined,reconcileAttendance:async()=>attendance});
+        assert.equal(partial.status,'partial');
+        assert.equal(partial.retryable,attendance.failed > 0);
+    }
     res = await runFitpassSyncCycle({ log: false, fetchRows: async () => { throw new Error('panel caído'); }, afterImport: async () => { order.push('NO'); } });
     assert.equal(res.status, 'fetch-failed'); assert.ok(res.retryable); assert.ok(!order.includes('NO'), 'sin snapshot no se llama el hook');
     res = await runFitpassSyncCycle({ log: false, fetchRows: async () => [], afterImport: async () => { throw new Error('boom'); } });
