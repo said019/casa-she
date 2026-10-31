@@ -12,9 +12,9 @@ const CATALOG: OnboardingCatalog = {
     Yoga: { id: 'ct-yoga' }, Flex: { id: 'ct-flex' }, Salsa: { id: 'ct-salsa' },
   },
   plans: {
-    'Clase de prueba': { id: 'pl-prueba', price: 150 }, 'Paquete 5': { id: 'pl-5', price: 1300 },
+    'Clase muestra': { id: 'pl-prueba', price: 280 }, 'Paquete 5': { id: 'pl-5', price: 1300 },
     'Paquete 8': { id: 'pl-8', price: 2000 }, 'Paquete 12': { id: 'pl-12', price: 2880 },
-    'Membresía 360': { id: 'pl-360', price: 3800 },
+    'Mensual ilimitado': { id: 'pl-360', price: 3100 },
   },
 };
 
@@ -78,7 +78,7 @@ const CATALOG: OnboardingCatalog = {
 // (7) Mapeo frecuencia → plan en los 5 casos.
 {
   const cases: Array<[OnboardingAnswers['frequency'], string]> = [
-    ['probar', 'Clase de prueba'], ['1x', 'Paquete 5'], ['2x', 'Paquete 8'], ['3x', 'Paquete 12'], ['4x', 'Membresía 360'],
+    ['probar', 'Clase muestra'], ['1x', 'Paquete 5'], ['2x', 'Paquete 8'], ['3x', 'Paquete 12'], ['4x', 'Mensual ilimitado'],
   ];
   for (const [freq, plan] of cases) {
     const a: OnboardingAnswers = { goal: 'bienestar', level: 'intermedio', body_focus: ['todo'], intensity: 'equilibrado', frequency: freq, health: ['ninguna'] };

@@ -68,11 +68,11 @@ export const DEFAULT_RULES: OnboardingRules = {
     avanzada: W(1, 2, 3, 2, 2),
   },
   planByFrequency: {
-    probar: 'Drop-in',
+    probar: 'Clase muestra',
     '1x': 'Paquete 5',
     '2x': 'Paquete 8',
     '3x': 'Paquete 12',
-    '4x': 'Mensual ilimitado + 1 servicio',
+    '4x': 'Mensual ilimitado',
   },
   reasons: {
     'Pilates Mat': 'Control, core y postura desde el primer día.',
@@ -186,8 +186,8 @@ export function recommend(
     : null;
 
   const configuredPlan = rules.planByFrequency[answers.frequency];
-  const planName = configuredPlan === 'Clase de prueba' ? 'Drop-in'
-    : configuredPlan === 'Membresía 360' ? 'Mensual ilimitado + 1 servicio' : configuredPlan;
+  const planName = ['Clase de prueba', 'Drop-in'].includes(configuredPlan) ? 'Clase muestra'
+    : ['Membresía 360', 'Mensual ilimitado + 1 servicio', 'Membresía Black'].includes(configuredPlan) ? 'Mensual ilimitado' : configuredPlan;
   const planRow = catalog.plans[planName];
   const plan = { plan_id: planRow?.id ?? null, name: planName, price: planRow?.price ?? null };
 
