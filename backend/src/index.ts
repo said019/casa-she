@@ -3619,7 +3619,10 @@ async function runStartupMigrations(): Promise<void> {
     // admin cree después.
     // ===========================================================================
     try {
-        const CS_PLANS = ['Drop-in', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Mensual ilimitado', 'Mensual ilimitado + 1 servicio', 'Membresía Black', 'Salsa · 1 clase', 'Salsa · 4 clases'];
+        // Keep the original $280 plan ID so existing memberships and orders remain linked.
+        await query(`UPDATE plans SET name='Clase muestra', updated_at=NOW() WHERE name='Drop-in'
+            AND NOT EXISTS (SELECT 1 FROM plans WHERE name='Clase muestra')`);
+        const CS_PLANS = ['Clase muestra', 'Paquete 5', 'Paquete 8', 'Paquete 12', 'Mensual ilimitado'];
         const CS_TYPES = CASA_SHE_OFFICIAL_CLASS_TYPES.map((type) => type.name);
 
         // Reglamento obligatorio: marca de aceptación por usuaria (NULL = no aceptado aún).
@@ -3642,8 +3645,8 @@ async function runStartupMigrations(): Promise<void> {
         await query(`INSERT INTO plans (name, reformer_credits, multi_credits, price, duration_days, is_active, sort_order)
             SELECT v.name, 0, v.credits, v.price, v.days, true, v.sort
             FROM (VALUES
-              ('Clase de prueba',1,150,7,1),('Drop-in',1,280,30,2),('Paquete 5',5,1300,30,3),
-              ('Paquete 8',8,2000,30,4),('Paquete 12',12,2880,30,5),
+              ('Clase de prueba',1,150,7,1),('Clase muestra',1,280,30,2),('Paquete 5',5,1350,30,3),
+              ('Paquete 8',8,1950,30,4),('Paquete 12',12,2750,30,5),
               ('Membresía 360',NULL,3800,30,6),('Membresía Black',NULL,4200,30,7)
             ) AS v(name, credits, price, days, sort)
             WHERE NOT EXISTS (SELECT 1 FROM plans p WHERE p.name = v.name)`);
@@ -3893,7 +3896,7 @@ async function runStartupMigrations(): Promise<void> {
                 3800,'MXN',30,NULL,0,NULL,1,0,
                 '["Cosmiatría","Nutrición"]'::jsonb,
                 '["Clases ilimitadas","1 servicio a elegir: Cosmiatría o Nutrición","Vigencia de 30 días"]'::jsonb,
-                true,false,6,'#AE4836','mixto'
+                false,false,6,'#AE4836','mixto'
             WHERE NOT EXISTS (SELECT 1 FROM plans WHERE name='Mensual ilimitado + 1 servicio')`);
         await query(`ALTER TABLE user_benefits ADD COLUMN IF NOT EXISTS source_membership_id UUID REFERENCES memberships(id) ON DELETE CASCADE`);
         await query(`ALTER TABLE user_benefits ADD COLUMN IF NOT EXISTS source_slot INTEGER`);

@@ -41,14 +41,11 @@ const STUDIO_CLASSES = "Pilates Mat · Barre · Sculpt · Yoga · Flex";
 // El precio real se obtiene del API (/plans). Solo se muestra la tarjeta si el plan
 // está activo en la DB. planName debe coincidir exactamente con plans.name.
 const CARDS: Card[] = [
-  { title: "MEMBRESÍA SHÉ BLACK", planName: "Membresía Black", color: "#AE4836", tagline: "Nuestra membresía más completa para sostener una práctica constante y volver a ti.", hint: "Clases ilimitadas · 2 servicios · 1 taller · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Membresía" },
-  { title: "MENSUAL ILIMITADO + 1 SERVICIO", planName: "Mensual ilimitado + 1 servicio", color: "#AE4836", tagline: "Clases ilimitadas y un servicio a elegir: Cosmiatría o Nutrición.", hint: "Clases ilimitadas · 1 servicio · vigencia 30 días", applies: STUDIO_CLASSES, kind: "Membresía" },
   { title: "MENSUAL ILIMITADO", planName: "Mensual ilimitado", color: "#8F7F36", tagline: "Clases ilimitadas para acompañar tu práctica, sin servicios adicionales.", hint: "Clases ilimitadas · vigencia 30 días", applies: STUDIO_CLASSES, kind: "Membresía" },
   { title: "PAQUETE 12 CLASES", planName: "Paquete 12", color: "#AE4836", tagline: "Constancia que se siente. Más sesiones para sostener tu práctica.", hint: "12 créditos · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Paquete" },
   { title: "PAQUETE 8 CLASES", planName: "Paquete 8", color: "#8F7F36", tagline: "El balance ideal entre flexibilidad y constancia, a tu ritmo.", hint: "8 créditos · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Paquete" },
   { title: "PAQUETE 5 CLASES", planName: "Paquete 5", color: "#6E4B34", tagline: "Una forma amable de empezar y encontrar tus clases favoritas.", hint: "5 créditos · vigencia 1 mes", applies: STUDIO_CLASSES, kind: "Paquete" },
-  { title: "CLASE SUELTA", planName: "Drop-in", color: "#D6D5C2", tagline: "Muévete cuando lo necesites, sin comprometer todo el mes.", hint: "1 crédito · vigencia 30 días", applies: STUDIO_CLASSES, kind: "Clase" },
-  { title: "CLASE MUESTRA", planName: "Clase de prueba", color: "#E7E0CE", tagline: "Ven a sentir Casa Shé y encuentra la práctica que conecta contigo.", hint: "1 crédito · vigencia 7 días", applies: STUDIO_CLASSES, kind: "Clase" },
+  { title: "CLASE MUESTRA", planName: "Clase muestra", color: "#D6D5C2", tagline: "Ven a sentir Casa Shé y encuentra la práctica que conecta contigo.", hint: "1 crédito · vigencia 30 días", applies: STUDIO_CLASSES, kind: "Clase" },
   { title: "SALSA · 1 CLASE", planName: "Salsa · 1 clase", color: "#2E1B22", tagline: "Ritmo, cuerpo y comunidad en una sesión para soltar y reconectar.", hint: "1 clase · vigencia 30 días", applies: "Salsa", kind: "Clase" },
   { title: "SALSA · 4 CLASES", planName: "Salsa · 4 clases", color: "#2E1B22", tagline: "Cuatro encuentros para aprender, bailar y hacer comunidad.", hint: "4 clases · vigencia 1 mes", applies: "Salsa", kind: "Paquete" },
 ];
